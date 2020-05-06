@@ -863,37 +863,6 @@ subsection \<open>While\<close>
     unfolding mwhile_def
     by pf_mono_prover
 
-
-(* TODO: adapt this rule and its proof
-  lemma mwhile_invar_rule:
-    assumes LR: "run (mwhile b f \<sigma>) s = r"
-    assumes NTERM: "P NTERM"
-    assumes INIT: "I \<sigma> s"
-    assumes STEP: "\<And>\<sigma> s. \<lbrakk>I \<sigma> s\<rbrakk>
-      \<Longrightarrow> mwp (run (b \<sigma>) s)
-              True
-              (\<lambda>msg. P (FAIL msg))
-              (\<lambda>e cb s. P (EXC e cb s) )
-              (\<lambda>ctd cb s. if ctd then (
-                  mwp (run (f \<sigma>) s) True (\<lambda>msg. P (FAIL msg)) (\<lambda>e c s. P (EXC e (cb+c) s)) (\<lambda>a c s. I a s))
-                else P (SUCC \<sigma> cb s) ) "
-    shows "P r"
-  proof -
-    from LR INIT show ?thesis
-    proof (induction rule: lrmwpe_REC_partial[OF mwhile_def, discharge_monos, consumes 1, case_names nterm step])
-      case (nterm x s)
-      then show ?case by (simp add: NTERM)
-    next
-      case (step while x s r)
-      then show ?case
-        using STEP[OF \<open>I x s\<close>]
-        apply (auto simp: run_simps mwp_def NTERM split: mres.splits)
-        subgoal premises prems for g cg sg x' cb s'
-          using prems(3)[OF _ prems(2)] prems(4-) oops
-    qed
-  qed
-*)
-
   lemmas mwhile_unfold[code] = REC_unfold[OF mwhile_def, discharge_monos]
 
 
