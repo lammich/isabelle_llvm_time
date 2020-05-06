@@ -49,13 +49,13 @@ begin
   locale block_allocator1 =
     fixes static_err :: 'err
       and mem_err :: 'err
-      and bload :: "'baddr::this_addr \<Rightarrow> ('val,_,'block,'err) M"
-      and bstore :: "'val \<Rightarrow> 'baddr \<Rightarrow> (unit,_,'block,'err) M"
-      and bcheck_addr :: "'baddr \<Rightarrow> (unit,_,'block,'err) M"
+      and bload :: "'baddr::this_addr \<Rightarrow> ('val,_,'c::monoid_add,'block,'err) M"
+      and bstore :: "'val \<Rightarrow> 'baddr \<Rightarrow> (unit,_,'c::monoid_add,'block,'err) M"
+      and bcheck_addr :: "'baddr \<Rightarrow> (unit,_,'c::monoid_add,'block,'err) M"
   begin
 
     text \<open>Allocate a new block, and a pointer to its start\<close>
-    definition alloc :: "'block \<Rightarrow> ('baddr addr rptr,_,'block memory,'err) M"
+    definition alloc :: "'block \<Rightarrow> ('baddr addr rptr,_,_,'block memory,'err) M"
     where "alloc init \<equiv> zoom (lift_lens static_err the_memory\<^sub>L) (doM {
       blocks \<leftarrow> Monad.get;
       let bi = length blocks;
@@ -65,7 +65,7 @@ begin
     })"
 
     text \<open>Free a block, specified by a pointer to its start\<close>    
-    definition free :: "'baddr addr rptr \<Rightarrow> (unit,_,'block memory,'err) M"
+    definition free :: "'baddr addr rptr \<Rightarrow> (unit,_,_,'block memory,'err) M"
     where "free \<equiv> 
       \<lambda>RP_ADDR (ADDR bi ba) \<Rightarrow> doM {
           fcheck mem_err (ba=this_addr);

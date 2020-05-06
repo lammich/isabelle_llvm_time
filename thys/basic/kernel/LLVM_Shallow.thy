@@ -4,7 +4,24 @@ imports Main
   "LLVM_Memory"
 begin
   text \<open>We define a type synonym for the LLVM monad\<close>
-  type_synonym 'a llM = "('a,unit,llvm_memory,err) M"
+  type_synonym cost = "string \<Rightarrow> nat" 
+
+  \<comment> \<open>TODO: warning! will clash with another definition of plus lifted to function,
+          from "../../lib/Sep_Algebra_Add"
+        maybe hide @{type cost} behind a new type and define + for it? \<close>
+
+  instantiation "fun" :: (type, cancel_comm_monoid_add) cancel_comm_monoid_add
+  begin
+    definition "zero_fun = (\<lambda>_. 0)"
+    definition "plus_fun a b = (\<lambda>x. a x + b x)"
+
+  instance (* TODO refactor *)
+    apply standard
+      apply (auto simp: plus_fun_def zero_fun_def add.assoc diff_diff_add) 
+      by (simp add: add.commute) 
+  end
+
+  type_synonym 'a llM = "('a,unit,cost,llvm_memory,err) M"
   translations
     (type) "'a llM" \<leftharpoondown> (type) "('a, unit, llvm_memory, err) M"
   

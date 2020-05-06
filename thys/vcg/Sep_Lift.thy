@@ -170,7 +170,8 @@ begin
       unfolding lift_assn_def
       by (auto simp: sep_algebra_simps intro: carve_project_Z_imp_Z)
             
-    lemma lift_ty:   
+    (* TODO
+      lemma lift_ty:   
       assumes PRESTY: "\<And>s. wlp c (\<lambda>_ s'. tys s' = tys s) s"
       shows "wlp (zoom (lift_lens e L) c) (\<lambda>_ s'. tyb s' = tyb s) s"
       using PRESTY
@@ -179,7 +180,7 @@ begin
       apply (erule mwp_cons)
       apply (auto)
       done
-      
+      *)
       
     lemma infer_pre_get_with_frame:
       assumes "lift_assn P p" "p ## f"  "\<alpha>b s = p + f"
@@ -188,7 +189,8 @@ begin
       apply (rule precond[THEN conjunct1])
       using assms splittable_same_struct unfolding lift_assn_def 
       by fastforce+
-      
+
+  (* TODO
     lemma lift_operation:
       assumes NZ: "\<not>P 0"
       assumes PRESTY: "\<And>s. wlp c (\<lambda>_ s'. tys s' = tys s) s"
@@ -233,7 +235,7 @@ begin
           apply (auto simp: disj_project_eq_lift sep_algebra_simps)
           done
         done    
-    qed
+    qed*)
     
   end
 
