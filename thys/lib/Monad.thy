@@ -68,24 +68,25 @@ begin
   section \<open>Monad Definition\<close>
 
   subsection \<open>Inner Type\<close>
-  datatype (discs_sels) ('a,'e,'s,'f) mres = NTERM | FAIL (the_failure: 'f) | EXC 'e (the_state: 's) | SUCC 'a (the_state: 's)
-  datatype ('a,'e,'s,'f) M = M (run: "'s \<Rightarrow> ('a,'e,'s,'f) mres")
+  datatype (discs_sels) ('a,'e,'c,'s,'f) mres = NTERM | FAIL (the_failure: 'f)
+    | EXC 'e 'c (the_state: 's) | SUCC 'a 'c (the_state: 's)
+  datatype ('a,'e,'c,'s,'f) M = M (run: "'s \<Rightarrow> ('a,'e,'c,'s,'f) mres")
 
-  abbreviation "map_mres_state f \<equiv> map_mres id id f id"
-  abbreviation "map_mres_fail f \<equiv> map_mres id id id f"
+  abbreviation "map_mres_state f \<equiv> map_mres id id id f id"
+  abbreviation "map_mres_fail f \<equiv> map_mres id id id id f"
 
   lemma map_mres_state_invert[simp]:
     (*"map_mres_state f m = NTERM \<longleftrightarrow> m = NTERM"*)
     "map_mres_state f m = FAIL msg \<longleftrightarrow> m = FAIL msg"
-    "map_mres_state f m = EXC e s \<longleftrightarrow> (\<exists>ss. s=f ss \<and> m = EXC e ss)"
-    "map_mres_state f m = SUCC x s \<longleftrightarrow> (\<exists>ss. s=f ss \<and> m = SUCC x ss)"
+    "map_mres_state f m = EXC e c s \<longleftrightarrow> (\<exists>ss. s=f ss \<and> m = EXC e c ss)"
+    "map_mres_state f m = SUCC x c s \<longleftrightarrow> (\<exists>ss. s=f ss \<and> m = SUCC x c ss)"
     by (cases m; auto; fail)+
 
   lemma map_mres_fail_invert[simp]:
     (*"map_mres_state f m = NTERM \<longleftrightarrow> m = NTERM"*)
     "map_mres_fail f m = FAIL msg \<longleftrightarrow> (\<exists>msg'. msg = f msg' \<and> m = FAIL msg')"
-    "map_mres_fail f m = EXC e s \<longleftrightarrow> m = EXC e s"
-    "map_mres_fail f m = SUCC x s \<longleftrightarrow> m = SUCC x s"
+    "map_mres_fail f m = EXC e c s \<longleftrightarrow> m = EXC e c s"
+    "map_mres_fail f m = SUCC x c s \<longleftrightarrow> m = SUCC x c s"
     by (cases m; auto; fail)+
 
   lemma M_eqI[intro?]: "\<lbrakk> \<And>s. run m s = run m' s \<rbrakk> \<Longrightarrow> m=m'"
@@ -105,24 +106,39 @@ begin
     apply (intro partial_function_image partial_function_lift flat_interpretation)
     by (auto simp: M.expand)
 
+
+  fun addcost :: "'a \<Rightarrow> ('b, 'c, 'a::{monoid_add}, 'd, 'e) mres \<Rightarrow> ('b, 'c, 'a, 'd, 'e) mres"  where 
+    "addcost _ NTERM = NTERM"
+  | "addcost _ (FAIL v) = (FAIL v)"
+  | "addcost c' (EXC e c s) = (EXC e (c'+c) s)"
+  | "addcost c' (SUCC x c s) = (SUCC x (c'+c) s)"
+
   subsection \<open>Basic Combinators\<close>
   
   definition REC where "REC \<equiv> M.fixp_fun"
   definition internal_nterm where "internal_nterm \<equiv> M (\<lambda>_. NTERM)"
   definition fail where "fail msg \<equiv> M (\<lambda>_. FAIL msg)"
-  definition return where "return x \<equiv> M (SUCC x)"
-  definition bind where "bind m f \<equiv> M (\<lambda>s. case run m s of SUCC x s \<Rightarrow> run (f x) s | NTERM \<Rightarrow> NTERM | FAIL msg \<Rightarrow> FAIL msg | EXC e s \<Rightarrow> EXC e s)"
-  definition get where "get \<equiv> M (\<lambda>s. SUCC s s)"
-  definition set where "set s \<equiv> M (\<lambda>_. SUCC () s)"
-  definition raise where "raise e \<equiv> M (EXC e)"
-  definition handle where "handle m h \<equiv> M (\<lambda>s. case run m s of EXC e s \<Rightarrow> run (h e) s | SUCC x s \<Rightarrow> SUCC x s | NTERM \<Rightarrow> NTERM | FAIL msg \<Rightarrow> FAIL msg)"
+  definition return where "return x \<equiv> M (SUCC x 0)"
+
+  definition bind where "bind m f \<equiv> M (\<lambda>s. case run m s of SUCC x c s \<Rightarrow> addcost c (run (f x) s)
+                     | NTERM \<Rightarrow> NTERM | FAIL msg \<Rightarrow> FAIL msg | EXC e c s \<Rightarrow> EXC e c s)"
+  definition get where "get \<equiv> M (\<lambda>s. SUCC s 0 s)"
+  definition set where "set s \<equiv> M (\<lambda>_. SUCC () 0 s)"
+  definition raise where "raise e \<equiv> M (EXC e 0)"
+  definition handle where "handle m h \<equiv> M (\<lambda>s. case run m s of EXC e c s \<Rightarrow> addcost c (run (h e) s)
+         | SUCC x c s \<Rightarrow> SUCC x c s | NTERM \<Rightarrow> NTERM | FAIL msg \<Rightarrow> FAIL msg)"
+
+  definition consume where "consume t = M (\<lambda>s. SUCC () t s)"
 
   definition mblock where "mblock begin end m \<equiv> M (map_mres_state end o run m o begin)"
   definition mfail where "mfail f m \<equiv> M (map_mres_fail f o run m)"
 
 
   text \<open>Derived, but required for some laws.\<close>
-  definition "map_state f \<equiv> bind get (set o f)"
+  definition "map_state f \<equiv> M (\<lambda>s. SUCC () 0 (f s))"
+  lemma map_state_bind:
+    "((map_state f)::(unit, 'a, 'c::{monoid_add}, 'b, 'd) M) \<equiv> bind get (set o f)" 
+    by(auto simp: map_state_def set_def bind_def get_def)
 
 
   section \<open>Syntax\<close>
@@ -175,26 +191,39 @@ begin
     unfolding return_def bind_def map_state_def get_def set_def
     by (auto split: mres.splits)
 
-
+  lemma addcost_zero[simp]: "addcost 0 m = m"
+    by(cases m; auto)
+  lemma addcost_assoc[simp]: "addcost c1 (addcost c2 m) = addcost (c1 + c2) m"
+    by (cases m; auto simp: add.assoc)
 
   lemma bind_laws[simp]:
-    "bind m return = m"
-    "bind (return x) f = f x"
-    "bind (bind m (\<lambda>x. f x)) g = bind m (\<lambda>x. bind (f x) g)"
-    "bind (fail msg) f = fail msg"
-    "bind (internal_nterm) f = internal_nterm"
-    "bind (raise e) f = raise e"
-    unfolding bind_def return_def fail_def raise_def internal_nterm_def
-    by (cases m; auto split: mres.split)+
+    fixes m :: "('a, 'b, 'c::{monoid_add},'d, 'e) M"
+    shows
+      "bind m return = m"
+      "bind (return x) f = f x"
+      "bind (bind m (\<lambda>x. f x)) g = bind m (\<lambda>x. bind (f x) g)"
+      "bind (fail msg) f = fail msg"
+      "bind (internal_nterm) f = internal_nterm"
+      "bind (raise e) f = raise e"
+      "bind (consume c1) (\<lambda>_. consume c2) = consume (c1+c2)"
+      unfolding bind_def return_def fail_def raise_def internal_nterm_def consume_def
+      by (cases m; auto split: mres.split)+
+
+  (*
+  lemma bind_laws_comm:
+    fixes m :: "('a, 'b, 'c::{comm_monoid_add},'d, 'e) M"
+    shows
+        "bind (consume c) (\<lambda>_. m) = bind m (\<lambda>x. bind (consume c) (\<lambda>_. return x))" *)
 
   lemma handle_laws[simp]:
     "handle (return x) h = return x"
+    "handle (consume c) h = consume c"
     "handle (fail msg) h = fail msg"
     "handle (internal_nterm) h = internal_nterm"
     "handle (raise e) h = h e"
     "handle m raise = m"
     "handle (handle m (\<lambda>e. h e)) i = handle m (\<lambda>e. handle (h e) i)"
-    unfolding handle_def return_def fail_def raise_def internal_nterm_def
+    unfolding handle_def return_def fail_def raise_def internal_nterm_def consume_def
     by ((auto split: mres.split | (cases m; auto split: mres.split)) [])+
 
   lemma state_laws[simp]:
@@ -265,8 +294,8 @@ begin
     by (metis DEF M.mono_body_fixp MONO REC_def)
 
   lemma REC_partial_rule:
-    fixes PQ :: "'a \<Rightarrow> 'b \<Rightarrow> ('c, 'd, 'b,'f) mres \<Rightarrow> bool"
-      and F :: "('a \<Rightarrow> ('c, 'd, 'b,'f) M) \<Rightarrow> 'a \<Rightarrow> ('c, 'd, 'b,'f) M"
+    fixes PQ :: "'a \<Rightarrow> 'b \<Rightarrow> ('c, 'd, 'cc, 'b,'f) mres \<Rightarrow> bool"
+      and F :: "('a \<Rightarrow> ('c, 'd, 'cc, 'b,'f) M) \<Rightarrow> 'a \<Rightarrow> ('c, 'd, 'cc, 'b,'f) M"
     assumes "f \<equiv> REC F"
         and "\<And>x. M.mono_body (\<lambda>fa. F fa x)"
         and "\<And>x s. PQ x s NTERM"
@@ -284,8 +313,8 @@ begin
 
   subsection \<open>Well-Founded Induction\<close>
   lemma REC_total_rule:
-    fixes PQ :: "'a \<Rightarrow> 'b \<Rightarrow> ('c, 'd, 'b,'f) mres \<Rightarrow> bool"
-      and F :: "('a \<Rightarrow> ('c, 'd, 'b,'f) M) \<Rightarrow> 'a \<Rightarrow> ('c, 'd, 'b,'f) M"
+    fixes PQ :: "'a \<Rightarrow> 'b \<Rightarrow> ('c, 'd,'cc, 'b,'f) mres \<Rightarrow> bool"
+      and F :: "('a \<Rightarrow> ('c, 'd,'cc, 'b,'f) M) \<Rightarrow> 'a \<Rightarrow> ('c, 'd,'cc, 'b,'f) M"
     assumes DEF: "f \<equiv> REC F"
         and MONO: "\<And>x. M.mono_body (\<lambda>fa. F fa x)"
         and WF: "wf R"
@@ -313,13 +342,13 @@ begin
     apply (smt M.collapse M.sel mres.distinct(3) mres.distinct(7) run_def)
     apply (smt M.collapse M.sel mres.distinct(3) mres.inject(2) run_def)
     apply (smt M.collapse M.sel mres.distinct(3) mres.inject(2) run_def)
+    apply (smt M.collapse M.sel mres.distinct(3) mres.inject(2) run_def)
     apply (smt M.collapse M.sel mres.distinct(11) mres.distinct(3) run_def)
     apply (smt M.collapse M.sel mres.distinct(5) run_def)
     apply (smt M.collapse M.sel mres.distinct(5) mres.distinct(9) run_def)
     apply (smt M.collapse M.sel mres.distinct(11) mres.distinct(5) run_def)
-    apply (smt M.collapse M.sel mres.distinct(5) mres.inject(3) run_def)
+    apply (smt M.collapse M.sel addcost.simps(1) mres.distinct(5) mres.sel(5) mres.sel(6) mres.sel(7) run_def)
     done
-
 
   lemma M_handle_mono[partial_function_mono]:
     assumes mf: "M_mono B" and mg: "\<And>y. M_mono (\<lambda>f. C y f)"
@@ -334,11 +363,12 @@ begin
     apply (smt M.collapse M.sel mres.distinct(1) mres.distinct(9) run_def)
     apply (smt M.collapse M.sel mres.distinct(3) run_def)
     apply (smt M.collapse M.sel mres.distinct(3) mres.distinct(7) run_def)
-    apply (smt M.collapse M.sel mres.distinct(3) mres.inject(2) run_def)
+    apply (smt M.collapse M.sel addcost.simps(1) mres.distinct(3) mres.sel(2) mres.sel(3) mres.sel(4) run_def)
     apply (smt M.collapse M.sel mres.distinct(11) mres.distinct(3) run_def)
     apply (smt M.collapse M.sel mres.distinct(5) run_def)
     apply (smt M.collapse M.sel mres.distinct(5) mres.distinct(9) run_def)
     apply (smt M.collapse M.sel mres.distinct(11) mres.distinct(5) run_def)
+    apply (smt M.collapse M.sel mres.distinct(5) mres.inject(3) run_def)
     apply (smt M.collapse M.sel mres.distinct(5) mres.inject(3) run_def)
     apply (smt M.collapse M.sel mres.distinct(5) mres.inject(3) run_def)
     done
@@ -397,8 +427,8 @@ section \<open>Reasoning Setup\<close>
   lemma mwp_simps[simp]:
     "mwp NTERM N F E S = N"
     "mwp (FAIL msg) N F E S = F msg"
-    "mwp (EXC e s) N F E S = E e s"
-    "mwp (SUCC x s) N F E S = S x s"
+    "mwp (EXC e c s) N F E S = E e c s"
+    "mwp (SUCC x c s) N F E S = S x c s"
     by (auto simp: mwp_def)
 
   lemma mwp_cong[cong]: "m=m' \<Longrightarrow> mwp m N F E S = mwp m' N F E S" by simp
@@ -407,8 +437,8 @@ section \<open>Reasoning Setup\<close>
     assumes "mwp m N F E S = r"
     assumes "m = NTERM \<Longrightarrow> r = N \<Longrightarrow> thesis"
     assumes "\<And>e. m = FAIL e \<Longrightarrow> r = F e \<Longrightarrow> thesis"
-    assumes "\<And>e s. m = EXC e s \<Longrightarrow> r = E e s \<Longrightarrow> thesis"
-    assumes "\<And>v s. m = SUCC v s \<Longrightarrow> r = S v s \<Longrightarrow> thesis"
+    assumes "\<And>e c s. m = EXC e c s \<Longrightarrow> r = E e c s \<Longrightarrow> thesis"
+    assumes "\<And>v c s. m = SUCC v c s \<Longrightarrow> r = S v c s \<Longrightarrow> thesis"
     shows thesis
     using assms unfolding mwp_def by (auto split: mres.splits)
 
@@ -417,16 +447,16 @@ section \<open>Reasoning Setup\<close>
       (mwp m
         (mwp N N' F' E' S')
         (\<lambda>x. mwp (F x) N' F' E' S')
-        (\<lambda>e s. mwp (E e s) N' F' E' S')
-        (\<lambda>x s. mwp (S x s) N' F' E' S')
+        (\<lambda>e c s. mwp (E e c s) N' F' E' S')
+        (\<lambda>x c s. mwp (S x c s) N' F' E' S')
       )"
     by (auto simp: mwp_def split: mres.splits)
 
   lemma mwp_eqI[intro!]:
     assumes "m=NTERM \<Longrightarrow> N=N'"
     assumes "\<And>f. m=FAIL f \<Longrightarrow> F f = F' f"
-    assumes "\<And>e s. m=EXC e s \<Longrightarrow> E e s = E' e s"
-    assumes "\<And>x s. m=SUCC x s \<Longrightarrow> S x s = S' x s"
+    assumes "\<And>e c s. m=EXC e c s \<Longrightarrow> E e c s = E' e c s"
+    assumes "\<And>x c s. m=SUCC x c s \<Longrightarrow> S x c s = S' x c s"
     shows "mwp m N F E S = mwp m N' F' E' S'"
     using assms by (cases m) auto
 
@@ -435,51 +465,51 @@ section \<open>Reasoning Setup\<close>
     assumes "mwp r N' F' E' S'"
     assumes "N'\<Longrightarrow>N"
     assumes "\<And>msg. F' msg \<Longrightarrow> F msg"
-    assumes "\<And>e s. E' e s \<Longrightarrow> E e s"
-    assumes "\<And>x s. S' x s \<Longrightarrow> S x s"
+    assumes "\<And>e c s. E' e c s \<Longrightarrow> E e c s"
+    assumes "\<And>x c s. S' x c s \<Longrightarrow> S x c s"
     shows "mwp r N F E S"
     using assms by (auto simp: mwp_def split: mres.split)
 
-  lemma mwp_map_mres_state[simp]: "mwp (map_mres_state f s) N F E S = mwp s N F (\<lambda>e s. E e (f s)) (\<lambda>r s. S r (f s))"
+  lemma mwp_map_mres_state[simp]: "mwp (map_mres_state f s) N F E S = mwp s N F (\<lambda>e c s. E e c (f s)) (\<lambda>r c s. S r c (f s))"
     by (cases s) auto
 
   lemma mwp_triv[simp]: 
     "mwp m top top top top"
-    "mwp m True (\<lambda>_. True) (\<lambda>_ _. True) (\<lambda>_ _. True)"
+    "mwp m True (\<lambda>_. True) (\<lambda>_ _ _. True) (\<lambda>_ _ _. True)"
     by (cases m; auto; fail)+
   
-  lemma mwp_trivI: "\<lbrakk>N; \<And>f. F f; \<And>e s. E e s; \<And>x s. S x s \<rbrakk> \<Longrightarrow> mwp m N F E S"
+  lemma mwp_trivI: "\<lbrakk>N; \<And>f. F f; \<And>e c s. E e c s; \<And>x c s. S x c s \<rbrakk> \<Longrightarrow> mwp m N F E S"
     by (cases m; auto)
     
     
     
   lemma flip_run_eq[simp]:
-    "SUCC r s' = run c s \<longleftrightarrow> run c s = SUCC r s'" 
-    "EXC e s' = run c s \<longleftrightarrow> run c s = EXC e s'" 
+    "SUCC r c s' = run m s \<longleftrightarrow> run m s = SUCC r c s'"
+    "EXC e c s' = run m s \<longleftrightarrow> run m s = EXC e c s'"
     by auto
 
   lemma flip_mwp_eq[simp]:
-    "SUCC r s' = mwp m N F E S \<longleftrightarrow> mwp m N F E S = SUCC r s'" 
-    "EXC e s' = mwp m N F E S \<longleftrightarrow> mwp m N F E S = EXC e s'" 
+    "SUCC r c s' = mwp m N F E S \<longleftrightarrow> mwp m N F E S = SUCC r c s'"
+    "EXC e c s' = mwp m N F E S \<longleftrightarrow> mwp m N F E S = EXC e c s'"
     by auto
 
   lemma basic_run_simps[run_simps]:
-    "\<And>s. run (return x) s = SUCC x s"
+    "\<And>s. run (return x) s = SUCC x 0 s"
     "\<And>s. run (fail msg) s = FAIL msg"
     "\<And>s. run (internal_nterm) s = NTERM"
-    "\<And>s. run (raise e) s = EXC e s"
-    "\<And>s. run (get) s = SUCC s s"
-    "\<And>s. run (set s') s = SUCC () s'"
+    "\<And>s. run (raise e) s = EXC e 0 s"
+    "\<And>s. run (get) s = SUCC s 0 s"
+    "\<And>s. run (set s') s = SUCC () 0 s'"
     by (auto simp: return_def fail_def raise_def get_def set_def internal_nterm_def)
 
   lemma run_Let[run_simps]: "run (let x=v in f x) s = run (f v) s" by auto
 
   lemma run_bind[run_simps]: "run (bind m f) s
-    = (mwp (run m s) NTERM (\<lambda>x. FAIL x) (\<lambda>e s. EXC e s) (\<lambda>x s. run (f x) s))"
+    = (mwp (run m s) NTERM (\<lambda>x. FAIL x) (\<lambda>e c s. EXC e c s) (\<lambda>x c s.  addcost c (run (f x) s)))"
     unfolding bind_def mwp_def by simp
 
   lemma run_handle[run_simps]: "run (handle m h) s
-    = (mwp (run m s) NTERM (\<lambda>msg. FAIL msg) (\<lambda>e s. run (h e) s) (\<lambda>x s. SUCC x s))"
+    = (mwp (run m s) NTERM (\<lambda>msg. FAIL msg) (\<lambda>e c s.  addcost c (run (h e) s)) (\<lambda>x c s. SUCC x c s))"
     unfolding handle_def mwp_def by simp
 
   lemma run_mblock[run_simps]: "run (mblock b e m) s = map_mres_state e (run m (b s))"
@@ -488,7 +518,7 @@ section \<open>Reasoning Setup\<close>
   lemma run_mfail[run_simps]: "run (mfail f m) s = map_mres_fail f (run m s)"
     unfolding mfail_def by simp
 
-  lemma run_map_state[run_simps]: "run (map_state f) s = SUCC () (f s)"
+  lemma run_map_state[run_simps]: "run (map_state f) s = SUCC () 0 (f s)"
     unfolding map_state_def
     by (simp add: run_simps)
 
@@ -530,7 +560,7 @@ section \<open>Reasoning Setup\<close>
   subsection \<open>Simulation\<close>
 
 
-  definition "sim m m' \<equiv> \<forall>s. mwp (run m s) top top (\<lambda>e s'. run m' s = EXC e s') (\<lambda>x s'. run m' s = SUCC x s')"
+  definition "sim m m' \<equiv> \<forall>s. mwp (run m s) top top (\<lambda>e c s'. run m' s = EXC e c s') (\<lambda>x c s'. run m' s = SUCC x c s')"
 
   named_theorems sim_rules
 
@@ -564,7 +594,7 @@ section \<open>Reasoning Setup\<close>
   proof (rule mwp_inductI)
     fix s r
     assume "run (f x) s = r"
-    then show "mwp r top top (\<lambda>e s'. run (f' x) s = EXC e s') (\<lambda>xa s'. run (f' x) s = SUCC xa s')"
+    then show "mwp r top top (\<lambda>e c s'. run (f' x) s = EXC e c s') (\<lambda>xa c s'. run (f' x) s = SUCC xa c s')"
     proof (induction rule: lrmwpe_REC_partial[OF DEF _ MONO(1), consumes 1, case_names nterm step])
       case (nterm x s)
       then show ?case by simp
@@ -580,19 +610,29 @@ section \<open>Reasoning Setup\<close>
     qed
   qed
 
+  lemma addcost_EXC_D: "addcost c1 m = EXC e c s \<Longrightarrow> (\<exists>c2. m = EXC e c2 s \<and> c=c1+c2)"
+    apply(cases m) by auto
+
+  lemma addcost_SUCC_D: "addcost c1 m = SUCC a c s \<Longrightarrow> (\<exists>c2. m = SUCC a c2 s \<and> c=c1+c2)"
+    apply(cases m) by auto
+  lemma addcost_SUCC_sym_D: "SUCC a c s = addcost c1 m \<Longrightarrow> (\<exists>c2. m = SUCC a c2 s \<and> c=c1+c2)"
+    apply(cases m) by auto
+
   lemma sim_bind[sim_rules]:
     assumes "sim m m'" assumes "\<And>x. sim (f x) (f' x)"
     shows "sim (bind m f) (bind m' f')"
     using assms
     unfolding sim_def
-    by (fastforce simp: run_simps mwp_def split: mres.splits)
+    by (fastforce simp: run_simps mwp_def split: mres.splits
+                      dest!: addcost_EXC_D addcost_SUCC_D)
 
   lemma sim_handle[sim_rules]:
     assumes "sim m m'" assumes "\<And>x. sim (h x) (h' x)"
     shows "sim (handle m h) (handle m' h')"
     using assms
     unfolding sim_def
-    by (fastforce simp: run_simps mwp_def split: mres.splits)
+    by (fastforce simp: run_simps mwp_def split: mres.splits
+                      dest!: addcost_EXC_D addcost_SUCC_D)
 
   lemma sim_mblock[sim_rules]:
     "sim m m' \<Longrightarrow> sim (mblock begin end m) (mblock begin end m')"
@@ -624,13 +664,15 @@ definition "mmblock begin end m \<equiv> doM {
 
 lemma run_mmblock[run_simps]:
   "run (mmblock begin end m) s = mwp (run begin s) NTERM FAIL EXC
-    (\<lambda>s' s. mwp (run m s')
+    (\<lambda>s' c1 s. mwp (run m s')
       NTERM
       FAIL
-      (\<lambda>e s'. mwp (run (end s') s) NTERM FAIL EXC (\<lambda>_ s. EXC e s))
-      (\<lambda>x s'. mwp (run (end s') s) NTERM FAIL EXC (\<lambda>_ s. SUCC x s))
+      (\<lambda>e c2 s'. mwp (run (end s') s) NTERM FAIL (\<lambda>e c3 s. EXC e (c1+c2+c3) s)
+                                                 (\<lambda>_ c3 s. EXC e (c1+c2+c3) s))
+      (\<lambda>x c2 s'. mwp (run (end s') s) NTERM FAIL (\<lambda>e c3 s. EXC e (c1+c2+c3) s)
+                                                 (\<lambda>_ c3 s. SUCC x (c1+c2+c3) s))
     )"
-  by (auto simp add: mmblock_def run_simps mwp_def cong del: mwp_cong split: prod.splits mres.splits)
+  by (auto simp add: add.assoc mmblock_def run_simps mwp_def cong del: mwp_cong split: prod.splits mres.splits)
 
 lemma mmblock_mono[partial_function_mono]:
   "monotone M.le_fun M_ord m \<Longrightarrow> monotone M.le_fun M_ord (\<lambda>f. mmblock begin end (m f))"
@@ -648,7 +690,7 @@ lemma lift_sum_simps[simp]:
   by (auto simp: lift_sum_def)
 
 lemma run_lift_sum[run_simps]:
-  "run (lift_sum m) s = (case m of Inl f \<Rightarrow> FAIL f | Inr x \<Rightarrow> SUCC x s)"
+  "run (lift_sum m) s = (case m of Inl f \<Rightarrow> FAIL f | Inr x \<Rightarrow> SUCC x 0 s)"
   by (auto simp: lift_sum_def run_simps split: sum.splits)
 
 subsection \<open>Lifting Lenses\<close>
@@ -688,19 +730,19 @@ abbreviation (input) "eget_cases L s f1 f2 \<equiv> case epre_get L s of None \<
 abbreviation (input) "eput_cases L x s f1 f2 \<equiv> case epre_put L x s of None \<Rightarrow> f1 (eput' L x s) | Some e \<Rightarrow> f2 e"
 
 lemma run_mget[run_simps]:
-  "run (mget L s) xx = (eget_cases L s (\<lambda>x. SUCC x xx) (FAIL))"
+  "run (mget L s) xx = (eget_cases L s (\<lambda>x. SUCC x 0 xx) (FAIL))"
   by (auto simp: mget_def run_simps split: sum.splits option.splits)
 
 lemma run_mput[run_simps]:
-  "elens L \<Longrightarrow> run (mput L x s) xx = (eput_cases L x s (\<lambda>x. SUCC x xx) FAIL)"
+  "elens L \<Longrightarrow> run (mput L x s) xx = (eput_cases L x s (\<lambda>x. SUCC x 0 xx) FAIL)"
   by (auto simp: mput_def run_simps split: sum.splits option.splits)
 
 lemma run_use[run_simps]:
-  "elens L \<Longrightarrow> run (use L) s = (eget_cases L s (\<lambda>x. SUCC x s) FAIL)"
+  "elens L \<Longrightarrow> run (use L) s = (eget_cases L s (\<lambda>x. SUCC x 0 s) FAIL)"
   by (auto simp: use_def run_simps)
 
 lemma run_assign[run_simps]:
-  "elens L \<Longrightarrow> run (assign L x) s = eput_cases L x s (SUCC ()) FAIL"
+  "elens L \<Longrightarrow> run (assign L x) s = eput_cases L x s (SUCC () 0) FAIL"
   by (auto simp: assign_def run_simps split: option.splits)
 
 
@@ -712,7 +754,8 @@ lemma run_zoom[run_simps]:
   shows
   "run (zoom L m) s = (
     eget_cases L s
-      (\<lambda>ss. mwp (run m ss) NTERM FAIL (\<lambda>e ss. EXC e (eput' L ss s)) (\<lambda>x ss. SUCC x (eput' L ss s)))
+      (\<lambda>ss. mwp (run m ss) NTERM FAIL (\<lambda>e c ss. EXC e c (eput' L ss s))
+                                      (\<lambda>x c ss. SUCC x c (eput' L ss s)))
       FAIL
     )"
   by (auto simp: zoom_def run_simps split: option.splits)
@@ -747,10 +790,17 @@ lemma zoom_return: "\<lbrakk>elens L\<rbrakk> \<Longrightarrow> zoom L (return x
   apply (rule M_eqI)
   apply (auto simp: run_simps eget_put_pre split: option.split)
   done
-  
+
+lemma addcost_mwp: "(addcost c N = N)
+  \<Longrightarrow> (\<And>x. addcost c (F x) = F x)
+  \<Longrightarrow> (\<And>e c' s. addcost c (E e c' s) = E e (c + c') s)
+  \<Longrightarrow> (\<And>a c' s. addcost c (S a c' s) = S a (c + c') s)
+  \<Longrightarrow> addcost c (mwp m N F E S) = mwp (addcost c m) N F E S"
+  apply(cases m) by auto
+
 lemma zoom_bind: "elens L \<Longrightarrow> zoom L (m\<bind>f) = zoom L m \<bind> zoom L o f"
   apply (rule M_eqI)
-  apply (auto simp: run_simps eget_put_pre split: option.split)
+  apply (auto simp: addcost_mwp run_simps eget_put_pre split: option.split)
   done
   
   
@@ -759,11 +809,11 @@ lemma zoom_bind: "elens L \<Longrightarrow> zoom L (m\<bind>f) = zoom L m \<bind
 definition "ap_state f \<equiv> doM {s\<leftarrow>get; set (f s)}"
 definition ap_lens (infix "%=" 51) where "ap_lens L f \<equiv> zoom L (ap_state f)"
 
-lemma run_ap_state[run_simps]: "run (ap_state f) s = SUCC () (f s)"
+lemma run_ap_state[run_simps]: "run (ap_state f) s = SUCC () 0 (f s)"
   by (auto simp: ap_state_def run_simps)
 
 lemma run_ap_lens[run_simps]: "elens L
-  \<Longrightarrow> run (L%=f) s = (eget_cases L s (\<lambda>ss. SUCC () (eput' L (f ss) s)) FAIL)"
+  \<Longrightarrow> run (L%=f) s = (eget_cases L s (\<lambda>ss. SUCC () 0 (eput' L (f ss) s)) FAIL)"
   by (auto simp: ap_lens_def run_simps split: option.splits)
 
 
@@ -813,6 +863,8 @@ subsection \<open>While\<close>
     unfolding mwhile_def
     by pf_mono_prover
 
+
+(* TODO: adapt this rule and its proof
   lemma mwhile_invar_rule:
     assumes LR: "run (mwhile b f \<sigma>) s = r"
     assumes NTERM: "P NTERM"
@@ -821,10 +873,10 @@ subsection \<open>While\<close>
       \<Longrightarrow> mwp (run (b \<sigma>) s)
               True
               (\<lambda>msg. P (FAIL msg))
-              (\<lambda>e s. P (EXC e s) )
-              (\<lambda>ctd s. if ctd then (
-                  mwp (run (f \<sigma>) s) True (\<lambda>msg. P (FAIL msg)) (\<lambda>e s. P (EXC e s)) I)
-                else P (SUCC \<sigma> s) ) "
+              (\<lambda>e cb s. P (EXC e cb s) )
+              (\<lambda>ctd cb s. if ctd then (
+                  mwp (run (f \<sigma>) s) True (\<lambda>msg. P (FAIL msg)) (\<lambda>e c s. P (EXC e (cb+c) s)) (\<lambda>a c s. I a s))
+                else P (SUCC \<sigma> cb s) ) "
     shows "P r"
   proof -
     from LR INIT show ?thesis
@@ -835,10 +887,12 @@ subsection \<open>While\<close>
       case (step while x s r)
       then show ?case
         using STEP[OF \<open>I x s\<close>]
-        by (auto simp: run_simps mwp_def NTERM split: mres.splits)
+        apply (auto simp: run_simps mwp_def NTERM split: mres.splits)
+        subgoal premises prems for g cg sg x' cb s'
+          using prems(3)[OF _ prems(2)] prems(4-) oops
     qed
   qed
-
+*)
 
   lemmas mwhile_unfold[code] = REC_unfold[OF mwhile_def, discharge_monos]
 
@@ -852,7 +906,7 @@ subsection \<open>Check\<close>
     "fcheck e False = fail e"
     by (auto simp: fcheck_def)
 
-  lemma run_fcheck[run_simps]: "run (fcheck f \<Phi>) s = (if \<Phi> then SUCC () s else FAIL f)"
+  lemma run_fcheck[run_simps]: "run (fcheck f \<Phi>) s = (if \<Phi> then SUCC () 0 s else FAIL f)"
     by (auto simp: fcheck_def run_simps)
 
 
@@ -913,31 +967,35 @@ next
   show ?case by simp pf_mono_prover
 qed
 
+
 lemma run_mmap_unit_state_idxD:
-  assumes "run (mmap f xs) () = SUCC ys ()"
+  assumes "run (mmap f xs) () = SUCC ys c ()"
   assumes "i<length xs"
-  shows "run (f (xs!i)) () = SUCC (ys!i) ()"
-  using assms apply (induction xs arbitrary: i ys)
-  by (auto simp: run_simps nth_Cons split: nat.splits elim!: mwp_eq_cases)
+  shows "\<exists>c. run (f (xs!i)) () = SUCC (ys!i) c ()"
+  using assms apply (induction xs arbitrary: i ys c)
+  by (auto simp: run_simps nth_Cons split: nat.splits
+            elim!: mwp_eq_cases dest!: addcost_SUCC_sym_D)
+
 
 lemma run_mmap_length_eq:
-  assumes "run (mmap f xs) s = SUCC ys s'"
+  assumes "run (mmap f xs) s = SUCC ys c s'"
   shows "length ys = length xs"
-  using assms apply (induction xs arbitrary: ys s)
-  by (auto simp: run_simps elim!: mwp_eq_cases)
+  using assms apply (induction xs arbitrary: ys c s)
+  by (auto simp: run_simps elim!: mwp_eq_cases dest!: addcost_SUCC_sym_D)
+
 
 lemma run_mmap_unit_state_elemD:
-  assumes "run (mmap f xs) () = SUCC ys ()"
+  assumes "run (mmap f xs) () = SUCC ys c ()"
   assumes "x\<in>List.set xs"
-  shows "\<exists>y\<in>List.set ys. run (f x) () = SUCC y ()"
+  shows "\<exists>y\<in>List.set ys. \<exists>c. run (f x) () = SUCC y c ()"
   using assms
   by (auto simp: in_set_conv_nth Bex_def run_mmap_unit_state_idxD run_mmap_length_eq)
 
 lemma run_mmap_append[run_simps]:
-  "run (mmap f (xs@ys)) s = mwp (run (mmap f xs) s) NTERM FAIL EXC (\<lambda>rxs s.
-  mwp (run (mmap f ys) s) NTERM FAIL EXC (\<lambda>rys s. SUCC (rxs@rys) s))"
+  "run (mmap f (xs@ys)) s = mwp (run (mmap f xs) s) NTERM FAIL EXC (\<lambda>rxs cxs s.
+  mwp (run (mmap f ys) s) NTERM FAIL (\<lambda>a cys s. EXC a (cxs+cys) s) (\<lambda>rys cys s. SUCC (rxs@rys) (cxs+cys) s))"
   apply (induction xs arbitrary: s)
-  apply (auto simp: run_simps mwp_def split: mres.splits)
+  apply (auto simp: run_simps mwp_def add.assoc split: mres.splits)
   done
 
 
@@ -950,7 +1008,7 @@ subsection \<open>Lookup\<close>
   definition "lookup f m s \<equiv> case m s of None \<Rightarrow> fail f | Some x \<Rightarrow> return x"
 
   lemma run_lookup[run_simps]:
-    "run (lookup f m k) s = (case m k of None \<Rightarrow> FAIL f | Some v \<Rightarrow> SUCC v s)"
+    "run (lookup f m k) s = (case m k of None \<Rightarrow> FAIL f | Some v \<Rightarrow> SUCC v 0 s)"
     by (auto simp: lookup_def run_simps split: option.splits)
 
   lemma lookup_sim[sim_rules]:

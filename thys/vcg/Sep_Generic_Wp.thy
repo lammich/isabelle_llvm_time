@@ -350,18 +350,18 @@ declaration \<open>
 
 section \<open>Setup for mres-Monad\<close>
 
-  definition "wp c Q s \<equiv> mwp (run c s) bot bot bot Q"
-  definition "wlp c Q s \<equiv> mwp (run c s) top top top Q"
+  definition  wp :: "('d, 'e, 'b::{cancel_comm_monoid_add}, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where 
+    "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,cr-c))"
   
   (* Definition for presentation in paper *)
-  lemma "wp c Q s = (\<exists>r s'. run c s = SUCC r s' \<and> Q r s')"
-    unfolding wp_def mwp_def by (auto split: mres.splits)
-  
-  
-  lemma wlp_true[simp, intro!]: 
-    "wlp c (\<lambda>_ _. True) s"
-    "wlp c top s"
-    by (auto simp: wlp_def mwp_def split: mres.splits)
+  lemma "wp m Q s = (\<exists>r c s'. run m (fst s) = SUCC r c s' \<and> Q r (s', snd s-c))"
+    unfolding wp_def mwp_def by (fastforce split: mres.splits)
+
+  \<^cancel>\<open>definition "wlp c Q \<equiv> mwp (run c s) top top top (\<lambda>r c s. Q r (c,s))"
+    lemma wlp_true[simp, intro!]:
+      "wlp c (\<lambda>_ _. True) s"
+      "wlp c top s"
+      by (auto simp: wlp_def mwp_def split: mres.splits)\<close>
   
   interpretation generic_wp wp 
     apply unfold_locales 
@@ -375,18 +375,15 @@ section \<open>Setup for mres-Monad\<close>
     by (auto simp: wp_def run_simps)
 
   lemma wp_fcheck[vcg_normalize_simps]: "wp (fcheck e \<Phi>) Q s \<longleftrightarrow> \<Phi> \<and> Q () s"  
-    by (auto simp: wp_def run_simps)
+    by (auto simp: wp_def run_simps split: if_splits)
             
+  (* TODO: refactor that proof, should not need to unfold mwp_def at that stage *)
   lemma wp_bind[vcg_normalize_simps]: "wp (m\<bind>f) Q s = wp m (\<lambda>x. wp (f x) Q) s"  
-    by (auto simp: wp_def run_simps)
-    
+    apply (auto simp: wp_def run_simps split: prod.splits)
+    unfolding mwp_def by (auto split: mres.splits simp add: diff_diff_add)  
     
 
   thm vcg_normalize_simps
-
-
-
-
 
 
 end
