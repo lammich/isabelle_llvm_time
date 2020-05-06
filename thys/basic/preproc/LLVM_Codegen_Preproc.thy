@@ -75,9 +75,9 @@ subsection \<open>Preprocessor\<close>
         fun dest_return @{mpat "return ?x ::_ llM"} = SOME x | dest_return _ = NONE
         fun dest_bind @{mpat "bind ?m ?f ::_ llM"} = SOME (m,f) | dest_bind _ = NONE
         
-        fun dest_monadT (Type (@{type_name M},[T,@{typ unit},@{typ llvm_memory},@{typ err}])) = SOME T | dest_monadT _ = NONE
+        fun dest_monadT (Type (@{type_name M},[T,@{typ unit},@{typ cost},@{typ llvm_memory},@{typ err}])) = SOME T | dest_monadT _ = NONE
 
-        val strip_op = K strip_comb
+        (*val strip_op = K strip_comb*)
         
         val bind_return_thm = @{lemma "bind m return = m" by simp}
         val return_bind_thm = @{lemma "bind (return x) f = f x" by simp}
