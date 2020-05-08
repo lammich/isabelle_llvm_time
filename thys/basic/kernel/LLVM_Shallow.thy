@@ -367,7 +367,7 @@ begin
   }"
 
   definition ll_gep_snd :: "'p::llvm_rep ptr \<Rightarrow> 'b::llvm_rep ptr llM" where "ll_gep_snd p = doM {
-    consume (cost ''ll_gep_snd'' 1);
+    consume (cost ''gep_snd'' 1);
     fcheck (STATIC_ERROR ''gep_snd: Expected pair type'') (llvm_is_s_pair (struct_of TYPE('p)));
     r \<leftarrow> llvm_checked_gep (the_raw_ptr p) PSND;
     return (PTR r)
