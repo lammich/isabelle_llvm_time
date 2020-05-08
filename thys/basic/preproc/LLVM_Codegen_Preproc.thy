@@ -10,12 +10,6 @@ begin
 
   subsection \<open>Fixed-Point Unfolding Setup\<close>
 
-  lemma llc_while_mono[partial_function_mono]:      
-    assumes "\<And>x. M_mono (\<lambda>f. b f x)"
-    assumes "\<And>x. M_mono (\<lambda>f. c f x)"
-    shows "M_mono (\<lambda>D. llc_while (b D) (c D) \<sigma>)"
-    using assms unfolding llc_while_def by pf_mono_prover
-      
   declaration \<open>fn _ => Definition_Utils.declare_extraction_group @{binding LLVM} #> snd\<close>
   declaration \<open>fn _ => Definition_Utils.declare_extraction_group @{binding LLVM_while} #> snd\<close>
     
@@ -35,6 +29,15 @@ begin
     }
   \<close>
 
+  declaration \<open>fn _ =>
+    Definition_Utils.add_extraction (@{extraction_group LLVM},\<^here>) {
+      pattern = Logic.varify_global @{term "REC' (B::('a \<Rightarrow> 'b llM) \<Rightarrow> 'a \<Rightarrow> 'b llM)"},
+      gen_thm = @{thm REC'_unfold},
+      gen_tac = Partial_Function.mono_tac
+    }
+  \<close>
+  
+  
 subsection \<open>Preprocessor\<close>  
   text \<open>
     The actual code generator expects a set of monomorphic, well-shaped equations.

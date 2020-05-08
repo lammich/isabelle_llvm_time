@@ -446,10 +446,13 @@ begin
     apply (rewrite REC_unfold[OF reflexive MONO])
     by rule
     
-  thm REC_unfold  
-    
-
-  (* TODO: We probably need mono-lemmas for REC, to allow nested REC! *)  
+  lemma REC'_mono[partial_function_mono]:
+    assumes MONO: "\<And>D x. M.mono_body (\<lambda>E. B D (\<lambda>x. ll_call (E x)) x)"
+    assumes 1: "\<And>E x. M_mono (\<lambda>D. B D (\<lambda>x. ll_call (E x)) x)"
+    shows "M_mono (\<lambda>D. REC' (B D) x)"
+    unfolding REC'_def
+    using assms
+    by pf_mono_prover
     
     
   notepad  (* TODO: cleanup *)
@@ -507,5 +510,13 @@ begin
     apply pf_mono_prover
     by simp
     
+   
+  lemma llc_while_mono[partial_function_mono]:      
+    assumes "\<And>x. M_mono (\<lambda>f. b f x)"
+    assumes "\<And>x. M_mono (\<lambda>f. c f x)"
+    shows "M_mono (\<lambda>D. llc_while (b D) (c D) \<sigma>)"
+    using assms unfolding llc_while_def by pf_mono_prover
       
+    
+       
 end
