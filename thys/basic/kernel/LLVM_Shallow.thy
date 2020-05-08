@@ -428,7 +428,8 @@ begin
 
   subsubsection \<open>Function Call\<close>
 
-  definition "ll_call f \<equiv> doM { consume (cost ''call'' 1) ; f  }"
+  definition ll_call :: "'a llM \<Rightarrow> 'a llM" where 
+    "ll_call f \<equiv> doM { consume (cost ''call'' 1) ; f  }"
 
   lemma ll_call_mono[partial_function_mono]: "M_mono f \<Longrightarrow> M_mono (\<lambda>x. ll_call (f x))"
     unfolding ll_call_def
