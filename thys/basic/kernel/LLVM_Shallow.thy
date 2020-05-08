@@ -66,11 +66,11 @@ begin
   definition cost :: "'a \<Rightarrow> 'b::{cancel_comm_monoid_add} \<Rightarrow> ('a,'b) acost" where
     "cost n x = acostC ((the_acost 0)(n:=x))"
 
-  lemma c_same_curr_add: "cost n x + cost n y = cost n (x+y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
-  lemma c_same_curr_minus: "cost n x - cost n y = cost n (x-y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
-  lemma c_zero: "cost n 0 = 0" by(auto simp: cost_def zero_acost_def)
+  lemma cost_same_curr_add: "cost n x + cost n y = cost n (x+y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
+  lemma cost_same_curr_minus: "cost n x - cost n y = cost n (x-y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
+  lemma cost_zero: "cost n 0 = 0" by(auto simp: cost_def zero_acost_def)
 
-  lemmas c_simps = c_same_curr_add c_same_curr_minus c_zero add_ac[where a="_::(_,_) acost"]
+  lemmas c_simps = cost_same_curr_add cost_same_curr_minus cost_zero add_ac[where a="_::(_,_) acost"]
       \<comment> \<open>strange: thm  add_ac[where ?'a="(_,_) acost"] \<close>
 
   type_synonym 'a llM = "('a,unit,cost,llvm_memory,err) M"
@@ -236,24 +236,26 @@ begin
   
   
   subsubsection \<open>Compare Operations\<close>
-  definition op_lift_cmp :: "_ \<Rightarrow> 'a::len word \<Rightarrow> 'a word \<Rightarrow> 1 word llM"
-    where "op_lift_cmp f a b \<equiv> doM {
+  definition op_lift_cmp :: "_ \<Rightarrow> _ \<Rightarrow> 'a::len word \<Rightarrow> 'a word \<Rightarrow> 1 word llM"
+    where "op_lift_cmp n f a b \<equiv> doM {
+    consume (cost n 1);
     let a = word_to_lint a;
     let b = word_to_lint b;
     return (lint_to_word (bool_to_lint (f a b)))
   }"
     
-  definition op_lift_ptr_cmp :: "_ \<Rightarrow> 'a::llvm_rep ptr \<Rightarrow> 'a ptr \<Rightarrow> 1 word llM"
-    where "op_lift_ptr_cmp f a b \<equiv> doM {
+  definition op_lift_ptr_cmp :: "_ \<Rightarrow> _ \<Rightarrow> 'a::llvm_rep ptr \<Rightarrow> 'a ptr \<Rightarrow> 1 word llM"
+    where "op_lift_ptr_cmp n f a b \<equiv> doM {
+    consume (cost n 1);
     return (lint_to_word (bool_to_lint (f a b)))
   }"
   
-  definition "ll_icmp_eq \<equiv>  op_lift_cmp (=)"
-  definition "ll_icmp_ne \<equiv>  op_lift_cmp (\<noteq>)"
-  definition "ll_icmp_sle \<equiv> op_lift_cmp (\<le>\<^sub>s)"
-  definition "ll_icmp_slt \<equiv> op_lift_cmp (<\<^sub>s)"
-  definition "ll_icmp_ule \<equiv> op_lift_cmp (\<le>)"
-  definition "ll_icmp_ult \<equiv> op_lift_cmp (<)"
+  definition "ll_icmp_eq \<equiv>  op_lift_cmp ''icmp_eq'' (=)"
+  definition "ll_icmp_ne \<equiv>  op_lift_cmp ''icmp_ne'' (\<noteq>)"
+  definition "ll_icmp_sle \<equiv> op_lift_cmp ''icmp_sle'' (\<le>\<^sub>s)"
+  definition "ll_icmp_slt \<equiv> op_lift_cmp ''icmp_slt'' (<\<^sub>s)"
+  definition "ll_icmp_ule \<equiv> op_lift_cmp ''icmp_ule'' (\<le>)"
+  definition "ll_icmp_ult \<equiv> op_lift_cmp ''icmp_ult'' (<)"
 
   text \<open>Note: There are no pointer compare instructions in LLVM. 
     To compare pointers in LLVM, they have to be casted to integers first.
@@ -266,8 +268,8 @@ begin
     For less-than, suitable preconditions are required, which are consistent with the 
     actual memory layout of LLVM. We could, e.g., adopt the rules from the C standard here.
   \<close>
-  definition "ll_ptrcmp_eq \<equiv> op_lift_ptr_cmp (=)"
-  definition "ll_ptrcmp_ne \<equiv> op_lift_ptr_cmp (\<noteq>)"
+  definition "ll_ptrcmp_eq \<equiv> op_lift_ptr_cmp ''ptrcmp_eq'' (=)"
+  definition "ll_ptrcmp_ne \<equiv> op_lift_ptr_cmp ''ptrcmp_ne'' (\<noteq>)"
   
 
   
@@ -296,10 +298,10 @@ begin
     return (llvm_the_pair v)
   }"
   
-  definition ll_extract_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep llM" where "ll_extract_fst p = doM { (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val a }"
-  definition ll_extract_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep llM" where "ll_extract_snd p = doM { (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val b }"
-  definition ll_insert_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep \<Rightarrow> 't llM" where "ll_insert_fst p x = doM { (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair (to_val x) b) }" 
-  definition ll_insert_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep \<Rightarrow> 't llM" where "ll_insert_snd p x = doM { (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair a (to_val x)) }" 
+  definition ll_extract_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep llM" where "ll_extract_fst p = doM { consume (cost ''extract_fst'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val a }"
+  definition ll_extract_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep llM" where "ll_extract_snd p = doM { consume (cost ''extract_snd'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val b }"
+  definition ll_insert_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep \<Rightarrow> 't llM" where "ll_insert_fst p x = doM { consume (cost ''insert_fst'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair (to_val x) b) }" 
+  definition ll_insert_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep \<Rightarrow> 't llM" where "ll_insert_snd p x = doM { consume (cost ''insert_snd'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair a (to_val x)) }" 
     
   (*  
   definition ll_extract_fst :: "('a::llvm_rep \<times> 'b::llvm_rep) \<Rightarrow> 'a llM" where "ll_extract_fst ab \<equiv> return (fst ab)"
@@ -312,12 +314,16 @@ begin
     
   definition ll_load :: "'a::llvm_rep ptr \<Rightarrow> 'a llM" where
     "ll_load p \<equiv> doM {
+      consume (cost ''load'' 1);
       r \<leftarrow> llvm_load (the_raw_ptr p);
       checked_from_val r
     }"
     
   definition ll_store :: "'a::llvm_rep \<Rightarrow> 'a ptr \<Rightarrow> unit llM" where
-    "ll_store v p \<equiv> llvm_store (to_val v) (the_raw_ptr p)"
+    "ll_store v p \<equiv> doM {
+      consume (cost ''store'' 1);
+      llvm_store (to_val v) (the_raw_ptr p)
+    }"
 
   text \<open>Note that LLVM itself does not have malloc and free instructions.
     However, these are primitive instructions in our abstract memory model, 
@@ -329,14 +335,17 @@ begin
     
   definition ll_malloc :: "'a::llvm_rep itself \<Rightarrow> _::len word \<Rightarrow> 'a ptr llM" where
     "ll_malloc TYPE('a) n = doM {
-      \<comment> \<open>DESIGN CHOICE: consume n\<close>
+      consume (cost ''malloc'' (unat n)); \<comment> \<open>DESIGN CHOICE: malloc consumes n\<close>
       fcheck MEM_ERROR (unat n > 0); \<comment> \<open>Disallow empty malloc\<close>
       r \<leftarrow> llvm_allocn (to_val (init::'a)) (unat n);
       return (PTR r)
     }"
         
   definition ll_free :: "'a::llvm_rep ptr \<Rightarrow> unit llM" 
-    where "ll_free p \<equiv> \<comment> \<open>TODO: consume 1 \<close> llvm_free (the_raw_ptr p)"
+    where "ll_free p \<equiv> doM {
+            consume (cost ''free'' 1); \<comment> \<open>DESIGN CHOICE: consume 1 \<close>
+            llvm_free (the_raw_ptr p)
+          }"
 
 
   text \<open>As for the aggregate operations, the \<open>getelementptr\<close> instruction is instantiated 
@@ -345,17 +354,20 @@ begin
   \<comment> \<open>pointer arithmetic, cost 1 each\<close>
 
   definition ll_ofs_ptr :: "'a::llvm_rep ptr \<Rightarrow> _::len word \<Rightarrow> 'a ptr llM" where "ll_ofs_ptr p ofs = doM {
+    consume (cost ''ofs_ptr'' 1);
     r \<leftarrow> llvm_checked_idx_ptr (the_raw_ptr p) (sint ofs);
     return (PTR r)
   }"  
 
   definition ll_gep_fst :: "'p::llvm_rep ptr \<Rightarrow> 'a::llvm_rep ptr llM" where "ll_gep_fst p = doM {
+    consume (cost ''gep_fst'' 1);
     fcheck (STATIC_ERROR ''gep_fst: Expected pair type'') (llvm_is_s_pair (struct_of TYPE('p)));
     r \<leftarrow> llvm_checked_gep (the_raw_ptr p) PFST;
     return (PTR r)
   }"
 
   definition ll_gep_snd :: "'p::llvm_rep ptr \<Rightarrow> 'b::llvm_rep ptr llM" where "ll_gep_snd p = doM {
+    consume (cost ''ll_gep_snd'' 1);
     fcheck (STATIC_ERROR ''gep_snd: Expected pair type'') (llvm_is_s_pair (struct_of TYPE('p)));
     r \<leftarrow> llvm_checked_gep (the_raw_ptr p) PSND;
     return (PTR r)
@@ -377,17 +389,18 @@ begin
     return (zext w i)
   }"
   
-  definition op_lift_iconv :: "_ \<Rightarrow> 'a::len word \<Rightarrow> 'b::len word itself  \<Rightarrow> 'b word llM"
-    where "op_lift_iconv f a _ \<equiv> doM {
+  definition op_lift_iconv :: "_ \<Rightarrow> _ \<Rightarrow> 'a::len word \<Rightarrow> 'b::len word itself  \<Rightarrow> 'b word llM"
+    where "op_lift_iconv n f a _ \<equiv> doM {
+    consume (cost n 1);
     let a = word_to_lint a;
     let w = LENGTH('b);
     r \<leftarrow> f a w;
     return (lint_to_word r)
   }"
   
-  definition "ll_trunc \<equiv> op_lift_iconv llb_trunc"
-  definition "ll_sext \<equiv> op_lift_iconv llb_sext"
-  definition "ll_zext \<equiv> op_lift_iconv llb_zext"
+  definition "ll_trunc \<equiv> op_lift_iconv ''trunc'' llb_trunc"
+  definition "ll_sext \<equiv> op_lift_iconv ''sext'' llb_sext"
+  definition "ll_zext \<equiv> op_lift_iconv ''zext'' llb_zext"
   
     
         
