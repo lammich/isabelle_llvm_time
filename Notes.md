@@ -1,3 +1,25 @@
+# Friday 8.5.20
+
+## design choices:
+    
+  - kein cc, projektion im abstrakten mit \inf
+  - alloc n kostet n
+  - free, amortisiert, kostet 1 ! (oder n?)
+  -> abstract credits für free in Malloc_Tac aufladen (amortisierung) 
+  -> wird von Sepref eingeführt
+    
+    
+# TODO
+    
+## peter:
+  - mono beweise fixen
+  - ll_call in code-generator
+  - Tupel?
+  - bis LLVM_Shallow_RS probleme fixen
+    
+## max:
+  - LLVM_Shallow operationen mit kosten versehen
+  - time credits mit top element versehen
 
 
 # Wednesday 6.5.2020
