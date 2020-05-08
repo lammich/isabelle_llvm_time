@@ -606,7 +606,15 @@ begin
                   in
                     (CmWhile (sv, cond, body, inits), ctxt)
                   end
-                | _ => raise TERM ("parse_cmd: While needs 3 arguments",[t])
+                | _ => raise TERM ("parse_cmd: llc_while needs 3 arguments",[t])
+              )
+            | @{const_name ll_call} => (case args of [fxs] => let
+                  val (cf,cargs) = strip_comb fxs
+                  val _ = check_valid_head cf
+                  val (ops,ctxt) = fold_map llc_parse_op cargs ctxt
+                  val fname = ftab_lookup ctxt cf
+                in (CmCall (rty, fname ,ops), ctxt) end
+                | _ => raise TERM ("parse_cmd: ll_call needs one argument",[t])
               )
             | _ => 
                 if is_llvm_instr cname then let 
@@ -614,6 +622,7 @@ begin
                     val (ops,ctxt) = fold_map llc_parse_op' args ctxt
                   in (CmInstr (cname,ops), ctxt) end
                 else let 
+                    val _ = raise TERM("parse_cmd: command not recognized: "^ cname ^" (function calls must be wrapped in ll_call)",[t])
                     val (ops,ctxt) = fold_map llc_parse_op args ctxt
                     val fname = ftab_lookup ctxt f
                   in (CmCall (rty, fname ,ops), ctxt) end

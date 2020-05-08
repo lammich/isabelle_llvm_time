@@ -607,8 +607,8 @@ experiment begin
   }"
 
   definition [llvm_code]: "add_add_driver (a::32 word) (b::64 word) \<equiv> doM {
-    a \<leftarrow> add_add a;
-    b \<leftarrow> add_add b;
+    a \<leftarrow> ll_call (add_add a);
+    b \<leftarrow> ll_call (add_add b);
     a \<leftarrow> ll_zext a TYPE(64 word);
     b \<leftarrow> ll_add a b;
     return b
@@ -617,14 +617,14 @@ experiment begin
   export_llvm (debug) add_add_driver
   
   definition [llvm_code]: "main (argc::32 word) (argv::8 word ptr ptr) \<equiv> doM {
-    r \<leftarrow> test2 argc;
+    r \<leftarrow> ll_call (test2 argc);
     r \<leftarrow> ll_zext r TYPE(32 word);
     return r
   }" 
 
   definition [llvm_code]: "main_exp (argc::32 word) (argv::8 word ptr ptr) \<equiv> doM {
     argc \<leftarrow> ll_zext argc TYPE(64 word);
-    r \<leftarrow> exp argc;
+    r \<leftarrow> ll_call (exp argc);
     r \<leftarrow> ll_trunc r TYPE(32 word);
     return r
   }" 
@@ -664,7 +664,7 @@ definition [llvm_code]:
 export_llvm test_if_names
 
 definition fib :: "64 word \<Rightarrow> 64 word llM" 
-  where [llvm_code]: "fib n \<equiv> REC (\<lambda>fib n. doM { 
+  where [llvm_code]: "fib n \<equiv> REC' (\<lambda>fib n. doM { 
     t\<leftarrow>ll_icmp_ule n 1; 
     llc_if t 
       (return n) 
@@ -676,7 +676,7 @@ definition fib :: "64 word \<Rightarrow> 64 word llM"
         c\<leftarrow>ll_add a b; 
         return c })} ) n"
 
-export_llvm fib is fib
+export_llvm (debug) fib is fib
 
 
 definition triple_sum :: "(64 word \<times> 64 word \<times> 64 word) \<Rightarrow> 64 word llM" where [llvm_code]:
