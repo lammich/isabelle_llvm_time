@@ -42,7 +42,7 @@ begin
       subgoal for a b c apply(cases a; cases b; cases c) by (auto simp: add.assoc)
       subgoal for a b   apply(cases a; cases b) by (auto simp: add.commute) 
       done
-end
+  end
 
 
  
@@ -435,42 +435,44 @@ end
     }"
   
   lemma llc_if_mono[partial_function_mono]:      
-    "\<lbrakk>monotone orda ordb F; monotone orda ordb G\<rbrakk> \<Longrightarrow> monotone orda ordb (\<lambda>f. llc_if b (F f) (G f))"
-    unfolding llc_if_def apply pf_mono_prover  
-    supply [[unify_trace_failure,show_sorts]]
-    apply(rule M_bind_mono) using M_bind_mono sorry
-
-
+    "\<lbrakk>M_mono F; M_mono G\<rbrakk> \<Longrightarrow> M_mono (\<lambda>f. llc_if b (F f) (G f))"
+    unfolding llc_if_def 
+    by pf_mono_prover  
 
   subsubsection \<open>Function Call\<close>
 
   definition "ll_call f \<equiv> doM { consume (cost ''call'' 1) ; f  }"
 
+  lemma ll_call_mono[partial_function_mono]: "M_mono f \<Longrightarrow> M_mono (\<lambda>x. ll_call (f x))"
+    unfolding ll_call_def
+    by pf_mono_prover
   
+  subsubsection \<open>Recursion with Time for Call\<close>  
+    
   definition "REC' F x = REC (\<lambda>D x. F (\<lambda>x. ll_call (D x)) x) x"
-
-  thm REC_unfold[no_vars]
-
+  
   lemma REC'_unfold:
     assumes DEF: "f \<equiv> REC' F"
-    assumes MONO: "\<And>x. M.mono_body (\<lambda>fa. F fa x)"
+    assumes MONO: "\<And>x. M.mono_body (\<lambda>fa. F (\<lambda>x. ll_call (fa x)) x)"
     shows "f = F (\<lambda>x. ll_call (f x))" 
     unfolding DEF REC'_def
-    apply(rewrite REC_unfold[OF reflexive  ])
-    subgoal
-      unfolding ll_call_def
-      supply MONO[partial_function_mono]
-      apply pf_mono_prover (* TODO: fix mono_prover *)
-      sorry
-    subgoal 
-      ..
-    done
-
+    apply (rewrite REC_unfold[OF reflexive MONO])
+    by rule
+    
+  lemma REC'_mono[partial_function_mono]:
+    assumes MONO: "\<And>D x. M.mono_body (\<lambda>E. B D (\<lambda>x. ll_call (E x)) x)"
+    assumes 1: "\<And>E x. M_mono (\<lambda>D. B D (\<lambda>x. ll_call (E x)) x)"
+    shows "M_mono (\<lambda>D. REC' (B D) x)"
+    unfolding REC'_def
+    using assms
+    by pf_mono_prover
+    
+    
   notepad  (* TODO: cleanup *)
   begin
    
   
-    assume MONO: "\<And>x. M.mono_body (\<lambda>fa. F fa x)"
+    assume MONO: "\<And>x. M.mono_body (\<lambda>fa. F (\<lambda>x. ll_call (fa x)) x)"
     
       and DEF: "f \<equiv> REC' F"
       and F: " F  \<equiv> \<lambda>D x. (if x>0 then D (x-1) else return 0 )"
@@ -508,7 +510,7 @@ end
     unfolding assms
     unfolding llc_while_def llc_if_def
     apply (rewrite REC'_unfold[OF reflexive])
-      subgoal sorry
+    apply pf_mono_prover
     by simp
 
   (* 'Definition' of llc_while for presentation in paper: *)  
@@ -518,8 +520,16 @@ end
    }"
     unfolding llc_while_def llc_if_def
     apply (rewrite REC'_unfold[OF reflexive])
-      subgoal sorry
+    apply pf_mono_prover
     by simp
     
+   
+  lemma llc_while_mono[partial_function_mono]:      
+    assumes "\<And>x. M_mono (\<lambda>f. b f x)"
+    assumes "\<And>x. M_mono (\<lambda>f. c f x)"
+    shows "M_mono (\<lambda>D. llc_while (b D) (c D) \<sigma>)"
+    using assms unfolding llc_while_def by pf_mono_prover
       
+    
+       
 end
