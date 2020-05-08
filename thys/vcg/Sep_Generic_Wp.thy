@@ -350,11 +350,14 @@ declaration \<open>
 
 section \<open>Setup for mres-Monad\<close>
 
-  definition  wp :: "('d, 'e, 'b::{cancel_comm_monoid_add}, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where 
-    "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,cr-c))"
+  lemma "cr-c+c=(cr::nat) \<longleftrightarrow> cr\<ge>c" by auto
+  lemma "cr-c+c=(cr::int) \<longleftrightarrow> True" by auto
   
+  definition  wp :: "('d, 'e, 'b::{cancel_comm_monoid_add}, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where 
+    "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,cr-c) \<and> cr-c+c=cr)"
+
   (* Definition for presentation in paper *)
-  lemma "wp m Q s = (\<exists>r c s'. run m (fst s) = SUCC r c s' \<and> Q r (s', snd s-c))"
+  lemma "wp m Q (s,cr::nat) = (\<exists>r c s'. run m s = SUCC r c s' \<and> Q r (s', cr-c) \<and> c\<le>cr )"
     unfolding wp_def mwp_def by (fastforce split: mres.splits)
 
   \<^cancel>\<open>definition "wlp c Q \<equiv> mwp (run c s) top top top (\<lambda>r c s. Q r (c,s))"
@@ -380,8 +383,15 @@ section \<open>Setup for mres-Monad\<close>
   (* TODO: refactor that proof, should not need to unfold mwp_def at that stage *)
   lemma wp_bind[vcg_normalize_simps]: "wp (m\<bind>f) Q s = wp m (\<lambda>x. wp (f x) Q) s"  
     apply (auto simp: wp_def run_simps split: prod.splits)
-    unfolding mwp_def by (auto split: mres.splits simp add: diff_diff_add)  
-    
+    unfolding mwp_def apply (auto split: mres.splits simp add: diff_diff_add)
+    subgoal   
+      by (metis add.left_commute add_diff_cancel_left')  
+    subgoal   
+      by (metis add.assoc add.commute add_diff_cancel_left')  
+    subgoal  
+      by (metis add.assoc add.commute)
+    done
+
 
   thm vcg_normalize_simps
 
