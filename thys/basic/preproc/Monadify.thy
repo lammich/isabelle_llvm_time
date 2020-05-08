@@ -152,7 +152,7 @@ begin
         else BIND (mk_operation t mk_return') F
       and mk_operation t F ctxt = let
             val (f,xs) = strip_op ctxt t
-            fun R t [] = F t | R t (x::xs) = mk_operand x (fn x => R (t$x) xs)
+            fun R t [] = F t | R t (x::xs) = mk_operand x (fn x => R (betapply (t,x)) xs)
           in
             R f xs ctxt
           end
@@ -188,19 +188,8 @@ begin
   \<close>
 
   ML \<open>
-    functor Gen_Monadify_Cong (
-      val mk_return: term -> term
-      val mk_bind: term -> term -> term
-      val dest_return: term -> term option
-      val dest_bind: term -> (term * term) option
-      val dest_monadT: typ -> typ option
-      
-      val bind_return_thm : thm  (* bind m return = m *)
-      val return_bind_thm : thm  (* bind (return x) f = f x  *)
-      val bind_bind_thm : thm    (* bind (bind m f) g = bind m (\<lambda>x. bind (f x) g) *)
-    
-    ) = struct
-          
+  
+    functor Gen_Monadify_Cong_Basis () = struct
       structure Consts = Generic_Data (
         type T = term Item_Net.T
         val empty = Item_Net.init (op aconv) single
@@ -236,6 +225,24 @@ begin
         fun stripc (t as f$x, xs) = if is_const ctxt t then (t,xs) else stripc (f,x::xs) 
           | stripc tt = tt
       in stripc (t,[]) end
+  
+    end
+  
+    functor Gen_Monadify_Cong (
+      val mk_return: term -> term
+      val mk_bind: term -> term -> term
+      val dest_return: term -> term option
+      val dest_bind: term -> (term * term) option
+      val dest_monadT: typ -> typ option
+      
+      val bind_return_thm : thm  (* bind m return = m *)
+      val return_bind_thm : thm  (* bind (return x) f = f x  *)
+      val bind_bind_thm : thm    (* bind (bind m f) g = bind m (\<lambda>x. bind (f x) g) *)
+    
+    ) = struct
+
+      structure BT = Gen_Monadify_Cong_Basis()
+      open BT
 
       structure T = Gen_Monadify (
         val mk_return = mk_return
