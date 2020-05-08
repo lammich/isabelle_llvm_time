@@ -66,11 +66,16 @@ subsection \<open>Preprocessor\<close>
   lemma pull_lambda_case: "(case x of (a,b) \<Rightarrow> \<lambda>y. t a b y) = (\<lambda>y. case x of (a,b) \<Rightarrow> t a b y)"
     apply (rule ext) apply (cases x) by auto
 
+    
+  ML_val \<open>Term.Var\<close>  
+    
   ML \<open> structure LLC_Preprocessor = 
     struct
       open LLC_Lib
           
-      structure Monadify = Gen_Monadify_Cong (
+      structure Monadify = struct 
+        structure BT = Gen_Monadify_Cong_Basis ()
+        open BT
       
         fun mk_return x = @{mk_term "return ?x ::_ llM"}
         fun mk_bind m f = @{mk_term "bind ?m ?f ::_ llM"}
@@ -80,13 +85,34 @@ subsection \<open>Preprocessor\<close>
         
         fun dest_monadT (Type (@{type_name M},[T,@{typ unit},@{typ cost},@{typ llvm_memory},@{typ err}])) = SOME T | dest_monadT _ = NONE
 
-        (*val strip_op = K strip_comb*)
+        fun mk_ll_call t = @{mk_term \<open>ll_call ?t\<close>}
+        
+        fun strip_op ctxt @{mpat \<open>ll_call ?fxs\<close>} = let
+            val (f,xs) = BT.strip_op ctxt fxs
+            val vnames = Name.invent_list (Term.add_free_names f []) "x" (length xs)
+            val vars = vnames ~~ map fastype_of xs |> map Free
+            val f = betapplys (f,vars) |> mk_ll_call |> fold_rev lambda vars
+          in (f,xs) end
+        | strip_op ctxt t = BT.strip_op ctxt t  
         
         val bind_return_thm = @{lemma "bind m return = m" by simp}
         val return_bind_thm = @{lemma "bind (return x) f = f x" by simp}
         val bind_bind_thm = @{lemma "bind (bind m (\<lambda>x. f x)) g = bind m (\<lambda>x. bind (f x) g)" by simp}
         
-      )
+        structure T = Gen_Monadify (
+          val mk_return = mk_return
+          val mk_bind = mk_bind
+          val dest_return = dest_return
+          val dest_bind = dest_bind
+          val dest_monadT = dest_monadT
+          val strip_op = strip_op
+          val bind_return_thm = bind_return_thm
+          val return_bind_thm = return_bind_thm
+          val bind_bind_thm = bind_bind_thm
+        )
+        open T
+        
+      end
       
       (********* Normalization of code theorems *)
       
@@ -131,7 +157,8 @@ subsection \<open>Preprocessor\<close>
         May fail on non-well-formed theorems.
       *)
       fun cthm_format ctxt thm = let
-        fun normalize_bind1 t = let
+        fun normalize_bind1 @{mpat \<open>ll_call ?t\<close>} = normalize_bind1 t |> Monadify.mk_ll_call
+        | normalize_bind1 t = let
           val (f,args) = strip_comb t
           val _ = check_valid_head f
   
@@ -285,6 +312,32 @@ subsection \<open>Preprocessor\<close>
   \<close>
 
   declaration \<open>K (LLC_Preprocessor.Monadify.prepare_add_const_decl @{term "numeral a"})\<close>  
+  
+  (* Small regression test against ll-call aware strip-op *)
+  ML_val \<open>
+    fun test ctxt t = 
+      betapplys (LLC_Preprocessor.Monadify.strip_op ctxt t) aconv t
+      orelse raise TERM("Monadify strip-op regression test",[t])
+  
+    val _ = let val t=test @{context} in
+      t @{term \<open>f\<close>};
+      t @{term \<open>f x\<close>};
+      t @{term \<open>f x y z\<close>};
+
+      t @{term \<open>ll_call f\<close>};
+      t @{term \<open>ll_call (f x)\<close>};
+      t @{term \<open>ll_call (f x y z)\<close>};
+          
+      ()
+    end
+  \<close>
+  
+  ML_val \<open>
+    @{term \<open>doM { z\<leftarrow>ll_add a b; ll_call (f (x+y+a) z (b+1)) }\<close>}
+    |> LLC_Preprocessor.Monadify.monadify @{context}
+    |> Thm.cterm_of @{context}
+    
+  \<close>
   
   
     
