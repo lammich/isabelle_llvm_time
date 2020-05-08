@@ -3,23 +3,75 @@ theory LLVM_Shallow
 imports Main  
   "LLVM_Memory"
 begin
+
+
   text \<open>We define a type synonym for the LLVM monad\<close>
-  type_synonym cost = "string \<Rightarrow> nat" 
+  datatype ('a, 'b) acost = acostC (the_acost: "'a \<Rightarrow> 'b") 
+  type_synonym cost = "(string, nat) acost"
 
   \<comment> \<open>TODO: warning! will clash with another definition of plus lifted to function,
           from "../../lib/Sep_Algebra_Add"
         maybe hide @{type cost} behind a new type and define + for it? \<close>
 
-  instantiation "fun" :: (type, cancel_comm_monoid_add) cancel_comm_monoid_add
-  begin
-    definition "zero_fun = (\<lambda>_. 0)"
-    definition "plus_fun a b = (\<lambda>x. a x + b x)"
 
-  instance (* TODO refactor *)
-    apply standard
-      apply (auto simp: plus_fun_def zero_fun_def add.assoc diff_diff_add) 
-      by (simp add: add.commute) 
+  instantiation acost :: (type, zero) zero
+  begin
+    definition "zero_acost = acostC (\<lambda>_. 0)"
+    instance ..
   end
+
+  instantiation acost :: (type, plus) plus
+  begin
+    fun plus_acost where "plus_acost (acostC a) (acostC b) = acostC (\<lambda>x. a x + b x)"
+    instance ..
+  end
+
+  instantiation acost :: (type, minus) minus
+  begin
+    fun minus_acost where "minus_acost (acostC a) (acostC b) = acostC (\<lambda>x. a x - b x)"
+    instance ..
+  end
+
+
+
+  instantiation acost :: (type, ab_semigroup_add) ab_semigroup_add
+  begin
+  
+    instance (* TODO refactor *)
+      apply standard 
+      subgoal for a b c apply(cases a; cases b; cases c) by (auto simp: add.assoc)
+      subgoal for a b   apply(cases a; cases b) by (auto simp: add.commute) 
+      done
+end
+
+
+ 
+
+  instantiation acost :: (type, cancel_comm_monoid_add) cancel_comm_monoid_add
+  begin
+  
+    instance (* TODO refactor *)
+      apply standard
+          apply (auto simp: zero_acost_def add.assoc diff_diff_add)  
+      subgoal for a b   apply(cases a; cases b) by (auto simp: add.commute) 
+      subgoal for a b c apply(cases a; cases b; cases c) by (auto simp: diff_diff_add) 
+      subgoal for a     apply(cases a) by auto
+      done
+  end
+
+
+  term "(a::cost) + b"
+  term "(0::cost)"
+
+  definition cost :: "'a \<Rightarrow> 'b::{cancel_comm_monoid_add} \<Rightarrow> ('a,'b) acost" where
+    "cost n x = acostC ((the_acost 0)(n:=x))"
+
+  lemma c_same_curr_add: "cost n x + cost n y = cost n (x+y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
+  lemma c_same_curr_minus: "cost n x - cost n y = cost n (x-y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
+  lemma c_zero: "cost n 0 = 0" by(auto simp: cost_def zero_acost_def)
+
+  lemmas c_simps = c_same_curr_add c_same_curr_minus c_zero add_ac[where a="_::(_,_) acost"]
+      \<comment> \<open>strange: thm  add_ac[where ?'a="(_,_) acost"] \<close>
 
   type_synonym 'a llM = "('a,unit,cost,llvm_memory,err) M"
   translations
@@ -157,29 +209,30 @@ begin
   text \<open>We define a generic lifter for binary arithmetic operations.
     It is parameterized by an error condition.
   \<close> (* TODO: Use precondition instead of negated precondition! *)
-  
-  definition op_lift_arith2 :: "_ \<Rightarrow> _ \<Rightarrow> 'a::len word \<Rightarrow> 'a word \<Rightarrow> 'a word llM"
-    where "op_lift_arith2 ovf f a b \<equiv> doM {
+
+  definition op_lift_arith2 :: "_ \<Rightarrow> _ \<Rightarrow> _ \<Rightarrow> 'a::len word \<Rightarrow> 'a word \<Rightarrow> 'a word llM"
+    where "op_lift_arith2 n ovf f a b \<equiv> doM {
+    consume (cost n 1);
     let a = word_to_lint a;
     let b = word_to_lint b;
     fcheck (OVERFLOW_ERROR) (\<not>ovf a b);
     return (lint_to_word (f a b))
   }"
         
-  definition "op_lift_arith2' \<equiv> op_lift_arith2 (\<lambda>_ _. False)"
+  definition "op_lift_arith2' n \<equiv> op_lift_arith2 n (\<lambda>_ _. False)"
 
   definition udivrem_is_undef :: "lint \<Rightarrow> lint \<Rightarrow> bool" 
     where "udivrem_is_undef a b \<equiv> lint_to_uint b=0"
   definition sdivrem_is_undef :: "lint \<Rightarrow> lint \<Rightarrow> bool" 
     where "sdivrem_is_undef a b \<equiv> lint_to_sint b=0 \<or> sdivrem_ovf a b"
   
-  definition "ll_add \<equiv> op_lift_arith2' (+)"
-  definition "ll_sub \<equiv> op_lift_arith2' (-)"
-  definition "ll_mul \<equiv> op_lift_arith2' (*)"
-  definition "ll_udiv \<equiv> op_lift_arith2 udivrem_is_undef (div)"
-  definition "ll_urem \<equiv> op_lift_arith2 udivrem_is_undef (mod)"
-  definition "ll_sdiv \<equiv> op_lift_arith2 sdivrem_is_undef (sdiv)"
-  definition "ll_srem \<equiv> op_lift_arith2 sdivrem_is_undef (smod)"
+  definition "ll_add \<equiv> op_lift_arith2' ''add'' (+)"
+  definition "ll_sub \<equiv> op_lift_arith2' ''sub'' (-)"
+  definition "ll_mul \<equiv> op_lift_arith2' ''mul'' (*)"
+  definition "ll_udiv \<equiv> op_lift_arith2 ''udiv'' udivrem_is_undef (div)"
+  definition "ll_urem \<equiv> op_lift_arith2 ''urem'' udivrem_is_undef (mod)"
+  definition "ll_sdiv \<equiv> op_lift_arith2 ''sdiv'' sdivrem_is_undef (sdiv)"
+  definition "ll_srem \<equiv> op_lift_arith2 ''srem'' sdivrem_is_undef (smod)"
   
   
   subsubsection \<open>Compare Operations\<close>
@@ -224,13 +277,13 @@ begin
   definition "bitASHR' a n \<equiv> bitASHR a (nat (lint_to_uint n))"
   definition "bitLSHR' a n \<equiv> bitLSHR a (nat (lint_to_uint n))"
   
-  definition "ll_shl \<equiv> op_lift_arith2 shift_ovf bitSHL'"  
-  definition "ll_lshr \<equiv> op_lift_arith2 shift_ovf bitLSHR'"  
-  definition "ll_ashr \<equiv> op_lift_arith2 shift_ovf bitASHR'"
+  definition "ll_shl \<equiv> op_lift_arith2 ''shl'' shift_ovf bitSHL'"  
+  definition "ll_lshr \<equiv> op_lift_arith2 ''lshr'' shift_ovf bitLSHR'"  
+  definition "ll_ashr \<equiv> op_lift_arith2 ''ashr'' shift_ovf bitASHR'"
   
-  definition "ll_and \<equiv> op_lift_arith2' (AND)"
-  definition "ll_or \<equiv> op_lift_arith2' (OR)"
-  definition "ll_xor \<equiv> op_lift_arith2' (XOR)"
+  definition "ll_and \<equiv> op_lift_arith2' ''and'' (AND)"
+  definition "ll_or \<equiv> op_lift_arith2' ''or'' (OR)"
+  definition "ll_xor \<equiv> op_lift_arith2' ''xor'' (XOR)"
     
 
   subsubsection \<open>Aggregate Operations\<close>
@@ -276,18 +329,21 @@ begin
     
   definition ll_malloc :: "'a::llvm_rep itself \<Rightarrow> _::len word \<Rightarrow> 'a ptr llM" where
     "ll_malloc TYPE('a) n = doM {
+      \<comment> \<open>DESIGN CHOICE: consume n\<close>
       fcheck MEM_ERROR (unat n > 0); \<comment> \<open>Disallow empty malloc\<close>
       r \<leftarrow> llvm_allocn (to_val (init::'a)) (unat n);
       return (PTR r)
     }"
         
   definition ll_free :: "'a::llvm_rep ptr \<Rightarrow> unit llM" 
-    where "ll_free p \<equiv> llvm_free (the_raw_ptr p)"
+    where "ll_free p \<equiv> \<comment> \<open>TODO: consume 1 \<close> llvm_free (the_raw_ptr p)"
 
 
   text \<open>As for the aggregate operations, the \<open>getelementptr\<close> instruction is instantiated 
     for pointer indexing, fst, and snd. \<close>
-      
+
+  \<comment> \<open>pointer arithmetic, cost 1 each\<close>
+
   definition ll_ofs_ptr :: "'a::llvm_rep ptr \<Rightarrow> _::len word \<Rightarrow> 'a ptr llM" where "ll_ofs_ptr p ofs = doM {
     r \<leftarrow> llvm_checked_idx_ptr (the_raw_ptr p) (sint ofs);
     return (PTR r)
@@ -361,12 +417,58 @@ begin
   
   definition llc_if :: "1 word \<Rightarrow> 'a::llvm_repv llM \<Rightarrow> 'a llM \<Rightarrow> 'a llM" where
     "llc_if b t e \<equiv> doM {
+      consume (cost ''if'' 1);
       if to_bool b then t else e
     }"
   
   lemma llc_if_mono[partial_function_mono]:      
     "\<lbrakk>monotone orda ordb F; monotone orda ordb G\<rbrakk> \<Longrightarrow> monotone orda ordb (\<lambda>f. llc_if b (F f) (G f))"
-    unfolding llc_if_def by pf_mono_prover
+    unfolding llc_if_def apply pf_mono_prover  
+    supply [[unify_trace_failure,show_sorts]]
+    apply(rule M_bind_mono) using M_bind_mono sorry
+
+
+
+  subsubsection \<open>Function Call\<close>
+
+  definition "ll_call f \<equiv> doM { consume (cost ''call'' 1) ; f  }"
+
+  
+  definition "REC' F x = REC (\<lambda>D x. F (\<lambda>x. ll_call (D x)) x) x"
+
+  thm REC_unfold[no_vars]
+
+  lemma REC'_unfold:
+    assumes DEF: "f \<equiv> REC' F"
+    assumes MONO: "\<And>x. M.mono_body (\<lambda>fa. F fa x)"
+    shows "f = F (\<lambda>x. ll_call (f x))" 
+    unfolding DEF REC'_def
+    apply(rewrite REC_unfold[OF reflexive  ])
+    subgoal
+      unfolding ll_call_def
+      supply MONO[partial_function_mono]
+      apply pf_mono_prover (* TODO: fix mono_prover *)
+      sorry
+    subgoal 
+      ..
+    done
+
+  notepad  (* TODO: cleanup *)
+  begin
+   
+  
+    assume MONO: "\<And>x. M.mono_body (\<lambda>fa. F fa x)"
+    
+      and DEF: "f \<equiv> REC' F"
+      and F: " F  \<equiv> \<lambda>D x. (if x>0 then D (x-1) else return 0 )"
+    have "P f"
+      apply(rewrite REC'_unfold[OF DEF MONO])
+      apply(rewrite REC'_unfold[OF DEF MONO])
+      apply(rewrite REC'_unfold[OF DEF MONO])
+      apply(rewrite REC'_unfold[OF DEF MONO])
+      unfolding F ll_call_def sorry
+  
+  end
 
   subsubsection \<open>While-Combinator\<close>
   text \<open>
@@ -382,20 +484,28 @@ begin
   \<close>
     
   definition llc_while :: "('a::llvm_repv \<Rightarrow> 1 word llM) \<Rightarrow> ('a \<Rightarrow> 'a llM) \<Rightarrow> 'a \<Rightarrow> 'a llM" where
-    "llc_while b f s\<^sub>0 \<equiv> mwhile (\<lambda>s. b s \<bind> return o to_bool) f s\<^sub>0"
-      
+    "llc_while b f s\<^sub>0 \<equiv> REC' (\<lambda>mwhile \<sigma>. doM {
+              ctd \<leftarrow> b \<sigma>;
+              llc_if ctd (f \<sigma> \<bind> mwhile) (return \<sigma>)
+            }) s\<^sub>0" 
+
   lemma gen_code_thm_llc_while:
     assumes "f \<equiv> llc_while b body"
-    shows "f s = doM { ctd \<leftarrow> b s; llc_if ctd (doM { s\<leftarrow>body s; f s}) (return s)}"
+    shows "f s = doM { ctd \<leftarrow> b s; llc_if ctd (doM { s\<leftarrow>body s; ll_call (f s)}) (return s)}"
     unfolding assms
     unfolding llc_while_def llc_if_def
-    apply (rewrite mwhile_unfold)
+    apply (rewrite REC'_unfold[OF reflexive])
+      subgoal sorry
     by simp
 
   (* 'Definition' of llc_while for presentation in paper: *)  
-  lemma "llc_while b c s \<equiv> doM { x \<leftarrow> b s; llc_if x (doM {s\<leftarrow>c s; llc_while b c s}) (return s) }"
+  lemma "\<And>c. llc_while b c s \<equiv> doM {
+     x \<leftarrow> b s;
+     llc_if x (doM {s\<leftarrow>c s; ll_call (llc_while b c s)}) (return s)
+   }"
     unfolding llc_while_def llc_if_def
-    apply (rewrite mwhile_unfold)
+    apply (rewrite REC'_unfold[OF reflexive])
+      subgoal sorry
     by simp
     
       
