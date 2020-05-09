@@ -3,6 +3,7 @@ imports
   "../lib/Sep_Algebra_Add" 
   "../lib/Frame_Infer"
   "../lib/Monad"
+  "HOL-Library.Extended_Nat"
 begin
 
 section \<open>General VCG Setup for Separation Logic\<close>
@@ -346,15 +347,98 @@ declaration \<open>
 
 
 
+section \<open>a General framework for abstract and concrete costs\<close>
+
+text \<open>This locale fixes a type of concrete costs \<open>'cc\<close> which is used in \<open>mres\<close> and a type for
+      abstract costs \<open>'ca\<close> which should be used in the separation logic with (resource) credits. 
+      There is some invariant that has to hold between the credits currently available "on the heap"
+      and the resources spent in the computation, \<open>I\<close> captures that.
+      Also it needs to be possible to deduct the resources used by the computation from the credits,
+      this is captured by \<open>minus\<close>.
+      \<close>
+
+locale cost_framework =
+  fixes
+    I :: "'cc::{monoid_add} \<Rightarrow> 'ca \<Rightarrow> bool"
+  and minus :: "'ca \<Rightarrow> 'cc \<Rightarrow> 'ca" \<comment> \<open>takes abstract credits, and returns the effect of consuming
+                                        the concrete resources\<close>
+assumes minus_0: "\<And>y. minus y 0 = y"
+  and I_0: "I 0 cr"
+  and minus_minus_add: "\<And>a b c. minus (minus a b) c = minus a (b + c)"
+  \<comment> \<open>TODO: maybe some of these are redundant\<close>
+  and I1: "\<And>a b c. I (a + b) c \<Longrightarrow> I b (minus c a)"
+  and I2: "\<And>a b c. I (a + b) c \<Longrightarrow> I a c"
+  and I3:  "\<And>a b c. I a (minus c b) \<Longrightarrow> I b c \<Longrightarrow> I (b + a) c"
+begin
+
+  definition  wp :: "('d, 'e, _, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where
+    "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,minus cr c) \<and> I c cr)"
+
+
+  interpretation generic_wp wp
+    apply unfold_locales
+    unfolding wp_def fun_eq_iff inf_fun_def inf_bool_def mwp_def
+    by (auto split: mres.split)
+
+
+  lemma wp_return: "wp (return x) Q s \<longleftrightarrow> Q x s"
+    by (auto simp: wp_def run_simps minus_0 I_0)
+
+  lemma wp_fail: "\<not> wp (fail x) Q s"
+    by (auto simp: wp_def run_simps)
+
+  lemma wp_fcheck: "wp (fcheck e \<Phi>) Q s \<longleftrightarrow> \<Phi> \<and> Q () s"
+    by (auto simp: wp_def run_simps minus_0 I_0 split: if_splits)
+
+  (* TODO: refactor that proof, should not need to unfold mwp_def at that stage *)
+  lemma wp_bind: "wp (m\<bind>f) Q s = wp m (\<lambda>x. wp (f x) Q) s"
+    apply (auto simp: wp_def run_simps split: prod.splits)
+    unfolding mwp_def apply (auto split: mres.splits simp add: minus_minus_add)
+    subgoal
+      by (metis I1)
+    subgoal
+      by (metis I2)
+    subgoal
+      by (metis I3)
+    done
+end
+
+interpretation nat: cost_framework "\<lambda>(c::nat) (cr::nat). cr-c+c=cr" "(-)"
+  apply standard
+  by auto
+
+interpretation int: cost_framework "\<lambda>(c::int) (cr::int). True" "(-)"
+  apply standard
+  by auto
+
+
 
 
 section \<open>Setup for mres-Monad\<close>
 
   lemma "cr-c+c=(cr::nat) \<longleftrightarrow> cr\<ge>c" by auto
   lemma "cr-c+c=(cr::int) \<longleftrightarrow> True" by auto
-  
-  definition  wp :: "('d, 'e, 'b::{cancel_comm_monoid_add}, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where 
-    "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,cr-c) \<and> cr-c+c=cr)"
+
+
+  interpretation cost_framework "\<lambda>(c::nat) (cr::enat). cr-c+c=cr" "(-)"
+    apply standard
+         apply (auto simp: zero_enat_def)
+    subgoal
+      by (metis diff_diff_add idiff_enat_enat idiff_infinity not_infinity_eq)
+    subgoal
+      by (metis \<open>\<And>c b a. a - enat b - enat c = a - enat (b + c)\<close> add_diff_assoc_enat add_diff_cancel_left' enat_ord_simps(1) idiff_enat_enat le_add_same_cancel1 zero_le)  
+    subgoal
+      by (smt \<open>\<And>c b a. a - enat b - enat c = a - enat (b + c)\<close> \<open>\<And>c b a. c - enat (a + b) + enat (a + b) = c \<Longrightarrow> c - enat a - enat b + enat b = c - enat a\<close> add.commute add.left_commute of_nat_add of_nat_eq_enat)  
+    subgoal
+      by (metis \<open>\<And>c b a. a - enat b - enat c = a - enat (b + c)\<close> add.assoc add.commute plus_enat_simps(1))  
+    done
+
+  lemma enat_nat_I_conv: "cr - enat c + enat c = cr \<longleftrightarrow> cr \<ge> c"
+    by (cases cr; cases c; auto)
+
+  (* Definition for presentation *)
+  lemma natenat_alt: "wp m Q \<equiv> \<lambda>(s, cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s, cr - enat c) \<and> cr \<ge> c)"
+    unfolding wp_def apply(subst enat_nat_I_conv) .
 
   (* Definition for presentation in paper *)
   lemma "wp m Q (s,cr::nat) = (\<exists>r c s'. run m s = SUCC r c s' \<and> Q r (s', cr-c) \<and> c\<le>cr )"
@@ -371,27 +455,13 @@ section \<open>Setup for mres-Monad\<close>
     unfolding wp_def fun_eq_iff inf_fun_def inf_bool_def mwp_def
     by (auto split: mres.split)
 
-  lemma wp_return[vcg_normalize_simps]: "wp (return x) Q s \<longleftrightarrow> Q x s"  
-    by (auto simp: wp_def run_simps)
+  declare wp_return[vcg_normalize_simps]
 
-  lemma wp_fail[vcg_normalize_simps]: "\<not> wp (fail x) Q s"  
-    by (auto simp: wp_def run_simps)
+  declare wp_fail[vcg_normalize_simps]
 
-  lemma wp_fcheck[vcg_normalize_simps]: "wp (fcheck e \<Phi>) Q s \<longleftrightarrow> \<Phi> \<and> Q () s"  
-    by (auto simp: wp_def run_simps split: if_splits)
-            
-  (* TODO: refactor that proof, should not need to unfold mwp_def at that stage *)
-  lemma wp_bind[vcg_normalize_simps]: "wp (m\<bind>f) Q s = wp m (\<lambda>x. wp (f x) Q) s"  
-    apply (auto simp: wp_def run_simps split: prod.splits)
-    unfolding mwp_def apply (auto split: mres.splits simp add: diff_diff_add)
-    subgoal   
-      by (metis add.left_commute add_diff_cancel_left')  
-    subgoal   
-      by (metis add.assoc add.commute add_diff_cancel_left')  
-    subgoal  
-      by (metis add.assoc add.commute)
-    done
+  declare wp_fcheck[vcg_normalize_simps]
 
+  declare wp_bind[vcg_normalize_simps]
 
   thm vcg_normalize_simps
 
