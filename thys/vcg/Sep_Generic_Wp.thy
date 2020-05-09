@@ -420,17 +420,23 @@ section \<open>Setup for mres-Monad\<close>
   lemma "cr-c+c=(cr::int) \<longleftrightarrow> True" by auto
 
 
+  lemma enat_diff_diff: "a - enat b - enat c = a - enat (b + c)"
+    apply(cases a) by auto
+  lemma enat_aux1: "c - enat (a + b) + enat (a + b) = c \<Longrightarrow> c - enat a + enat a = c"
+    apply(cases c) by auto
+
   interpretation cost_framework "\<lambda>(c::nat) (cr::enat). cr-c+c=cr" "(-)"
     apply standard
          apply (auto simp: zero_enat_def)
     subgoal
-      by (metis diff_diff_add idiff_enat_enat idiff_infinity not_infinity_eq)
+      by (metis enat_diff_diff)
     subgoal
-      by (metis \<open>\<And>c b a. a - enat b - enat c = a - enat (b + c)\<close> add_diff_assoc_enat add_diff_cancel_left' enat_ord_simps(1) idiff_enat_enat le_add_same_cancel1 zero_le)  
+      by (metis enat_diff_diff add_diff_assoc_enat add_diff_cancel_left' enat_ord_simps(1)
+                idiff_enat_enat le_add_same_cancel1 zero_le)
     subgoal
-      by (smt \<open>\<And>c b a. a - enat b - enat c = a - enat (b + c)\<close> \<open>\<And>c b a. c - enat (a + b) + enat (a + b) = c \<Longrightarrow> c - enat a - enat b + enat b = c - enat a\<close> add.commute add.left_commute of_nat_add of_nat_eq_enat)  
+      by (metis enat_aux1)
     subgoal
-      by (metis \<open>\<And>c b a. a - enat b - enat c = a - enat (b + c)\<close> add.assoc add.commute plus_enat_simps(1))  
+      by (metis enat_diff_diff add.assoc add.commute plus_enat_simps(1))
     done
 
   lemma enat_nat_I_conv: "cr - enat c + enat c = cr \<longleftrightarrow> cr \<ge> c"
@@ -465,5 +471,128 @@ section \<open>Setup for mres-Monad\<close>
 
   thm vcg_normalize_simps
 
+
+
+section \<open>experiment: cost type for Space\<close>
+
+
+datatype space_cost = Space_Cost nat nat (* highest point,  how far below that mark at the moment *)
+
+fun max_cost where "max_cost (Space_Cost h _) = h"
+fun curr_cost where "curr_cost (Space_Cost h c) = int h - int c"
+
+definition "new_h m1 c1 m2 c2 \<equiv> (max (int m1) (((int m1 - int c1)+int m2)))"
+definition "new_c m1 c1 m2 c2 \<equiv> (new_h m1 c1 m2 c2 - ((int m1 - int c1)+(int m2 - int c2)))"
+
+lemma new_h_nonneg: "new_h m1 c1 m2 c2 \<ge> 0"
+  by (auto simp: new_h_def)
+
+lemma new_c_nonneg: "new_c m1 c1 m2 c2 \<ge> 0"
+  by (auto simp: new_c_def new_h_def)
+
+instantiation space_cost :: plus
+begin
+  lemma fixes m1 c1 m2 c2 :: nat
+    shows "(max (int m1) (((int m1 - int c1)+int m2))) - ((int m1 - int c1)+(int m2 - int c2)) \<ge> 0"
+    by auto
+
+lemma "new_h m1 c1 m2 c2 - ((int m1 - int c1)+(int m2 - int c2)) \<ge> 0"
+  by (auto simp: new_h_def)
+
+  fun plus_space_cost :: "space_cost \<Rightarrow> space_cost \<Rightarrow> space_cost" where
+    "plus_space_cost (Space_Cost m1 c1) (Space_Cost m2 c2) =
+             Space_Cost (nat (new_h m1 c1 m2 c2)) (nat (new_c m1 c1 m2 c2))"
+
+  instance ..
+end
+
+
+instantiation space_cost :: monoid_add
+begin
+  definition zero_space_cost :: space_cost where "zero_space_cost = Space_Cost 0 0"
+
+  instance
+    apply standard
+    subgoal for a b c
+      apply(cases a; cases b; cases c)
+      apply (simp add: new_h_nonneg new_c_nonneg) apply safe
+      subgoal for m1 c1 m2 c2 m3 c3
+        apply(subst (2) new_h_def)
+        apply(simp add: new_c_nonneg  new_h_nonneg)
+        apply(subst (4) new_h_def)
+        apply(simp add: new_c_nonneg  new_h_nonneg)
+        by (auto simp: new_h_def new_c_def max.assoc)
+      subgoal for m1 c1 m2 c2 m3 c3
+        apply(subst (3) new_c_def)
+        apply(simp add: new_c_nonneg  new_h_nonneg)
+        apply(subst (3) new_c_def)
+        apply(subst (3) new_h_def)
+        apply(simp add: new_c_nonneg  new_h_nonneg)
+        apply(subst (2) new_c_def)
+        apply(simp add: new_c_nonneg  new_h_nonneg)
+        by (auto simp: new_h_def new_c_def max.assoc)
+      done
+    subgoal for a apply(cases a)
+      subgoal for m c
+        by (auto simp: new_h_def new_c_def zero_space_cost_def)
+      done
+    subgoal for a apply(cases a)
+      subgoal for m c
+        by (auto simp: new_h_def new_c_def zero_space_cost_def)
+      done
+    done
+end
+
+
+text \<open>the Invariant denotes, that maximum space \<open>m\<close> is at most the number of space_credits \<open>n\<close>\<close>
+
+fun space_I :: "space_cost \<Rightarrow> nat \<Rightarrow> bool"  where
+  "space_I (Space_Cost m c) n \<longleftrightarrow> m\<le>n"
+
+fun space_minus :: "nat \<Rightarrow> space_cost \<Rightarrow> nat"  where
+  "space_minus  n (Space_Cost m c) = n - m + c"
+\<comment> \<open>if space_I holds, this is n - (m-c), i.e. credits minus newly occupied space\<close>
+
+interpretation space: cost_framework "space_I" "space_minus"
+  apply standard
+  subgoal for a by(simp add: zero_space_cost_def)
+  subgoal for cr apply (simp add: zero_space_cost_def) done
+  subgoal for a b c apply(cases b; cases c) by (simp add: new_c_def new_h_def)
+  subgoal for a b c apply(cases a; cases b) by (simp add: new_c_def new_h_def)
+  subgoal for a b c apply(cases a; cases b) by (simp add: new_c_def new_h_def)
+  subgoal for a b c apply(cases a; cases b) by (simp add: new_c_def new_h_def)
+  done
+
+
+lemma space_minus_aux: "space_I b 0 \<Longrightarrow> Space_Cost 0 (space_minus 0 b) = b"
+  apply(cases b) by simp
+
+
+text \<open>The test \<open>sm\<le>cr\<close> makes sure that the maximum of space \<open>sm\<close> used does not exceed 
+      the allowed space by the "space-credits" cr.
+      When before executing \<open>m\<close> there are \<open>cr\<close> credits, after the execution there will be
+      \<open>cr - (sm-c)\<close>, i.e. the credits before minus the number of consumed space,
+      see @{const curr_cost}.\<close>
+
+lemma "space.wp m Q (s,cr) = (\<exists>r sm c s'. run m s = SUCC r (Space_Cost sm c) s'
+                                   \<and> Q r (s', cr - sm + c) \<and> sm\<le>cr )"
+    unfolding space.wp_def  mwp_def
+    apply (auto split: mres.splits)
+    subgoal for a b c apply(cases b)
+      by simp
+    done
+
+
+(* TODO: again clash with type class lifting with prod for sep_algebra!
+instantiation prod :: (monoid_add,monoid_add) monoid_add
+begin
+
+end
+
+lemma
+  assumes "cost_framework I1 minus1"
+    and "cost_framework I2 minus2"
+  shows "cost_framework (\<lambda>(a,b) (c,d). I1 a c \<and> I2 b d) (\<lambda>(a,b) (c,d). (minus1 a c, minus2 b d))"
+*)
 
 end
