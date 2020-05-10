@@ -36,9 +36,9 @@ begin
   locale block_allocator2 = block_allocator1 static_err mem_err bload bstore bcheck_addr
     for static_err :: 'err
     and mem_err :: 'err
-    and bload :: "'baddr::this_addr \<Rightarrow> ('val,_,'block,'err) M"
-    and bstore :: "'val \<Rightarrow> 'baddr \<Rightarrow> (unit,_,'block,'err) M"
-    and bcheck_addr :: "'baddr \<Rightarrow> (unit,_,'block,'err) M"
+    and bload :: "'baddr::this_addr \<Rightarrow> ('val,_,_,'block,'err) M"
+    and bstore :: "'val \<Rightarrow> 'baddr \<Rightarrow> (unit,_,_,'block,'err) M"
+    and bcheck_addr :: "'baddr \<Rightarrow> (unit,_,_,'block,'err) M"
     
   + fixes \<alpha>b :: "'block \<Rightarrow> 'ablock::unique_zero_sep_algebra"
       and bpto :: "'val \<Rightarrow> 'baddr \<Rightarrow> 'ablock \<Rightarrow> bool"
