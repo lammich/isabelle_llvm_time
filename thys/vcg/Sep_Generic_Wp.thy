@@ -471,8 +471,108 @@ section \<open>Setup for mres-Monad\<close>
 
   thm vcg_normalize_simps
 
+  
+section \<open>experiment: Hoare-triple without Time\<close>  
+ 
+  
+  (* TODO: Move, to Sep_Lift *)  
+  text \<open>Lifting Assertions over Product\<close>
+  definition FST :: "('a \<Rightarrow> bool) \<Rightarrow> 'a \<times> 'b::zero \<Rightarrow> bool" 
+    where "FST P \<equiv> \<lambda>(a,b). P a \<and> b=0"
+  
+  definition SND :: "('b \<Rightarrow> bool) \<Rightarrow> 'a::zero \<times> 'b \<Rightarrow> bool" 
+    where "SND P \<equiv> \<lambda>(a,b). a=0 \<and> P b"
+    
+  
+  lemma FST_project_frame: "(FST P \<and>* F) (a, b) \<longleftrightarrow> (P ** (\<lambda>a. F (a,b))) a"
+    unfolding sep_conj_def
+    by (force simp add: sep_algebra_simps FST_def) 
+    
+  lemma FST_conj_conv: "(FST P ** FST Q) = FST (P**Q)"  
+    unfolding sep_conj_def
+    by (force simp add: sep_algebra_simps FST_def) 
+    
+  lemma FST_apply[sep_algebra_simps]: "FST P (a,b) \<longleftrightarrow> P a \<and> b=0"
+    unfolding FST_def by auto
+    
+      
+  (* TODO: Move *)
+  instantiation enat :: stronger_sep_algebra begin
+    definition "(_::enat) ## _ \<equiv> True"
+  
+    instance
+      apply standard
+      apply (simp_all add: sep_disj_enat_def)
+      done
+      
+  end
+  
+  text \<open>Weakest precondition without time\<close>
+  definition "wpn m Q s \<equiv> (\<exists>r s'. run m s = SUCC r 0 s' \<and> Q r s')"
+  
+  lemma wpn_alt: "wpn m Q s = wp m (FST o Q) (s,0)"
+    unfolding wp_def wpn_def mwp_def
+    by (auto split: mres.split simp: zero_enat_def FST_def)
+  
+  interpretation notime: generic_wp wpn  
+    apply unfold_locales 
+    unfolding wpn_def fun_eq_iff inf_fun_def inf_bool_def mwp_def
+    by (auto split: mres.split)
+    
+  term wp  
+  term htriple
+  text \<open>Transfer of Hoare-Triples\<close>
+        
+  
+  lemma wp_time_mono: "wp m Q (s,c) \<Longrightarrow> wp m (\<lambda>r (s',c'). \<exists>cc'. c'=cc'+d \<and> Q r (s',cc')) (s,c+d)"
+    unfolding wp_def mwp_def
+    apply (auto simp add: algebra_simps sep_algebra_simps SND_def sep_conj_def split: mres.split)
+    apply (metis add.commute add_diff_assoc_enat enat_nat_I_conv)
+    by (metis ab_semigroup_add_class.add_ac(1) add_diff_cancel_enat enat.distinct(1))
+      
+  lemma notime_to_htriple:
+    fixes c :: "('a, 'b, nat, 'd, 'e) M"
+    assumes H: "notime.htriple \<alpha> P c Q"
+    shows "htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
+    apply (rule htripleI)
+    apply clarify
+  proof -
+    fix F a and b :: enat
+    assume "(FST P \<and>* F) (\<alpha> a, b)"
+    hence "(P ** (\<lambda>a. F (a,b))) (\<alpha> a)"
+      by (simp add: sep_algebra_simps FST_project_frame)
+    from notime.htripleD[OF H this] have "wpn c (\<lambda>r s'. (Q r \<and>* (\<lambda>a. F (a, b))) (\<alpha> s')) a" .
+    then have "wp c (\<lambda>x (a, ba). (Q x \<and>* (\<lambda>a. F (a, b))) (\<alpha> a) \<and> ba = 0) (a, 0)"
+      unfolding wpn_alt FST_def comp_def by simp
+    from wp_time_mono[OF this, of b] have "wp c (\<lambda>r (s', c'). c' = b \<and> (Q r \<and>* (\<lambda>a. F (a, b))) (\<alpha> s')) (a, b)"
+      by simp
+    then show "wp c (\<lambda>r s'. ((FST \<circ> Q) r \<and>* F) (case s' of (s, x) \<Rightarrow> (\<alpha> s, x))) (a, b)"  
+      apply (rule wp_monoI)
+      apply (auto simp: FST_project_frame)
+      done
+  qed  
 
-
+  lemma htriple_to_notime:
+    assumes H: "htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
+    shows "notime.htriple \<alpha> P c Q"
+    apply (rule notime.htripleI)
+    unfolding wpn_alt
+  proof -  
+    fix F s
+    assume A: "(P \<and>* F) (\<alpha> s)"
+    
+    show "wp c (FST \<circ> (\<lambda>r s'. (Q r \<and>* F) (\<alpha> s'))) (s, 0)"
+      apply (rule wp_monoI)
+      apply (rule htripleD[OF H, where F="FST F"])
+      apply (auto simp: FST_conj_conv sep_algebra_simps A)
+      done
+  qed      
+  
+  lemma notime_htriple_eq: "notime.htriple \<alpha> P c Q = htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
+    by (blast intro: notime_to_htriple htriple_to_notime)
+  
+    
+  
 section \<open>experiment: cost type for Space\<close>
 
 
