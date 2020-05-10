@@ -469,6 +469,7 @@ begin
     by pf_mono_prover
     
     
+  
   notepad  (* TODO: cleanup *)
   begin
    
@@ -477,7 +478,7 @@ begin
     
       and DEF: "f \<equiv> REC' F"
       and F: " F  \<equiv> \<lambda>D x. (if x>0 then D (x-1) else return 0 )"
-    have "P f"
+    have "P (ll_call (f x))"
       apply(rewrite REC'_unfold[OF DEF MONO])
       apply(rewrite REC'_unfold[OF DEF MONO])
       apply(rewrite REC'_unfold[OF DEF MONO])
@@ -488,37 +489,35 @@ begin
 
   subsubsection \<open>While-Combinator\<close>
   text \<open>
-    Note that we also include the while combinator at this point, as we plan
-    to add direct translation of while to a control flow graph as an optional 
-    feature of the code generator. 
+    Note that we also include the while combinator at this point, as we direct translation 
+    of while to a control flow graph is the default translation mode of the code generator. 
     
-    In the current state, the code generator will recognize the while combinator, 
-    but refuse to translate it.
-  
-    Note that the standard way of using a while combinator is to translate it to 
+    As an optional feature, while can be translated to 
     a tail recursive function call, which the preprocessor can do automatically.
   \<close>
     
   definition llc_while :: "('a::llvm_repv \<Rightarrow> 1 word llM) \<Rightarrow> ('a \<Rightarrow> 'a llM) \<Rightarrow> 'a \<Rightarrow> 'a llM" where
-    "llc_while b f s\<^sub>0 \<equiv> REC' (\<lambda>mwhile \<sigma>. doM {
+    "llc_while b f s\<^sub>0 \<equiv> ll_call (REC' (\<lambda>mwhile \<sigma>. doM {
               ctd \<leftarrow> b \<sigma>;
               llc_if ctd (f \<sigma> \<bind> mwhile) (return \<sigma>)
-            }) s\<^sub>0" 
+            }) s\<^sub>0)" 
 
+  (*          
   lemma gen_code_thm_llc_while:
     assumes "f \<equiv> llc_while b body"
-    shows "f s = doM { ctd \<leftarrow> b s; llc_if ctd (doM { s\<leftarrow>body s; ll_call (f s)}) (return s)}"
+    shows "f s = ll_call (doM { ctd \<leftarrow> b s; llc_if ctd (doM { s\<leftarrow>body s; f s}) (return s)})"
     unfolding assms
     unfolding llc_while_def llc_if_def
     apply (rewrite REC'_unfold[OF reflexive])
     apply pf_mono_prover
     by simp
+  *)
 
   (* 'Definition' of llc_while for presentation in paper: *)  
-  lemma "\<And>c. llc_while b c s \<equiv> doM {
+  lemma "\<And>c. llc_while b c s \<equiv> ll_call (doM {
      x \<leftarrow> b s;
-     llc_if x (doM {s\<leftarrow>c s; ll_call (llc_while b c s)}) (return s)
-   }"
+     llc_if x (doM {s\<leftarrow>c s; llc_while b c s}) (return s)
+   })"
     unfolding llc_while_def llc_if_def
     apply (rewrite REC'_unfold[OF reflexive])
     apply pf_mono_prover

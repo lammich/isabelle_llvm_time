@@ -11,15 +11,6 @@ begin
   subsection \<open>Fixed-Point Unfolding Setup\<close>
 
   declaration \<open>fn _ => Definition_Utils.declare_extraction_group @{binding LLVM} #> snd\<close>
-  declaration \<open>fn _ => Definition_Utils.declare_extraction_group @{binding LLVM_while} #> snd\<close>
-    
-  declaration \<open> fn _ =>
-    Definition_Utils.add_extraction (@{extraction_group LLVM_while},\<^here>) {
-      pattern = Logic.varify_global @{term "llc_while b body"},
-      gen_thm = @{thm gen_code_thm_llc_while},
-      gen_tac = K (K no_tac)
-    }
-  \<close>
 
   declaration \<open>fn _ =>
     Definition_Utils.add_extraction (@{extraction_group LLVM},\<^here>) {
@@ -259,8 +250,6 @@ subsection \<open>Preprocessor\<close>
       
       fun default_extractions ctxt = 
           Definition_Utils.get_extraction_group ctxt @{extraction_group LLVM}
-        |> (not (Config.get ctxt llc_compile_while) ? 
-              append (Definition_Utils.get_extraction_group ctxt @{extraction_group LLVM_while}))  
       
       fun gather_code_thms roots lthy = let
         val thy = Proof_Context.theory_of lthy
@@ -283,6 +272,7 @@ subsection \<open>Preprocessor\<close>
               val exs = default_extractions lthy
               
               val ((teqn,add_eqns,_),lthy) = Definition_Utils.extract_recursion_eqs exs basename teqn lthy
+              
               val teqns = teqn::add_eqns
               
               (* Inline and format again *)
@@ -373,7 +363,7 @@ subsection \<open>Code Generator Driver\<close>
         val dbg = Config.get lthy cfg_llvm_debug
         val gen_header = Config.get lthy cfg_llvm_gen_header
         fun trace s = if dbg then Pretty.string_of (s ()) |> tracing else ()
-                                                                                                      
+
         val _ = trace (fn () => Pretty.str "Gathering code theorems")
         val (cthms,lthy) = LLC_Preprocessor.gather_code_thms (map fst cns) lthy
         val _ = trace (fn () => pretty_cthms lthy cthms)
@@ -478,23 +468,50 @@ subsection \<open>Code Generator Driver\<close>
           -- Scan.option ((@{keyword "file"} |-- Parse.position Parse.path))
           ) 
             >> (fn ((((dbg,nowhile),no_header),bnd),((cns,tydefs),path_spos)) => fn lthy => let 
+
             
-              local
-                val lthy = (dbg?Config.put cfg_llvm_debug true) lthy
-                val lthy = (nowhile?Config.put LLC_Lib.llc_compile_while false) lthy
-                val lthy = (no_header?Config.put cfg_llvm_gen_header false) lthy
-              in
-                val cns = map (apfst (Syntax.read_term lthy)) cns
-                val cns = map (apsnd (map_option (LLC_HeaderGen.check_raw_sig lthy))) cns
-                val tydefs = the_default [] (map_option (LLC_HeaderGen.check_raw_tydefs lthy) tydefs)
-                
-                val path = Option.map (prepare_path lthy) path_spos 
-                val hfnpath = prepare_hpath lthy path_spos
-                
-                val (cthms,lthy) = export_llvm cns tydefs path hfnpath lthy
-              end
+              val nowhile_declarations = 
+                Config.put LLC_Lib.llc_compile_while false
+              #> Context.proof_map (Named_Simpsets.add_simp @{named_simpset llvm_inline} @{thm llc_while_def})
+                        
+              val lthy = (dbg?Config.put cfg_llvm_debug true) lthy
+              val lthy = (nowhile?nowhile_declarations) lthy
+              val lthy = (no_header?Config.put cfg_llvm_gen_header false) lthy
+
+              (*
+                TODO: No idea what happens here, but any subsequent
+                  open_target/close_target block will RESET the configuration options 
+                  just made! Unless, we open our own target here ... then options will 
+                  only be reset at corresponding close_target.
+              
+                  PROBLEM:
+                    set_option; open_target; close_target; <No effect of set-option visible here!>
+
+                  BUT:
+                    set_option; open; open; close <effect still visible>; close <effect gone>
+                                      
+                    
+                  No chance to figure out what happens, given the 'ample' 1-paragraph
+                  documentation available on the local target mechanism in Isabelle.
+                  I'm not even sure at this point whether the local-target stuff is required
+                  in extract_recursion_eqs in first place?
+              *)
+              val lthy = Local_Theory.open_target lthy |> snd
+            
+                            
+              val cns = map (apfst (Syntax.read_term lthy)) cns
+              val cns = map (apsnd (map_option (LLC_HeaderGen.check_raw_sig lthy))) cns
+              val tydefs = the_default [] (map_option (LLC_HeaderGen.check_raw_tydefs lthy) tydefs)
+              
+              val path = Option.map (prepare_path lthy) path_spos 
+              val hfnpath = prepare_hpath lthy path_spos
+              
+              val (cthms,lthy) = export_llvm cns tydefs path hfnpath lthy
               
               val (_,lthy) = Local_Theory.note (bnd,cthms) lthy 
+              
+              val lthy = Local_Theory.close_target lthy
+              
               
             in lthy end))
         
@@ -631,10 +648,10 @@ experiment begin
 
   
 definition [llvm_code]: "testx (a::64 word) \<equiv> llc_while (\<lambda>a. ll_icmp_ult 0 a) (\<lambda>a. ll_sub a 1) a"
-    
-declare [[eta_contract = false]]
+
 export_llvm (debug) testx
 export_llvm (debug) exp_thms1: exp  
+
 export_llvm (debug) (no_while) exp_thms2: exp  
 export_llvm (debug) (no_while) exp_thms3: exp  
 
@@ -664,7 +681,7 @@ definition [llvm_code]:
 export_llvm test_if_names
 
 definition fib :: "64 word \<Rightarrow> 64 word llM" 
-  where [llvm_code]: "fib n \<equiv> REC' (\<lambda>fib n. doM { 
+  where [llvm_code]: "fib n \<equiv> ll_call (REC' (\<lambda>fib n. doM { 
     t\<leftarrow>ll_icmp_ule n 1; 
     llc_if t 
       (return n) 
@@ -674,7 +691,7 @@ definition fib :: "64 word \<Rightarrow> 64 word llM"
         n\<^sub>2 \<leftarrow> ll_sub n 2; 
         b\<leftarrow>fib n\<^sub>2; 
         c\<leftarrow>ll_add a b; 
-        return c })} ) n"
+        return c })} ) n)"
 
 export_llvm (debug) fib is fib
 

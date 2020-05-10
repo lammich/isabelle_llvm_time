@@ -158,13 +158,9 @@ begin
         (is_valid_head f orelse raise TERM("Invalid head (expected const or free)",[f]); f)
       
       val name_of_head = fst o dest_head
-                    
-      
       
       val llc_compile_while =
-        Config.bool (Config.declare ("llc_compile_while", \<^here>) (fn _ => Config.Bool true));
-      
-      
+        Attrib.setup_config_bool @{binding llc_compile_while} (K true)
       
     end
   \<close>
