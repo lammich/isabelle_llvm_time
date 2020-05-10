@@ -45,8 +45,8 @@ begin
       and tag_of :: "'block \<Rightarrow> 'tag"
       and is_complete_tag :: "'ablock \<Rightarrow> 'tag \<Rightarrow> bool"
       
-    assumes bload_rule: "\<And>x a. htriple \<alpha>b (bpto x a) (bload a) (\<lambda>r. \<up>(r=x) ** bpto x a)"
-        and bstore_rule: "\<And>x xx a. htriple \<alpha>b (bpto xx a) (bstore x a) (\<lambda>_. bpto x a)"
+    assumes bload_rule: "\<And>x a. notime.htriple \<alpha>b (bpto x a) (bload a) (\<lambda>r. \<up>(r=x) ** bpto x a)"
+        and bstore_rule: "\<And>x xx a. notime.htriple \<alpha>b (bpto xx a) (bstore x a) (\<lambda>_. bpto x a)"
         and bload_pres_tag: "\<And>s a. wlp (bload a) (\<lambda>_ s'. tag_of s' = tag_of s) s"
         and bstore_pres_tag: "\<And>s a x. wlp (bstore a x) (\<lambda>_ s'. tag_of s' = tag_of s) s"
         and complete_tag: 
@@ -66,9 +66,10 @@ begin
       where "block b \<equiv> \<lambda>RP_ADDR (ADDR bi ba) \<Rightarrow> EXACT (0(bi:=(b,0))) ** \<up>(ba=this_addr) | _ \<Rightarrow> sep_false"
   
     
-    lemma alloc_rule: "htriple \<alpha> \<box> (alloc b) (\<lambda>r. block (\<alpha>b b) r ** tag (tag_of b) r)"
-      apply (rule htripleI')
-      apply (auto simp: alloc_def wp_def run_simps sep_algebra_simps split: option.splits)
+    lemma alloc_rule: "notime.htriple \<alpha> \<box> (alloc b) (\<lambda>r. block (\<alpha>b b) r ** tag (tag_of b) r)"
+      apply (rule notime.htripleI')
+      apply (auto simp: alloc_def wpn_def run_simps sep_algebra_simps split: option.splits)
+      (* TODO/FIXME: auto followed by proof. *)
     proof -
       fix s :: "'block memory"
       obtain blocks where [simp]: "s = MEMORY blocks" by (cases s)
@@ -120,11 +121,11 @@ begin
         done
     qed        
     
-    lemma free_rule: "htriple \<alpha> (block blk a ** tag t a ** \<up>(is_complete_tag blk t)) (free a) (\<lambda>_. \<box>)"
-      apply (rule htripleI')
+    lemma free_rule: "notime.htriple \<alpha> (block blk a ** tag t a ** \<up>(is_complete_tag blk t)) (free a) (\<lambda>_. \<box>)"
+      apply (rule notime.htripleI')
       subgoal for p s f
         apply (cases s)
-        apply (auto simp: free_def wp_def run_simps sep_algebra_simps split: option.splits addr.splits rptr.splits)
+        apply (auto simp: free_def wpn_def run_simps sep_algebra_simps split: option.splits addr.splits rptr.splits)
         apply (auto simp: block_def tag_def sep_algebra_simps pred_lift_extract_simps)
         apply (all \<open>subst (asm) EXACT_split[symmetric] sep_disj_fun_def; clarsimp simp: sep_algebra_simps\<close>)
         apply (auto simp: \<alpha>_def sep_algebra_simps merge_fun_singleton split_fun_upd_0)
@@ -194,20 +195,20 @@ begin
       
     fun rptr_cases where "rptr_cases (RP_NULL) = ()" | "rptr_cases (RP_ADDR (ADDR _ _)) = ()"
     
-    lemma load_rule: "htriple \<alpha> (pto x a) (load a) (\<lambda>r. \<up>(x=r) ** pto x a)"
+    lemma load_rule: "notime.htriple \<alpha> (pto x a) (load a) (\<lambda>r. \<up>(x=r) ** pto x a)"
       unfolding load_def
       apply (cases a rule: rptr_cases.cases; simp)
-      apply (rule cons_post_rule)
+      apply (rule notime.cons_post_rule)
       apply (rule block_lifter.lift_operation[simplified, OF _ _ bload_rule])
       apply (simp add: bpto_notZ)
       apply (rule bload_pres_tag)
       apply (auto simp: sep_algebra_simps pred_lift_extract_simps)
       done
       
-    lemma store_rule: "htriple \<alpha> (pto xx a) (store x a) (\<lambda>_. pto x a)"  
+    lemma store_rule: "notime.htriple \<alpha> (pto xx a) (store x a) (\<lambda>_. pto x a)"  
       unfolding store_def
       apply (cases a rule: rptr_cases.cases; simp)
-      apply (rule cons_post_rule)
+      apply (rule notime.cons_post_rule)
       apply (rule block_lifter.lift_operation[simplified, OF _ _ bstore_rule])
       apply (simp add: bpto_notZ)
       apply (rule bstore_pres_tag)

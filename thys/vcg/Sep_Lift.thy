@@ -170,17 +170,14 @@ begin
       unfolding lift_assn_def
       by (auto simp: sep_algebra_simps intro: carve_project_Z_imp_Z)
             
-    (* TODO
-      lemma lift_ty:   
+    lemma lift_ty:   
       assumes PRESTY: "\<And>s. wlp c (\<lambda>_ s'. tys s' = tys s) s"
       shows "wlp (zoom (lift_lens e L) c) (\<lambda>_ s'. tyb s' = tyb s) s"
       using PRESTY
-      apply (auto simp: wlp_def run_simps split: option.splits)
+      apply (auto simp: mwp_def wlp_def run_simps split: option.splits)
       apply (drule meta_spec[where x="get' L s"])
-      apply (erule mwp_cons)
-      apply (auto)
+      apply (auto split: mres.split)
       done
-      *)
       
     lemma infer_pre_get_with_frame:
       assumes "lift_assn P p" "p ## f"  "\<alpha>b s = p + f"
@@ -190,13 +187,12 @@ begin
       using assms splittable_same_struct unfolding lift_assn_def 
       by fastforce+
 
-  (* TODO
     lemma lift_operation:
       assumes NZ: "\<not>P 0"
       assumes PRESTY: "\<And>s. wlp c (\<lambda>_ s'. tys s' = tys s) s"
-      assumes HT: "htriple \<alpha>s P c Q"
-      shows "htriple \<alpha>b (lift_assn P) (zoom (lift_lens e L) c) (\<lambda>r. lift_assn (Q r))"
-    proof (rule htripleI'; clarsimp simp: lift_assn_def)
+      assumes HT: "notime.htriple \<alpha>s P c Q"
+      shows "notime.htriple \<alpha>b (lift_assn P) (zoom (lift_lens e L) c) (\<lambda>r. lift_assn (Q r))"
+    proof (rule notime.htripleI'; clarsimp simp: lift_assn_def)
       fix p s f
       assume A: "p ## f" and [simp]: "\<alpha>b s = p + f" "splittable p" "carve p = 0" and "P (project p)"
       hence [simp]: "project p\<noteq>0" "p\<noteq>0" "p##f" "f##p" using NZ by (auto simp: sep_algebra_simps)
@@ -211,21 +207,21 @@ begin
 
       have [simp]: "project (\<alpha>b s) \<noteq> 0" using A by simp 
         
-      note HT'= htripleD'[OF HT _ _ \<open>P (project p)\<close>, where f="project f" and s="get' L s", simplified]
+      note HT'= notime.htripleD'[OF HT _ _ \<open>P (project p)\<close>, where f="project f" and s="get' L s", simplified]
       
       from PRESTY HT' have HT': 
-        "wp c (\<lambda>r s'. tys s' = tys (get' L s) \<and> (\<exists>p'. p' ## project f \<and> \<alpha>s s' = p' + project f \<and> Q r p')) (get' L s)"
-        apply (auto simp: wlp_def wp_def mwp_def split: mres.splits) 
+        "wpn c (\<lambda>r s'. tys s' = tys (get' L s) \<and> (\<exists>p'. p' ## project f \<and> \<alpha>s s' = p' + project f \<and> Q r p')) (get' L s)"
+        apply (auto simp: wlp_def wpn_def mwp_def split: mres.splits) 
         apply (drule meta_spec[where x="get' L s"]; simp) (* FIXME: Why can't we solve that goal in one line? *)
         done
       
-      note HT' = HT'[unfolded wp_def]
+      note HT' = HT'[unfolded wpn_def]
 
       (*from precond have [simp]: "pre_get L s" "pre_put L s" by auto*)
       note [simp] = precond
       
-      show "wp (zoom (lift_lens e L) c) (\<lambda>r s'. \<exists>p'. p' ## f \<and> \<alpha>b s' = p' + f \<and> splittable p' \<and> carve p' = 0 \<and> Q r (project p')) s"
-        apply (auto simp: wp_def run_simps split: option.splits)
+      show "wpn (zoom (lift_lens e L) c) (\<lambda>r s'. \<exists>p'. p' ## f \<and> \<alpha>b s' = p' + f \<and> splittable p' \<and> carve p' = 0 \<and> Q r (project p')) s"
+        apply (auto simp: wpn_def run_simps split: option.splits)
         apply (rule mwp_cons[OF HT'])
         apply (clarsimp_all simp: )
         subgoal for x s' p'
@@ -235,7 +231,7 @@ begin
           apply (auto simp: disj_project_eq_lift sep_algebra_simps)
           done
         done    
-    qed*)
+    qed
     
   end
 

@@ -450,12 +450,6 @@ section \<open>Setup for mres-Monad\<close>
   lemma "wp m Q (s,cr::nat) = (\<exists>r c s'. run m s = SUCC r c s' \<and> Q r (s', cr-c) \<and> c\<le>cr )"
     unfolding wp_def mwp_def by (fastforce split: mres.splits)
 
-  \<^cancel>\<open>definition "wlp c Q \<equiv> mwp (run c s) top top top (\<lambda>r c s. Q r (c,s))"
-    lemma wlp_true[simp, intro!]:
-      "wlp c (\<lambda>_ _. True) s"
-      "wlp c top s"
-      by (auto simp: wlp_def mwp_def split: mres.splits)\<close>
-  
   interpretation generic_wp wp 
     apply unfold_locales 
     unfolding wp_def fun_eq_iff inf_fun_def inf_bool_def mwp_def
@@ -508,7 +502,11 @@ section \<open>experiment: Hoare-triple without Time\<close>
   end
   
   text \<open>Weakest precondition without time\<close>
-  definition "wpn m Q s \<equiv> (\<exists>r s'. run m s = SUCC r 0 s' \<and> Q r s')"
+  definition "wpn m Q s \<equiv> mwp (run m s) bot bot bot (\<lambda>r c s'. c=0 \<and> Q r s')"
+  
+  lemma wpn_def': "wpn m Q s = (\<exists>r s'. run m s = SUCC r 0 s' \<and> Q r s')"
+    unfolding wpn_def mwp_def
+    by (auto split: mres.split)
   
   lemma wpn_alt: "wpn m Q s = wp m (FST o Q) (s,0)"
     unfolding wp_def wpn_def mwp_def
@@ -518,11 +516,44 @@ section \<open>experiment: Hoare-triple without Time\<close>
     apply unfold_locales 
     unfolding wpn_def fun_eq_iff inf_fun_def inf_bool_def mwp_def
     by (auto split: mres.split)
-    
-  term wp  
-  term htriple
-  text \<open>Transfer of Hoare-Triples\<close>
+
         
+  lemma wpn_return[vcg_normalize_simps]: "wpn (return x) Q s \<longleftrightarrow> Q x s"
+    by (auto simp: wpn_def run_simps)
+
+  lemma wpn_fail[vcg_normalize_simps]: "\<not> wpn (fail x) Q s"
+    by (auto simp: wpn_def run_simps)
+
+  lemma wpn_fcheck[vcg_normalize_simps]: "wpn (fcheck e \<Phi>) Q s \<longleftrightarrow> \<Phi> \<and> Q () s"
+    by (auto simp: wpn_def run_simps split: if_splits)
+
+  (* TODO: refactor that proof, should not need to unfold mwp_def at that stage *)
+  (* TODO: Intuitively, want equality here: BUT, equality only holds if costs cannot be negative! *)
+  lemma wpn_bind[vcg_decomp_rules]: "wpn m (\<lambda>x. wpn (f x) Q) s \<Longrightarrow> wpn (m\<bind>f) Q s"
+    apply (auto simp: wpn_def[abs_def] run_simps split: prod.splits)
+    unfolding mwp_def 
+    by (auto 
+      split: mres.splits 
+      simp add: minus_minus_add dest!: addcost_SUCC_D)
+  
+  (*      
+  lemma wpn_bind: "wpn (m\<bind>f) Q s = wpn m (\<lambda>x. wpn (f x) Q) s"
+    apply (auto simp: wpn_def run_simps split: prod.splits)
+    unfolding mwp_def 
+    apply (auto 
+      split: mres.splits 
+      simp add: minus_minus_add dest!: addcost_SUCC_D)
+    xxx. ctd here: need positive costs, 
+      otherwise negatove+positive can cancel out.
+      
+  *)
+  
+  
+  lemma notime_return_rule: "notime.htriple \<alpha> P (return x) (\<lambda>r. \<up>(r=x)**P)" for \<alpha>
+    by vcg
+  
+      
+  text \<open>Transfer of Hoare-Triples\<close>
   
   lemma wp_time_mono: "wp m Q (s,c) \<Longrightarrow> wp m (\<lambda>r (s',c'). \<exists>cc'. c'=cc'+d \<and> Q r (s',cc')) (s,c+d)"
     unfolding wp_def mwp_def
@@ -571,7 +602,16 @@ section \<open>experiment: Hoare-triple without Time\<close>
   lemma notime_htriple_eq: "notime.htriple \<alpha> P c Q = htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
     by (blast intro: notime_to_htriple htriple_to_notime)
   
+
+  definition "wlp c Q s \<equiv> mwp (run c s) top top top (\<lambda>r c s. Q r s)"
+  lemma wlp_true[simp, intro!]:
+    "wlp c (\<lambda>_ _. True) s"
+    "wlp c top s"
+    by (auto simp: wlp_def mwp_def split: mres.splits)
     
+  lemma wlp_return[simp]: "wlp (return x) Q s = Q x s"
+    by (auto simp: wlp_def run_simps)
+        
   
 section \<open>experiment: cost type for Space\<close>
 

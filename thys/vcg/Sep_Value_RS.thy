@@ -557,29 +557,29 @@ begin
   subsection \<open>Hoare-Triples for Load and Store\<close>  
     
   
-  lemma get_aval_rule: "htriple val_\<alpha> (EXACT (val_\<alpha> v)) Monad.get (\<lambda>r. \<up>(r=v) ** EXACT (val_\<alpha> v))"
-    apply (rule htripleI')
-    apply (auto simp: wp_def run_simps)
+  lemma get_aval_rule: "notime.htriple val_\<alpha> (EXACT (val_\<alpha> v)) Monad.get (\<lambda>r. \<up>(r=v) ** EXACT (val_\<alpha> v))"
+    apply (rule notime.htripleI')
+    apply (auto simp: wpn_def run_simps)
     apply (auto simp: sep_algebra_simps)
     done
   
-  lemma set_aval_rule: "htriple val_\<alpha> (EXACT (val_\<alpha> v)) (Monad.set v') (\<lambda>_. EXACT (val_\<alpha> v'))"
-    apply (rule htripleI')
-    apply (auto simp: wp_def run_simps)
+  lemma set_aval_rule: "notime.htriple val_\<alpha> (EXACT (val_\<alpha> v)) (Monad.set v') (\<lambda>_. EXACT (val_\<alpha> v'))"
+    apply (rule notime.htripleI')
+    apply (auto simp: wpn_def run_simps)
     done
   
   
-  lemma vload_rule: "htriple val_\<alpha> (vpto_assn v a) (vload err a) (\<lambda>r. \<up>(r=v) ** vpto_assn v a)"  
+  lemma vload_rule: "notime.htriple val_\<alpha> (vpto_assn v a) (vload err a) (\<lambda>r. \<up>(r=v) ** vpto_assn v a)"  
     unfolding vload_def vpto_assn_def
-    apply (rule cons_post_rule)
+    apply (rule notime.cons_post_rule)
     apply (rule vaddr_lifter.lift_operation[simplified])
     apply simp
     apply (rule get_aval_rule)
     by auto
     
-  lemma vstore_rule: "htriple val_\<alpha> (vpto_assn v a) (vstore err v' a) (\<lambda>_. vpto_assn v' a)"
+  lemma vstore_rule: "notime.htriple val_\<alpha> (vpto_assn v a) (vstore err v' a) (\<lambda>_. vpto_assn v' a)"
     unfolding vstore_def vpto_assn_def
-    apply (rule cons_post_rule)
+    apply (rule notime.cons_post_rule)
     apply (rule vaddr_lifter.lift_operation[simplified])
     apply simp
     apply (rule set_aval_rule)

@@ -5,7 +5,7 @@ imports
   Sep_Array_Block_RS
 begin
   
-  interpretation ab: array_block2 "STATIC_ERROR ''''" MEM_ERROR "vload MEM_ERROR::_ \<Rightarrow> (llvm_primval val,_,_,_) M" "vstore MEM_ERROR" "checked_gep MEM_ERROR" val_\<alpha> vpto_assn "\<lambda>v. v\<in>range val_\<alpha>"
+  interpretation ab: array_block2 "STATIC_ERROR ''''" MEM_ERROR "vload MEM_ERROR::_ \<Rightarrow> (llvm_primval val,_,_,_,_) M" "vstore MEM_ERROR" "checked_gep MEM_ERROR" val_\<alpha> vpto_assn "\<lambda>v. v\<in>range val_\<alpha>"
     apply unfold_locales
     apply (rule vload_rule)
     apply (rule vstore_rule)
@@ -50,7 +50,7 @@ begin
       unfolding abase_llvm_ptr_def acompat_llvm_ptr_def adiff_llvm_ptr_def aidx_llvm_ptr_def
       apply (intro part_equivpI sympI transpI)
       apply (metis ab.block_ptr_imp_abase ab.is_block_ptr_simps(2) acompat_refl llvm_ptr.sel)
-      apply (auto intro: acompat_sym acompat_trans simp: acompat_dom)
+      apply (auto intro: acompat_trans simp: acompat_dom)
       done
   end
   
@@ -68,12 +68,12 @@ begin
     
   
   lemma xfer_htriple: 
-    assumes "htriple ab.ba.\<alpha> P c Q"
+    assumes "notime.htriple ab.ba.\<alpha> P c Q"
     assumes "P' = P o llvm_amemory.the_amemory"
     assumes "c' = llvm_zoom_base \<alpha> c"
     assumes "\<And>r. Q' (\<alpha> r) = Q r o llvm_amemory.the_amemory"
-    shows "htriple llvm_\<alpha> P' c' Q'"
-    using assms unfolding htriple_alt llvm_zoom_base_def llvm_\<alpha>_def wp_def
+    shows "notime.htriple llvm_\<alpha> P' c' Q'"
+    using assms unfolding notime.htriple_alt llvm_zoom_base_def llvm_\<alpha>_def wpn_def
     apply (clarsimp simp: run_simps)
   proof goal_cases
     case A: (1 p s f)
@@ -98,7 +98,7 @@ begin
     
   
   
-  lemma llvm_load_rule[vcg_rules]: "htriple llvm_\<alpha> (llvm_pto x p) (llvm_load p) (\<lambda>r. \<up>(r=x) ** llvm_pto x p)"
+  lemma llvm_load_rule[vcg_rules]: "notime.htriple llvm_\<alpha> (llvm_pto x p) (llvm_load p) (\<lambda>r. \<up>(r=x) ** llvm_pto x p)"
     apply (rule xfer_htriple[OF ab.ba.load_rule])
     unfolding llvm_pto_def llvm_load_def
     apply simp
@@ -107,7 +107,7 @@ begin
     apply (auto simp: sep_algebra_simps pred_lift_extract_simps)
     done
 
-  lemma llvm_store_unchecked_rule[vcg_rules]: "htriple llvm_\<alpha> (llvm_pto xx p) (llvm_store_unchecked x p) (\<lambda>_. llvm_pto x p)"
+  lemma llvm_store_unchecked_rule[vcg_rules]: "notime.htriple llvm_\<alpha> (llvm_pto xx p) (llvm_store_unchecked x p) (\<lambda>_. llvm_pto x p)"
     apply (rule xfer_htriple[OF ab.ba.store_rule])
     unfolding llvm_pto_def llvm_store_unchecked_def
     apply simp
@@ -118,7 +118,7 @@ begin
 
     
   lemma llvm_store_rule[vcg_rules]: "llvm_vstruct x = llvm_vstruct xx 
-    \<Longrightarrow> htriple llvm_\<alpha> (llvm_pto xx p) (llvm_store x p) (\<lambda>_. llvm_pto x p)"
+    \<Longrightarrow> notime.htriple llvm_\<alpha> (llvm_pto xx p) (llvm_store x p) (\<lambda>_. llvm_pto x p)"
     unfolding llvm_store_def
     by vcg
     
@@ -142,7 +142,7 @@ begin
   lemma xfer_sep_list_conj1: "(\<And>*map (\<lambda>x. f x o the_amemory) l) = (\<And>*map f l) o the_amemory"  
     apply (induction l)
     apply auto
-    by (auto intro!: ext simp: sep_algebra_simps xfer_sep_conj)
+    by (auto simp: sep_algebra_simps xfer_sep_conj)
 
   lemma xfer_sep_list_conj2: "(\<And>*map (\<lambda>x s. f x (the_amemory s)) l) = (\<And>*map f l) o the_amemory"  
     using xfer_sep_list_conj1 unfolding comp_def .
@@ -162,7 +162,7 @@ begin
   
       
   lemma llvm_allocn_rule[vcg_rules]: 
-    "htriple llvm_\<alpha> 
+    "notime.htriple llvm_\<alpha> 
       \<box> 
       (llvm_allocn v n) 
       (\<lambda>r. (\<Union>*i\<in>{0..<int n}. llvm_pto v (r +\<^sub>a i)) 
@@ -178,7 +178,7 @@ begin
     
     
   lemma llvm_free_rule[vcg_rules]:
-    "htriple llvm_\<alpha> 
+    "notime.htriple llvm_\<alpha> 
       ((\<Union>*i\<in>{0..<n}. EXS v. llvm_pto v (p +\<^sub>a i)) 
         ** llvm_malloc_tag n p)
       (llvm_free p)
@@ -194,7 +194,7 @@ begin
   
   lemma llvm_checked_idx_ptr_rule[vcg_rules]:
     "abase p \<Longrightarrow>
-      htriple llvm_\<alpha>
+      notime.htriple llvm_\<alpha>
         (llvm_pto v (p +\<^sub>a i))
         (llvm_checked_idx_ptr p i)
         (\<lambda>r. \<up>(r= p +\<^sub>a i) ** llvm_pto v (p +\<^sub>a i))

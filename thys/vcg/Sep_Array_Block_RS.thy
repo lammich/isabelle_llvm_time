@@ -34,16 +34,16 @@ end
 locale array_block2 = array_block1 static_err mem_err vload vstore vgep
     for static_err :: 'err
     and mem_err :: 'err
-    and vload :: "'vaddr::this_addr \<Rightarrow> ('val,_,'val,'err) M"
-    and vstore :: "'val \<Rightarrow> 'vaddr \<Rightarrow> (unit,_,'val,'err) M"
-    and vgep :: "'vaddr \<Rightarrow> 'vidx \<Rightarrow> ('vaddr,_,'val,'err) M"
+    and vload :: "'vaddr::this_addr \<Rightarrow> ('val,_,_,'val,'err) M"
+    and vstore :: "'val \<Rightarrow> 'vaddr \<Rightarrow> (unit,_,_,'val,'err) M"
+    and vgep :: "'vaddr \<Rightarrow> 'vidx \<Rightarrow> ('vaddr,_,_,'val,'err) M"
     
 + fixes \<alpha>v :: "'val \<Rightarrow> 'aval::unique_zero_sep_algebra"
     and vpto :: "'val \<Rightarrow> 'vaddr \<Rightarrow> 'aval \<Rightarrow> bool"
     and vcomplete :: "'aval \<Rightarrow> bool"
     
-  assumes vload_rule: "htriple \<alpha>v (vpto x va) (vload va) (\<lambda>r. \<up>(r=x) ** vpto x va)" 
-      and vstore_rule: "htriple \<alpha>v (vpto xx va) (vstore x va) (\<lambda>_. vpto x va)"
+  assumes vload_rule: "notime.htriple \<alpha>v (vpto x va) (vload va) (\<lambda>r. \<up>(r=x) ** vpto x va)" 
+      and vstore_rule: "notime.htriple \<alpha>v (vpto xx va) (vstore x va) (\<lambda>_. vpto x va)"
       and vpto_notZ: "\<And>x a. \<not>vpto x a 0"
       and vcompleteD: "\<And>v v'. \<lbrakk>vcomplete v; v##v'\<rbrakk> \<Longrightarrow> v'=0"
       and vpto_this: "\<And>v av. vpto v this_addr av \<longleftrightarrow> av = \<alpha>v v"
@@ -133,17 +133,17 @@ begin
   declare vpto_notZ[simp]  
     
   
-  lemma load_rule: "htriple \<alpha> (pto x va) (load va) (\<lambda>r. \<up>(r=x) ** pto x va)"
+  lemma load_rule: "notime.htriple \<alpha> (pto x va) (load va) (\<lambda>r. \<up>(r=x) ** pto x va)"
     unfolding load_def
     supply pto_is_lift[simp]
-    apply (cases va; clarsimp simp: htriple_extract_pre_pure sep_algebra_simps)
+    apply (cases va; clarsimp simp: notime.htriple_extract_pre_pure sep_algebra_simps)
     using array_lifter.lift_operation[simplified, OF _ vload_rule, simplified] 
     .
     
-  lemma store_rule: "htriple \<alpha> (pto xx va) (store x va) (\<lambda>_. pto x va)"
+  lemma store_rule: "notime.htriple \<alpha> (pto xx va) (store x va) (\<lambda>_. pto x va)"
     unfolding store_def
     supply pto_is_lift[simp]
-    apply (cases va; clarsimp simp: htriple_extract_pre_pure sep_algebra_simps)
+    apply (cases va; clarsimp simp: notime.htriple_extract_pre_pure sep_algebra_simps)
     using array_lifter.lift_operation[simplified, OF _ vstore_rule, simplified] 
     .
     
@@ -174,12 +174,12 @@ begin
     done
       
   lemma checked_idx_baddr_rule: "abase a 
-    \<Longrightarrow> htriple \<alpha> (pto xx (a +\<^sub>a i)) (checked_idx_baddr a i) (\<lambda>r. \<up>(r=a +\<^sub>a i) ** pto xx (a +\<^sub>a i))"
-    apply (rule htripleI')
+    \<Longrightarrow> notime.htriple \<alpha> (pto xx (a +\<^sub>a i)) (checked_idx_baddr a i) (\<lambda>r. \<up>(r=a +\<^sub>a i) ** pto xx (a +\<^sub>a i))"
+    apply (rule notime.htripleI')
     unfolding checked_idx_baddr_def check_addr_def pto_is_lift
     apply (clarsimp simp: pred_lift_extract_simps split: baddr.splits)
     apply (frule (1) array_lifter.infer_pre_get_with_frame, simp, simp)
-    apply (force simp: wp_def run_simps aidx_baddr_def abase_baddr_def sep_algebra_simps split: prod.splits baddr.splits)
+    apply (force simp: wpn_def run_simps aidx_baddr_def abase_baddr_def sep_algebra_simps split: prod.splits baddr.splits)
     done
     
 
@@ -321,17 +321,13 @@ begin
     
   lemma tag_of_init[simp]: "tag_of (init v n) = int n" by (auto simp: tag_of_def init_def)
 
-  lemma ba_allocn_rule: "htriple ba.\<alpha> \<box> (ba_allocn v n) (\<lambda>r. (\<Union>*i\<in>{0..<int n}. ba.pto v (r +\<^sub>a i)) ** ba.tag (int n) r ** \<up>(abase r))"
+  lemma ba_allocn_rule: "notime.htriple ba.\<alpha> \<box> (ba_allocn v n) (\<lambda>r. (\<Union>*i\<in>{0..<int n}. ba.pto v (r +\<^sub>a i)) ** ba.tag (int n) r ** \<up>(abase r))"
     unfolding ba_allocn_def
-    apply (rule cons_rule[OF ba.alloc_rule])
+    apply (rule notime.cons_rule[OF ba.alloc_rule])
     apply simp
     apply (simp add: ba_block_alt sep_algebra_simps pred_lift_extract_simps)
     done
 
-  (* TODO: Move to gen_wp locale *)          
-  lemma wp_cons: "wp c Q s \<Longrightarrow> (\<And>x s. Q x s \<Longrightarrow> Q' x s) \<Longrightarrow> wp c Q' s"  
-    by (simp add: wp_monoI)
-    
   lemma blk_complete_tag[simp]: "is_complete_tag (\<alpha> blk) (int (length blk))"  
     by (auto simp: is_complete_tag_def \<alpha>_def list\<alpha>_def \<alpha>v_complete)
 
@@ -342,16 +338,16 @@ begin
     apply (auto simp: tag_of_def)
     done
     
-  lemma ba_freen_rule: "htriple ba.\<alpha> ((\<Union>*i\<in>{0..<n}. EXS v. ba.pto v (p+\<^sub>ai)) \<and>* ba.tag n p) (ba.free p) (\<lambda>_. \<box>)"
+  lemma ba_freen_rule: "notime.htriple ba.\<alpha> ((\<Union>*i\<in>{0..<n}. EXS v. ba.pto v (p+\<^sub>ai)) \<and>* ba.tag n p) (ba.free p) (\<lambda>_. \<box>)"
     apply (subst ba_tag_extr_baseptr)
-    apply (rule htripleI')
+    apply (rule notime.htripleI')
     apply (clarsimp simp: sep_algebra_simps pred_lift_extract_simps)
     apply (simp add: ba_block_exs_alt)
     apply (clarsimp simp: sep_algebra_simps pred_lift_extract_simps)
     
     subgoal for pp s f blk
       supply R = ba.free_rule[of "\<alpha> blk" p "int (length blk)"]
-      apply (rule R[THEN htripleD', THEN wp_cons])
+      apply (rule R[THEN notime.htripleD', THEN notime.wp_monoI])
       apply assumption+
       apply (simp add: sep_algebra_simps)
       apply (simp add: sep_algebra_simps)
@@ -360,21 +356,13 @@ begin
     
   lemma checked_idx_baddr_pres_tag: "wlp (checked_idx_baddr (BADDR a b) i) (\<lambda>_ s'. tag_of s' = tag_of sa) sa"  
     by (auto simp: wlp_def checked_idx_baddr_def check_addr_def run_simps split: prod.splits baddr.splits)
-    
-  (* TODO: Move *)  
-  lemma return_rule: "htriple \<alpha> P (return x) (\<lambda>r. \<up>(r=x)**P)" for \<alpha>
-    by vcg
-    
-  (* TODO: Move *)  
-  lemma wlp_return[simp]: "wlp (return x) Q s = Q x s"
-    by (auto simp: wlp_def run_simps)
-    
+
   lemma checked_idx_ptr_rule: "abase p 
-    \<Longrightarrow> htriple ba.\<alpha> (ba.pto xx (p +\<^sub>a i)) (checked_idx_ptr p i) (\<lambda>r. \<up>(r=p +\<^sub>a i) ** ba.pto xx (p +\<^sub>a i))"
+    \<Longrightarrow> notime.htriple ba.\<alpha> (ba.pto xx (p +\<^sub>a i)) (checked_idx_ptr p i) (\<lambda>r. \<up>(r=p +\<^sub>a i) ** ba.pto xx (p +\<^sub>a i))"
     unfolding checked_idx_ptr_def
     apply (cases p rule: ba.rptr_cases.cases; simp add: zoom_bind)
     supply [vcg_rules] = ba.block_lifter.lift_operation[simplified, OF _ _ checked_idx_baddr_rule]
-    supply [vcg_rules] = ba.block_lifter.lift_operation[simplified, OF _ _ return_rule]
+    supply [vcg_rules] = ba.block_lifter.lift_operation[simplified, OF _ _ notime_return_rule]
     supply [simp] = pto_notZ checked_idx_baddr_pres_tag abase_baddr_def
     supply [named_ss fri_prepare_simps] = aidx_baddr_simp
     supply [split] = baddr.splits
