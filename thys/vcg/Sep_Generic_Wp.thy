@@ -3,8 +3,49 @@ imports
   "../lib/Sep_Algebra_Add" 
   "../lib/Frame_Infer"
   "../lib/Monad"
-  "HOL-Library.Extended_Nat"
+  "HOL-Library.Extended_Nat" (* TODO: This gives us Complex_Main. Too much for this theory! *)
+  "../basic/kernel/LLVM_Shallow" (* TODO: Just used for acostC datatype. Move this datatype! *)
 begin
+
+
+  (* TODO: Move, to Sep_Lift *)  
+  text \<open>Lifting Assertions over Product\<close>
+  definition FST :: "('a \<Rightarrow> bool) \<Rightarrow> 'a \<times> 'b::zero \<Rightarrow> bool" 
+    where "FST P \<equiv> \<lambda>(a,b). P a \<and> b=0"
+  
+  definition SND :: "('b \<Rightarrow> bool) \<Rightarrow> 'a::zero \<times> 'b \<Rightarrow> bool" 
+    where "SND P \<equiv> \<lambda>(a,b). a=0 \<and> P b"
+    
+  
+  lemma FST_project_frame: "(FST P \<and>* F) (a, b) \<longleftrightarrow> (P ** (\<lambda>a. F (a,b))) a"
+    unfolding sep_conj_def
+    by (force simp add: sep_algebra_simps FST_def) 
+
+  lemma SND_project_frame: "(SND P \<and>* F) (a, b) \<longleftrightarrow> (P ** (\<lambda>b. F (a,b))) b"
+    unfolding sep_conj_def
+    by (force simp add: sep_algebra_simps SND_def) 
+    
+        
+  lemma FST_conj_conv: "(FST P ** FST Q) = FST (P**Q)"  
+    unfolding sep_conj_def
+    by (force simp add: sep_algebra_simps FST_def) 
+
+  lemma SND_conj_conv: "(SND P ** SND Q) = SND (P**Q)"  
+    unfolding sep_conj_def
+    by (force simp add: sep_algebra_simps SND_def) 
+    
+        
+  lemma FST_apply[sep_algebra_simps]: "FST P (a,b) \<longleftrightarrow> P a \<and> b=0"
+    unfolding FST_def by auto
+    
+  lemma SND_apply[sep_algebra_simps]: "SND P (a,b) \<longleftrightarrow> P b \<and> a=0"
+    unfolding SND_def by auto
+
+
+
+declare [[coercion_enabled = false]]
+hide_const (open) Transcendental.pi
+
 
 section \<open>General VCG Setup for Separation Logic\<close>
 
@@ -362,8 +403,8 @@ locale cost_framework =
     I :: "'cc::{monoid_add} \<Rightarrow> 'ca \<Rightarrow> bool"
   and minus :: "'ca \<Rightarrow> 'cc \<Rightarrow> 'ca" \<comment> \<open>takes abstract credits, and returns the effect of consuming
                                         the concrete resources\<close>
-assumes minus_0: "\<And>y. minus y 0 = y"
-  and I_0: "I 0 cr"
+assumes minus_0[simp]: "\<And>y. minus y 0 = y"
+  and I_0[simp,intro!]: "I 0 cr"
   and minus_minus_add: "\<And>a b c. minus (minus a b) c = minus a (b + c)"
   \<comment> \<open>TODO: maybe some of these are redundant\<close>
   and I1: "\<And>a b c. I (a + b) c \<Longrightarrow> I b (minus c a)"
@@ -374,7 +415,10 @@ begin
   definition  wp :: "('d, 'e, _, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where
     "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,minus cr c) \<and> I c cr)"
 
-
+(*
+  term "\<alpha> x \<le> y \<longleftrightarrow> x \<le> \<gamma> y"    
+*)
+    
   interpretation generic_wp wp
     apply unfold_locales
     unfolding wp_def fun_eq_iff inf_fun_def inf_bool_def mwp_def
@@ -401,6 +445,10 @@ begin
     subgoal
       by (metis I3)
     done
+    
+  lemma wp_consume: "wp (consume c) Q (s,cr) \<longleftrightarrow> I c cr \<and> Q () (s,minus cr c)"  
+    unfolding wp_def mwp_def consume_def by (auto split: mres.split)
+    
 end
 
 interpretation nat: cost_framework "\<lambda>(c::nat) (cr::nat). cr-c+c=cr" "(-)"
@@ -411,8 +459,24 @@ interpretation int: cost_framework "\<lambda>(c::int) (cr::int). True" "(-)"
   apply standard
   by auto
 
+  
+term acostC  
+  
 
 
+context cost_framework begin                     
+
+  lemma fun_cost_framework: "cost_framework (\<lambda>cc ca. \<forall>x. I (the_acost cc x) (the_acost ca x)) (\<lambda>ca cc. acostC (\<lambda>x. minus (the_acost ca x) (the_acost cc x)))"
+    apply unfold_locales
+    apply (simp_all add: zero_acost_def I_0 minus_0 minus_minus_add fun_eq_iff)
+    subgoal for a b c by (cases a;cases b;cases c; auto)
+    subgoal for a b c by (cases a;cases b;cases c; auto simp: I1)
+    subgoal for a b c by (cases a;cases b;cases c; auto intro: I2)
+    subgoal for a b c by (cases a;cases b;cases c; auto simp: I3)
+    done
+
+
+end
 
 section \<open>Setup for mres-Monad\<close>
 
@@ -425,6 +489,33 @@ section \<open>Setup for mres-Monad\<close>
   lemma enat_aux1: "c - enat (a + b) + enat (a + b) = c \<Longrightarrow> c - enat a + enat a = c"
     apply(cases c) by auto
 
+    
+  typ cost  
+  type_synonym ecost = "(string,enat) acost"
+    
+  definition le_cost_ecost :: "cost \<Rightarrow> ecost \<Rightarrow> bool" 
+    where "le_cost_ecost cc ca \<equiv> \<forall>x. enat (the_acost cc x) \<le> (the_acost ca x)"
+
+  definition minus_ecost_cost :: "ecost \<Rightarrow> cost \<Rightarrow> ecost"
+    where "minus_ecost_cost ca cc \<equiv> acostC (\<lambda>x. (the_acost ca x) - enat (the_acost cc x))"
+      
+  interpretation cost_framework le_cost_ecost minus_ecost_cost
+    unfolding le_cost_ecost_def minus_ecost_cost_def
+    apply (rule cost_framework.fun_cost_framework)
+    apply standard
+    apply (auto simp flip: zero_enat_def)
+    subgoal by (metis enat_diff_diff)
+    subgoal
+      by (smt add.commute add_diff_cancel_enat add_right_mono enat.distinct(1) enat_aux1 eq_iff le_iff_add linear of_nat_add of_nat_eq_enat)
+    subgoal
+      by (meson enat_ord_simps(1) le_add1 order_subst2)
+    subgoal
+      by (metis add_diff_cancel_enat add_left_mono enat.simps(3) le_iff_add plus_enat_simps(1))
+    done
+
+    
+  (*      
+  term pi  
   interpretation cost_framework "\<lambda>(c::nat) (cr::enat). cr-c+c=cr" "(-)"
     apply standard
          apply (auto simp: zero_enat_def)
@@ -438,16 +529,18 @@ section \<open>Setup for mres-Monad\<close>
     subgoal
       by (metis enat_diff_diff add.assoc add.commute plus_enat_simps(1))
     done
+  *)
 
+  (*
   lemma enat_nat_I_conv: "cr - enat c + enat c = cr \<longleftrightarrow> cr \<ge> c"
     by (cases cr; cases c; auto)
+  *)
 
   (* Definition for presentation *)
-  lemma natenat_alt: "wp m Q \<equiv> \<lambda>(s, cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s, cr - enat c) \<and> cr \<ge> c)"
-    unfolding wp_def apply(subst enat_nat_I_conv) .
+  lemma natenat_alt: "wp m Q = (\<lambda>(s, cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s, minus_ecost_cost cr c) \<and> le_cost_ecost c cr))" unfolding wp_def ..
 
   (* Definition for presentation in paper *)
-  lemma "wp m Q (s,cr::nat) = (\<exists>r c s'. run m s = SUCC r c s' \<and> Q r (s', cr-c) \<and> c\<le>cr )"
+  lemma "wp m Q (s,cr::ecost) = (\<exists>r (c::cost) s'. run m s = SUCC r c s' \<and> Q r (s', minus_ecost_cost cr c) \<and> le_cost_ecost c cr )"
     unfolding wp_def mwp_def by (fastforce split: mres.splits)
 
   interpretation generic_wp wp 
@@ -466,30 +559,7 @@ section \<open>Setup for mres-Monad\<close>
   thm vcg_normalize_simps
 
   
-section \<open>experiment: Hoare-triple without Time\<close>  
- 
   
-  (* TODO: Move, to Sep_Lift *)  
-  text \<open>Lifting Assertions over Product\<close>
-  definition FST :: "('a \<Rightarrow> bool) \<Rightarrow> 'a \<times> 'b::zero \<Rightarrow> bool" 
-    where "FST P \<equiv> \<lambda>(a,b). P a \<and> b=0"
-  
-  definition SND :: "('b \<Rightarrow> bool) \<Rightarrow> 'a::zero \<times> 'b \<Rightarrow> bool" 
-    where "SND P \<equiv> \<lambda>(a,b). a=0 \<and> P b"
-    
-  
-  lemma FST_project_frame: "(FST P \<and>* F) (a, b) \<longleftrightarrow> (P ** (\<lambda>a. F (a,b))) a"
-    unfolding sep_conj_def
-    by (force simp add: sep_algebra_simps FST_def) 
-    
-  lemma FST_conj_conv: "(FST P ** FST Q) = FST (P**Q)"  
-    unfolding sep_conj_def
-    by (force simp add: sep_algebra_simps FST_def) 
-    
-  lemma FST_apply[sep_algebra_simps]: "FST P (a,b) \<longleftrightarrow> P a \<and> b=0"
-    unfolding FST_def by auto
-    
-      
   (* TODO: Move *)
   instantiation enat :: stronger_sep_algebra begin
     definition "(_::enat) ## _ \<equiv> True"
@@ -501,6 +571,70 @@ section \<open>experiment: Hoare-triple without Time\<close>
       
   end
   
+  
+  instantiation acost :: (type,stronger_sep_algebra) stronger_sep_algebra begin
+    definition "f1 ## f2 \<longleftrightarrow> (\<forall>x. the_acost f1 x ## the_acost f2 x)"
+    (*definition [simp]: "(f1 + f2) = acostC (\<lambda>x. the_acost f1 x + the_acost f2 x)"
+    definition [simp]: "0 x \<equiv> 0"
+    *)
+  
+    instance
+      apply standard
+      unfolding sep_disj_acost_def plus_acost_alt zero_acost_def
+      apply (auto simp: sep_algebra_simps split: acost.splits)
+      done  
+    
+  end
+  
+  
+
+definition time_credits_assn :: "ecost \<Rightarrow> (_ \<times> ecost \<Rightarrow> bool)" ("$_" [900] 900) where "($c) \<equiv> SND (EXACT c)"
+
+term "a ** $c"
+term "c ** $a"
+
+(* For presentation *)
+lemma "($c) (s,c') \<longleftrightarrow> s=0 \<and> c'=c"
+  unfolding time_credits_assn_def by (simp add: sep_algebra_simps SND_def) (* TODO: Lemmas for SND! *)
+  
+definition "lift_\<alpha>_cost \<alpha> \<equiv> \<lambda>(s,c). (\<alpha> s,c)"  
+
+definition "lift_acost c \<equiv> acostC (enat o the_acost c)"
+
+
+lemma for_max3: "le_cost_ecost c (lift_acost c + cr')" sorry
+
+lemma for_max4: "minus_ecost_cost (lift_acost c + cr') c = cr'" sorry
+    
+lemma consume_rule: "htriple (lift_\<alpha>_cost \<alpha>) ($(lift_acost c)) (consume c) (\<lambda>_. \<box>)"  
+  apply (rule htripleI)
+  apply clarify
+  apply (simp add: wp_consume time_credits_assn_def lift_\<alpha>_cost_def)
+proof (rule conjI)
+  fix F s cr
+  assume "(SND (EXACT (lift_acost c)) \<and>* F) ((\<alpha> s, cr))"
+  from this have "(EXACT (lift_acost c) \<and>* (\<lambda>b. F (\<alpha> s, b))) cr" by (simp add: SND_project_frame)
+  then obtain cr' where [simp]: "lift_acost c ## cr'" "cr = lift_acost c + cr'" and F: "F (\<alpha> s, cr')"
+    by (rule sep_conjE) (simp add: sep_algebra_simps)
+  show "le_cost_ecost c cr" by (simp add: for_max3)
+  
+  show "F (\<alpha> s, minus_ecost_cost cr c)" using F by (simp add: for_max4)
+qed    
+  
+    
+section \<open>experiment: Hoare-triple without Time\<close>  
+ 
+  
+      
+    
+    
+    
+    
+    
+    
+    
+    
+  
   text \<open>Weakest precondition without time\<close>
   definition "wpn m Q s \<equiv> mwp (run m s) bot bot bot (\<lambda>r c s'. c=0 \<and> Q r s')"
   
@@ -508,6 +642,11 @@ section \<open>experiment: Hoare-triple without Time\<close>
     unfolding wpn_def mwp_def
     by (auto split: mres.split)
   
+  (* TODO: Move *)  
+  lemma le_cost_zero_conv[simp]: "le_cost_ecost c 0 \<longleftrightarrow> c=0"
+    unfolding le_cost_ecost_def by (cases c; auto simp: zero_acost_def zero_enat_def)
+  
+    
   lemma wpn_alt: "wpn m Q s = wp m (FST o Q) (s,0)"
     unfolding wp_def wpn_def mwp_def
     by (auto split: mres.split simp: zero_enat_def FST_def)
@@ -555,20 +694,29 @@ section \<open>experiment: Hoare-triple without Time\<close>
       
   text \<open>Transfer of Hoare-Triples\<close>
   
+  lemma for_max1: "le_cost_ecost x c \<Longrightarrow> minus_ecost_cost (c + d) x = minus_ecost_cost c x + d"
+    sorry
+  
+  lemma for_max2: "le_cost_ecost x c \<Longrightarrow> le_cost_ecost x (c + d)"  
+    sorry
+    
+  (* TODO: Move *)
   lemma wp_time_mono: "wp m Q (s,c) \<Longrightarrow> wp m (\<lambda>r (s',c'). \<exists>cc'. c'=cc'+d \<and> Q r (s',cc')) (s,c+d)"
     unfolding wp_def mwp_def
     apply (auto simp add: algebra_simps sep_algebra_simps SND_def sep_conj_def split: mres.split)
-    apply (metis add.commute add_diff_assoc_enat enat_nat_I_conv)
-    by (metis ab_semigroup_add_class.add_ac(1) add_diff_cancel_enat enat.distinct(1))
+    subgoal by (intro exI conjI; assumption?) (rule for_max1)
+    subgoal by (rule for_max2)
+    done
       
   lemma notime_to_htriple:
-    fixes c :: "('a, 'b, nat, 'd, 'e) M"
+    fixes c :: "('a, 'b, cost, 'd, 'e) M"
     assumes H: "notime.htriple \<alpha> P c Q"
-    shows "htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
+    shows "htriple (lift_\<alpha>_cost \<alpha>) (FST P) c (FST o Q)"
+    unfolding lift_\<alpha>_cost_def
     apply (rule htripleI)
     apply clarify
   proof -
-    fix F a and b :: enat
+    fix F a and b :: ecost
     assume "(FST P \<and>* F) (\<alpha> a, b)"
     hence "(P ** (\<lambda>a. F (a,b))) (\<alpha> a)"
       by (simp add: sep_algebra_simps FST_project_frame)
@@ -584,7 +732,7 @@ section \<open>experiment: Hoare-triple without Time\<close>
   qed  
 
   lemma htriple_to_notime:
-    assumes H: "htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
+    assumes H: "htriple (lift_\<alpha>_cost \<alpha>) (FST P) c (FST o Q)"
     shows "notime.htriple \<alpha> P c Q"
     apply (rule notime.htripleI)
     unfolding wpn_alt
@@ -595,11 +743,12 @@ section \<open>experiment: Hoare-triple without Time\<close>
     show "wp c (FST \<circ> (\<lambda>r s'. (Q r \<and>* F) (\<alpha> s'))) (s, 0)"
       apply (rule wp_monoI)
       apply (rule htripleD[OF H, where F="FST F"])
+      unfolding lift_\<alpha>_cost_def
       apply (auto simp: FST_conj_conv sep_algebra_simps A)
       done
   qed      
   
-  lemma notime_htriple_eq: "notime.htriple \<alpha> P c Q = htriple (\<lambda>(s,cr). (\<alpha> s, cr)) (FST P) c (FST o Q)"
+  lemma notime_htriple_eq: "notime.htriple \<alpha> P c Q = htriple (lift_\<alpha>_cost \<alpha>) (FST P) c (FST o Q)"
     by (blast intro: notime_to_htriple htriple_to_notime)
   
 
@@ -617,6 +766,16 @@ section \<open>experiment: cost type for Space\<close>
 
 
 datatype space_cost = Space_Cost nat nat (* highest point,  how far below that mark at the moment *)
+
+
+(*
+
+  mm_alloc n \<Longrightarrow> \<lambda>(m,c). (max m (c+n),c+n)
+  mm_free n \<Longrightarrow> \<lambda>(m,c). assert(n\<le>c), (m,c-n)
+
+
+*)
+
 
 fun max_cost where "max_cost (Space_Cost h _) = h"
 fun curr_cost where "curr_cost (Space_Cost h c) = int h - int c"

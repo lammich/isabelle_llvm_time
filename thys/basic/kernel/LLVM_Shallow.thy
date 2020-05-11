@@ -33,7 +33,25 @@ begin
   end
 
 
-
+  instantiation acost :: (type, monoid_add) monoid_add
+  begin
+  
+    instance (* TODO refactor *)
+      apply standard
+      subgoal for a b c apply(cases a; cases b; cases c) by (auto simp: add.assoc)
+          apply (auto simp: zero_acost_def add.assoc diff_diff_add)  
+      subgoal for a     apply(cases a) by auto
+      subgoal for a     apply(cases a) by auto
+      done
+  end
+  
+  lemma plus_acost_alt: "a+b = (case (a,b) of (acostC a,acostC b) \<Rightarrow> acostC (\<lambda>x. a x+b x))"
+    by (cases a; cases b; auto)
+  
+  lemma minus_acost_alt: "a-b = (case (a,b) of (acostC a,acostC b) \<Rightarrow> acostC (\<lambda>x. a x-b x))"
+    by (cases a; cases b; auto)
+  
+(*
   instantiation acost :: (type, ab_semigroup_add) ab_semigroup_add
   begin
   
@@ -43,7 +61,18 @@ begin
       subgoal for a b   apply(cases a; cases b) by (auto simp: add.commute) 
       done
   end
-
+*)
+  
+  instantiation acost :: (type, comm_monoid_add) comm_monoid_add
+  begin
+  
+    instance (* TODO refactor *)
+      apply standard
+          apply (auto simp: zero_acost_def add.assoc diff_diff_add)  
+      subgoal for a b   apply(cases a; cases b) by (auto simp: add.commute) 
+      subgoal for a     apply(cases a) by auto
+      done
+  end
 
  
 
@@ -52,10 +81,8 @@ begin
   
     instance (* TODO refactor *)
       apply standard
-          apply (auto simp: zero_acost_def add.assoc diff_diff_add)  
       subgoal for a b   apply(cases a; cases b) by (auto simp: add.commute) 
       subgoal for a b c apply(cases a; cases b; cases c) by (auto simp: diff_diff_add) 
-      subgoal for a     apply(cases a) by auto
       done
   end
 

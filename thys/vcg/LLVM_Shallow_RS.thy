@@ -53,15 +53,19 @@ declare llvm_inline_bind_laws[vcg_monadify_xforms]
 
 subsection \<open>Abbreviations for VCG\<close>
 
-type_synonym ll_assn = "(llvm_amemory \<Rightarrow> bool)"
+
+type_synonym ll_astate = "llvm_amemory \<times> ecost"
+type_synonym ll_assn = "(ll_astate \<Rightarrow> bool)"
+
+definition "ll_\<alpha> \<equiv> lift_\<alpha>_cost llvm_\<alpha>"
 abbreviation llvm_htriple 
   :: "ll_assn \<Rightarrow> 'a llM \<Rightarrow> ('a \<Rightarrow> ll_assn) \<Rightarrow> bool" 
-  where "llvm_htriple \<equiv> htriple llvm_\<alpha>"
+  where "llvm_htriple \<equiv> htriple ll_\<alpha>"
 abbreviation llvm_htripleF 
   :: "ll_assn \<Rightarrow> ll_assn \<Rightarrow> 'a llM \<Rightarrow> ('a \<Rightarrow> ll_assn) \<Rightarrow> bool" 
-  where "llvm_htripleF \<equiv> htripleF llvm_\<alpha>"
-abbreviation "llSTATE \<equiv> STATE llvm_\<alpha>"
-abbreviation "llPOST \<equiv> POSTCOND llvm_\<alpha>"
+  where "llvm_htripleF \<equiv> htripleF ll_\<alpha>"
+abbreviation "llSTATE \<equiv> STATE ll_\<alpha>"
+abbreviation "llPOST \<equiv> POSTCOND ll_\<alpha>"
 
 locale llvm_prim_setup
 (* Locale to contain primitive VCG setup, without data refinement *)
@@ -76,8 +80,25 @@ lemma norm_prod_case[vcg_normalize_simps]:
   "wp (case p of (a,b) \<Rightarrow> f a b) Q s \<longleftrightarrow> (\<forall>a b. p=(a,b) \<longrightarrow> wp (f a b) Q s)" 
   by (auto split: prod.split) 
 
-
+lemmas ll_notime_htriple_eq = notime_htriple_eq[of llvm_\<alpha> _ "_::_ llM", folded ll_\<alpha>_def]
+  
+lemma ll_consume_rule[vcg_rules]: "llvm_htriple ($lift_acost c) (consume c) (\<lambda>_. \<box>)"
+  unfolding ll_\<alpha>_def by (simp add: consume_rule)
+  
 subsection \<open>Assertions\<close>
+
+(*
+xxx: notatiooN!
+definition time_credits_assn :: "ecost \<Rightarrow> ll_assn" ("$_" [900] 900) where "($c) \<equiv> SND (EXACT c)"
+
+
+term "a ** $c"
+term "c ** $a"
+
+(* For presentation *)
+lemma "($c) (s,c') \<longleftrightarrow> s=0 \<and> c'=c"
+  unfolding time_credits_assn_def by (simp add: sep_algebra_simps SND_def) (* TODO: Lemmas for SND! *)
+*)
 
   
 typedef ('a,'c) dr_assn = "UNIV :: ('a \<Rightarrow> 'c \<Rightarrow> ll_assn) set" by simp
@@ -176,7 +197,9 @@ lemma mk_assn_extractI:
   assumes "A a c \<turnstile> \<up>\<Phi> a c ** sep_true"
   shows "\<Phi> a c"
   using assms
-  by (auto simp: entails_def sep_conj_def pred_lift_def sep_algebra_simps)
+  apply (cases "\<Phi> a c"; simp)
+  using entails_eqI by fastforce
+  
   
 lemma mk_assn_extractI':
   assumes "pure_part (\<upharpoonleft>(mk_assn A) a c)"
@@ -206,7 +229,7 @@ subsubsection \<open>Pointers\<close>
 
 text \<open>Assertion for pointer to single value\<close>
 definition ll_pto :: "('a::llvm_rep, 'a ptr) dr_assn"
-  where "ll_pto \<equiv> mk_assn (\<lambda>v p. llvm_pto (to_val v) (the_raw_ptr p))"
+  where "ll_pto \<equiv> mk_assn (\<lambda>v p. FST (llvm_pto (to_val v) (the_raw_ptr p)))"
 
 instantiation ptr :: (llvm_rep) addr_algebra begin  
   definition "abase \<equiv> abase o the_raw_ptr"
@@ -288,18 +311,47 @@ proof -
 qed    
     
   
+(* TODO: Move *)
+
+thm vcg_normalize_simps
+
+lemma FST_pure[sep_algebra_simps, vcg_normalize_simps]: "FST (\<up>\<phi>) = \<up>\<phi>"
+  unfolding FST_def by (simp add: fun_eq_iff pred_lift_extract_simps sep_algebra_simps)
+
+lemma FST_extract_pure[sep_algebra_simps, vcg_normalize_simps]: "FST (\<up>\<phi> ** Q) = (\<up>\<phi> ** FST Q)"  
+  unfolding FST_def by (simp add: fun_eq_iff pred_lift_extract_simps sep_algebra_simps)
+  
+
 subsubsection \<open>Load and Store\<close>
 context llvm_prim_mem_setup begin
 lemma checked_from_val_rule[vcg_rules]: "llvm_htriple \<box> (checked_from_val (to_val x)) (\<lambda>r. \<up>(r=x))"  
   unfolding checked_from_val_def
   by vcg
   
+ 
+  
+abbreviation (input) ll_cost_assn ("$$") where "ll_cost_assn \<equiv> \<lambda>name n. $lift_acost (cost name n)"  
+  
+lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_load_rule]
+lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_store_rule]
+
+(*
+
+  $\<^bsub>''load''\<^esub>
+
+  $$ ''load'' 1
+
+  $\<^bsub>load\<^esub>
+  
+    
+*)
+
 text \<open>Standard rules for load and store from pointer\<close>  
-lemma ll_load_rule[vcg_rules]: "llvm_htriple (\<upharpoonleft>ll_pto x p) (ll_load p) (\<lambda>r. \<up>(r=x) ** \<upharpoonleft>ll_pto x p)"
+lemma ll_load_rule[vcg_rules]: "llvm_htriple ($$ ''load'' 1 ** \<upharpoonleft>ll_pto x p) (ll_load p) (\<lambda>r. \<up>(r=x) ** \<upharpoonleft>ll_pto x p)"
   unfolding ll_load_def ll_pto_def 
   by vcg
 
-lemma ll_store_rule[vcg_rules]: "llvm_htriple (\<upharpoonleft>ll_pto xx p) (ll_store x p) (\<lambda>_. \<upharpoonleft>ll_pto x p)"
+lemma ll_store_rule[vcg_rules]: "llvm_htriple ($$ ''store'' 1 ** \<upharpoonleft>ll_pto xx p) (ll_store x p) (\<lambda>_. \<upharpoonleft>ll_pto x p)"
   unfolding ll_store_def ll_pto_def
   by vcg
   
@@ -312,7 +364,7 @@ find_theorems htriple EXTRACT
 thm vcg_decomp_rules
 
 lemma ll_load_rule_range[vcg_rules]:
-  shows "llvm_htriple (\<upharpoonleft>(ll_range I) a p ** \<up>\<^sub>!( p' ~\<^sub>a p \<and> p' -\<^sub>a p \<in> I )) (ll_load p') (\<lambda>r. \<up>(r = a (p' -\<^sub>a p)) ** \<upharpoonleft>(ll_range I) a p)"
+  shows "llvm_htriple ($$ ''load'' 1 ** \<upharpoonleft>(ll_range I) a p ** \<up>\<^sub>!( p' ~\<^sub>a p \<and> p' -\<^sub>a p \<in> I )) (ll_load p') (\<lambda>r. \<up>(r = a (p' -\<^sub>a p)) ** \<upharpoonleft>(ll_range I) a p)"
   unfolding vcg_tag_defs
   apply (rule htriple_vcgI')
   apply fri_extract_basic
@@ -322,7 +374,7 @@ lemma ll_load_rule_range[vcg_rules]:
   done
 
 lemma ll_store_rule_range[vcg_rules]:
-  shows "llvm_htriple (\<upharpoonleft>(ll_range I) a p ** \<up>\<^sub>!( p' ~\<^sub>a p \<and> p' -\<^sub>a p \<in> I )) (ll_store x p') (\<lambda>_. \<upharpoonleft>(ll_range I) (a(p' -\<^sub>a p := x)) p)"
+  shows "llvm_htriple ($$ ''store'' 1 ** \<upharpoonleft>(ll_range I) a p ** \<up>\<^sub>!( p' ~\<^sub>a p \<and> p' -\<^sub>a p \<in> I )) (ll_store x p') (\<lambda>_. \<upharpoonleft>(ll_range I) (a(p' -\<^sub>a p := x)) p)"
   unfolding vcg_tag_defs
   apply (rule htriple_vcgI')
   apply fri_extract_basic
@@ -336,10 +388,14 @@ subsubsection \<open>Offsetting Pointers\<close>
   which is not supported by these rules yet.
 *)
 
+lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_checked_idx_ptr_rule]
+
+
+
 text \<open>Rule for indexing pointer. Note, the new target address must exist\<close>
 lemma ll_ofs_ptr_rule[vcg_rules]: 
   "llvm_htriple 
-    (\<upharpoonleft>ll_pto v (p +\<^sub>a (sint i)) ** \<up>\<^sub>!(abase p))
+    ($$ ''ofs_ptr'' 1 ** \<upharpoonleft>ll_pto v (p +\<^sub>a (sint i)) ** \<up>\<^sub>!(abase p))
     (ll_ofs_ptr p i) 
     (\<lambda>r. \<up>(r= p +\<^sub>a (sint i)) ** \<upharpoonleft>ll_pto v (p +\<^sub>a (sint i)))"
   unfolding ll_ofs_ptr_def ll_pto_def abase_ptr_def aidx_ptr_def
@@ -349,7 +405,7 @@ text \<open>Rule for indexing pointer into range. Note, the new target address m
   
 lemma ll_ofs_ptr_rule'[vcg_rules]: 
   shows "llvm_htriple 
-    (\<upharpoonleft>(ll_range I) x p ** \<up>\<^sub>!(p ~\<^sub>a p' \<and> (p' +\<^sub>a sint i) -\<^sub>a p \<in> I)) 
+    ($$ ''ofs_ptr'' 1 ** \<upharpoonleft>(ll_range I) x p ** \<up>\<^sub>!(p ~\<^sub>a p' \<and> (p' +\<^sub>a sint i) -\<^sub>a p \<in> I)) 
     (ll_ofs_ptr p' i) 
     (\<lambda>r. \<up>(r= p' +\<^sub>a sint i) ** \<upharpoonleft>(ll_range I) x p)"
   unfolding vcg_tag_defs
@@ -363,21 +419,44 @@ lemma ll_ofs_ptr_rule'[vcg_rules]:
   
 subsubsection \<open>Allocate and Free\<close>
 
+(* TODO: Move *)
+lemma FST_empty[sep_algebra_simps, vcg_normalize_simps]: "FST \<box> = \<box>"
+  unfolding FST_def by (auto simp: sep_algebra_simps)
+
+lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_allocn_rule, unfolded FST_empty]
+
+(* TODO: Move *)
+lemma FST_distrib_img[sep_algebra_simps, vcg_normalize_simps, named_ss fri_prepare_simps]: "FST (\<Union>*i\<in>I. P i) = (\<Union>*i\<in>I. FST (P i))" sorry
+
+
 text \<open>Memory allocation tag, which expresses ownership of an allocated block.\<close>
 definition ll_malloc_tag :: "int \<Rightarrow> 'a::llvm_rep ptr \<Rightarrow> _" 
-  where "ll_malloc_tag n p \<equiv> \<up>(n\<ge>0) ** llvm_malloc_tag n (the_raw_ptr p)"
+  where "ll_malloc_tag n p \<equiv> $$ ''free'' 1 ** \<up>(n\<ge>0) ** FST (llvm_malloc_tag n (the_raw_ptr p))"
 
+(*
+(FST ( (\<Union>*i\<in>{0..<int (unat n)}. llvm_pto (to_val init) (r +\<^sub>a i)) \<and>* llvm_malloc_tag (int (unat n)) r) \<and>* $lift_acost (cost ''free'' (Suc 0)) \<and>* F)
+
+*)  
+  
 text \<open>Allocation returns an array-base pointer to an initialized range, 
   as well as an allocation tag\<close>
 lemma ll_malloc_rule[vcg_rules]: 
   "llvm_htriple 
-    (\<up>(n\<noteq>0)) 
+    ($$ ''malloc'' (unat n) ** $$ ''free'' 1 ** \<up>(n\<noteq>0)) 
     (ll_malloc TYPE('a::llvm_rep) n) 
     (\<lambda>r. \<upharpoonleft>(ll_range {0..< uint n}) (\<lambda>_. init) r ** ll_malloc_tag (uint n) r)"
   unfolding ll_malloc_def ll_pto_def ll_malloc_tag_def ll_range_def 
   supply [simp] = list_conj_eq_sep_set_img uint_nat abase_ptr_def aidx_ptr_def unat_gt_0
+  supply [vcg_normalize_simps] = FST_conj_conv[symmetric]
   apply vcg
   done
+
+  
+lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_free_rule]
+  
+(* TODO: Move *)
+lemma FST_EXS_conv[sep_algebra_simps, named_ss fri_prepare_simps, vcg_normalize_simps]: "FST (EXS x. P x) = (EXS x. FST (P x))"
+  by (auto simp: FST_def sep_algebra_simps)
 
   
 text \<open>Free takes a range and the matching allocation tag\<close>
@@ -389,8 +468,10 @@ lemma ll_free_rule[vcg_rules]:
   "
   unfolding ll_free_def ll_pto_def ll_malloc_tag_def ll_range_def vcg_tag_defs
   supply [simp] = list_conj_eq_sep_set_img abase_ptr_def aidx_ptr_def 
-  supply [named_ss fri_prepare_simps] = sep_set_img_pull_EXS
+  supply [named_ss fri_prepare_simps] = sep_set_img_pull_EXS FST_conj_conv[symmetric]
+  supply [vcg_normalize_simps] = FST_conj_conv[symmetric]
   by vcg
+  
   
 end  
 
@@ -444,7 +525,9 @@ begin
 
 paragraph \<open>Arithmetic\<close>
 
-lemma ll_add_simp[vcg_normalize_simps]: "ll_add a b = return (a + b)" by (auto simp: ll_add_def)
+abbreviation "consumec1 n \<equiv> consume (cost n 1)"
+
+lemma ll_add_simp[vcg_normalize_simps]: "ll_add a b = doM {consumec1 ''add''; return (a + b)}" by (auto simp: ll_add_def)
 lemma ll_sub_simp[vcg_normalize_simps]: "ll_sub a b = return (a - b)" by (auto simp: ll_sub_def)
 lemma ll_mul_simp[vcg_normalize_simps]: "ll_mul a b = return (a * b)" by (auto simp: ll_mul_def)
 lemma ll_udiv_simp[vcg_normalize_simps]: "b\<noteq>0 \<Longrightarrow> ll_udiv a b = return (a div b)" by (auto simp: ll_udiv_def)
@@ -569,7 +652,7 @@ lemma annotate_llc_while: "llc_while = llc_while_annot I R" by (simp add: llc_wh
 context llvm_prim_ctrl_setup begin
   
 lemma basic_while_rule:
-  assumes "wf R"
+  assumes "wf R" (* TODO: R = measure (\<pi>_tcredits s)  *)
   assumes "llSTATE (I \<sigma> t) s"
   assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE (I \<sigma> t) s \<rbrakk> \<Longrightarrow> wp (b \<sigma>) (\<lambda>ctd s\<^sub>1. 
     (to_bool ctd \<longrightarrow> wp (f \<sigma>) (\<lambda>\<sigma>' s\<^sub>2. llSTATE (EXS t'. I \<sigma>' t' ** \<up>((t',t)\<in>R)) s\<^sub>2) s\<^sub>1)
