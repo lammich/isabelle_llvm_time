@@ -1,3 +1,43 @@
+# Monday 11.5.20
+
+## Ideen:
+- trace semantic 
+  - kann zur rechtfertigung von Zeit und Space benutzt werden. Kompatibel mit ndet.
+  trace = lazy list (finite+infinite???, oder finite + NTERM)
+  - verifikation von yes()
+  -(trace monade)
+  - reminds me of a talk by Magnus Myreen (https://drops.dagstuhl.de/opus/volltexte/2019/11087/pdf/LIPIcs-ITP-2019-32.pdf)
+
+  
+## TODO:
+
+- bzgl cost_framework:
+  - Erweiterungen auf Funtionen, Paare
+  - I1-I3: natürlich sprachig verstehen
+  - Galois connection conjecture durchdenken
+
+- type class resource_algebra oder so einführen
+  - mit x ## y := True
+  - dann fällt monoid_add mit sep_algebra zusammen, und man spart sich evtl den datatype acost, welche nur `'a => ('b::monoid_add)` wrapt  
+  
+- lifting auf Sepref 
+
+### Max
+- for_maxX beweisen in Sep_Generic_wp.thy
+- algebraische struktur der locale `cost_framework` ausarbeiten
+- 
+
+### Peter
+- LLVM_Shallow_RS anpassen
+- Hoare Triple für basis datenstrukturen beweisen
+  - Folder /ds
+  - wenns geht: ignore component "TimeFrame Inference module"
+  - 
+  
+## Nächstes Treffen:
+Mittwoch 13.5. 10:00 UK-Time / 11:00 DE-Time
+
+
 # Friday 8.5.20
 
 ## design choices:
