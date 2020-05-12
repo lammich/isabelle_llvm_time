@@ -48,30 +48,31 @@ context begin
     by (smt Suc_n_not_le_n Suc_pred bintrunc_mod2p int_mod_eq' len_gt_0 power_increasing_iff sint_range' uint_sint)
     
   lemma array_new_rule_sint[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>sint.assn n ni ** \<up>\<^sub>d(n>0)) 
+    ($$''malloc'' (nat n) ** $$''free'' 1 ** \<upharpoonleft>sint.assn n ni ** \<up>\<^sub>d(n>0)) 
     (array_new TYPE('a::llvm_rep) ni) 
     (\<upharpoonleft>array_assn (replicate (nat n) init))"
     unfolding array_new_def array_assn_cnv_range_malloc sint.assn_def
-    supply [simp] = pos_sint_to_uint
+    supply [simp] = pos_sint_to_uint unat_def[symmetric]
     by vcg
 
   lemma array_new_rule_uint[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>uint.assn n ni ** \<up>\<^sub>d(n>0)) 
+    ($$''malloc'' (nat n) ** $$''free'' 1 ** \<upharpoonleft>uint.assn n ni ** \<up>\<^sub>d(n>0)) 
     (array_new TYPE('a::llvm_rep) ni) 
     (\<upharpoonleft>array_assn (replicate (nat n) init))"
+    supply [simp] = unat_def[symmetric]
     unfolding array_new_def array_assn_cnv_range_malloc uint.assn_def
     by vcg
 
   lemma array_new_rule_unat[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>unat.assn n ni ** \<up>\<^sub>d(n>0)) 
+    ($$''malloc'' n ** $$''free'' 1 ** \<upharpoonleft>unat.assn n ni ** \<up>\<^sub>d(n>0)) 
     (array_new TYPE('a::llvm_rep) ni) 
     (\<upharpoonleft>array_assn (replicate n init))"
     unfolding array_new_def array_assn_cnv_range_malloc unat.assn_def
-    apply (simp add: unat_def)
+    supply [simp] = unat_def
     by vcg
 
   lemma array_new_rule_snat[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>snat.assn n ni ** \<up>\<^sub>d(n>0)) 
+    ($$''malloc'' n ** $$''free'' 1 ** \<upharpoonleft>snat.assn n ni ** \<up>\<^sub>d(n>0)) 
     (array_new TYPE('a::llvm_rep) ni) 
     (\<upharpoonleft>array_assn (replicate n init))"
     unfolding array_new_def array_assn_cnv_range_malloc snat.assn_def
@@ -93,14 +94,14 @@ context begin
   abbreviation (input) "in_range_uint i (ii::'a::len word) xs \<equiv> i<int (length xs) \<and> i<max_sint LENGTH('a)"
 
   lemma array_nth_rule_sint[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i<int (length xs)))
+    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i<int (length xs)))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!nat i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def sint.assn_def
     by vcg
 
   lemma array_nth_rule_uint[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>d(in_range_uint i ii xs))
+    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>d(in_range_uint i ii xs))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!nat i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def uint.assn_def
@@ -108,7 +109,7 @@ context begin
     by vcg
       
   lemma array_nth_rule_unat[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>d(in_range_nat i ii xs))
+    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>d(in_range_nat i ii xs))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def unat.assn_def unat_def
@@ -116,7 +117,7 @@ context begin
     by vcg
 
   lemma array_nth_rule_snat[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
+    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def snat.assn_def
@@ -124,7 +125,7 @@ context begin
     by vcg
     
   lemma array_upd_rule_sint[vcg_rules]: "llvm_htriple
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i < int (length xs)))
+    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i < int (length xs)))
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[nat i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -133,7 +134,7 @@ context begin
     by vcg
 
   lemma array_upd_rule_uint[vcg_rules]: "llvm_htriple
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>din_range_uint i ii xs)
+    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>din_range_uint i ii xs)
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[nat i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -143,7 +144,7 @@ context begin
     by vcg
         
   lemma array_upd_rule_nat[vcg_rules]: "llvm_htriple
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>din_range_nat i ii xs)
+    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>din_range_nat i ii xs)
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -153,7 +154,7 @@ context begin
     by vcg
     
   lemma array_upd_rule_snat[vcg_rules]: "llvm_htriple
-    (\<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
+    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -161,13 +162,6 @@ context begin
     supply [simp] = cnv_snat_to_uint
     supply [fri_rules] = fri_abs_cong_rl
     by vcg
-    
-    
-    
-    
-    
-    
-    
     
 end  
 
@@ -246,7 +240,7 @@ lemma arrayset_rule_snat[vcg_rules]: "llvm_htriple
   apply vcg_monadify
   apply vcg'
   apply (auto simp: nth_append list_update_append replicate_Suc_conv_snoc simp del: replicate_Suc)
-  by (metis Cons_nth_drop_Suc less_le_trans list_update_code(2))
+  oops by (metis Cons_nth_drop_Suc less_le_trans list_update_code(2))
   
 text \<open>Array-Set also works for zero-size, and any pointer, including \<open>null\<close>\<close>  
 lemma arrayset_zerosize_rule: "llvm_htriple (\<upharpoonleft>snat.assn 0 ni) (arrayset p c ni) (\<lambda>_. \<box>)"  
