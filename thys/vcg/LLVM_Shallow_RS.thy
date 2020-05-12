@@ -67,8 +67,12 @@ abbreviation llvm_htripleF
 abbreviation "llSTATE \<equiv> STATE ll_\<alpha>"
 abbreviation "llPOST \<equiv> POSTCOND ll_\<alpha>"
 
-locale llvm_prim_setup
+locale llvm_prim_setup begin
 (* Locale to contain primitive VCG setup, without data refinement *)
+
+  abbreviation (input) ll_cost_assn ("$$") where "ll_cost_assn \<equiv> \<lambda>name n. $lift_acost (cost name n)"  
+
+end
 
 subsection \<open>General VCG Setup\<close>
 lemma fri_extract_prod_case[fri_extract_simps]: "(case p of (a,b) \<Rightarrow> (P a b :: ll_assn)) = (EXS a b. \<up>(p=(a,b)) ** P a b)"  
@@ -222,8 +226,9 @@ lemma fri_abs_cong_rl: "PRECOND (SOLVE_AUTO (a=a')) \<Longrightarrow> \<upharpoo
   
 
 subsection \<open>Memory Reasoning\<close>
-locale llvm_prim_mem_setup
-sublocale llvm_prim_setup < llvm_prim_mem_setup .
+locale llvm_prim_mem_setup begin
+  sublocale llvm_prim_setup .
+end  
 
 subsubsection \<open>Pointers\<close>
 
@@ -330,7 +335,6 @@ lemma checked_from_val_rule[vcg_rules]: "llvm_htriple \<box> (checked_from_val (
   
  
   
-abbreviation (input) ll_cost_assn ("$$") where "ll_cost_assn \<equiv> \<lambda>name n. $lift_acost (cost name n)"  
   
 lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_load_rule]
 lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_store_rule]
@@ -506,15 +510,21 @@ text \<open>
   Note that the Hoare-rule will only be tried if the simplification rule did not 
   succeed.
 \<close>
+
+(* TODO: Move *)  
+abbreviation ll_consume :: "cost \<Rightarrow> unit llM" where "ll_consume \<equiv> consume"
   
-lemma cond_llvm_htripleI: "x = return y \<Longrightarrow> llvm_htriple \<box> x (\<lambda>r. \<up>(r=y))" by vcg
-
-
-locale llvm_prim_arith_setup
-
-sublocale llvm_prim_setup < llvm_prim_arith_setup .
+context llvm_prim_setup begin
+  abbreviation "consume1r n v \<equiv> doM {ll_consume (cost n 1); return v}"
   
-context llvm_prim_arith_setup begin
+  lemma cond_llvm_htripleI: "x = consume1r n y \<Longrightarrow> llvm_htriple ($$ n 1) x (\<lambda>r. \<up>(r=y))" by vcg
+
+end
+
+locale llvm_prim_arith_setup begin
+
+sublocale llvm_prim_setup .
+
 context 
   notes [simp] = op_lift_arith2'_def op_lift_arith2_def 
                   op_lift_cmp_def op_lift_ptr_cmp_def op_lift_iconv_def 
@@ -525,78 +535,77 @@ begin
 
 paragraph \<open>Arithmetic\<close>
 
-abbreviation "consumec1 n \<equiv> consume (cost n 1)"
 
-lemma ll_add_simp[vcg_normalize_simps]: "ll_add a b = doM {consumec1 ''add''; return (a + b)}" by (auto simp: ll_add_def)
-lemma ll_sub_simp[vcg_normalize_simps]: "ll_sub a b = return (a - b)" by (auto simp: ll_sub_def)
-lemma ll_mul_simp[vcg_normalize_simps]: "ll_mul a b = return (a * b)" by (auto simp: ll_mul_def)
-lemma ll_udiv_simp[vcg_normalize_simps]: "b\<noteq>0 \<Longrightarrow> ll_udiv a b = return (a div b)" by (auto simp: ll_udiv_def)
-lemma ll_urem_simp[vcg_normalize_simps]: "b\<noteq>0 \<Longrightarrow> ll_urem a b = return (a mod b)" by (auto simp: ll_urem_def)
+lemma ll_add_simp[vcg_normalize_simps]: "ll_add a b = consume1r ''add'' (a + b)" by (auto simp: ll_add_def)
+lemma ll_sub_simp[vcg_normalize_simps]: "ll_sub a b = consume1r ''sub'' (a - b)" by (auto simp: ll_sub_def)
+lemma ll_mul_simp[vcg_normalize_simps]: "ll_mul a b = consume1r ''mul'' (a * b)" by (auto simp: ll_mul_def)
+lemma ll_udiv_simp[vcg_normalize_simps]: "b\<noteq>0 \<Longrightarrow> ll_udiv a b = consume1r ''udiv'' (a div b)" by (auto simp: ll_udiv_def)
+lemma ll_urem_simp[vcg_normalize_simps]: "b\<noteq>0 \<Longrightarrow> ll_urem a b = consume1r ''urem'' (a mod b)" by (auto simp: ll_urem_def)
 
-lemma ll_sdiv_simp[vcg_normalize_simps]: "\<lbrakk>b\<noteq>0; in_srange (sdiv) a b\<rbrakk> \<Longrightarrow> ll_sdiv a b = return (a sdiv b)" 
+lemma ll_sdiv_simp[vcg_normalize_simps]: "\<lbrakk>b\<noteq>0; in_srange (sdiv) a b\<rbrakk> \<Longrightarrow> ll_sdiv a b = consume1r ''sdiv'' (a sdiv b)" 
   by (auto simp: ll_sdiv_def Let_def)
-lemma ll_srem_simp[vcg_normalize_simps]: "\<lbrakk>b\<noteq>0; in_srange (sdiv) a b\<rbrakk> \<Longrightarrow> ll_srem a b = return (a smod b)" 
+lemma ll_srem_simp[vcg_normalize_simps]: "\<lbrakk>b\<noteq>0; in_srange (sdiv) a b\<rbrakk> \<Longrightarrow> ll_srem a b = consume1r ''srem'' (a smod b)" 
   by (auto simp: ll_srem_def)
 
-lemma ll_udiv_rule[vcg_rules]: "WBOUNDS (b\<noteq>0) \<Longrightarrow> llvm_htriple \<box> (ll_udiv a b) (\<lambda>r. \<up>(r = a div b))" 
+lemma ll_udiv_rule[vcg_rules]: "WBOUNDS (b\<noteq>0) \<Longrightarrow> llvm_htriple ($$ ''udiv'' 1) (ll_udiv a b) (\<lambda>r. \<up>(r = a div b))" 
   unfolding vcg_tag_defs by vcg
-lemma ll_urem_rule[vcg_rules]: "WBOUNDS (b\<noteq>0) \<Longrightarrow> llvm_htriple \<box> (ll_urem a b) (\<lambda>r. \<up>(r = a mod b))" 
+lemma ll_urem_rule[vcg_rules]: "WBOUNDS (b\<noteq>0) \<Longrightarrow> llvm_htriple ($$ ''urem'' 1) (ll_urem a b) (\<lambda>r. \<up>(r = a mod b))" 
   unfolding vcg_tag_defs by vcg
-lemma ll_sdiv_rule[vcg_rules]: "\<lbrakk>WBOUNDS (b\<noteq>0); WBOUNDS (in_srange (sdiv) a b)\<rbrakk> \<Longrightarrow> llvm_htriple \<box> (ll_sdiv a b) (\<lambda>r. \<up>(r = a sdiv b))"
+lemma ll_sdiv_rule[vcg_rules]: "\<lbrakk>WBOUNDS (b\<noteq>0); WBOUNDS (in_srange (sdiv) a b)\<rbrakk> \<Longrightarrow> llvm_htriple ($$ ''sdiv'' 1) (ll_sdiv a b) (\<lambda>r. \<up>(r = a sdiv b))"
   unfolding vcg_tag_defs by vcg
-lemma ll_srem_rule[vcg_rules]: "\<lbrakk>WBOUNDS (b\<noteq>0); WBOUNDS (in_srange (sdiv) a b)\<rbrakk> \<Longrightarrow> llvm_htriple \<box> (ll_srem a b) (\<lambda>r. \<up>(r = a smod b))"
+lemma ll_srem_rule[vcg_rules]: "\<lbrakk>WBOUNDS (b\<noteq>0); WBOUNDS (in_srange (sdiv) a b)\<rbrakk> \<Longrightarrow> llvm_htriple ($$ ''srem'' 1) (ll_srem a b) (\<lambda>r. \<up>(r = a smod b))"
   unfolding vcg_tag_defs by vcg
 
 paragraph \<open>Comparison\<close>
 lemma ll_icmp_simps[vcg_normalize_simps]: 
-  "ll_icmp_eq a b = return (from_bool (a = b))" 
-  "ll_icmp_ne a b = return (from_bool (a \<noteq> b))" 
-  "ll_icmp_sle a b = return (from_bool (a <=s b))" 
-  "ll_icmp_slt a b = return (from_bool (a <s b))" 
-  "ll_icmp_ule a b = return (from_bool (a \<le> b))" 
-  "ll_icmp_ult a b = return (from_bool (a < b))" 
+  "ll_icmp_eq a b = consume1r ''icmp_eq'' (from_bool (a = b))" 
+  "ll_icmp_ne a b = consume1r ''icmp_ne'' (from_bool (a \<noteq> b))" 
+  "ll_icmp_sle a b = consume1r ''icmp_sle'' (from_bool (a <=s b))" 
+  "ll_icmp_slt a b = consume1r ''icmp_slt'' (from_bool (a <s b))" 
+  "ll_icmp_ule a b = consume1r ''icmp_ule'' (from_bool (a \<le> b))" 
+  "ll_icmp_ult a b = consume1r ''icmp_ult'' (from_bool (a < b))" 
   unfolding ll_icmp_eq_def ll_icmp_ne_def ll_icmp_sle_def ll_icmp_slt_def ll_icmp_ule_def ll_icmp_ult_def
   by auto
 
 lemma ll_ptrcmp_simps[vcg_normalize_simps]: 
-  "ll_ptrcmp_eq a b = return (from_bool (a = b))" 
-  "ll_ptrcmp_ne a b = return (from_bool (a \<noteq> b))" 
+  "ll_ptrcmp_eq a b = consume1r ''ptrcmp_eq'' (from_bool (a = b))" 
+  "ll_ptrcmp_ne a b = consume1r ''ptrcmp_ne'' (from_bool (a \<noteq> b))" 
   unfolding ll_ptrcmp_eq_def ll_ptrcmp_ne_def 
   by auto
   
 paragraph \<open>Bitwise\<close>
 
-lemma ll_and_simp[vcg_normalize_simps]: "ll_and a b = return (a AND b)" by (auto simp: ll_and_def)
-lemma ll_or_simp[vcg_normalize_simps]: "ll_or a b = return (a OR b)" by (auto simp: ll_or_def)
-lemma ll_xor_simp[vcg_normalize_simps]: "ll_xor a b = return (a XOR b)" by (auto simp: ll_xor_def)
+lemma ll_and_simp[vcg_normalize_simps]: "ll_and a b = consume1r ''and'' (a AND b)" by (auto simp: ll_and_def)
+lemma ll_or_simp[vcg_normalize_simps]: "ll_or a b = consume1r ''or'' (a OR b)" by (auto simp: ll_or_def)
+lemma ll_xor_simp[vcg_normalize_simps]: "ll_xor a b = consume1r ''xor'' (a XOR b)" by (auto simp: ll_xor_def)
   
-lemma ll_shl_simp[vcg_normalize_simps]: "unat b < LENGTH ('a) \<Longrightarrow> ll_shl (a::'a::len word) b = return (a << unat b)" 
+lemma ll_shl_simp[vcg_normalize_simps]: "unat b < LENGTH ('a) \<Longrightarrow> ll_shl (a::'a::len word) b = consume1r ''shl'' (a << unat b)" 
   by (auto simp: ll_shl_def Let_def shift_ovf_def unat_def bitSHL'_def)
   
-lemma ll_lshr_simp[vcg_normalize_simps]: "unat b < LENGTH ('a) \<Longrightarrow> ll_lshr (a::'a::len word) b = return (a >> unat b)" 
+lemma ll_lshr_simp[vcg_normalize_simps]: "unat b < LENGTH ('a) \<Longrightarrow> ll_lshr (a::'a::len word) b = consume1r ''lshr'' (a >> unat b)" 
   by (auto simp: ll_lshr_def Let_def shift_ovf_def unat_def bitLSHR'_def)
 
-lemma ll_ashr_simp[vcg_normalize_simps]: "unat b < LENGTH ('a) \<Longrightarrow> ll_ashr (a::'a::len word) b = return (a >>> unat b)" 
+lemma ll_ashr_simp[vcg_normalize_simps]: "unat b < LENGTH ('a) \<Longrightarrow> ll_ashr (a::'a::len word) b = consume1r ''ashr'' (a >>> unat b)" 
   by (auto simp: ll_ashr_def Let_def shift_ovf_def unat_def bitASHR'_def)
   
 lemma [vcg_rules]:
   fixes a b :: "'a::len word" 
   assumes "WBOUNDS (unat b < LENGTH ('a))"  
-  shows ll_shl_rule: "llvm_htriple \<box> (ll_shl a b) (\<lambda>r. \<up>(r=a<<unat b))"
-    and ll_lshr_rule: "llvm_htriple \<box> (ll_lshr a b) (\<lambda>r. \<up>(r=a>>unat b))"
-    and ll_ashr_rule: "llvm_htriple \<box> (ll_ashr a b) (\<lambda>r. \<up>(r=a>>>unat b))"
+  shows ll_shl_rule: "llvm_htriple ($$ ''shl'' 1) (ll_shl a b) (\<lambda>r. \<up>(r=a<<unat b))"
+    and ll_lshr_rule: "llvm_htriple ($$ ''lshr'' 1) (ll_lshr a b) (\<lambda>r. \<up>(r=a>>unat b))"
+    and ll_ashr_rule: "llvm_htriple ($$ ''ashr'' 1) (ll_ashr a b) (\<lambda>r. \<up>(r=a>>>unat b))"
   using assms unfolding vcg_tag_defs
   by vcg  
   
 paragraph \<open>Conversion\<close>
     
-lemma ll_trunc_simp[vcg_normalize_simps]: "is_down' UCAST ('a\<rightarrow>'b) \<Longrightarrow> ll_trunc (a::'a::len word) TYPE('b::len word) = return (UCAST ('a\<rightarrow>'b) a)"
+lemma ll_trunc_simp[vcg_normalize_simps]: "is_down' UCAST ('a\<rightarrow>'b) \<Longrightarrow> ll_trunc (a::'a::len word) TYPE('b::len word) = consume1r ''trunc'' (UCAST ('a\<rightarrow>'b) a)"
   by (auto simp: ll_trunc_def llb_trunc_def Let_def)
   
-lemma ll_zext_simp[vcg_normalize_simps]: "is_up' UCAST ('a\<rightarrow>'b) \<Longrightarrow> ll_zext (a::'a::len word) TYPE('b::len word) = return (UCAST ('a\<rightarrow>'b) a)"
+lemma ll_zext_simp[vcg_normalize_simps]: "is_up' UCAST ('a\<rightarrow>'b) \<Longrightarrow> ll_zext (a::'a::len word) TYPE('b::len word) = consume1r ''zext'' (UCAST ('a\<rightarrow>'b) a)"
   by (auto simp: ll_zext_def llb_zext_def Let_def)
   
-lemma ll_sext_simp[vcg_normalize_simps]: "is_up' SCAST ('a\<rightarrow>'b) \<Longrightarrow> ll_sext (a::'a::len word) TYPE('b::len word) = return (SCAST ('a\<rightarrow>'b) a)"
+lemma ll_sext_simp[vcg_normalize_simps]: "is_up' SCAST ('a\<rightarrow>'b) \<Longrightarrow> ll_sext (a::'a::len word) TYPE('b::len word) = consume1r ''sext'' (SCAST ('a\<rightarrow>'b) a)"
   by (auto simp: ll_sext_def llb_sext_def Let_def)
 
   
@@ -609,25 +618,27 @@ end
 
 subsection \<open>Control Flow\<close>
 
-locale llvm_prim_ctrl_setup
 
-sublocale llvm_prim_setup < llvm_prim_ctrl_setup .
 
-context llvm_prim_ctrl_setup begin
+locale llvm_prim_ctrl_setup begin
+
+sublocale llvm_prim_setup .
 
 text \<open>The if command is handled by a set of normalization rules.
   Note that the VCG will split on the introduced conjunction automatically.
 \<close>
 
 lemma llc_if_simps[vcg_normalize_simps]:
-  "llc_if 1 t e = t"
-  "r\<noteq>0 \<Longrightarrow> llc_if r t e = t"
-  "llc_if 0 t e = e"
+  "llc_if 1 t e = doM {consume (cost ''if'' 1); t}"
+  "r\<noteq>0 \<Longrightarrow> llc_if r t e = doM {consume (cost ''if'' 1); t}"
+  "llc_if 0 t e = doM {consume (cost ''if'' 1); e}"
   by (auto simp: llc_if_def)
   
-lemma llc_if_simp[vcg_normalize_simps]: "wp (llc_if b t e) Q s \<longleftrightarrow> (to_bool b \<longrightarrow> wp t Q s) \<and> (\<not>to_bool b \<longrightarrow> wp e Q s)"
-  unfolding llc_if_def by simp
-
+lemma llc_if_simp[vcg_normalize_simps]: "wp (llc_if b t e) Q s \<longleftrightarrow> wp (ll_consume (cost ''if'' 1)) (\<lambda>_ s. (to_bool b \<longrightarrow> wp t Q s) \<and> (\<not>to_bool b \<longrightarrow> wp e Q s)) s"
+  unfolding llc_if_def 
+  by (auto simp add: vcg_normalize_simps)
+  
+(* Probably useless, as we cannot implement that *)
 lemma if_simp[vcg_normalize_simps]: "wp (If b t e) Q s \<longleftrightarrow> (b \<longrightarrow> wp t Q s) \<and> (\<not>b \<longrightarrow> wp e Q s)"
   by simp
   
@@ -635,26 +646,52 @@ end
     
 text \<open>The while command is handled by a standard invariant/variant rule.\<close>  
 
-lemma llc_while_unfold: "llc_while b f \<sigma> = doM { ctd \<leftarrow> b \<sigma>; llc_if ctd (doM { \<sigma>\<leftarrow>f \<sigma>; llc_while b f \<sigma>}) (return \<sigma>)}"
+lemma llc_while_unfold: "llc_while b f \<sigma> = doM { ll_consume (cost ''call'' 1); ctd \<leftarrow> b \<sigma>; llc_if ctd (doM { \<sigma>\<leftarrow>f \<sigma>; llc_while b f \<sigma>}) (return \<sigma>)}"
   unfolding llc_while_def
-  unfolding llc_while_def llc_if_def
-  apply (rewrite mwhile_unfold)
-  apply simp
-  done
+  apply (rewrite REC'_unfold[OF reflexive], pf_mono_prover)
+  by (simp add: ll_call_def)
 
-definition llc_while_annot :: "('\<sigma>::llvm_rep \<Rightarrow> 't \<Rightarrow> llvm_amemory \<Rightarrow> bool) \<Rightarrow> ('t\<times>'t) set \<Rightarrow> ('\<sigma>\<Rightarrow>1 word llM) \<Rightarrow> _"
+definition llc_while_annot :: "('\<sigma>::llvm_rep \<Rightarrow> 't \<Rightarrow> ll_astate \<Rightarrow> bool) \<Rightarrow> ('t\<times>'t) set \<Rightarrow> ('\<sigma>\<Rightarrow>1 word llM) \<Rightarrow> _"
   where [llvm_inline]: "llc_while_annot I R \<equiv> llc_while"
 
 declare [[vcg_const "llc_while_annot I R"]]
   
 lemma annotate_llc_while: "llc_while = llc_while_annot I R" by (simp add: llc_while_annot_def) 
   
+
+(* TODO: Move. Some lemmas on how bind and consume commutes if program terminates and throws no exceptions. *)
+(* This does not hold: even if everything terminates, m may throw an exception. *)
+lemma "mwp (run (doM { r\<leftarrow>m; consume c; return r }) s) N (\<lambda>_. N) E S = mwp (run (doM {consume c; m}) s) N (\<lambda>_. N) E S"
+  unfolding mwp_def bind_def consume_def
+  apply (auto split: mres.split simp: run_simps)
+  oops
+
+lemma "mwp (run (doM { r\<leftarrow>m; consume (c::_::comm_monoid_add); return r }) s) N (\<lambda>_. N) bot S = mwp (run (doM {consume c; m}) s) N (\<lambda>_. N) bot S"
+  unfolding mwp_def bind_def consume_def
+  by (auto split: mres.split simp: run_simps algebra_simps)
+  
+lemma "mwp (run (doM { r\<leftarrow>m; consume (c::_::comm_monoid_add); return r }) s) bot bot bot S = mwp (run (doM {consume c; m}) s) bot bot bot S"
+  unfolding mwp_def bind_def consume_def
+  by (auto split: mres.split simp: run_simps algebra_simps)
+  
+lemma wp_consume_bind_commute: "wp (doM { r\<leftarrow>m; consume c; f r }) Q = wp (doM {consume c; r\<leftarrow>m; f r}) Q"  
+  unfolding wp_def mwp_def bind_def consume_def
+  by (auto split: mres.split simp: run_simps algebra_simps fun_eq_iff)
+  
+lemma wp_consume_bind_commute_simp: "NO_MATCH (consume X) m \<Longrightarrow> wp (doM { r\<leftarrow>m; consume c; f r }) Q = wp (doM {consume c; r\<leftarrow>m; f r}) Q"  
+  by (rule wp_consume_bind_commute)
+  
+  
+  
+                       
+
+  
 context llvm_prim_ctrl_setup begin
   
 lemma basic_while_rule:
   assumes "wf R" (* TODO: R = measure (\<pi>_tcredits s)  *)
   assumes "llSTATE (I \<sigma> t) s"
-  assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE (I \<sigma> t) s \<rbrakk> \<Longrightarrow> wp (b \<sigma>) (\<lambda>ctd s\<^sub>1. 
+  assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE (I \<sigma> t) s \<rbrakk> \<Longrightarrow> wp (doM {ll_consume (cost ''call'' 1); ctd \<leftarrow> b \<sigma>; ll_consume (cost ''if'' 1); return ctd}) (\<lambda>ctd s\<^sub>1. 
     (to_bool ctd \<longrightarrow> wp (f \<sigma>) (\<lambda>\<sigma>' s\<^sub>2. llSTATE (EXS t'. I \<sigma>' t' ** \<up>((t',t)\<in>R)) s\<^sub>2) s\<^sub>1)
   \<and> (\<not>to_bool ctd \<longrightarrow> Q \<sigma> s\<^sub>1)
     ) s"
@@ -662,18 +699,126 @@ lemma basic_while_rule:
   using assms(1,2)
 proof (induction t arbitrary: \<sigma> s)
   case (less t)
+  
+  note STEP = STEP[simplified vcg_normalize_simps]
+  
   show ?case 
     apply (subst llc_while_unfold)
-    apply (simp add: vcg_normalize_simps)
+    apply (simp only: vcg_normalize_simps)
     apply (rule wp_monoI[OF STEP])
     apply fact
-    subgoal for r s\<^sub>1
-      apply (cases "to_bool r"; simp add: vcg_normalize_simps)
-      apply (erule wp_monoI; clarsimp; fri_extract)
-      apply (rule less.IH; assumption)
+    subgoal for uu s\<^sub>0
+      apply (simp add: vcg_normalize_simps)
+      apply (erule wp_monoI)
+      subgoal for r s\<^sub>1
+        apply (cases "to_bool r"; simp add: vcg_normalize_simps)
+        subgoal
+          apply (erule wp_monoI; clarsimp simp: vcg_normalize_simps)
+          apply (erule wp_monoI; clarsimp; fri_extract)
+          apply (rule less.IH; assumption)
+          done
+        subgoal
+          apply (erule wp_monoI; clarsimp simp: vcg_normalize_simps)
+          done
+        done
       done
     done
+    
 qed          
+
+definition "enat_less_than \<equiv> {(a,b::enat). a<b}"
+lemma wf_enat_less_than[simp, intro!]: "wf enat_less_than" unfolding enat_less_than_def by (rule wellorder_class.wf)
+
+(* TODO @Max: This monotonicity property is probably another cost-framework property: 
+  Intuitively, (time-like) costs do not decrease, i.e., credits never increase.
+*)
+lemma wp_weaken_cost:
+  assumes "wp c (\<lambda>r s'. (the_acost (snd s') \<le> the_acost (snd s)) \<longrightarrow> Q r s') s"
+  shows "wp c Q s"
+  using assms unfolding wp_def mwp_def
+  apply (auto simp: run_simps split: mres.splits)
+  by (smt acost.sel add.commute add_diff_cancel_enat enat.distinct(1) le_cost_ecost_def le_funI le_iff_add minus_ecost_cost_def)
+
+lemma wp_weaken_cost_monoI:
+  assumes 1: "wp c Q' s"
+  assumes 2: "\<And>r s'. \<lbrakk> the_acost (snd s') \<le> the_acost (snd s); Q' r s' \<rbrakk> \<Longrightarrow> Q r s'"
+  shows "wp c Q s"
+  using assms 
+  by (blast intro: wp_weaken_cost wp_monoI)
+
+lemma wp_weaken_cost_monoI_STATE:
+  assumes 1: "wp c Q' s"
+  assumes 2: "\<And>r s'. \<lbrakk> the_acost (snd s') \<le> the_acost (snd s); Q' r s' \<rbrakk> \<Longrightarrow> Q r s'"
+  shows "wp c Q s"
+  using assms 
+  by (blast intro: wp_weaken_cost wp_monoI)
+
+    
+(*(* TODO: Move *)  
+lemma wp_consume': "wp (consume c) Q s = (le_cost_ecost c (snd s) \<and> Q () (fst s, minus_ecost_cost (snd s) c))"
+  by (cases s) (simp add: wp_consume)
+  *)
+(*
+lemma basic_while_rule':
+  defines "R \<equiv> inv_image enat_less_than (\<lambda>c. the_acost c ''call'')" (* Only works if there are no infinite call credits! *)
+  assumes I0: "llSTATE (I \<sigma>) s"
+  assumes STEP: "\<And>\<sigma> s. \<lbrakk> llSTATE (I \<sigma>) s \<rbrakk> \<Longrightarrow> wp (doM {ll_consume (cost ''call'' 1); ctd \<leftarrow> b \<sigma>; ll_consume (cost ''if'' 1); return ctd}) (\<lambda>ctd s\<^sub>1. 
+    (to_bool ctd \<longrightarrow> wp (f \<sigma>) (\<lambda>\<sigma>' s\<^sub>2. llSTATE (I \<sigma>') s\<^sub>2) s\<^sub>1)
+  \<and> (\<not>to_bool ctd \<longrightarrow> Q \<sigma> s\<^sub>1)
+    ) s"
+  shows "wp (llc_while b f \<sigma>) Q s"
+proof -
+
+  note STEP = STEP[where s="(s,cr)" for s cr, simplified wp_consume vcg_normalize_simps, simplified, zero_var_indexes]
+  
+  show ?thesis  
+    apply (rule basic_while_rule[where R=R and I="\<lambda>\<sigma> t s. I \<sigma> s \<and> t=snd s" and t="snd (ll_\<alpha> s)"])
+    subgoal unfolding R_def by blast
+    subgoal using I0 unfolding STATE_def by simp
+    
+    apply (use wp_consume[vcg_normalize_simps] in vcg_normalize)
+    apply (rule conjI)
+    subgoal using STEP[THEN conjunct1] unfolding STATE_def by auto
+    subgoal
+      apply (rule wp_weaken_cost_monoI[OF STEP[THEN conjunct2]])
+      apply (unfold STATE_def; clarsimp; assumption)
+      apply (erule wp_weaken_cost_monoI)
+      apply (safe; clarsimp)
+      subgoal
+        apply (erule wp_weaken_cost_monoI)
+        unfolding STATE_def
+        apply (simp add: sep_algebra_simps pred_lift_extract_simps R_def enat_less_than_def)
+        apply (clarsimp simp: ll_\<alpha>_def lift_\<alpha>_cost_def) apply (drule le_funD[where x="''call''"])+
+      
+    
+    
+    find_theorems wp consume
+    
+    apply vcg_normalize
+xxx, ctd here: for the first step, we know that costs actually decrease!    
+    apply (rule wp_weaken_cost_monoI[OF STEP])
+    apply (unfold STATE_def; clarsimp; assumption)
+    apply (erule wp_weaken_cost_monoI)
+    apply (safe; clarsimp)
+    
+    subgoal
+      apply (erule wp_weaken_cost_monoI)
+      unfolding STATE_def
+      apply (simp add: sep_algebra_simps pred_lift_extract_simps R_def enat_less_than_def)
+      apply (clarsimp simp: ll_\<alpha>_def lift_\<alpha>_cost_def) apply (drule le_funD[where x="''call''"])+
+      
+      
+    
+    
+    oops
+    apply (safe; clarsimp)
+  
+*)  
+
+
+
+
+
 
 text \<open>
   Standard while rule. 
@@ -685,14 +830,15 @@ lemma llc_while_annot_rule[vcg_decomp_erules]:
   assumes "llSTATE P s"
   assumes "FRAME P (I \<sigma> t) F"
   assumes WF: "SOLVE_AUTO_DEFER (wf R)"
-  assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE ((I \<sigma> t ** F)) s \<rbrakk> \<Longrightarrow> EXTRACT (wp (b \<sigma>) (\<lambda>ctd s\<^sub>1. 
+  assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE ((I \<sigma> t ** F)) s \<rbrakk> \<Longrightarrow> EXTRACT (wp (doM {ll_consume (cost ''call'' 1); ctd \<leftarrow> b \<sigma>; ll_consume (cost ''if'' 1); return ctd}) (\<lambda>ctd s\<^sub>1. 
     (to_bool ctd \<longrightarrow> wp (f \<sigma>) (\<lambda>\<sigma>' s\<^sub>2. llPOST (EXS t'. I \<sigma>' t' ** \<up>((t',t)\<in>R) ** F) s\<^sub>2) s\<^sub>1)
   \<and> (\<not>to_bool ctd \<longrightarrow> Q \<sigma> s\<^sub>1)
     ) s)"
   shows "wp (llc_while_annot I R b f \<sigma>) Q s"
-proof -
+proof -                  
   from \<open>llSTATE P s\<close> \<open>FRAME P (I \<sigma> t) F\<close> have PRE: "llSTATE (I \<sigma> t ** F) s"
-    by (simp add: FRAME_def STATE_def entails_def)
+    unfolding FRAME_def STATE_def entails_def
+    by (simp del: split_paired_All)
 
   show ?thesis  
     unfolding llc_while_annot_def
@@ -721,6 +867,7 @@ subsubsection \<open>Direct Arithmetic\<close>
   then reason about this!
 *)
 
+(*
 context begin
   interpretation llvm_prim_arith_setup .
 
@@ -735,7 +882,9 @@ context begin
     by vcg
     
 end  
+*)
 
+(*
 subsubsection \<open>Direct Comparison\<close>
 abbreviation (input) ll_cmp' :: "bool \<Rightarrow> 1 word" where "ll_cmp' \<equiv> from_bool"
 definition [vcg_monadify_xforms,llvm_inline]: "ll_cmp b \<equiv> return (ll_cmp' b)"
@@ -778,10 +927,14 @@ context begin
     
     
 end    
+*)
+
 
 subsubsection \<open>Boolean Operations\<close>
+(*
 lemma llvm_if_inline[llvm_inline,vcg_monadify_xforms]: "If b t e = llc_if (from_bool b) t e"  
   by (auto simp: llc_if_def)
+*)  
   
 lemma (in llvm_prim_arith_setup) llvm_from_bool_inline[llvm_inline]: 
   "from_bool (a\<and>b) = (from_bool a AND from_bool b)"  
@@ -793,24 +946,29 @@ lemma (in llvm_prim_arith_setup) llvm_from_bool_inline[llvm_inline]:
   done
 
 subsubsection \<open>Products\<close>
-  
+(*  
 lemma inline_prod_case[llvm_inline]: "(\<lambda>(a,b). f a b) = (\<lambda>x. doM { a\<leftarrow>prod_extract_fst x; b \<leftarrow> prod_extract_snd x; f a b })"  
   by (auto simp: prod_ops_simp)
+*)  
   
 lemma inline_return_prod_case[llvm_inline]: 
   "return (case x of (a,b) \<Rightarrow> f a b) = (case x of (a,b) \<Rightarrow> return (f a b))" by (rule prod.case_distrib)
   
-  
+(*  
 lemma inline_return_prod[llvm_inline]: "return (a,b) = doM { x \<leftarrow> prod_insert_fst init a; x \<leftarrow> prod_insert_snd x b; return x }"  
   by (auto simp: prod_ops_simp)
+*)  
   
+context begin
+interpretation llvm_prim_setup .
+
 lemma ll_extract_pair_pair:
-  "ll_extract_fst (a,b) = return a" 
-  "ll_extract_snd (a,b) = return b" 
+  "ll_extract_fst (a,b) = consume1r ''extract_fst'' a" 
+  "ll_extract_snd (a,b) = consume1r ''extract_snd'' b" 
   unfolding ll_extract_fst_def ll_extract_snd_def checked_split_pair_def checked_from_val_def
   by auto 
 
-  
+end  
   
 subsubsection \<open>Marking of constants\<close>    
 definition "ll_const x \<equiv> return x"
@@ -833,6 +991,8 @@ locale standard_opr_abstraction =
   assumes dflt_EPURE_correct: "\<And>c. I c \<Longrightarrow> dflt_EPURE (\<alpha> c) c"  
 begin
 
+interpretation llvm_prim_setup .
+
 definition "assn \<equiv> mk_pure_assn (\<lambda>a c. I c \<and> a=\<alpha> c)"
                            
 lemma assn_pure[is_pure_rule]: "is_pure assn"
@@ -843,34 +1003,34 @@ lemma vcg_prep_delete_assn[vcg_prep_ext_rules]:
   by (auto simp: assn_def dflt_EPURE_correct)
   
 
-definition "is_un_op PRE cop mop aop \<equiv> 
-  (\<forall>a::'c. I a \<and> PRE TYPE('c) (\<alpha> a) \<longrightarrow> I (mop a) \<and> \<alpha> (mop a) = aop (\<alpha> a) \<and> cop a = return (mop a))"
+definition "is_un_op name PRE cop mop aop \<equiv> 
+  (\<forall>a::'c. I a \<and> PRE TYPE('c) (\<alpha> a) \<longrightarrow> I (mop a) \<and> \<alpha> (mop a) = aop (\<alpha> a) \<and> cop a = consume1r name (mop a))"
   
-definition "is_bin_op PRE cop mop aop \<equiv> 
-  (\<forall>a b::'c. I a \<and> I b \<and> PRE TYPE('c) (\<alpha> a) (\<alpha> b) \<longrightarrow> I (mop a b) \<and> \<alpha> (mop a b) = aop (\<alpha> a) (\<alpha> b) \<and> cop a b = return (mop a b))"
+definition "is_bin_op name PRE cop mop aop \<equiv> 
+  (\<forall>a b::'c. I a \<and> I b \<and> PRE TYPE('c) (\<alpha> a) (\<alpha> b) \<longrightarrow> I (mop a b) \<and> \<alpha> (mop a b) = aop (\<alpha> a) (\<alpha> b) \<and> cop a b = consume1r name (mop a b))"
 
-abbreviation "is_un_op' cop mop aop \<equiv> is_un_op (dflt_PRE1 aop) cop mop aop"
-abbreviation "is_bin_op' cop mop aop \<equiv> is_bin_op (dflt_PRE2 aop) cop mop aop"
+abbreviation "is_un_op' name cop mop aop \<equiv> is_un_op name (dflt_PRE1 aop) cop mop aop"
+abbreviation "is_bin_op' name cop mop aop \<equiv> is_bin_op name (dflt_PRE2 aop) cop mop aop"
 
 lemma is_un_opI[intro?]:
-  assumes "\<And>a. \<lbrakk>I a; PRE TYPE('c) (\<alpha> a)\<rbrakk> \<Longrightarrow> cop a = return (mop a)"
+  assumes "\<And>a. \<lbrakk>I a; PRE TYPE('c) (\<alpha> a)\<rbrakk> \<Longrightarrow> cop a = consume1r name (mop a)"
   assumes "\<And>a. \<lbrakk>I a; PRE TYPE('c) (\<alpha> a)\<rbrakk> \<Longrightarrow> I (mop a)"
   assumes "\<And>a. \<lbrakk>I a; PRE TYPE('c) (\<alpha> a)\<rbrakk> \<Longrightarrow> \<alpha> (mop a) = aop (\<alpha> a)"
-  shows "is_un_op PRE cop mop aop"
+  shows "is_un_op name PRE cop mop aop"
   using assms unfolding is_un_op_def by blast
 
 lemma is_bin_opI[intro?]:
-  assumes "\<And>a b. \<lbrakk>I a; I b; PRE TYPE('c) (\<alpha> a) (\<alpha> b)\<rbrakk> \<Longrightarrow> cop a b = return (mop a b)"
+  assumes "\<And>a b. \<lbrakk>I a; I b; PRE TYPE('c) (\<alpha> a) (\<alpha> b)\<rbrakk> \<Longrightarrow> cop a b = consume1r name (mop a b)"
   assumes "\<And>a b. \<lbrakk>I a; I b; PRE TYPE('c) (\<alpha> a) (\<alpha> b)\<rbrakk> \<Longrightarrow> I (mop a b)"
   assumes "\<And>a b. \<lbrakk>I a; I b; PRE TYPE('c) (\<alpha> a) (\<alpha> b)\<rbrakk> \<Longrightarrow> \<alpha> (mop a b) = aop (\<alpha> a) (\<alpha> b)"
-  shows "is_bin_op PRE cop mop aop"
+  shows "is_bin_op name PRE cop mop aop"
   using assms unfolding is_bin_op_def by blast
 
 lemma un_op_tmpl:
   fixes w :: "'c"
-  assumes A: "is_un_op PRE cop mop aop"
+  assumes A: "is_un_op name PRE cop mop aop"
   shows "llvm_htriple 
-    (\<upharpoonleft>assn i w ** \<up>\<^sub>d(PRE TYPE('c) i)) 
+    ($$ name 1 ** \<upharpoonleft>assn i w ** \<up>\<^sub>d(PRE TYPE('c) i)) 
     (cop w) 
     (\<lambda>r. \<upharpoonleft>assn (aop i) r ** \<upharpoonleft>assn i w)
     "
@@ -887,9 +1047,9 @@ qed
   
 lemma bin_op_tmpl:
   fixes w\<^sub>1 w\<^sub>2 :: "'c"
-  assumes A: "is_bin_op PRE cop mop aop"
+  assumes A: "is_bin_op name PRE cop mop aop"
   shows "llvm_htriple 
-    (\<upharpoonleft>assn i\<^sub>1 w\<^sub>1 ** \<upharpoonleft>assn i\<^sub>2 w\<^sub>2 ** \<up>\<^sub>d(PRE TYPE('c) i\<^sub>1 i\<^sub>2)) 
+    ($$name 1 ** \<upharpoonleft>assn i\<^sub>1 w\<^sub>1 ** \<upharpoonleft>assn i\<^sub>2 w\<^sub>2 ** \<up>\<^sub>d(PRE TYPE('c) i\<^sub>1 i\<^sub>2)) 
     (cop w\<^sub>1 w\<^sub>2) 
     (\<lambda>r. \<upharpoonleft>assn (aop i\<^sub>1 i\<^sub>2) r ** \<upharpoonleft>assn i\<^sub>1 w\<^sub>1 ** \<upharpoonleft>assn i\<^sub>2 w\<^sub>2)
     "
@@ -910,20 +1070,22 @@ interpretation bool: standard_opr_abstraction "to_bool::1 word \<Rightarrow> boo
 
 context standard_opr_abstraction begin
 
-  definition "is_cmp_op cop mop aop \<equiv> 
-    (\<forall>a b. I a \<and> I b \<longrightarrow> (cop a b = return (from_bool (mop a b)) \<and> (mop a b \<longleftrightarrow> aop (\<alpha> a) (\<alpha> b))))"
+  interpretation llvm_prim_setup .
+
+  definition "is_cmp_op name cop mop aop \<equiv> 
+    (\<forall>a b. I a \<and> I b \<longrightarrow> (cop a b = consume1r name (from_bool (mop a b)) \<and> (mop a b \<longleftrightarrow> aop (\<alpha> a) (\<alpha> b))))"
   
   lemma is_cmp_opI[intro?]:
-    assumes "\<And>a b. \<lbrakk>I a; I b\<rbrakk> \<Longrightarrow> cop a b = return (from_bool (mop a b))"
+    assumes "\<And>a b. \<lbrakk>I a; I b\<rbrakk> \<Longrightarrow> cop a b = consume1r name (from_bool (mop a b))"
     assumes "\<And>a b. \<lbrakk>I a; I b\<rbrakk> \<Longrightarrow> mop a b \<longleftrightarrow> aop (\<alpha> a) (\<alpha> b)"
-    shows "is_cmp_op cop mop aop"
+    shows "is_cmp_op name cop mop aop"
     using assms unfolding is_cmp_op_def by blast
     
   lemma cmp_op_tmpl:
     fixes w\<^sub>1 w\<^sub>2 :: "'c"
-    assumes "is_cmp_op cop mop aop"
+    assumes "is_cmp_op name cop mop aop"
     shows "llvm_htriple 
-      (\<upharpoonleft>assn i\<^sub>1 w\<^sub>1 ** \<upharpoonleft>assn i\<^sub>2 w\<^sub>2) 
+      ($$ name 1 ** \<upharpoonleft>assn i\<^sub>1 w\<^sub>1 ** \<upharpoonleft>assn i\<^sub>2 w\<^sub>2) 
       (cop w\<^sub>1 w\<^sub>2) 
       (\<lambda>r. \<upharpoonleft>bool.assn (aop i\<^sub>1 i\<^sub>2) r ** \<upharpoonleft>assn i\<^sub>1 w\<^sub>1 ** \<upharpoonleft>assn i\<^sub>2 w\<^sub>2)
       "
@@ -953,20 +1115,22 @@ interpretation llvm_prim_arith_setup .
 
 abbreviation ll_not1 :: "1 word \<Rightarrow> 1 word llM" where "ll_not1 x \<equiv> ll_add x 1"  
     
+(*
 lemma ll_not1_inline[llvm_inline]: "return (~~x) \<equiv> ll_not1 x"
   by (auto simp: word1_NOT_eq arith_inlines)
+*)  
   
 lemma bool_bin_ops:
-  "bool.is_bin_op' ll_and (AND) (\<and>)" 
-  "bool.is_bin_op' ll_or (OR) (\<or>)" 
-  "bool.is_bin_op' ll_xor (XOR) (\<noteq>)" 
+  "bool.is_bin_op' ''and'' ll_and (AND) (\<and>)" 
+  "bool.is_bin_op' ''or'' ll_or (OR) (\<or>)" 
+  "bool.is_bin_op' ''xor'' ll_xor (XOR) (\<noteq>)" 
   apply (all \<open>rule\<close>)
   apply (simp_all only: to_bool_logics)
   apply (all \<open>vcg_normalize?\<close>)
   done
 
 lemma bool_un_ops:
-  "bool.is_un_op' ll_not1 bitNOT Not" 
+  "bool.is_un_op' ''add'' ll_not1 bitNOT Not" 
   apply (all \<open>rule\<close>)
   apply (simp_all only: to_bool_logics)
   apply (all \<open>vcg_normalize?\<close>)
@@ -986,24 +1150,24 @@ definition "ABSTRACT c ty P s \<equiv> \<exists>F a. llSTATE (\<upharpoonleft>ty
 
 lemma ABSTRACT_pure: "is_pure A \<Longrightarrow> ABSTRACT c A P h \<longleftrightarrow> (\<exists>a. \<flat>\<^sub>pA a c \<and> P a)"
   unfolding ABSTRACT_def  
-  apply (auto simp: STATE_extract)
-  apply (auto simp: STATE_def dr_assn_pure_asm_prefix_def sep_conj_def pure_part_def)
-  by (metis (full_types) extract_pure_assn pred_lift_def sep_add_zero_sym sep_disj_commute sep_disj_zero sep_empty_app)
-
+  apply (cases h; auto simp: STATE_extract)
+  apply (auto simp: STATE_def dr_assn_pure_asm_prefix_def sep_conj_def pure_part_def ll_\<alpha>_def lift_\<alpha>_cost_def)
+  by (metis disjoint_zero_sym extract_pure_assn pred_lift_extract_simps(1) sep_add_zero_sym)
+  
 lemma ABSTRACT_erule[vcg_decomp_erules]:
   assumes "llSTATE P s"
   assumes "FRAME P (\<upharpoonleft>ty a c) F"
   assumes "llSTATE (\<upharpoonleft>ty a c ** F) s \<Longrightarrow> EXTRACT (Q a)"
   shows "ABSTRACT c ty Q s"
   using assms
-  by (auto simp: FRAME_def ABSTRACT_def STATE_def entails_def vcg_tag_defs)
+  by (auto simp: FRAME_def ABSTRACT_def STATE_def entails_def vcg_tag_defs simp del: split_paired_All)
 
 
 context begin
   interpretation llvm_prim_arith_setup + llvm_prim_ctrl_setup .
 
   lemma dr_normalize_llc_if[vcg_normalize_simps]: 
-    "\<flat>\<^sub>pbool.assn b bi \<Longrightarrow> wp (llc_if bi t e) Q s \<longleftrightarrow> ((b \<longrightarrow> wp t Q s) \<and> (\<not>b\<longrightarrow>wp e Q s))"
+    "\<flat>\<^sub>pbool.assn b bi \<Longrightarrow> wp (llc_if bi t e) Q s \<longleftrightarrow> wp (consume1r ''if'' ()) (\<lambda>_ s. (b \<longrightarrow> wp t Q s) \<and> (\<not>b\<longrightarrow>wp e Q s)) s"
     unfolding bool.assn_def by vcg_normalize
 
 
@@ -1011,7 +1175,7 @@ context begin
     assumes "llSTATE P s"
     assumes "FRAME P (I \<sigma> t) F"
     assumes WF: "SOLVE_AUTO_DEFER (wf R)"
-    assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE ((I \<sigma> t ** F)) s \<rbrakk> \<Longrightarrow> EXTRACT (wp (b \<sigma>) (\<lambda>ctdi s\<^sub>1. 
+    assumes STEP: "\<And>\<sigma> t s. \<lbrakk> llSTATE ((I \<sigma> t ** F)) s \<rbrakk> \<Longrightarrow> EXTRACT (wp (doM {ll_consume (cost ''call'' 1); ctd \<leftarrow> b \<sigma>; ll_consume (cost ''if'' 1); return ctd}) (\<lambda>ctdi s\<^sub>1. 
         ABSTRACT ctdi bool.assn (\<lambda>ctd. 
             (ctd \<longrightarrow> wp (f \<sigma>) (\<lambda>\<sigma>' s\<^sub>2. llPOST (EXS t'. I \<sigma>' t' ** \<up>\<^sub>d((t',t)\<in>R) ** F) s\<^sub>2) s\<^sub>1)
           \<and> (\<not>ctd \<longrightarrow> Q \<sigma> s\<^sub>1)
