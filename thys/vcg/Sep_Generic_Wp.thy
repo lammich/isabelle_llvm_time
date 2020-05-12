@@ -412,6 +412,7 @@ assumes minus_0[simp]: "\<And>y. minus y 0 = y"
   and I3:  "\<And>a b c. I a (minus c b) \<Longrightarrow> I b c \<Longrightarrow> I (b + a) c"
 begin
 
+
   definition  wp :: "('d, 'e, _, 'a, 'f) M \<Rightarrow> _ \<Rightarrow> _" where
     "wp m Q \<equiv> \<lambda>(s,cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s,minus cr c) \<and> I c cr)"
 
@@ -451,6 +452,8 @@ begin
     
 end
 
+
+
 interpretation nat: cost_framework "\<lambda>(c::nat) (cr::nat). cr-c+c=cr" "(-)"
   apply standard
   by auto
@@ -459,6 +462,26 @@ interpretation int: cost_framework "\<lambda>(c::int) (cr::int). True" "(-)"
   apply standard
   by auto
 
+locale cost_framework2 = cost_framework I minus for I :: "'cc::{monoid_add} \<Rightarrow> 'ca::{plus} \<Rightarrow> bool" and minus +
+  assumes I_left_mono: "\<And>x c d. I x c \<Longrightarrow> I x (c+d)" \<comment> \<open>@{thm ordered_comm_monoid_add_class.add_increasing2}\<close>
+  assumes minus_add_assoc2: "\<And>x c d. I x c \<Longrightarrow> minus (c + d) x = minus c x + d" \<comment> \<open>@{thm ordered_cancel_comm_monoid_diff_class.diff_add_assoc2}\<close>
+begin
+
+
+end
+
+locale cost_framework3 = cost_framework2 I minus for I :: "'cc::{monoid_add} \<Rightarrow> 'ca::{plus} \<Rightarrow> bool" and minus +
+  fixes lift :: "'cc \<Rightarrow> 'ca"
+  assumes I_add1: "\<And>c cr. I c (lift c + cr)" \<comment> \<open>@{thm le_add1}\<close>
+  assumes add_minus_cancel: "\<And>c cr. minus (lift c + cr) c = cr" \<comment> \<open>@{thm Extended_Nat.add_diff_cancel_enat}\<close>
+begin
+
+
+end
+
+
+
+
   
 term acostC  
   
@@ -466,7 +489,10 @@ term acostC
 
 context cost_framework begin                     
 
-  lemma fun_cost_framework: "cost_framework (\<lambda>cc ca. \<forall>x. I (the_acost cc x) (the_acost ca x)) (\<lambda>ca cc. acostC (\<lambda>x. minus (the_acost ca x) (the_acost cc x)))"
+abbreviation "I_fun \<equiv> (\<lambda>cc ca. \<forall>x. I (the_acost cc x) (the_acost ca x))"
+abbreviation "minus_fun \<equiv> (\<lambda>ca cc. acostC (\<lambda>x. minus (the_acost ca x) (the_acost cc x)))"
+
+  lemma fun_cost_framework: "cost_framework I_fun minus_fun"
     apply unfold_locales
     apply (simp_all add: zero_acost_def I_0 minus_0 minus_minus_add fun_eq_iff)
     subgoal for a b c by (cases a;cases b;cases c; auto)
@@ -474,9 +500,34 @@ context cost_framework begin
     subgoal for a b c by (cases a;cases b;cases c; auto intro: I2)
     subgoal for a b c by (cases a;cases b;cases c; auto simp: I3)
     done
+end
+
+context cost_framework3
+begin
+
+
+lemma fun_cost_framework2: "cost_framework2 I_fun minus_fun"
+  unfolding cost_framework2_def
+  apply safe apply (fact fun_cost_framework)
+  apply unfold_locales
+  subgoal for x c d by(cases x; cases c; cases d) (auto intro: I_left_mono)
+  subgoal for x c d by(cases x; cases c; cases d) (auto intro: minus_add_assoc2)
+  done
+
+
+abbreviation "lift_fun \<equiv> (\<lambda>cc. acostC (\<lambda>x. lift (the_acost cc x)))"
+
+lemma fun_cost_framework3: "cost_framework3 I_fun minus_fun lift_fun"
+  unfolding cost_framework3_def
+  apply safe apply (fact fun_cost_framework2)
+  apply unfold_locales
+  subgoal for c cr by(cases c; cases cr) (auto intro: I_add1)
+  subgoal for c cr by(cases c; cases cr) (auto intro: add_minus_cancel)
+  done
 
 
 end
+
 
 section \<open>Setup for mres-Monad\<close>
 
@@ -601,10 +652,19 @@ definition "lift_\<alpha>_cost \<alpha> \<equiv> \<lambda>(s,c). (\<alpha> s,c)"
 
 definition "lift_acost c \<equiv> acostC (enat o the_acost c)"
 
+lemma cost_ecost_minus_add_assoc2: "le_cost_ecost x c \<Longrightarrow> minus_ecost_cost (c + d) x = minus_ecost_cost c x + d"
+  apply(cases x; cases c; cases d) apply(auto simp: minus_ecost_cost_def le_cost_ecost_def)
+  by (simp add: add.commute add_diff_assoc_enat)
 
-lemma for_max3: "le_cost_ecost c (lift_acost c + cr')" sorry
+lemma cost_ecost_add_increasing2: "le_cost_ecost x c \<Longrightarrow> le_cost_ecost x (c + d)"  
+  apply(cases x; cases c; cases d) apply (auto simp:   le_cost_ecost_def) 
+  by (simp add:  add_increasing2) 
 
-lemma for_max4: "minus_ecost_cost (lift_acost c + cr') c = cr'" sorry
+lemma cost_ecost_add1: "le_cost_ecost c (lift_acost c + cr')" 
+  apply(cases cr') by (auto simp: le_cost_ecost_def lift_acost_def )
+
+lemma cost_ecost_add_minus_cancel: "minus_ecost_cost (lift_acost c + cr') c = cr'"  
+  apply(cases cr') by (auto simp: minus_ecost_cost_def lift_acost_def )
     
 lemma consume_rule: "htriple (lift_\<alpha>_cost \<alpha>) ($(lift_acost c)) (consume c) (\<lambda>_. \<box>)"  
   apply (rule htripleI)
@@ -616,9 +676,11 @@ proof (rule conjI)
   from this have "(EXACT (lift_acost c) \<and>* (\<lambda>b. F (\<alpha> s, b))) cr" by (simp add: SND_project_frame)
   then obtain cr' where [simp]: "lift_acost c ## cr'" "cr = lift_acost c + cr'" and F: "F (\<alpha> s, cr')"
     by (rule sep_conjE) (simp add: sep_algebra_simps)
-  show "le_cost_ecost c cr" by (simp add: for_max3)
+  have "0 \<preceq> cr'"
+    by (simp add: sep_substate_def) 
+  show "le_cost_ecost c cr" by (simp add: cost_ecost_add1)
   
-  show "F (\<alpha> s, minus_ecost_cost cr c)" using F by (simp add: for_max4)
+  show "F (\<alpha> s, minus_ecost_cost cr c)" using F by (simp add: cost_ecost_add_minus_cancel)
 qed    
   
     
@@ -693,19 +755,13 @@ section \<open>experiment: Hoare-triple without Time\<close>
   
       
   text \<open>Transfer of Hoare-Triples\<close>
-  
-  lemma for_max1: "le_cost_ecost x c \<Longrightarrow> minus_ecost_cost (c + d) x = minus_ecost_cost c x + d"
-    sorry
-  
-  lemma for_max2: "le_cost_ecost x c \<Longrightarrow> le_cost_ecost x (c + d)"  
-    sorry
     
   (* TODO: Move *)
   lemma wp_time_mono: "wp m Q (s,c) \<Longrightarrow> wp m (\<lambda>r (s',c'). \<exists>cc'. c'=cc'+d \<and> Q r (s',cc')) (s,c+d)"
     unfolding wp_def mwp_def
     apply (auto simp add: algebra_simps sep_algebra_simps SND_def sep_conj_def split: mres.split)
-    subgoal by (intro exI conjI; assumption?) (rule for_max1)
-    subgoal by (rule for_max2)
+    subgoal by (intro exI conjI; assumption?) (rule cost_ecost_minus_add_assoc2)
+    subgoal by (rule cost_ecost_add_increasing2)
     done
       
   lemma notime_to_htriple:
