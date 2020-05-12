@@ -102,10 +102,8 @@ begin
 
   type_synonym 'a llM = "('a,unit,cost,llvm_memory,err) M"
   translations
-    (type) "'a llM" \<leftharpoondown> (type) "('a, unit, llvm_memory, err) M"
+    (type) "'a llM" \<leftharpoondown> (type) "('a, unit, (char list, nat) acost, llvm_memory, err) M"
   
-    
-
   subsection \<open>Shallow Embedding of Values\<close>  
 
   text \<open>We use a type class to characterize types that can be injected into the value type.
