@@ -9,19 +9,24 @@ begin
   
   definition "narray_assn \<equiv> mk_assn (\<lambda>xs p. case xs of [] \<Rightarrow> \<up>(p=null) | _ \<Rightarrow> \<upharpoonleft>array_assn xs p)"
   
-  term array_new
+  
   
   definition [llvm_inline]: 
-    "narray_new TYPE('a::llvm_rep) n \<equiv> if n=signed_nat 0 then return null else array_new TYPE('a) n"
+    "narray_new TYPE('a::llvm_rep) n \<equiv> doM { b\<leftarrow>ll_icmp_eq n (signed_nat 0); llc_if b (return null) (array_new TYPE('a) n) }"
 
   thm array_new_rule_snat[no_vars]
   
   lemma narray_new_rule_snat[vcg_rules]: 
-    "llvm_htriple (\<upharpoonleft>snat.assn n ni) (narray_new TYPE(_) ni) (\<upharpoonleft>narray_assn (replicate n init))"
+    "llvm_htriple ($$''malloc'' n ** $$''free'' 1 ** $$''if'' 1 ** $$''icmp_eq'' 1 ** \<upharpoonleft>snat.assn n ni) (narray_new TYPE(_) ni) (\<upharpoonleft>narray_assn (replicate n init))"
     unfolding narray_assn_def narray_new_def
     supply [split] = list.split
     apply vcg_monadify
     apply vcg
+    defer
+    apply vcg
+    (* TODO: Need to drop excess credits! *)
+    
+    oops
     done
     
 
