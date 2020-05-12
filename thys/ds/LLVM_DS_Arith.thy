@@ -96,22 +96,189 @@ subsection \<open>Constant Folding\<close>
 (*
    TODO: No idea how complete these are 
 *)
-lemmas llvm_num_const_simps[llvm_inline] 
+lemmas llvm_num_const_simps[llvm_inline] =
+  arith_extra_simps
+  arith_simps arith_special 
+  more_arith_simps
+  nat_numeral_diff_1 diff_nat_numeral nat_numeral nat_0 nat_1 minus_nat.diff_0 
+  numeral_plus_one one_plus_numeral diff_minus_eq_add add_uminus_conv_diff
+  cancel_comm_monoid_add_class.diff_cancel 
+  pred_numeral_simps
+  Num.pow.simps power_numeral power_0 monoid_mult_class.power_one_right
+
+  word_of_int_numeral word_of_int_neg_numeral word_of_int_0 word_of_int_1  
+
+(* normalize word numerals to be positive and within range. *)    
+declaration \<open>fn _ => Named_Simpsets.map_ctxt @{named_simpset llvm_inline} (fn ctxt => 
+  ctxt addsimprocs [@{simproc unsigned_norm},@{simproc unsigned_norm_neg0},@{simproc unsigned_norm_neg1}])\<close>
+lemmas [llvm_inline] = minus_one_norm_num of_nat_numeral
+lemmas [llvm_inline] = len_of_numeral_defs  \<comment> \<open>Computation of LENGTH(_)\<close>
+  
+  
+  
+(* Regression test for constant folding *)  
+experiment
+begin                                                            
+
+  method ss = (simp named_ss llvm_inline: )
+
+  type_synonym w64 = "64 word"
+  type_synonym w1 = "1 word"
+  
+  (* nat + *)
+  schematic_goal "(3::nat) + 7 = numeral ?a" by ss
+  schematic_goal "(3::nat) + 0 = numeral ?a" by ss
+  schematic_goal "(3::nat) + 1 = numeral ?a" by ss
+  schematic_goal "(0::nat) + 7 = numeral ?a" by ss
+  schematic_goal "(1::nat) + 7 = numeral ?a" by ss
+  
+  (* int + *)
+  schematic_goal "(3::int) + 7 = numeral ?a" by ss
+  schematic_goal "(3::int) + 0 = numeral ?a" by ss
+  schematic_goal "(3::int) + 1 = numeral ?a" by ss
+  schematic_goal "(0::int) + 7 = numeral ?a" by ss
+  schematic_goal "(1::int) + 7 = numeral ?a" by ss
+  
+  schematic_goal "(3::int) + -7 = - numeral ?a" by ss
+  schematic_goal "(3::int) + -0 = numeral ?a" by ss
+  schematic_goal "(3::int) + -1 = numeral ?a" by ss
+  schematic_goal "(0::int) + -7 = - numeral ?a" by ss
+  schematic_goal "(1::int) + -7 = - numeral ?a" by ss
+
+  (* word 64 *)
+  schematic_goal "(3::w64) + 7 = numeral ?a" by ss
+  schematic_goal "(3::w64) + 0 = numeral ?a" by ss
+  schematic_goal "(3::w64) + 1 = numeral ?a" by ss
+  schematic_goal "(0::w64) + 7 = numeral ?a" by ss
+  schematic_goal "(1::w64) + 7 = numeral ?a" by ss
+  
+  schematic_goal "(-0::w64) = 0" by ss
+  schematic_goal "(-1::w64) = numeral ?a" by ss
+  schematic_goal "(-3::w64) = numeral ?a" by ss
+  
+  schematic_goal "(3::w64) + -0 = numeral ?a" by ss
+  schematic_goal "(3::w64) + -1 = numeral ?a" by ss
+  schematic_goal "(0::w64) + -7 = numeral ?a" by ss
+  schematic_goal "(1::w64) + -7 = numeral ?a" by ss
+  
+  schematic_goal "(3::w1) + 7 = 0" by ss
+  schematic_goal "(3::w1) + 0 = 1" by ss
+  schematic_goal "(3::w1) + 1 = 0" by ss
+  schematic_goal "(0::w1) + 7 = 1" by ss
+  schematic_goal "(1::w1) + 7 = 0" by ss
+  
+  schematic_goal "(-0::w1) = 0" by ss
+(*  schematic_goal "(-1::w1) = 1" by ss  
+  schematic_goal "(-3::w1) = 0" by ss TODO/FIXME: does not work yet*)
+  
+  schematic_goal "(3::w1) + -0 = 1" by ss
+  schematic_goal "(3::w1) + -1 = 0" by ss
+  (*
+  schematic_goal "(0::w1) + -7 = 1" by ss
+  schematic_goal "(1::w1) + -7 = numeral ?a" by ss TODO/FIXME: does not work yet*)
+  
+  (* nat - *)
+  schematic_goal "(9::nat) - 7 = numeral ?a" by ss
+  schematic_goal "(3::nat) - 0 = numeral ?a" by ss
+  schematic_goal "(3::nat) - 1 = numeral ?a" by ss
+  schematic_goal "(0::nat) - 0 = 0" by ss
+  schematic_goal "(1::nat) - 0 = 1" by ss
+  schematic_goal "(1::nat) - 1 = 0"  by ss
+  
+  (* int - *)
+  schematic_goal "(3::int) - 7 = -numeral ?a" by ss
+  schematic_goal "(3::int) - 0 = numeral ?a" by ss
+  schematic_goal "(3::int) - 1 = numeral ?a" by ss
+  schematic_goal "(0::int) - 7 = -numeral ?a" by ss
+  schematic_goal "(1::int) - 7 = -numeral ?a" by ss
+  schematic_goal "(0::int) - 0 = 0" by ss
+  schematic_goal "(1::int) - 0 = 1" by ss
+  schematic_goal "(1::int) - 1 = 0" by ss
+  
+  schematic_goal "(3::int) - -7 = numeral ?a" by ss
+  schematic_goal "(3::int) - -0 = numeral ?a" by ss
+  schematic_goal "(3::int) - -1 = numeral ?a" by ss
+  schematic_goal "(0::int) - -7 = numeral ?a" by ss
+  schematic_goal "(1::int) - -7 = numeral ?a" by ss
+  schematic_goal "(0::int) - -0 = 0" by ss
+  schematic_goal "(1::int) - -0 = 1" by ss
+  schematic_goal "(1::int) - -1 = numeral ?a" by ss
+
+  (* Powers (of 2) *)
+  schematic_goal "(2::nat)^0 = 1" by ss
+  schematic_goal "(2::nat)^1 = numeral ?a" by ss
+  schematic_goal "(2::nat)^3 = numeral ?a" by ss
+  schematic_goal "(2::nat)^4 = numeral ?a" by ss
+  schematic_goal "(2::nat)^5 = numeral ?a" by ss
+  schematic_goal "(2::nat)^6 = numeral ?a" by ss
+  schematic_goal "(2::nat)^7 = numeral ?a" by ss
+  schematic_goal "(2::nat)^8 = numeral ?a" by ss
+  schematic_goal "(2::nat)^16 = numeral ?a" by ss
+  schematic_goal "(2::nat)^32 = numeral ?a" by ss
+  schematic_goal "(2::nat)^64 = numeral ?a" by ss
+  schematic_goal "(2::nat)^128 = numeral ?a" by ss
+  
+  
+  schematic_goal "(2::int)^0 = 1" by ss
+  schematic_goal "(2::int)^1 = numeral ?a" by ss
+  schematic_goal "(2::int)^3 = numeral ?a" by ss
+  schematic_goal "(2::int)^4 = numeral ?a" by ss
+  schematic_goal "(2::int)^5 = numeral ?a" by ss
+  schematic_goal "(2::int)^6 = numeral ?a" by ss
+  schematic_goal "(2::int)^7 = numeral ?a" by ss
+  schematic_goal "(2::int)^8 = numeral ?a" by ss
+  schematic_goal "(2::int)^16 = numeral ?a" by ss
+  schematic_goal "(2::int)^32 = numeral ?a" by ss
+  schematic_goal "(2::int)^64 = numeral ?a" by ss
+  schematic_goal "(2::int)^128 = numeral ?a" by ss
+    
+
+end
+
+
+(* 
   = Num.arith_simps power_numeral pred_numeral_simps power_0
     arith_special numeral_One[symmetric]
-
+    len_of_numeral_defs word_of_int_numeral word_of_int_0 word_of_int_1 (* Computing LENGTH(numeral-type) *)
   
+    max_uint_def max_sint_def min_sint_def
+*)    
+    
 subsection \<open>Reflection of Maximum Representable Values\<close>  
   
-definition ll_max_uint :: "'l::len word llM" where [llvm_inline]: "ll_max_uint \<equiv> ll_sub 0 1"
-definition ll_max_sint :: "'l::len2 word llM" where [llvm_inline]: "ll_max_sint \<equiv> doM {r \<leftarrow> ll_max_uint; ll_lshr r 1}"
+lemmas [llvm_inline] = max_uint_def max_sint_def min_sint_def
+
+find_theorems "word_of_int (-_)"
+
+definition ll_max_uint :: "'l::len word llM" where [llvm_inline]: "ll_max_uint \<equiv> return (word_of_int (max_uint LENGTH('l) - 1))"
+definition ll_max_sint :: "'l::len2 word llM" where [llvm_inline]: "ll_max_sint \<equiv> return (word_of_int (max_sint LENGTH('l) - 1))"
+definition ll_min_sint :: "'l::len2 word llM" where [llvm_inline]: "ll_min_sint \<equiv> return (word_of_int (min_sint LENGTH('l) + 1))"
   
+(* TODO: Tuples will require some more thought. *)
+definition mk_pair :: "'a::llvm_rep \<Rightarrow> 'b::llvm_rep llM \<Rightarrow> ('a\<times>'b) llM" where
+  [llvm_inline]: "mk_pair a ctd \<equiv> doM { r\<leftarrow>ll_insert_fst init a; b\<leftarrow>ctd; ll_insert_snd r b }"
+
+experiment begin
+  (* Regression test to ensure that preprocessor does the computations. export-llvm will complain about non-numeral constants otherwise. *)
+  definition [llvm_code]: "test \<equiv> doM {
+    a\<leftarrow>(ll_max_uint :: 64 word llM);
+    b\<leftarrow>(ll_max_sint :: 64 word llM);
+    c\<leftarrow>(ll_min_sint :: 64 word llM);
+
+    d\<leftarrow>(ll_max_uint :: 1 word llM);
+    e\<leftarrow>(ll_max_sint :: 2 word llM);
+    f\<leftarrow>(ll_min_sint :: 2 word llM);
+      
+    mk_pair a (mk_pair b (mk_pair c (mk_pair d (mk_pair e (return f)))))
+  }"
+  
+  export_llvm "test"
+end
+
+
 context llvm_prim_arith_setup begin  
 
-lemma ll_max_uint_simp[vcg_normalize_simps]: "(ll_max_uint::'l::len word llM) = return (word_of_int (max_uint LENGTH('l) - 1))"
-  unfolding ll_max_uint_def max_uint_def
-  apply vcg_normalize
-  by (simp add: word_of_int_minus)
+lemmas [vcg_normalize_simps] = ll_max_uint_def ll_max_sint_def ll_min_sint_def
 
 lemma len_neq_one_conv: 
   "LENGTH('l::len) \<noteq> Suc 0 \<longleftrightarrow> (\<exists>n. LENGTH('l) = Suc (Suc n))"
@@ -133,7 +300,8 @@ proof -
   finally show ?thesis .
 qed  
  
-lemma ll_max_sint_simp[vcg_normalize_simps]: "(ll_max_sint::'l::len2 word llM) = return (word_of_int (max_sint LENGTH('l) - 1))"
+(*
+lemma ll_max_sint_simp[vcg_normalize_simps]: "(ll_max_sint::'l::len2 word llM) = consume1r ''sub'' (word_of_int (max_sint LENGTH('l) - 1))"
   unfolding ll_max_sint_def 
   supply [simp] = Suc_lessI max_sint_def max_uint_def len_neq_one_conv
   apply vcg_normalize
@@ -145,18 +313,19 @@ lemma ll_max_sint_simp[vcg_normalize_simps]: "(ll_max_sint::'l::len2 word llM) =
   apply (simp add: ll_max_sint_aux1)
   apply (smt one_le_power)
   by (simp add: pos_add_strict)
-    
+*)    
 
 lemma ll_max_uint_rule[vcg_rules]: "llvm_htriple \<box> (ll_max_uint::'l::len word llM) (\<lambda>r. \<up>(uint r = max_uint (LENGTH('l)) - 1))"
-  supply [simp] = max_uint_def zmod_minus1 uint_word_ariths
-  unfolding ll_max_uint_def max_uint_def
+  supply [simp] = max_uint_def zmod_minus1 uint_word_ariths word_of_int_inverse
   by vcg'
-    
-lemma ll_max_sint_rule: "llvm_htriple (\<box>) (ll_max_sint::'l::len2 word llM) (\<lambda>r. \<up>(uint r = max_sint LENGTH('l) - 1))"
-  apply vcg'
-  apply (auto simp add: uint_word_of_int max_sint_def)
-  by (smt diff_le_self int_mod_eq power_increasing_iff zless2p)
   
+lemma ll_max_sint_rule[vcg_rules]: "llvm_htriple (\<box>) (ll_max_sint::'l::len2 word llM) (\<lambda>r. \<up>(sint r = max_sint LENGTH('l) - 1))"
+  apply vcg'
+  by (simp add: max_sint_def sints_num word_sint.Abs_inverse)
+
+lemma ll_min_sint_rule[vcg_rules]: "llvm_htriple (\<box>) (ll_min_sint::'l::len2 word llM) (\<lambda>r. \<up>(sint r = min_sint LENGTH('l) + 1))"
+  apply vcg'
+  by (simp add: min_sint_def max_sint_def power_gt1_lemma word_sint.Abs_inverse)
 
 end  
   
@@ -184,11 +353,11 @@ interpretation llvm_prim_arith_setup .
 
 
 lemma sint_bin_ops:
-  "sint.is_bin_op' ll_add (+) (+)" 
-  "sint.is_bin_op' ll_sub (-) (-)"  
-  "sint.is_bin_op' ll_mul (*) (*)"  
-  "sint.is_bin_op (\<lambda>(_::'a::len word itself) a b. b\<noteq>0 \<and> a sdiv b \<in> sints LENGTH('a)) ll_sdiv (sdiv) (sdiv)"  
-  "sint.is_bin_op (\<lambda>(_::'a::len word itself) a b. b\<noteq>0 \<and> a sdiv b \<in> sints LENGTH('a)) ll_srem (smod) (smod)"
+  "sint.is_bin_op' ''add'' ll_add (+) (+)" 
+  "sint.is_bin_op' ''sub'' ll_sub (-) (-)"  
+  "sint.is_bin_op' ''mul'' ll_mul (*) (*)"  
+  "sint.is_bin_op ''sdiv'' (\<lambda>(_::'a::len word itself) a b. b\<noteq>0 \<and> a sdiv b \<in> sints LENGTH('a)) ll_sdiv (sdiv) (sdiv)"  
+  "sint.is_bin_op ''srem'' (\<lambda>(_::'a::len word itself) a b. b\<noteq>0 \<and> a sdiv b \<in> sints LENGTH('a)) ll_srem (smod) (smod)"
   supply [simp del] = in_sints_conv
   apply (all \<open>prove_sint_op simp:  sint_neq_ZD\<close>)
   apply (simp_all add: sbintrunc_eq_if_in_range sint_word_ariths signed_mod_arith signed_div_arith)
@@ -196,10 +365,10 @@ lemma sint_bin_ops:
   by (auto simp add: in_sints_conv min_sint_def max_sint_def)
   
 lemma sint_cmp_ops: 
-  "sint.is_cmp_op ll_icmp_eq (=) (=)" 
-  "sint.is_cmp_op ll_icmp_ne (\<noteq>) (\<noteq>)"
-  "sint.is_cmp_op ll_icmp_sle (\<lambda>a b. a <=s b) (\<le>)" (* FIXME: Why isn't <=s and <s proper infix operator? *) 
-  "sint.is_cmp_op ll_icmp_slt (\<lambda>a b. a <s b) (<)" 
+  "sint.is_cmp_op ''icmp_eq'' ll_icmp_eq (=) (=)" 
+  "sint.is_cmp_op ''icmp_ne'' ll_icmp_ne (\<noteq>) (\<noteq>)"
+  "sint.is_cmp_op ''icmp_sle'' ll_icmp_sle (\<lambda>a b. a <=s b) (\<le>)" (* FIXME: Why isn't <=s and <s proper infix operator? *) 
+  "sint.is_cmp_op ''icmp_slt'' ll_icmp_slt (\<lambda>a b. a <s b) (<)" 
   by (all \<open>prove_sint_op simp: word_sle_def word_sless_def le_less\<close>)
 
 lemmas sint_rules[vcg_rules] =  
@@ -271,27 +440,27 @@ interpretation llvm_prim_arith_setup .
 
 
 lemma uint_bin_ops_arith:
-  "uint.is_bin_op (\<lambda>(_::'a::len word itself) a b. a+b < max_uint LENGTH('a)) ll_add (+) (+)" 
-  "uint.is_bin_op (\<lambda>_ a b. b\<le>a) ll_sub (-) (-)"  
-  "uint.is_bin_op (\<lambda>(_::'a::len word itself) a b. a*b < max_uint LENGTH('a)) ll_mul (*) (*)"  
-  "uint.is_bin_op (\<lambda>_ a b. b\<noteq>0) ll_udiv (div) (div)"  
-  "uint.is_bin_op (\<lambda>_ a b. b\<noteq>0) ll_urem (mod) (mod)"
+  "uint.is_bin_op ''add'' (\<lambda>(_::'a::len word itself) a b. a+b < max_uint LENGTH('a)) ll_add (+) (+)" 
+  "uint.is_bin_op ''sub'' (\<lambda>_ a b. b\<le>a) ll_sub (-) (-)"  
+  "uint.is_bin_op ''mul'' (\<lambda>(_::'a::len word itself) a b. a*b < max_uint LENGTH('a)) ll_mul (*) (*)"  
+  "uint.is_bin_op ''udiv'' (\<lambda>_ a b. b\<noteq>0) ll_udiv (div) (div)"  
+  "uint.is_bin_op ''urem'' (\<lambda>_ a b. b\<noteq>0) ll_urem (mod) (mod)"
   by (all \<open>prove_uint_op simp: uint_mult_lem uint_neq_ZD uint_div uint_mod\<close>)
 
 (* TODO: Remove preconditions! *)
 lemma uint_bin_ops_bitwise:
-  "uint.is_bin_op (\<lambda>_ _ _. True) ll_and (AND) (AND)" 
-  "uint.is_bin_op (\<lambda>_ _ _. True) ll_or (OR) (OR)" 
-  "uint.is_bin_op (\<lambda>_ _ _. True) ll_xor (XOR) (XOR)" 
+  "uint.is_bin_op ''and'' (\<lambda>_ _ _. True) ll_and (AND) (AND)" 
+  "uint.is_bin_op ''or'' (\<lambda>_ _ _. True) ll_or (OR) (OR)" 
+  "uint.is_bin_op ''xor'' (\<lambda>_ _ _. True) ll_xor (XOR) (XOR)" 
   by (all \<open>prove_uint_op simp: uint_and uint_or uint_xor\<close>)
 
 lemmas uint_bin_ops = uint_bin_ops_arith uint_bin_ops_bitwise
   
 lemma uint_cmp_ops: 
-  "uint.is_cmp_op ll_icmp_eq (=) (=)" 
-  "uint.is_cmp_op ll_icmp_ne (\<noteq>) (\<noteq>)"
-  "uint.is_cmp_op ll_icmp_ule (\<le>) (\<le>)" 
-  "uint.is_cmp_op ll_icmp_ult (<) (<)" 
+  "uint.is_cmp_op ''icmp_eq'' ll_icmp_eq (=) (=)" 
+  "uint.is_cmp_op ''icmp_ne'' ll_icmp_ne (\<noteq>) (\<noteq>)"
+  "uint.is_cmp_op ''icmp_ule'' ll_icmp_ule (\<le>) (\<le>)" 
+  "uint.is_cmp_op ''icmp_ult'' ll_icmp_ult (<) (<)" 
   by (all \<open>prove_uint_op\<close>)
   
 lemmas uint_rules[vcg_rules] =
@@ -355,27 +524,27 @@ interpretation llvm_prim_arith_setup .
 
 
 lemma unat_bin_ops:
-  "unat.is_bin_op (\<lambda>(_::'a::len word itself) a b. a+b < max_unat LENGTH('a)) ll_add (+) (+)" 
-  "unat.is_bin_op (\<lambda>_ a b. b\<le>a) ll_sub (-) (-)"  
-  "unat.is_bin_op (\<lambda>(_::'a::len word itself) a b. a*b < max_unat LENGTH('a)) ll_mul (*) (*)"  
-  "unat.is_bin_op (\<lambda>_ a b. b\<noteq>0) ll_udiv (div) (div)"  
-  "unat.is_bin_op (\<lambda>_ a b. b\<noteq>0) ll_urem (mod) (mod)"
+  "unat.is_bin_op ''add'' (\<lambda>(_::'a::len word itself) a b. a+b < max_unat LENGTH('a)) ll_add (+) (+)" 
+  "unat.is_bin_op ''sub'' (\<lambda>_ a b. b\<le>a) ll_sub (-) (-)"  
+  "unat.is_bin_op ''mul'' (\<lambda>(_::'a::len word itself) a b. a*b < max_unat LENGTH('a)) ll_mul (*) (*)"  
+  "unat.is_bin_op ''udiv'' (\<lambda>_ a b. b\<noteq>0) ll_udiv (div) (div)"  
+  "unat.is_bin_op ''urem'' (\<lambda>_ a b. b\<noteq>0) ll_urem (mod) (mod)"
   by (all \<open>prove_unat_op simp: unat_mult_lem unat_neq_ZD unat_div unat_mod\<close>)
 
 lemma unat_bin_ops_bitwise:
-  "unat.is_bin_op (\<lambda>_ _ _. True) ll_and (AND) (AND)" 
-  "unat.is_bin_op (\<lambda>_ _ _. True) ll_or (OR) (OR)" 
-  "unat.is_bin_op (\<lambda>_ _ _. True) ll_xor (XOR) (XOR)" 
+  "unat.is_bin_op ''and'' (\<lambda>_ _ _. True) ll_and (AND) (AND)" 
+  "unat.is_bin_op ''or'' (\<lambda>_ _ _. True) ll_or (OR) (OR)" 
+  "unat.is_bin_op ''xor'' (\<lambda>_ _ _. True) ll_xor (XOR) (XOR)" 
   by (all \<open>prove_unat_op simp: unat_and unat_or unat_xor\<close>)
   
-lemma unat_un_ops: "unat.is_un_op' (\<lambda>x. ll_add x 1) (\<lambda>x. x+1) Suc"
+lemma unat_un_ops: "unat.is_un_op' ''add'' (\<lambda>x. ll_add x 1) (\<lambda>x. x+1) Suc"
   by (prove_unat_op simp: unat_word_ariths)
   
 lemma unat_cmp_ops: 
-  "unat.is_cmp_op ll_icmp_eq (=) (=)" 
-  "unat.is_cmp_op ll_icmp_ne (\<noteq>) (\<noteq>)"
-  "unat.is_cmp_op ll_icmp_ule (\<le>) (\<le>)" 
-  "unat.is_cmp_op ll_icmp_ult (<) (<)" 
+  "unat.is_cmp_op ''icmp_eq'' ll_icmp_eq (=) (=)" 
+  "unat.is_cmp_op ''icmp_ne'' ll_icmp_ne (\<noteq>) (\<noteq>)"
+  "unat.is_cmp_op ''icmp_ule'' ll_icmp_ule (\<le>) (\<le>)" 
+  "unat.is_cmp_op ''icmp_ult'' ll_icmp_ult (<) (<)" 
   by (all \<open>prove_unat_op\<close>)
   
 lemmas unat_rules[vcg_rules] =
@@ -463,11 +632,11 @@ lemma snat_in_bounds_aux: "(a::nat)<2^(x-Suc 0) \<Longrightarrow> a<2^x"
   by (metis diff_le_self leI le_less_trans less_not_refl nat_power_less_imp_less numeral_2_eq_2 zero_less_Suc)
 
 lemma snat_bin_ops:
-  "snat.is_bin_op' ll_add (+) (+)" 
-  "snat.is_bin_op (\<lambda>_ a b. b\<le>a) ll_sub (-) (-)"  
-  "snat.is_bin_op' ll_mul (*) (*)"  
-  "snat.is_bin_op (\<lambda>_ a b. b\<noteq>0) ll_udiv (div) (div)"  
-  "snat.is_bin_op (\<lambda>_ a b. b\<noteq>0) ll_urem (mod) (mod)"
+  "snat.is_bin_op' ''add'' ll_add (+) (+)" 
+  "snat.is_bin_op ''sub'' (\<lambda>_ a b. b\<le>a) ll_sub (-) (-)"  
+  "snat.is_bin_op' ''mul'' ll_mul (*) (*)"  
+  "snat.is_bin_op ''udiv'' (\<lambda>_ a b. b\<noteq>0) ll_udiv (div) (div)"  
+  "snat.is_bin_op ''urem'' (\<lambda>_ a b. b\<noteq>0) ll_urem (mod) (mod)"
   
   apply (prove_snat_op simp: unat_word_ariths)
   apply (prove_snat_op simp: unat_word_ariths unat_sub_if')
@@ -490,17 +659,17 @@ lemma snat_bin_ops:
     done
   done
   
-lemma snat_un_ops: "snat.is_un_op' (\<lambda>x. ll_add x 1) (\<lambda>x. x+1) Suc"
+lemma snat_un_ops: "snat.is_un_op' ''add'' (\<lambda>x. ll_add x 1) (\<lambda>x. x+1) Suc"
   by (prove_snat_op simp: unat_word_ariths)
   
   
 lemma snat_cmp_ops:
-  "snat.is_cmp_op ll_icmp_eq (=) (=)" 
-  "snat.is_cmp_op ll_icmp_ne (\<noteq>) (\<noteq>)"
-  "snat.is_cmp_op ll_icmp_ule (\<le>) (\<le>)" 
-  "snat.is_cmp_op ll_icmp_ult (<) (<)" 
-  "snat.is_cmp_op ll_icmp_sle (\<lambda>a b. a <=s b) (\<le>)" 
-  "snat.is_cmp_op ll_icmp_slt (\<lambda>a b. a <s b) (<)" 
+  "snat.is_cmp_op ''icmp_eq'' ll_icmp_eq (=) (=)" 
+  "snat.is_cmp_op ''icmp_ne'' ll_icmp_ne (\<noteq>) (\<noteq>)"
+  "snat.is_cmp_op ''icmp_ule'' ll_icmp_ule (\<le>) (\<le>)" 
+  "snat.is_cmp_op ''icmp_ult'' ll_icmp_ult (<) (<)" 
+  "snat.is_cmp_op ''icmp_sle'' ll_icmp_sle (\<lambda>a b. a <=s b) (\<le>)" 
+  "snat.is_cmp_op ''icmp_slt'' ll_icmp_slt (\<lambda>a b. a <s b) (<)" 
   
   apply (prove_snat_op)
   apply (prove_snat_op)
@@ -614,7 +783,7 @@ context begin
   
   lemma unat_snat_upcast_rule[vcg_rules]:
     "llvm_htriple 
-      (\<up>(is_up' UCAST('small \<rightarrow> 'big)) ** \<upharpoonleft>unat.assn n (ni::'small::len word)) 
+      ($$ ''zext'' 1 ** \<up>(is_up' UCAST('small \<rightarrow> 'big)) ** \<upharpoonleft>unat.assn n (ni::'small::len word)) 
       (unat_snat_upcast TYPE('big::len2) ni) 
       (\<lambda>r. \<upharpoonleft>snat.assn n r)"
     unfolding unat.assn_def snat.assn_def unat_snat_upcast_def
@@ -624,7 +793,7 @@ context begin
 
   lemma snat_unat_downcast_rule[vcg_rules]:
     "llvm_htriple 
-      (\<up>(is_down' UCAST('big \<rightarrow> 'small)) ** \<upharpoonleft>snat.assn n (ni::'big::len2 word) ** \<up>(n<max_unat LENGTH('small))) 
+      ($$ ''trunc'' 1 ** \<up>(is_down' UCAST('big \<rightarrow> 'small)) ** \<upharpoonleft>snat.assn n (ni::'big::len2 word) ** \<up>(n<max_unat LENGTH('small))) 
       (snat_unat_downcast TYPE('small::len) ni) 
       (\<lambda>r. \<upharpoonleft>unat.assn n r)"
     unfolding unat.assn_def snat.assn_def snat_unat_downcast_def
@@ -634,7 +803,7 @@ context begin
 
   lemma snat_snat_upcast_rule[vcg_rules]:
     "llvm_htriple 
-      (\<up>(is_up' UCAST('small \<rightarrow> 'big)) ** \<upharpoonleft>snat.assn n (ni::'small::len2 word)) 
+      ($$ ''zext'' 1 ** \<up>(is_up' UCAST('small \<rightarrow> 'big)) ** \<upharpoonleft>snat.assn n (ni::'small::len2 word)) 
       (snat_snat_upcast TYPE('big::len2) ni) 
       (\<lambda>r. \<upharpoonleft>snat.assn n r)"
     unfolding unat.assn_def snat.assn_def snat_snat_upcast_def
@@ -644,7 +813,7 @@ context begin
 
   lemma snat_snat_downcast_rule[vcg_rules]:
     "llvm_htriple 
-      (\<up>(is_down' UCAST('big \<rightarrow> 'small)) ** \<upharpoonleft>snat.assn n (ni::'big::len2 word) ** \<up>(n<max_snat LENGTH('small))) 
+      ($$ ''trunc'' 1 **\<up>(is_down' UCAST('big \<rightarrow> 'small)) ** \<upharpoonleft>snat.assn n (ni::'big::len2 word) ** \<up>(n<max_snat LENGTH('small))) 
       (snat_snat_downcast TYPE('small::len2) ni) 
       (\<lambda>r. \<upharpoonleft>snat.assn n r)"
     unfolding snat.assn_def snat_snat_downcast_def
@@ -654,7 +823,7 @@ context begin
 
    lemma unat_unat_upcast_rule[vcg_rules]:
     "llvm_htriple 
-      (\<up>(is_up' UCAST('small \<rightarrow> 'big)) ** \<upharpoonleft>unat.assn n (ni::'small::len word)) 
+      ($$ ''zext'' 1 ** \<up>(is_up' UCAST('small \<rightarrow> 'big)) ** \<upharpoonleft>unat.assn n (ni::'small::len word)) 
       (unat_unat_upcast TYPE('big::len) ni) 
       (\<lambda>r. \<upharpoonleft>unat.assn n r)"
     unfolding unat.assn_def snat.assn_def unat_unat_upcast_def
@@ -664,7 +833,7 @@ context begin
 
   lemma unat_unat_downcast_rule[vcg_rules]:
     "llvm_htriple 
-      (\<up>(is_down' UCAST('big \<rightarrow> 'small)) ** \<upharpoonleft>unat.assn n (ni::'big::len word) ** \<up>(n<max_unat LENGTH('small))) 
+      ($$ ''trunc'' 1 **\<up>(is_down' UCAST('big \<rightarrow> 'small)) ** \<upharpoonleft>unat.assn n (ni::'big::len word) ** \<up>(n<max_unat LENGTH('small))) 
       (unat_unat_downcast TYPE('small::len) ni) 
       (\<lambda>r. \<upharpoonleft>unat.assn n r)"
     unfolding unat.assn_def unat.assn_def unat_unat_downcast_def
