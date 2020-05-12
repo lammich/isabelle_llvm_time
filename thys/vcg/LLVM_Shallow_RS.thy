@@ -431,7 +431,9 @@ lemma FST_empty[sep_algebra_simps, vcg_normalize_simps]: "FST \<box> = \<box>"
 lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_allocn_rule, unfolded FST_empty]
 
 (* TODO: Move *)
-lemma FST_distrib_img[sep_algebra_simps, vcg_normalize_simps, named_ss fri_prepare_simps]: "FST (\<Union>*i\<in>I. P i) = (\<Union>*i\<in>I. FST (P i))" sorry
+lemma FST_distrib_img[sep_algebra_simps, vcg_normalize_simps, named_ss fri_prepare_simps]:
+  "finite I \<Longrightarrow> FST (\<Union>*i\<in>I. P i) = (\<Union>*i\<in>I. FST (P i))"
+  by(induct rule: finite_induct) (simp_all add: FST_empty FST_conj_conv[symmetric])
 
 
 text \<open>Memory allocation tag, which expresses ownership of an allocated block.\<close>
