@@ -1,13 +1,13 @@
 theory Sepref_Misc
 imports 
-  "../Refine_Monadic_Add"
+  (* "../Refine_Monadic_Add" *)
   PO_Normalizer
   "List-Index.List_Index"
   "Refine_Imperative_HOL.Named_Theorems_Rev"
   "HOL-Eisbach.Eisbach"
 begin
 
-  hide_const (open) CONSTRAINT
+(*  hide_const (open) CONSTRAINT *)
 
   
   ML \<open>
