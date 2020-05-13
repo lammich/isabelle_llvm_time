@@ -30,6 +30,12 @@ begin
     instance ..
   end
 
+  instantiation acost :: (type, ord) ord
+  begin 
+    definition "less_eq_acost a b = (\<forall>x. the_acost a x \<le> the_acost b x)"
+    definition "less_acost a b = (\<forall>x. the_acost a x < the_acost b x)"
+    instance ..
+  end
 
   instantiation acost :: (type, monoid_add) monoid_add
   begin
@@ -97,5 +103,39 @@ begin
 
   lemmas c_simps = cost_same_curr_add cost_same_curr_minus cost_zero add_ac[where a="_::(_,_) acost"]
       \<comment> \<open>strange: thm  add_ac[where ?'a="(_,_) acost"] \<close>
+
+
+  
+  
+  instantiation acost :: (type, Sup) Sup
+  begin                                                   
+    definition "Sup A = acostC (\<lambda>x. SUP f\<in>A. the_acost f x)"
+  
+    instance ..
+  
+  end
+  
+  instantiation acost :: (type, Inf) Inf
+  begin                                                   
+  
+    definition "Inf A = acostC (\<lambda>x. INF f\<in>A. the_acost f x)"
+  
+    instance ..
+  
+  end
+  
+  instantiation acost :: (type, complete_lattice) complete_lattice
+  begin                                                   
+    definition "bot_acost = acostC (\<lambda>x. bot)"             
+    definition "top_acost = acostC (\<lambda>x. top)"
+    definition "sup_acost c c' = acostC (\<lambda>x. sup (the_acost c x) (the_acost c' x))"
+
+    instance 
+      apply standard
+                     apply(auto simp add: le_fun_def less_eq_acost_def less_acost_def split: acost.split)
+      subgoal for x y apply(cases x; cases y) by (auto simp: le_less less_fun_def le_fun_def)      
+      sorry (* TODO *)
+  end
+
 
 end
