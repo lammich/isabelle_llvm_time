@@ -591,7 +591,7 @@ section \<open>Setup for mres-Monad\<close>
   lemma natenat_alt: "wp m Q = (\<lambda>(s, cr). mwp (run m s) bot bot bot (\<lambda>r c s. Q r (s, minus_ecost_cost cr c) \<and> le_cost_ecost c cr))" unfolding wp_def ..
 
   (* Definition for presentation in paper *)
-  lemma "wp m Q (s,cr::ecost) = (\<exists>r (c::cost) s'. run m s = SUCC r c s' \<and> Q r (s', minus_ecost_cost cr c) \<and> le_cost_ecost c cr )"
+  lemma wp_alt: "wp m Q (s,cr::ecost) = (\<exists>r (c::cost) s'. run m s = SUCC r c s' \<and> Q r (s', minus_ecost_cost cr c) \<and> le_cost_ecost c cr )"
     unfolding wp_def mwp_def by (fastforce split: mres.splits)
 
   interpretation generic_wp wp 
