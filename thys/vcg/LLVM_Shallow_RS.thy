@@ -60,10 +60,10 @@ type_synonym ll_assn = "(ll_astate \<Rightarrow> bool)"
 definition "ll_\<alpha> \<equiv> lift_\<alpha>_cost llvm_\<alpha>"
 abbreviation llvm_htriple 
   :: "ll_assn \<Rightarrow> 'a llM \<Rightarrow> ('a \<Rightarrow> ll_assn) \<Rightarrow> bool" 
-  where "llvm_htriple \<equiv> htriple ll_\<alpha>"
-abbreviation llvm_htripleF 
+  where "llvm_htriple \<equiv> htriple_gc GC ll_\<alpha>"
+(*abbreviation llvm_htripleF 
   :: "ll_assn \<Rightarrow> ll_assn \<Rightarrow> 'a llM \<Rightarrow> ('a \<Rightarrow> ll_assn) \<Rightarrow> bool" 
-  where "llvm_htripleF \<equiv> htripleF ll_\<alpha>"
+  where "llvm_htripleF \<equiv> htripleF ll_\<alpha>"*)
 abbreviation "llSTATE \<equiv> STATE ll_\<alpha>"
 abbreviation "llPOST \<equiv> POSTCOND ll_\<alpha>"
 
@@ -88,7 +88,8 @@ lemma norm_prod_case[vcg_normalize_simps]:
 lemmas ll_notime_htriple_eq = notime_htriple_eq[of llvm_\<alpha> _ "_::_ llM", folded ll_\<alpha>_def]
   
 lemma ll_consume_rule[vcg_rules]: "llvm_htriple ($lift_acost c) (consume c) (\<lambda>_. \<box>)"
-  unfolding ll_\<alpha>_def by (simp add: consume_rule)
+  unfolding ll_\<alpha>_def using consume_rule
+  by (simp)
   
 subsection \<open>Assertions\<close>
 
@@ -326,15 +327,37 @@ lemma FST_pure[sep_algebra_simps, vcg_normalize_simps]: "FST (\<up>\<phi>) = \<u
 
 lemma FST_extract_pure[sep_algebra_simps, vcg_normalize_simps]: "FST (\<up>\<phi> ** Q) = (\<up>\<phi> ** FST Q)"  
   unfolding FST_def by (simp add: fun_eq_iff pred_lift_extract_simps sep_algebra_simps)
-  
 
+  
+(********************)  
+text \<open>Frame inference setup to consume excess credits when solving entailments\<close>
+(* TODO: Move *)
+lemma GC_move_left[named_ss fri_prepare_simps]:
+  "NO_MATCH GC P \<Longrightarrow> (P ** GC) = (GC ** P)"
+  "NO_MATCH GC Q \<Longrightarrow> (Q ** GC ** P) = (GC ** Q ** P)"
+  "(GC ** GC) = GC"
+  "(GC ** GC ** P) = (GC ** P)"
+  "FRAME_INFER P (GC ** Q) \<box> = FRAME_INFER P Q GC"
+  by (simp_all add: sep_algebra_simps sep_conj_c FRAME_INFER_def)
+  
+lemmas [fri_end_rules] = empty_ent_GC entails_GC
+
+lemma consume_credits_fri_end_rule[fri_end_rules]: "P\<turnstile>GC \<Longrightarrow> $c**P \<turnstile> GC"
+  using conj_entails_mono entails_GC by fastforce
+
+
+print_named_simpset fri_prepare_simps    
+
+(********************)  
+  
+  
+  
 subsubsection \<open>Load and Store\<close>
 context llvm_prim_mem_setup begin
 lemma checked_from_val_rule[vcg_rules]: "llvm_htriple \<box> (checked_from_val (to_val x)) (\<lambda>r. \<up>(r=x))"  
   unfolding checked_from_val_def
+  supply [fri_rules] = empty_ent_GC
   by vcg
-  
- 
   
   
 lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_load_rule]
@@ -351,10 +374,12 @@ lemmas [vcg_rules] = ll_notime_htriple_eq[THEN iffD1, OF llvm_store_rule]
     
 *)
 
+
 text \<open>Standard rules for load and store from pointer\<close>  
 lemma ll_load_rule[vcg_rules]: "llvm_htriple ($$ ''load'' 1 ** \<upharpoonleft>ll_pto x p) (ll_load p) (\<lambda>r. \<up>(r=x) ** \<upharpoonleft>ll_pto x p)"
   unfolding ll_load_def ll_pto_def 
   by vcg
+  
 
 lemma ll_store_rule[vcg_rules]: "llvm_htriple ($$ ''store'' 1 ** \<upharpoonleft>ll_pto xx p) (ll_store x p) (\<lambda>_. \<upharpoonleft>ll_pto x p)"
   unfolding ll_store_def ll_pto_def
@@ -414,13 +439,8 @@ lemma ll_ofs_ptr_rule'[vcg_rules]:
     (ll_ofs_ptr p' i) 
     (\<lambda>r. \<up>(r= p' +\<^sub>a sint i) ** \<upharpoonleft>(ll_range I) x p)"
   unfolding vcg_tag_defs
-  apply (rule htriple_vcgI')
-  apply fri_extract_basic
-  apply (simp add: open_ll_range vcg_tag_defs)
-  apply fri_extract
-  apply vcg
-  done
-
+  supply [named_ss fri_prepare_simps] = open_ll_range
+  by vcg
   
 subsubsection \<open>Allocate and Free\<close>
 

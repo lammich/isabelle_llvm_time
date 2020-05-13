@@ -220,8 +220,20 @@ begin
       using and_pure_true unfolding entails_def by blast
       
   qed    
-    
+
+  
+  text \<open>With garbage collection\<close>
+  abbreviation "htriple_gc GC \<alpha> P c Q \<equiv> htriple \<alpha> P c (\<lambda>r. Q r ** GC)"
+  
+  lemma htriple_to_gc: "\<lbrakk> \<box>\<turnstile>GC; htriple \<alpha> P c Q \<rbrakk> \<Longrightarrow> htriple_gc GC \<alpha> P c Q"
+    apply (erule cons_rule)
+    apply simp
+    by (metis abel_semigroup.commute entails_def sep.mult.abel_semigroup_axioms sep_conj_empty sep_globalise)
+  
+      
 end
+
+
 
 experiment begin
   text \<open>Precondition defined by semantics relation:
@@ -644,6 +656,27 @@ definition time_credits_assn :: "ecost \<Rightarrow> (_ \<times> ecost \<Rightar
 term "a ** $c"
 term "c ** $a"
 
+definition "GC \<equiv> SND sep_true"
+  
+lemma GC_absorb[simp]: "(GC ** GC) = GC" by (auto simp: GC_def sep_algebra_simps SND_conj_conv)
+
+lemma entails_GC: "$c \<turnstile> GC" unfolding GC_def time_credits_assn_def
+  by (auto simp: entails_def SND_def) (* TODO: Monotonicity of FST,SND as lemmas? *)
+
+lemma "$0 = \<box>" oops 
+  
+lemma empty_ent_GC: "\<box>\<turnstile>GC" unfolding GC_def time_credits_assn_def
+  by (auto simp: entails_def SND_def sep_algebra_simps) 
+
+
+lemma "F \<turnstile> GC ** G \<Longrightarrow> $c ** F \<turnstile> GC ** G"
+  by (metis (no_types, lifting) GC_absorb conj_entails_mono entails_GC sep_conj_assoc)
+  
+lemma htriple_to_GC: "\<lbrakk> htriple \<alpha> P c Q \<rbrakk> \<Longrightarrow> htriple_gc GC \<alpha> P c Q"
+  using htriple_to_gc[OF empty_ent_GC] .
+  
+  
+
 (* For presentation *)
 lemma "($c) (s,c') \<longleftrightarrow> s=0 \<and> c'=c"
   unfolding time_credits_assn_def by (simp add: sep_algebra_simps SND_def) (* TODO: Lemmas for SND! *)
@@ -666,7 +699,7 @@ lemma cost_ecost_add1: "le_cost_ecost c (lift_acost c + cr')"
 lemma cost_ecost_add_minus_cancel: "minus_ecost_cost (lift_acost c + cr') c = cr'"  
   apply(cases cr') by (auto simp: minus_ecost_cost_def lift_acost_def )
     
-lemma consume_rule: "htriple (lift_\<alpha>_cost \<alpha>) ($(lift_acost c)) (consume c) (\<lambda>_. \<box>)"  
+lemma consume_rule_aux: "htriple (lift_\<alpha>_cost \<alpha>) ($(lift_acost c)) (consume c) (\<lambda>_. \<box>)"  
   apply (rule htripleI)
   apply clarify
   apply (simp add: wp_consume time_credits_assn_def lift_\<alpha>_cost_def)
@@ -683,6 +716,8 @@ proof (rule conjI)
   show "F (\<alpha> s, minus_ecost_cost cr c)" using F by (simp add: cost_ecost_add_minus_cancel)
 qed    
   
+lemmas consume_rule = htriple_to_GC[OF consume_rule_aux]
+
     
 section \<open>experiment: Hoare-triple without Time\<close>  
  

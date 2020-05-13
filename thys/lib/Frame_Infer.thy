@@ -100,6 +100,11 @@ named_simpset fri_prepare_simps = HOL_basic_ss_nomatch
 named_theorems fri_rules
 named_theorems fri_red_rules
 
+text \<open>Note, \<open>P\<turnstile>P\<close> will always be tried first! \<close>
+named_theorems fri_end_rules \<open>Rules for final step of frame-inference. Format \<open>unmatched-pre \<turnstile> fixed-frame\<close>. \<close>
+
+lemmas [fri_end_rules] = entails_true
+
 lemma fri_empty_concl_simp: "(\<box> ** FRI_END) = FRI_END" by simp
 
 lemmas [named_ss fri_prepare_simps] = sep_conj_assoc sep_conj_empty sep_conj_empty' sep_conj_exists
@@ -211,11 +216,14 @@ ML \<open>
       THEN' resolve_tac ctxt @{thms fri_prepare}
       THEN' simp_only_tac @{thms sep_conj_assoc fri_empty_concl_simp} ctxt
   
-    fun end_tac ctxt =   
+    fun end_tac ctxt = let  
+      val end_thms = Named_Theorems.get ctxt @{named_theorems fri_end_rules}
+      val end_thms = @{thm entails_refl}::end_thms (* Always try P\<turnstile>P first *)
+    in
       simp_ai_tac ctxt
       THEN' resolve_tac ctxt @{thms fri_end}
-      THEN' resolve_tac ctxt @{thms entails_refl entails_true}
-      
+      THEN' SOLVED' (REPEAT' (resolve_tac ctxt end_thms))
+    end  
       
     fun start_round_tac ctxt =
       simp_ai_tac ctxt
