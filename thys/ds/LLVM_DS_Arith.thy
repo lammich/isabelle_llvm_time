@@ -315,6 +315,7 @@ lemma ll_max_sint_simp[vcg_normalize_simps]: "(ll_max_sint::'l::len2 word llM) =
   by (simp add: pos_add_strict)
 *)    
 
+
 lemma ll_max_uint_rule[vcg_rules]: "llvm_htriple \<box> (ll_max_uint::'l::len word llM) (\<lambda>r. \<up>(uint r = max_uint (LENGTH('l)) - 1))"
   supply [simp] = max_uint_def zmod_minus1 uint_word_ariths word_of_int_inverse
   by vcg'

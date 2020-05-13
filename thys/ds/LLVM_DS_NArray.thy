@@ -22,11 +22,6 @@ begin
     supply [split] = list.split
     apply vcg_monadify
     apply vcg
-    defer
-    apply vcg
-    (* TODO: Need to drop excess credits! *)
-    
-    oops
     done
     
 
