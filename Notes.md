@@ -1,3 +1,29 @@
+# Wednesday 13.5.
+
+## Done:
+    
+  - Introduce GC in generic_wp
+    - nötig wegen unterschiedlichen kosten in verschiedenen branches
+    - [idee: für constant execution time müsste man überschüssige Zeit "ausleveln"]
+  - vcg teilweise anpassen
+  - hn_refine definiert + return regel als sanity check bewiesen.
+        
+## TODO:    
+ - Kosten modell direkt über Sepref definieren
+   - wahrscheinlich für jede hn_refine regel eine abstrakte currency/währung 
+    
+### Peter
+- fix Frameinference with GC
+- Hoaretriples für Basis DS anpassen
+
+### Max
+- hnr regeln (bind usw. als sanity check)
+- dann: Sepref anpassen
+- NREST mit mehr currencies zur verfügung stellen
+
+    
+## nächstes treffen: Fr. 15.5. 13uhr UKTime / 14Uhr DeTime
+
 # Monday 11.5.20
 
 ## Ideen:
