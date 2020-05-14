@@ -43,6 +43,8 @@ text \<open>
   lemma CONCLUSION_intro[intro!]: 
     "CONCLUSION True" 
     "\<And>P. \<forall>x. CONCLUSION (P x) \<Longrightarrow> CONCLUSION (\<forall>x. P x)"
+    (*"\<And>P. \<exists>x. CONCLUSION (P x) \<Longrightarrow> CONCLUSION (\<exists>x. P x)"
+    "\<And>P Q. \<lbrakk> CONCLUSION (P \<and> Q) \<rbrakk> \<Longrightarrow> CONCLUSION P \<and> CONCLUSION Q"*)
     "\<And>P Q. \<lbrakk> P \<Longrightarrow> CONCLUSION Q \<rbrakk> \<Longrightarrow> CONCLUSION (P\<longrightarrow>Q)"
     by (auto simp add: CONCLUSION_def)
     
@@ -106,14 +108,24 @@ text \<open>
         Note that you should have the CONCLUSION_intro rule.
         
       *)  
-      fun RECOVER_CONCLUSION' rc_tac tac ctxt = 
+      fun RECOVER_CONCLUSION' rc_tac tac ctxt = let
+        val prem_ok = not o exists_subterm (fn @{mpat \<open>CONCLUSION _\<close>} => true | _ => false)
+        val prems_ok = Logic.strip_assums_hyp #> forall prem_ok
+
+        val rem_conc_tac = 
+          COND' prems_ok 
+          THEN' SELECT_GOAL (unfold_tac ctxt @{thms CONCLUSION_def})
+              
+      in
         resolve_tac ctxt @{thms CONCLUSIOND}
         THEN' tac
         THEN_ALL_NEW (
-          resolve_tac ctxt @{thms CONCLUSIONI}
+          (*resolve_tac ctxt @{thms CONCLUSIONI}*)
+          rem_conc_tac 
           ORELSE'
           eresolve_tac ctxt @{thms recover_CONCLUSIONE} THEN' rc_tac
         )
+      end
         
       val RECOVER_CONCLUSION = RECOVER_CONCLUSION' (K all_tac)
         

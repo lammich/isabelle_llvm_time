@@ -109,6 +109,21 @@ begin
       
   qed simp
       
+  
+  text \<open>Initialize\<close>
+  lemma lo_init: "\<upharpoonleft>(list_assn (oelem_assn A)) (replicate n None) (replicate n x) = \<box>"
+    by (induction n) (auto simp: sep_algebra_simps)
+  
+  lemma lo_free: "set xs \<subseteq> {None} \<Longrightarrow> \<upharpoonleft>(list_assn (oelem_assn A)) xs xsi = \<up>(length xsi = length xs)"  
+  proof (induction xs arbitrary: xsi)
+    case Nil
+    then show ?case by simp
+  next
+    case (Cons a xs)
+    then show ?case by (cases xsi) auto
+  qed 
+  
+  
   text \<open>Extract element from list assertion\<close>
   lemma lo_extract_elem:
     assumes "i<length xs" "xs!i = Some x"  
@@ -129,8 +144,27 @@ begin
   definition "nao_assn A \<equiv> mk_assn (\<lambda>xs p. EXS xsi. \<upharpoonleft>narray_assn xsi p ** \<upharpoonleft>(list_assn (oelem_assn A)) xs xsi)"
 
   
+  definition "narrayo_new TYPE('a::llvm_rep) n \<equiv> narray_new TYPE('a) n"
+  
+  lemma nao_new_rule[vcg_rules]: "llvm_htriple
+    (cost_narray_new n ** \<upharpoonleft>snat.assn n ni) 
+    (narrayo_new TYPE('a::llvm_rep) ni)
+    (\<lambda>r. \<upharpoonleft>(nao_assn A) (replicate n None) r)"
+    unfolding nao_assn_def narrayo_new_def
+    supply [simp] = lo_init
+    by vcg
+
+  lemma nao_prim_free_rule[vcg_rules]: "llvm_htriple
+    (\<upharpoonleft>(nao_assn A) xs xsi ** \<up>\<^sub>d(set xs \<subseteq> {None}))
+    (narray_free xsi)
+    (\<lambda>_. \<box>)"  
+    unfolding nao_assn_def
+    supply [simp] = lo_free
+    apply vcg
+    done
+  
   lemma nao_nth_rule[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>(nao_assn A) xs p \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs \<and> xs!i\<noteq>None)) 
+    (cost_array_nth ** \<upharpoonleft>(nao_assn A) xs p \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs \<and> xs!i\<noteq>None)) 
     (array_nth p ii)
     (\<lambda>ri. \<upharpoonleft>A (the (xs!i)) ri \<and>* \<upharpoonleft>(nao_assn A) (xs[i:=None]) p)"  
     unfolding nao_assn_def
@@ -140,23 +174,13 @@ begin
   
   
   lemma nao_upd_rule_snat[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>(nao_assn A) xs p \<and>* \<upharpoonleft>A x xi \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs \<and> xs!i=None)) 
+    (cost_array_upd ** \<upharpoonleft>(nao_assn A) xs p \<and>* \<upharpoonleft>A x xi \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs \<and> xs!i=None)) 
     (array_upd p ii xi)
     (\<lambda>r. \<up>(r = p) \<and>* \<upharpoonleft>(nao_assn A) (xs[i := Some x]) p)"
     unfolding nao_assn_def 
     supply [simp] = lo_insert_elem
     apply vcg'
     done
-    
-(*
-  xxx, ctd here: new, free, then integrate into sepref!   
-    XXX: First integrate into sepref, than care about new and free.
-      for sorting algos, we only need get and set!
-        
-*)    
-    
-    
-    
         
   
 end

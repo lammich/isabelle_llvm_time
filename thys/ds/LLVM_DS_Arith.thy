@@ -315,6 +315,7 @@ lemma ll_max_sint_simp[vcg_normalize_simps]: "(ll_max_sint::'l::len2 word llM) =
   by (simp add: pos_add_strict)
 *)    
 
+
 lemma ll_max_uint_rule[vcg_rules]: "llvm_htriple \<box> (ll_max_uint::'l::len word llM) (\<lambda>r. \<up>(uint r = max_uint (LENGTH('l)) - 1))"
   supply [simp] = max_uint_def zmod_minus1 uint_word_ariths word_of_int_inverse
   by vcg'
@@ -858,7 +859,20 @@ context begin
     
 end
 
+subsection \<open>Pointers\<close>
 
+context begin
+  interpretation llvm_prim_arith_setup .
+    
+  lemma ptrcmp_eq_rule[vcg_rules]: "llvm_htriple ($$''ptrcmp_eq'' 1) (ll_ptrcmp_eq a b) (\<lambda>r. \<upharpoonleft>bool.assn (a=b) r)"
+    unfolding bool.assn_def
+    by vcg
+
+  lemma ptrcmp_ne_rule[vcg_rules]: "llvm_htriple ($$''ptrcmp_ne'' 1) (ll_ptrcmp_ne a b) (\<lambda>r. \<upharpoonleft>bool.assn (a\<noteq>b) r)"
+    unfolding bool.assn_def
+    by vcg
+
+end
 
 
 end

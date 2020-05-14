@@ -36,7 +36,7 @@ begin
   text \<open>Ghost instructions to guide the VCG and Frame Inference\<close>
   lemma entails_is_noop_htriple: "(A \<turnstile> B) \<Longrightarrow> llvm_htriple A (return x) (\<lambda>_. B)"
     apply (auto simp: htriple_def wp_return)
-    by (metis entails_def sep_conj_impl1)
+    by (metis (mono_tags, hide_lams) conj_entails_mono empty_ent_GC entails_def entails_lift_extract_simps(2) sep_conj_empty)
 
   lemma tag_op_ruleI: 
     assumes "tag_op = return x"  

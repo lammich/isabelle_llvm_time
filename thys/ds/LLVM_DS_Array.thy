@@ -93,15 +93,18 @@ context begin
   abbreviation (input) "in_range_nat i (ii::'a::len word) xs \<equiv> i<length xs \<and> int i<max_sint LENGTH('a)"  
   abbreviation (input) "in_range_uint i (ii::'a::len word) xs \<equiv> i<int (length xs) \<and> i<max_sint LENGTH('a)"
 
+  abbreviation "cost_array_nth \<equiv> $$''ofs_ptr'' 1 ** $$''load'' 1"
+  abbreviation "cost_array_upd \<equiv> $$''ofs_ptr'' 1 ** $$''store'' 1"
+  
   lemma array_nth_rule_sint[vcg_rules]: "llvm_htriple 
-    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i<int (length xs)))
+    (cost_array_nth ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i<int (length xs)))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!nat i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def sint.assn_def
     by vcg
 
   lemma array_nth_rule_uint[vcg_rules]: "llvm_htriple 
-    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>d(in_range_uint i ii xs))
+    (cost_array_nth ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>d(in_range_uint i ii xs))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!nat i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def uint.assn_def
@@ -109,7 +112,7 @@ context begin
     by vcg
       
   lemma array_nth_rule_unat[vcg_rules]: "llvm_htriple 
-    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>d(in_range_nat i ii xs))
+    (cost_array_nth ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>d(in_range_nat i ii xs))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def unat.assn_def unat_def
@@ -117,7 +120,7 @@ context begin
     by vcg
 
   lemma array_nth_rule_snat[vcg_rules]: "llvm_htriple 
-    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
+    (cost_array_nth ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs!i) ** \<upharpoonleft>array_assn xs p)"
     unfolding array_nth_def array_assn_def snat.assn_def
@@ -125,7 +128,7 @@ context begin
     by vcg
     
   lemma array_upd_rule_sint[vcg_rules]: "llvm_htriple
-    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i < int (length xs)))
+    (cost_array_upd ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>sint.assn i ii ** \<up>\<^sub>d(0\<le>i \<and> i < int (length xs)))
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[nat i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -134,7 +137,7 @@ context begin
     by vcg
 
   lemma array_upd_rule_uint[vcg_rules]: "llvm_htriple
-    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>din_range_uint i ii xs)
+    (cost_array_upd ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>uint.assn i ii ** \<up>\<^sub>din_range_uint i ii xs)
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[nat i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -144,7 +147,7 @@ context begin
     by vcg
         
   lemma array_upd_rule_nat[vcg_rules]: "llvm_htriple
-    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>din_range_nat i ii xs)
+    (cost_array_upd ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>unat.assn i ii ** \<up>\<^sub>din_range_nat i ii xs)
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -154,7 +157,7 @@ context begin
     by vcg
     
   lemma array_upd_rule_snat[vcg_rules]: "llvm_htriple
-    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
+    (cost_array_upd ** \<upharpoonleft>array_assn xs p ** \<upharpoonleft>snat.assn i ii ** \<up>\<^sub>d(i<length xs))
     (array_upd p ii x)
     (\<lambda>r. \<up>(r=p) ** \<upharpoonleft>array_assn (xs[i:=x]) p)"
     unfolding array_assn_cnv_range_upd
@@ -166,7 +169,7 @@ context begin
 end  
 
 
-
+(*
 subsection \<open>Basic Algorithms\<close>
 
 subsubsection \<open>Array-Copy\<close>
@@ -266,5 +269,6 @@ lemma array_new_init_rule[vcg_rules]: "llvm_htriple
   unfolding array_new_init_def
   by vcg
 
+*)
 
 end

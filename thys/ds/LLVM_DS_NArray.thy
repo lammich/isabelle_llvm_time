@@ -7,7 +7,7 @@ begin
 
   type_synonym 'a narray = "'a ptr"
   
-  definition "narray_assn \<equiv> mk_assn (\<lambda>xs p. case xs of [] \<Rightarrow> \<up>(p=null) | _ \<Rightarrow> \<upharpoonleft>array_assn xs p)"
+  definition "narray_assn \<equiv> mk_assn (\<lambda>xs p. (case xs of [] \<Rightarrow> \<up>(p=null) | _ \<Rightarrow> \<upharpoonleft>array_assn xs p) ** $$''if'' 1 ** $$''ptrcmp_eq'' 1)"
   
   
   
@@ -16,33 +16,30 @@ begin
 
   thm array_new_rule_snat[no_vars]
   
+  abbreviation "cost_narray_new n \<equiv> $$''malloc'' n ** $$''free'' 1 ** $$''if'' 1 ** $$''if'' 1 ** $$''icmp_eq'' 1 ** $$''ptrcmp_eq'' 1"
+  
   lemma narray_new_rule_snat[vcg_rules]: 
-    "llvm_htriple ($$''malloc'' n ** $$''free'' 1 ** $$''if'' 1 ** $$''icmp_eq'' 1 ** \<upharpoonleft>snat.assn n ni) (narray_new TYPE(_) ni) (\<upharpoonleft>narray_assn (replicate n init))"
+    "llvm_htriple (cost_narray_new n ** \<upharpoonleft>snat.assn n ni) (narray_new TYPE(_) ni) (\<upharpoonleft>narray_assn (replicate n init))"
     unfolding narray_assn_def narray_new_def
     supply [split] = list.split
     apply vcg_monadify
     apply vcg
-    defer
-    apply vcg
-    (* TODO: Need to drop excess credits! *)
-    
-    oops
     done
     
 
   (* TODO: From an abstract point of view, 
     it's a bad idea to split init by the simplifier! 
     Remove that from default setup!
-  *)      
+  *)(*      
   lemma narray_assn_init_pure: "\<box> \<turnstile> \<upharpoonleft>narray_assn [] null"  
     unfolding narray_assn_def
     by (auto simp: sep_algebra_simps)
-    
+  *)  
     
   thm array_nth_rule_snat[no_vars]  
     
   lemma narray_nth_rule[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>narray_assn xs p \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs)) 
+    ($$''ofs_ptr'' 1 ** $$''load'' 1 ** \<upharpoonleft>narray_assn xs p \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs)) 
     (array_nth p ii)
     (\<lambda>r. \<up>(r = xs ! i) \<and>* \<upharpoonleft>narray_assn xs p)"  
     unfolding narray_assn_def 
@@ -53,7 +50,7 @@ begin
   thm array_upd_rule_snat[no_vars]  
 
   lemma narray_upd_rule_snat[vcg_rules]: "llvm_htriple 
-    (\<upharpoonleft>narray_assn xs p \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs)) 
+    ($$''ofs_ptr'' 1 ** $$''store'' 1 ** \<upharpoonleft>narray_assn xs p \<and>* \<upharpoonleft>snat.assn i ii \<and>* \<up>\<^sub>d(i < length xs)) 
     (array_upd p ii x)
     (\<lambda>r. \<up>(r = p) \<and>* \<upharpoonleft>narray_assn (xs[i := x]) p)"
     unfolding narray_assn_def 
@@ -61,18 +58,18 @@ begin
     apply vcg
     done
     
-  definition [llvm_code]: "narray_free p \<equiv> if p=null then return () else array_free p"
-  
-  thm array_free_rule[no_vars]
+  definition [llvm_code]: "narray_free p \<equiv> doM { b \<leftarrow> ll_ptrcmp_eq p null; llc_if b (return ()) (array_free p) }"
   
   lemma narray_free_rule[vcg_rules]: 
     "llvm_htriple (\<upharpoonleft>narray_assn xs p) (narray_free p) (\<lambda>_. \<box>)"
     unfolding narray_assn_def narray_free_def
-    apply (cases xs; clarsimp)
+    supply [split] = list.split
+    apply vcg_monadify
     apply vcg
     done
 
 
+  (*  
   lemma narrayset_rule_snat[vcg_rules]: "llvm_htriple 
     (\<upharpoonleft>narray_assn dst dsti ** \<upharpoonleft>snat.assn n ni ** \<up>\<^sub>d(n\<le>length dst))
     (arrayset dsti c ni)
@@ -130,12 +127,12 @@ begin
     (\<lambda>dsti. \<upharpoonleft>narray_assn (take oldsz src@replicate (newsz - oldsz) init) dsti)"
     unfolding array_grow_def
     by vcg
-      
+  *)    
       
   definition [llvm_code]: "example1 (n::64 word) \<equiv> doM {
     a \<leftarrow> narray_new TYPE(8 word) n;
     array_upd a (1::64 word) 42;
-    narray_free a
+    ll_call (narray_free a)
   }"  
     
   export_llvm (debug) example1 (* is "example1" file "exampel1.ll"*)
