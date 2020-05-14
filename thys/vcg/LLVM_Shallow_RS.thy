@@ -668,7 +668,7 @@ lemma llc_if_simp[vcg_normalize_simps]: "wp (llc_if b t e) Q s \<longleftrightar
   by (auto simp add: vcg_normalize_simps)
   
 (* Probably useless, as we cannot implement that *)
-lemma if_simp[vcg_normalize_simps]: "wp (If b t e) Q s \<longleftrightarrow> (b \<longrightarrow> wp t Q s) \<and> (\<not>b \<longrightarrow> wp e Q s)"
+lemma if_simp(*[vcg_normalize_simps]*): "wp (If b t e) Q s \<longleftrightarrow> (b \<longrightarrow> wp t Q s) \<and> (\<not>b \<longrightarrow> wp e Q s)"
   by simp
   
 end  

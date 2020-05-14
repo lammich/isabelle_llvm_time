@@ -1,5 +1,6 @@
 section \<open>Array-Lists\<close>
-theory LLVM_DS_Array_List
+*** must be done on sepref-level, or we need full while-rule setup etc
+the**ory LLVM_DS_Array_List
 imports LLVM_DS_NArray
 begin
   type_synonym ('a,'l) array_list = "'l word \<times> 'l word \<times> 'a narray"

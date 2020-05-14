@@ -1,4 +1,6 @@
 section \<open>Array List with Pure Refinement of Elements\<close>
+*** must be done on sepref-level, or we need full while-rule setup etc
+
 theory LLVM_DS_Array_List_Pure
 imports LLVM_DS_List_Assn LLVM_DS_Array_List
 begin

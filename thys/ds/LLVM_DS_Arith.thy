@@ -859,7 +859,20 @@ context begin
     
 end
 
+subsection \<open>Pointers\<close>
 
+context begin
+  interpretation llvm_prim_arith_setup .
+    
+  lemma ptrcmp_eq_rule[vcg_rules]: "llvm_htriple ($$''ptrcmp_eq'' 1) (ll_ptrcmp_eq a b) (\<lambda>r. \<upharpoonleft>bool.assn (a=b) r)"
+    unfolding bool.assn_def
+    by vcg
+
+  lemma ptrcmp_ne_rule[vcg_rules]: "llvm_htriple ($$''ptrcmp_ne'' 1) (ll_ptrcmp_ne a b) (\<lambda>r. \<upharpoonleft>bool.assn (a\<noteq>b) r)"
+    unfolding bool.assn_def
+    by vcg
+
+end
 
 
 end
