@@ -1,3 +1,29 @@
+# Do 14.5.
+
+Diskussion zum Thema Zeitanalyse
+- Zeitanalyse für Introsort  
+  - https://en.wikipedia.org/wiki/Introsort
+  - Paper? informeller Beweis?
+- PDQ sort
+  - Edelkamp et al.
+  - Paper über branch aware 
+  - Boost implementierung "Orson Peters"  -> blog artikel?
+- Paper zu generating worst case inputs for quick sort -> symbolic execution  ???
+
+## TODOs
+### Peter
+- paper finden, generating worst-case inputs for quicksort mit symbolic execution
+- grundlegende hnr_rules beweisen
+- Überlegungen zu Laufzeitanalyse sammeln
+- evtl beweise mit "counter" die später eingegliedert werden können
+
+### Max
+- NREST mit Currencies
+- hnr regeln
+
+## nächstes Treffen
+- Montag 18.5. 10Uhr UKTime
+
 # Wednesday 13.5.
 
 ## Done:
