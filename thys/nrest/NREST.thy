@@ -228,6 +228,11 @@ lemma continuous_option: (* or generally, adding a bottom element *)
   apply(rule arg_cong[where f=Sup]) 
     by  (auto split: option.splits  intro: rev_image_eqI)   
 
+lemma continuous_option': 
+  assumes *: "continuous f"
+  shows "continuous (case_option None (\<lambda>x. Some (f x)))"
+  using continuous_option[OF *, unfolded comp_def]  .
+
 
 abbreviation (input) "SUPREMUM S f \<equiv> Sup (f ` S)" 
 
@@ -456,224 +461,13 @@ lemma case_option_refine: (* obsolete ? *)
   by (auto split: option.splits)
 
 
-section "time refine"
 
 
-definition timerefine ::"('b \<Rightarrow> 'c \<Rightarrow> enat)  \<Rightarrow> ('a, 'b \<Rightarrow> enat) nrest \<Rightarrow> ('a, 'c \<Rightarrow> enat) nrest"  where
-  "timerefine R m = (case m of FAILi \<Rightarrow> FAILi |
-                REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
-                  Some cm \<Rightarrow> Some (\<lambda>cc. Sum_any (\<lambda>ac. cm ac * R ac cc))))"
-
-definition wfn :: "('a, 'b \<Rightarrow> enat) nrest \<Rightarrow> bool" where
-  "wfn m = (case m of FAILi \<Rightarrow> True |
-                REST M \<Rightarrow> \<forall>r\<in>dom M. (case M r of None \<Rightarrow> True | Some cm \<Rightarrow> finite {x. cm x \<noteq> 0}))"
-
-definition wfR :: "('b \<Rightarrow> 'c \<Rightarrow> enat) \<Rightarrow> bool" where
-  "wfR R = (finite {(s,f). R s f \<noteq> 0})"
-
-
-
-
-
-lemma wfR_fst: "\<And>y. wfR R \<Longrightarrow> finite {x. R x y \<noteq> 0}"
-  unfolding wfR_def apply(rule finite_subset[where B="fst ` {(s, f). R s f \<noteq> 0}"])
-  subgoal by auto
-  apply(rule finite_imageI) by simp
-
-lemma wfR_snd: "\<And>x. wfR R \<Longrightarrow> finite {y. R x y \<noteq> 0}"
-  unfolding wfR_def apply(rule finite_subset[where B="snd ` {(s, f). R s f \<noteq> 0}"])
-  subgoal by auto
-  apply(rule finite_imageI) by simp
-
-(*
-lemma finite_same_support:
-  "\<And>f. finite {(x,y). R x y \<noteq> 0} \<Longrightarrow> (\<And>x.  f (R x) = 0 \<longleftrightarrow> R x = 0) \<Longrightarrow> finite {x. f (R x) \<noteq> 0}"
-  oops*)
-
-lemma 
-  finite_wfR_middle_mult:
-  assumes "wfR R1" "wfR R2"
-  shows "finite {a. R2 x a * R1 a y \<noteq> (0::enat)}"
-proof -
-  have "{a. R2 x a * R1 a y \<noteq> 0} = {a. R2 x a \<noteq> 0 \<and> R1 a y \<noteq> 0}" by simp
-  also have "\<dots> \<subseteq> fst ` {(a,a)| a. R2 x a \<noteq> 0 \<and> R1 a y \<noteq> 0}" by auto
-  also have "\<dots> \<subseteq> fst ` ({a. R2 x a \<noteq> 0} \<times> {a. R1 a y \<noteq> 0})"
-    apply(rule image_mono) by auto
-  finally
-  show ?thesis apply(rule finite_subset)
-    apply(rule finite_imageI)
-    apply(rule finite_cartesian_product)
-    apply(rule wfR_snd) apply fact
-    apply(rule wfR_fst) by fact
-qed
-
-
-
-lemma wfR_finite_mult_left:
-  assumes "wfR R2"
-  shows "finite {a. Mc a * R2 a ac \<noteq> (0::enat)}"
-proof -
-
-  have "{a. Mc a * R2 a ac \<noteq> 0} \<subseteq> {a. R2 a ac \<noteq> 0}"
-    by auto
-  then
-  show ?thesis
-    apply(rule finite_subset)
-    apply(rule wfR_fst) by fact
-qed
-
-
-
-
-lemma 
-  wfR_finite_crossprod:
-  assumes "wfR R2"
-  shows "finite ({a. \<exists>b. Mc a * (R2 a b * R1 b cc) \<noteq> (0::enat)} \<times> {b. \<exists>a. Mc a * (R2 a b * R1 b cc) \<noteq> 0})"
-proof -
-  have i: "{a. \<exists>b. Mc a * (R2 a b * R1 b cc) \<noteq> 0} \<subseteq> fst ` ({(a,b).  R2 a b \<noteq> 0} \<inter> {(a,b). R1 b cc \<noteq> 0})" by auto
-  have ii: "{b. \<exists>a. Mc a * (R2 a b * R1 b cc) \<noteq> 0} \<subseteq> snd ` ({(a,b).  R2 a b \<noteq> 0} \<inter> {(a,b). R1 b cc \<noteq> 0})" by auto
-  
-
-  show ?thesis 
-    apply(rule finite_cartesian_product)
-    subgoal  apply(rule finite_subset[OF i]) apply(rule finite_imageI)
-      apply(rule finite_Int)   using assms wfR_def by auto
-    subgoal  apply(rule finite_subset[OF ii]) apply(rule finite_imageI)
-      apply(rule finite_Int)   using assms wfR_def by auto
-    done    
-qed
-
-lemma wfR_finite_Sum_any: 
-  assumes *: "wfR R"
-  shows "finite {x. ((Sum_any (\<lambda>ac. ((Mc ac) * (R ac x)))) \<noteq> (0::enat))}"
-proof - 
-  {fix x
-    have "((Sum_any (\<lambda>ac. ((Mc ac) * (R ac x)))) \<noteq> 0)
-      \<Longrightarrow> \<exists>ac. (Mc ac) * (R ac x) \<noteq> 0"
-      using Sum_any.not_neutral_obtains_not_neutral by blast 
-  } then 
-  have "{x. ((Sum_any (\<lambda>ac. ((Mc ac) * (R ac x)))) \<noteq> 0)}
-          \<subseteq> {x. \<exists>ac. ((Mc ac) * (R ac x)) \<noteq> 0}" by blast
-  also have "\<dots> \<subseteq> snd ` {(ac,x). ((Mc ac) * (R ac x)) \<noteq> 0}" by auto 
-  also have "\<dots> \<subseteq> snd ` {(ac,x).  (R ac x) \<noteq> 0}" by auto
-
-  finally  show ?thesis 
-    apply(rule finite_subset )
-    apply(rule finite_imageI) using * unfolding wfR_def by auto
-qed 
-
-
-
-lemma assumes "R' \<le> R" "wfR R" shows "wfR R'"
-proof -                                    
-  from assms(1) have *: "\<And> a b. R' a b\<le> R a b"
-  unfolding le_fun_def   by auto
-  {fix  a b have "R a b  = 0 ==> R' a b = 0 "   
-      using * [of a b] by auto}
-  note f=this
-  show "wfR R'"
-    using \<open>wfR R\<close> unfolding wfR_def apply(rule rev_finite_subset)
-    apply safe using f by simp
-qed
-
-lemma wfn_timerefine: "wfn m \<Longrightarrow> wfR R \<Longrightarrow> wfn (timerefine R m)"
-proof -
-  assume "wfR R"
-  then show "wfn (timerefine R m)"
-    unfolding wfn_def timerefine_def 
-    apply(auto split: nrest.splits option.splits)
-    apply(rule wfR_finite_Sum_any) by simp
-qed
-
-
-lemma [simp]: "timerefine R FAILT = FAILT" by(auto simp: timerefine_def)
-
-definition pp where
-  "pp R2 R1 = (\<lambda>a c. Sum_any (%b. R1 a b * R2 b c  ) )"
-
-lemma Sum_any_mono:
-  assumes fg: "\<And>x.    f x \<le> g x"
-    and finG: "finite {x. g x \<noteq> (0::enat)}"
-shows "Sum_any f \<le> Sum_any g"
-proof -
-  have "{x. f x \<noteq> (0::enat)} \<subseteq> {x. g x \<noteq> (0::enat)}"
-    apply auto using fg   
-    by (metis ile0_eq)  
-  with finG have "finite {x. f x \<noteq> (0::enat)}"  
-    using finite_subset by blast   
-
-  thm sum_mono sum_mono2
-  
-  have "sum f {x. f x \<noteq> (0::enat)} \<le> sum f {x. g x \<noteq> (0::enat)}"
-    apply(rule sum_mono2) apply fact apply fact
-    by simp
-  also have "\<dots> \<le> sum g {x. g x \<noteq> (0::enat)}"
-    apply(rule sum_mono) using fg by simp
-  finally show ?thesis unfolding Sum_any.expand_set .
-qed
-
-lemma finite_support_mult:  
-  assumes "finite {xa.  R1 xa \<noteq> (0::enat)}"
-  and "finite {xa. R2 xa \<noteq> 0}"
-shows "finite {xa. R2 xa * R1 xa \<noteq> 0}"
-proof -
- 
-  have "{(xa,xa)|xa. R2 xa * R1 xa \<noteq> 0} = {(xa,xa)|xa. R2 xa \<noteq> 0 \<and> R1 xa \<noteq> 0}" by auto
-  also have "\<dots> \<subseteq> {(xa,xb)|xa xb. R2 xa \<noteq> 0 \<and> R1 xb \<noteq> 0}" by auto
-  also have "\<dots> = {xa. R2 xa \<noteq> 0} \<times> {xb. R1 xb \<noteq> 0}" by auto 
-  finally have k: "{xa. R2 xa * R1 xa \<noteq> 0} \<subseteq> fst ` ({xa. R2 xa \<noteq> 0} \<times> {xb. R1 xb \<noteq> 0})" by blast
-
-  show ?thesis
-    apply(rule finite_subset[OF k])
-    apply(rule finite_imageI) 
-    apply(rule finite_cartesian_product) by fact+
-qed
-
-
-lemma timerefine_mono: 
-  assumes "wfR R"
-  shows "c\<le>c' \<Longrightarrow> timerefine R c \<le> timerefine R c'"
-  apply(cases c) apply simp
-  apply(cases c') apply (auto simp: timerefine_def split: nrest.splits option.splits simp: le_fun_def)
-  subgoal  by (metis le_some_optE) 
-  proof (goal_cases)
-    case (1 x2 x2a x x2b x2c xa)
-    then have l: "\<And>ac. x2b ac \<le> x2c ac"  
-      by (metis le_funD less_eq_option_Some)    
-    show ?case 
-      apply(rule Sum_any_mono)
-      subgoal using l apply(rule mult_right_mono) by simp
-      apply(rule wfR_finite_mult_left) by fact
-  qed 
-
-
-lemma assumes "wfR R1" "wfR R2"
-  shows timerefine_iter: "timerefine R1 (timerefine R2 c) =  timerefine (pp R1 R2) c"
-  unfolding timerefine_def 
-  apply(cases c) apply simp 
-  apply (auto simp: le_fun_def pp_def split: option.splits) apply (rule ext)
-  apply (auto simp: le_fun_def pp_def split: option.splits) 
-    apply(subst Sum_any_right_distrib)
-  subgoal apply(rule finite_wfR_middle_mult) using assms by simp_all
-    apply (rule ext)
-  subgoal for mc r Mc cc
-        apply (subst Sum_any.swap[where C="{a. \<exists>b. Mc a * (R2 a b * R1 b cc) \<noteq> 0} \<times> {b. \<exists>a. Mc a * (R2 a b * R1 b cc) \<noteq> 0}"])
-        subgoal apply(rule wfR_finite_crossprod) using assms by simp
-        subgoal by simp 
-        apply(subst Sum_any_left_distrib)
-        subgoal apply(rule wfR_finite_mult_left) using assms by simp 
-        by (meson Sum_any.cong ab_semigroup_mult_class.mult_ac(1))  
-      done 
-
-lemma timerefine_trans: 
-  assumes "wfR R1" "wfR R2" shows 
-  "a \<le> timerefine R1 b \<Longrightarrow> b \<le> timerefine R2 c \<Longrightarrow> a \<le> timerefine (pp R1 R2) c"
-  apply(subst timerefine_iter[symmetric, OF assms])
-    apply(rule order.trans) apply simp
-    apply(rule timerefine_mono) using assms by auto
-
-   
-
+lemma consume_FAIL:
+    "(FAILT = consume m t1 ) \<longleftrightarrow> m = FAILT"
+    "(consume m t1 = FAILT ) \<longleftrightarrow> m = FAILT"
+  unfolding consume_def by (auto split: nrest.splits)
+lemma consume_Fails[simp]: "consume FAILT t = FAILT" by(auto simp: consume_def)
 
 
 section "pointwise reasoning"
@@ -709,10 +503,6 @@ lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
 
 
 subsection "pw reasoning for enat"
-(*
-definition inresT :: "('a,enat) nrest \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> bool" where 
-  "inresT S x t \<equiv> REST ([x\<mapsto>enat t]) \<le> S"
-*)
 
 locale pointwise_reasoning_defs =
   fixes  lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero}"
@@ -721,16 +511,14 @@ begin
     where "inresT S x t \<equiv> REST ([x\<mapsto>lift t]) \<le> S"
 end
 
-
 locale pointwise_reasoning = pointwise_reasoning_defs lift for lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero}" +
   assumes 
       lift_ord: "\<And>m n. (lift m \<le> lift n) = (m \<le> n)"
     and lift_le_zero: "lift t \<le> 0 \<longleftrightarrow> t \<le> 0"
     and lift_zero: "lift 0 = 0"
-    and lift_Sup: "\<lbrakk>X \<noteq> {}; lift t \<le> Sup X\<rbrakk> \<Longrightarrow> \<exists>x\<in>X. lift t \<le> x" 
+    and lift_Sup: "X \<noteq> {} \<Longrightarrow> (\<lambda>x. lift t \<le> x) (Sup X) \<Longrightarrow> Sup ((\<lambda>x. lift t \<le> x)`X)"
     and blab: "\<And>t t'. (\<And>tt. lift tt \<le> t \<Longrightarrow> lift tt \<le> t') \<Longrightarrow> t\<le>t'"
-    and my_zero_le: "\<And>x. (x::'ac) \<ge> 0" "\<And>x. (x::'cc) \<ge> 0"
-    
+    and my_zero_le: "\<And>x. (x::'ac) \<ge> 0" "\<And>x. (x::'cc) \<ge> 0"    
 begin
 
 lemma inresT_alt: "inresT S x t = (case S of FAILi \<Rightarrow> True | REST X \<Rightarrow> (\<exists>t'. X x = Some t' \<and>  lift t\<le>t'))"
@@ -751,12 +539,15 @@ lemma inresT_FAILT[simp]: "inresT FAILT r t"
 
 lemma fail_inresT[refine_pw_simps]: "\<not> nofailT M \<Longrightarrow> inresT M x t"
   unfolding nofailT_def by simp
+ 
 
-
+lemma lift_ex_Sup_iff: "(\<exists>x\<in>X. lift t \<le> x) \<longleftrightarrow> Sup ((\<lambda>x. lift t \<le> x)`X)"
+  by auto 
 
 lemma Sup_lift_less: "X \<noteq> {} \<Longrightarrow> lift t \<le> Sup X \<longleftrightarrow> (\<exists>x\<in>X. lift t \<le> x)"
   apply rule
   subgoal 
+    apply(simp only: lift_ex_Sup_iff)
     apply(rule lift_Sup) by simp_all
   subgoal apply auto
     by (simp add: Sup_upper2)
@@ -852,42 +643,682 @@ lemma inresT_SPEC[refine_pw_simps]: "inresT (SPEC a b) = (\<lambda>x t. a x \<an
 end
 
 
-context pointwise_reasoning
-begin               
-
-  abbreviation "lift_fun f \<equiv> acostC (\<lambda>x. lift (the_acost f x))"
-
- 
-lemma "pointwise_reasoning lift_fun"
-  apply unfold_locales 
-  subgoal for m n apply(cases m, cases n) by (auto simp: less_eq_acost_def le_fun_def lift_ord )
-  subgoal for t apply(cases t) by (auto simp: less_eq_acost_def zero_acost_def le_fun_def lift_le_zero)
-  subgoal by (auto simp: zero_acost_def lift_zero)
-  subgoal using lift_Sup Sup_acost_def   sorry
-  subgoal for t t' apply(cases t; cases t') unfolding less_eq_acost_def apply(auto)
-    apply(rule blab)
-    subgoal premises prems for ta t'a x tt
-      using prems(1)[rule_format, where x=x and tt="ttt"] prems sorry
-    done
-  subgoal sorry
-  subgoal sorry
-  done
-
-end
-
 interpretation pointwise_reasoning enat
   apply unfold_locales 
   subgoal by auto
   subgoal by (auto simp: zero_enat_def)
   subgoal by (auto simp: zero_enat_def)
-  subgoal by(simp add: Sup_enat_less[symmetric])
+  subgoal by(simp add: Sup_enat_less[symmetric])  
   subgoal for t t' apply(cases t'; cases t) apply auto 
     using not_le by blast
    apply auto 
-  done 
+  done
 
-subsection "pw reasoning for acost" 
+subsection \<open>pw reasoning for lifting to functions\<close>
 
+definition project_fun :: " 'b \<Rightarrow> ('a,'b\<Rightarrow>_) nrest \<Rightarrow>('a,_) nrest" where
+  "project_fun b S  \<equiv> (case S of FAILi \<Rightarrow> FAILi | REST X \<Rightarrow> REST (\<lambda>x. case X x of None \<Rightarrow> None | Some m \<Rightarrow> Some (m b)))"
+
+lemma nofailT_project_fun: "nofailT (project_fun b S) = nofailT S"
+  by(auto simp add: nofailT_def project_fun_def split: nrest.splits)
+
+context pointwise_reasoning
+begin
+
+
+lemma inresT_limit_SPECT[refine_pw_simps]: "inresT (project_fun b (SPECT M) ) x t = (\<exists>t'. t' b \<ge> lift t \<and> M x = Some t')"
+  unfolding inresT_def project_fun_def by (auto simp: le_fun_def split: option.splits)  
+
+lemma pw_fun_le_project: "(S \<le> S') \<longleftrightarrow> (\<forall>b. (project_fun b S) \<le> (project_fun b S'))"               
+  apply(cases S; cases S'; auto simp: project_fun_def le_fun_def less_eq_option_def split: option.splits)
+  by force
+
+lemma pw_fun_le_iff': 
+  fixes S:: "('a,'b\<Rightarrow>'ac) nrest"
+  shows 
+  "S \<le> S' \<longleftrightarrow> (\<forall>b. (nofailT (project_fun b S')\<longrightarrow> (nofailT (project_fun b S)
+                   \<and> (\<forall> x t. inresT (project_fun b S) x t \<longrightarrow> inresT (project_fun b S') x t))))"
+  unfolding pw_fun_le_project pw_le_iff ..
+
+
+lemma pw_fun_le_iff:  
+  "S \<le> S' \<longleftrightarrow> (nofailT S'\<longrightarrow> (nofailT S \<and> (\<forall>b x t. inresT (project_fun b S) x t \<longrightarrow> inresT (project_fun b S') x t)))"
+  using pw_fun_le_iff'  by (simp add: nofailT_project_fun)
+
+
+lemma pw_fun_eq_iff':
+  "S=S' \<longleftrightarrow> (\<forall>b. nofailT (project_fun b S) = nofailT (project_fun b S') \<and> (\<forall> x t. inresT (project_fun b S) x t \<longleftrightarrow> inresT (project_fun b S') x t))"
+  apply (rule iffI)
+  apply simp
+  apply (rule antisym)
+  apply (auto simp add: pw_fun_le_iff')
+  done
+
+lemma pw_fun_eq_iff:
+  "S=S' \<longleftrightarrow> (nofailT S = nofailT S' \<and> (\<forall>b x t. inresT (project_fun b S) x t \<longleftrightarrow> inresT (project_fun b S') x t))"
+  apply (rule iffI)
+  apply simp
+  apply (rule antisym)
+  apply (auto simp add: pw_fun_le_iff)
+  done
+
+lemma pw_fun_flat_ge_iff: "flat_ge S S' \<longleftrightarrow> 
+  (nofailT S) \<longrightarrow> nofailT S' \<and> (\<forall>b x t. inresT (project_fun b S) x t \<longleftrightarrow> inresT (project_fun b S') x t)"
+  apply (simp add: flat_ord_def)
+  apply(simp add: pw_fun_eq_iff) apply safe
+  by (auto simp add: nofailT_def)   
+
+
+lemma pw_fun_eqI: 
+  assumes "nofailT S = nofailT S'" 
+  assumes "\<And>b x t. inresT (project_fun b S) x t \<longleftrightarrow> inresT (project_fun b S') x t" 
+  shows "S=S'"
+  using assms by (simp add: pw_fun_eq_iff)
+
+lemma pw_fun_eqI': 
+  assumes "\<And>b. nofailT (project_fun b S) = nofailT (project_fun b S')" 
+  assumes "\<And>b x t. inresT (project_fun b S) x t \<longleftrightarrow> inresT (project_fun b S') x t" 
+  shows "S=S'"
+  using assms by (simp add: pw_fun_eq_iff')
+
+
+end
+
+ 
+subsection \<open>pw reasoning for lifting to acost\<close>
+
+definition project_acost :: " 'b \<Rightarrow> ('a,(_,_) acost) nrest \<Rightarrow>('a,_) nrest" where
+  "project_acost b S  \<equiv> (case S of FAILi \<Rightarrow> FAILi | REST X \<Rightarrow> REST (\<lambda>x. case X x of None \<Rightarrow> None | Some m \<Rightarrow> Some (the_acost m b)))"
+
+lemma nofailT_project_acost: "nofailT (project_acost b S) = nofailT S"
+  by(auto simp add: nofailT_def project_acost_def split: nrest.splits)
+
+lemma project_acost_SPECT: "project_acost b (SPECT M) = SPECT (\<lambda>x. case_option None (\<lambda>m. Some (the_acost m b)) (M x))"
+  unfolding project_acost_def by auto
+
+
+context pointwise_reasoning
+begin
+
+lemma pw_acost_le_project: "(S \<le> S') \<longleftrightarrow> (\<forall>b. (project_acost b S) \<le> (project_acost b S'))"               
+  apply(cases S; cases S')
+     apply(auto simp: project_acost_def less_eq_acost_def le_fun_def less_eq_option_def
+                split: option.splits)
+  by force
+
+lemma pw_acost_le_iff': 
+  fixes S:: "('a,('b,'ac) acost) nrest"
+  shows 
+  "S \<le> S' \<longleftrightarrow> (\<forall>b. (nofailT (project_acost b S')\<longrightarrow> (nofailT (project_acost b S) \<and> (\<forall> x t. inresT (project_acost b S) x t \<longrightarrow> inresT (project_acost b S') x t))))"
+  unfolding pw_acost_le_project pw_le_iff .. 
+
+
+lemma pw_acost_le_iff:   
+  "S \<le> S' \<longleftrightarrow> (nofailT S'\<longrightarrow> (nofailT S \<and> (\<forall>b x t. inresT (project_acost b S) x t \<longrightarrow> inresT (project_acost b S') x t)))"
+  using pw_acost_le_iff'  by (simp add: nofailT_project_acost)
+
+
+lemma pw_acost_eq_iff':
+  "S=S' \<longleftrightarrow> (\<forall>b. nofailT (project_acost b S) = nofailT (project_acost b S') \<and> (\<forall> x t. inresT (project_acost b S) x t \<longleftrightarrow> inresT (project_acost b S') x t))"
+  apply (rule iffI)
+  apply simp
+  apply (rule antisym)
+  apply (auto simp add: pw_acost_le_iff')
+  done
+
+lemma pw_acost_eq_iff:
+  "S=S' \<longleftrightarrow> (nofailT S = nofailT S' \<and> (\<forall>b x t. inresT (project_acost b S) x t \<longleftrightarrow> inresT (project_acost b S') x t))"
+  apply (rule iffI)
+  apply simp
+  apply (rule antisym)
+  apply (auto simp add: pw_acost_le_iff)
+  done
+
+lemma pw_acost_flat_ge_iff: "flat_ge S S' \<longleftrightarrow> 
+  (nofailT S) \<longrightarrow> nofailT S' \<and> (\<forall>b x t. inresT (project_acost b S) x t \<longleftrightarrow> inresT (project_acost b S') x t)"
+  apply (simp add: flat_ord_def)
+  apply(simp add: pw_acost_eq_iff) apply safe
+  by (auto simp add: nofailT_def)   
+
+
+lemma pw_acost_eqI: 
+  assumes "nofailT S = nofailT S'" 
+  assumes "\<And>b x t. inresT (project_acost b S) x t \<longleftrightarrow> inresT (project_acost b S') x t" 
+  shows "S=S'"
+  using assms by (simp add: pw_acost_eq_iff)
+
+lemma pw_acost_eqI': 
+  assumes "\<And>b. nofailT (project_acost b S) = nofailT (project_acost b S')" 
+  assumes "\<And>b x t. inresT (project_acost b S) x t \<longleftrightarrow> inresT (project_acost b S') x t" 
+  shows "S=S'"
+  using assms by (simp add: pw_acost_eq_iff')
+
+
+end
+
+
+
+section \<open> Monad Operators \<close>
+
+
+subsection \<open>bind\<close>
+
+definition bindT :: "('b,'c::{complete_lattice, plus}) nrest \<Rightarrow> ('b \<Rightarrow> ('a,'c) nrest) \<Rightarrow> ('a,'c) nrest" where
+  "bindT M f \<equiv> case M of 
+  FAILi \<Rightarrow> FAILT |
+  REST X \<Rightarrow> Sup { (case f x of FAILi \<Rightarrow> FAILT 
+                | REST m2 \<Rightarrow> REST (map_option ((+) t1) o (m2) ))
+                    |x t1. X x = Some t1}"
+
+lemma bindT_alt: "bindT M f = (case M of 
+  FAILi \<Rightarrow> FAILT | 
+  REST X \<Rightarrow> Sup { consume (f x) t1 |x t1. X x = Some t1})"
+  unfolding bindT_def consume_def by simp
+
+
+adhoc_overloading
+  Monad_Syntax.bind NREST.bindT
+
+
+lemma bindT_FAIL[simp]: "bindT FAILT g = FAILT"
+  by (auto simp: bindT_def)     
+
+lemma "bindT SUCCEEDT f = SUCCEEDT"
+  unfolding bindT_def by(auto split: nrest.split simp add: bot_nrest_def)
+
+subsection \<open>Pointwise reasoning for bindT\<close>
+
+lemma pw_inresT_bindT_aux: "inresT (bindT m f) r t \<longleftrightarrow>
+     (nofailT m \<longrightarrow> (\<exists>r' t' t''. inresT m r' t' \<and> inresT (f r') r t'' \<and> t \<le> t' + t''))"
+  apply(rule)
+  subgoal (* \<rightarrow> *)
+    apply(cases m)
+    subgoal by auto
+    subgoal apply(auto simp: bindT_def pw_inresT_Sup split: nrest.splits) 
+      subgoal for M x t' t1 
+        apply(rule exI[where x=x])
+        apply(cases "f x") apply auto  
+        subgoal for x2 z apply(cases t1)
+           apply auto
+          subgoal for n apply(rule exI[where x=n]) apply auto
+            by (smt dual_order.trans enat_ile enat_ord_simps(1) le_add2 linear order_mono_setup.refl plus_enat_simps(1)) 
+          subgoal
+            by (metis le_add1 zero_enat_def zero_le) 
+          done
+        done
+      subgoal for x t' t1
+        apply(rule exI[where x=x]) apply auto
+        apply(cases t1) apply auto
+        subgoal for n apply(rule exI[where x=n]) apply auto
+          apply(rule exI[where x=t]) by auto
+        subgoal 
+          by presburger
+        done 
+      done
+    done
+  subgoal (* <- *)
+    apply(cases m)
+    subgoal by auto
+    subgoal for x2
+      apply (auto simp: bindT_def  split: nrest.splits)
+      apply(auto simp: pw_inresT_Sup )
+      subgoal for r' t' t'a t''
+        apply(cases "f r'")
+        subgoal apply auto apply(force) done
+        subgoal for x2a
+          apply(rule exI[where x="REST (map_option ((+) t'a) \<circ> x2a)"]) 
+          apply auto
+           apply(rule exI[where x=r'])
+           apply auto
+          using add_mono by fastforce
+        done
+      done
+    done
+  done
+
+lemma pw_inresT_bindT[refine_pw_simps]: "inresT (bindT m f) r t \<longleftrightarrow>
+     (nofailT m \<longrightarrow> (\<exists>r' t' t''. inresT m r' t' \<and> inresT (f r') r t'' \<and> t = t' + t''))"
+  apply (auto simp: pw_inresT_bindT_aux) 
+  by (metis (full_types) inresT_mono le_iff_add linear nat_add_left_cancel_le) 
+
+
+subsection \<open>project_acost on bindT\<close>
+
+lemma continuous_nrest: (* or generally, adding a top element *)
+  assumes *: "continuous f"
+  shows "continuous (case_nrest FAILi (\<lambda>x. REST (f x)))"
+  apply(rule continuousI)
+  unfolding Sup_nrest_def apply (auto split: nrest.splits)
+  apply(subst continuousD[OF *])
+  apply(rule arg_cong[where f=Sup]) 
+  apply  (auto split: nrest.splits)    
+  using image_iff by fastforce
+
+lemma continuous_the_acost: "continuous (\<lambda>x. the_acost x b)"
+  apply(rule continuousI)  
+  by (simp add: Sup_acost_def) 
+  
+
+lemma continuous_project_acost: "continuous (project_acost b)"
+  unfolding project_acost_def
+  by (intro continuous_nrest continuous_fun continuous_option' continuous_the_acost) 
+
+
+lemma project_acost_Sup: "project_acost b (Sup A) = Sup (project_acost b ` A)"
+  using continuous_project_acost[THEN continuousD] .
+
+lemma project_acost_FAIL[simp]: "project_acost b FAILT = FAILT"
+  by(auto simp: project_acost_def)
+
+lemma the_acost_plus: "the_acost (t + t') b = the_acost t b + the_acost t' b"
+  apply(cases t; cases t') by auto
+
+lemma project_acost_consume: "project_acost b (consume M t) = consume (project_acost b M) (the_acost t b)"
+  unfolding consume_def project_acost_def
+  by(auto simp: the_acost_plus split: option.splits nrest.splits)
+
+lemma project_acost_bindT[refine_pw_simps]: "(project_acost b (bindT m f)) = bindT (project_acost b m) (\<lambda>x. project_acost b (f x))"
+  unfolding bindT_alt
+  apply (auto split: nrest.splits simp: project_acost_Sup project_acost_SPECT) 
+  apply(rule arg_cong[where f="Sup"])
+  by (auto split: option.splits simp: project_acost_consume[symmetric]) 
+
+subsubsection \<open>NofailT\<close>
+
+lemma pw_bindT_nofailT[refine_pw_simps]: "nofailT (bindT M f) \<longleftrightarrow> (nofailT M \<and> (\<forall>x t. inresT M x t \<longrightarrow> nofailT (f x)))"
+  unfolding bindT_def   
+  apply (auto elim: no_FAILTE simp: refine_pw_simps  split: nrest.splits )  
+   apply force
+  by (metis enat_ile le_cases nofailT_def)
+
+lemma g_pw_bindT_nofailT[refine_pw_simps]:
+  "nofailT (bindT M f) \<longleftrightarrow> (nofailT M \<and> (\<forall>b x t. inresT (project_acost b M) x t \<longrightarrow> nofailT (f x)))"
+  unfolding bindT_def   
+  apply (auto elim: no_FAILTE simp: project_acost_SPECT refine_pw_simps split: nrest.splits option.splits) 
+  subgoal by force
+  subgoal  
+    by (metis enat_0_iff(1) i0_lb nofailT_simps(1))  
+  done
+
+
+
+section \<open>Monad Rules\<close>
+
+
+lemma nres_bind_left_identity[simp]:
+  fixes f :: "'a \<Rightarrow> ('b,'c::{complete_lattice,zero,monoid_add}) nrest"
+  shows  "bindT (RETURNT x) f = f x"
+  unfolding bindT_def RETURNT_def 
+  apply (auto split: nrest.split)  
+  apply(rule ext) apply simp subgoal for x2 xa apply(cases "x2 xa") apply simp by simp
+  done
+
+
+lemma nres_bind_right_identity[simp]:
+  fixes M :: "('b,enat) nrest"
+  shows "bindT M RETURNT = M"
+  by(auto intro!: pw_eqI simp: refine_pw_simps) 
+
+thm refine_pw_simps
+
+lemma the_acost_zero_app: "the_acost 0 b = 0" by(auto simp: zero_acost_def)
+
+lemma project_acost_RETURNT[refine_pw_simps]:
+  "project_acost b (RETURNT r) = RETURNT r"
+  unfolding RETURNT_def project_acost_def
+  by (auto simp: the_acost_zero_app)
+
+
+lemma f_nres_bind_right_identity[simp]:
+  fixes M :: "('b,(_,enat) acost) nrest" 
+  shows "bindT M RETURNT = M"
+  apply(rule pw_acost_eqI)
+  subgoal by(simp add: refine_pw_simps)
+  by (auto intro!:   simp: refine_pw_simps project_acost_bindT) 
+
+term consume
+
+lemma g_nres_bind_right_identity[simp]:
+  fixes M :: "('b,'c::{complete_lattice,zero,monoid_add}) nrest"
+  shows "bindT M RETURNT = M"
+proof -
+  have kk: "\<And>y g P. (\<lambda>f. f y) ` {g x t1 |x t1. P x t1}
+  = {g x t1 y |x t1. P x t1}" by auto
+  show ?thesis
+  apply (auto simp: bindT_alt Sup_nrest_def consume_FAIL split: nrest.splits)
+  apply(auto simp: consume_def RETURNT_def )
+  apply(rule ext)  
+  apply(rule antisym)
+  subgoal apply simp apply(rule Sup_least) unfolding kk by auto  
+  subgoal for x2 x apply simp
+    apply(cases "x2 x") apply simp
+    apply simp
+    apply(rule Sup_upper)
+    unfolding kk by auto 
+  done
+qed
+
+
+lemma nres_bind_assoc[simp]:
+  fixes M :: "('a,enat) nrest"
+  shows "bindT (bindT M (\<lambda>x. f x)) g = bindT M (%x. bindT (f x) g)"
+  apply(auto intro!: pw_eqI simp:  refine_pw_simps)  
+  using inresT_mono by fastforce+
+
+thm refine_pw_simps project_acost_bindT
+
+lemma nres_acost_bind_assoc[simp]:
+  fixes M :: "('a,(_,enat) acost) nrest"
+  shows "bindT (bindT M (\<lambda>x. f x)) g = bindT M (%x. bindT (f x) g)"
+  by (auto intro!: pw_acost_eqI' simp: refine_pw_simps)   
+
+thm pw_inresT_Sup
+thm refine_pw_simps
+ 
+
+section \<open>Monotonicity lemmas\<close>
+
+
+lemma bindT_mono: 
+  "m \<le> m' \<Longrightarrow> (\<And>x. (\<exists>t. inresT m x t) \<Longrightarrow> nofailT m' \<Longrightarrow>  f x \<le> f' x)
+ \<Longrightarrow> bindT m f \<le> bindT  m' f'"
+  apply(auto simp: pw_le_iff refine_pw_simps) 
+  by fastforce+      
+
+lemma bindT_acost_mono: 
+  "m \<le> m' \<Longrightarrow> (\<And>x. (\<exists>b t. inresT (project_acost b m) x t) \<Longrightarrow> nofailT m' \<Longrightarrow>  f x \<le> f' x)
+ \<Longrightarrow> bindT m f \<le> bindT  m' f'"
+  apply(auto simp: pw_acost_le_iff refine_pw_simps nofailT_project_acost) 
+  by force+
+
+lemma bindT_mono'[refine_mono]: 
+  fixes m :: "('a,enat) nrest"
+  shows "m \<le> m' \<Longrightarrow> (\<And>x.   f x \<le> f' x)
+ \<Longrightarrow> bindT m f \<le> bindT  m' f'"
+  apply(rule bindT_mono) by auto
+
+lemma bindT_acost_mono'[refine_mono]: 
+  fixes m :: "('a,(_,enat)acost) nrest"
+  shows "m \<le> m' \<Longrightarrow> (\<And>x.   f x \<le> f' x)
+ \<Longrightarrow> bindT m f \<le> bindT  m' f'"
+  apply(rule bindT_acost_mono) by auto 
+ 
+lemma bindT_flat_mono[refine_mono]:  
+  fixes M :: "('a,enat) nrest"
+  shows 
+  "\<lbrakk> flat_ge M M'; \<And>x. flat_ge (f x) (f' x) \<rbrakk> \<Longrightarrow> flat_ge (bindT M f) (bindT M' f')" 
+  apply (auto simp: refine_pw_simps pw_flat_ge_iff) []
+  by fastforce+      
+
+lemma g_bindT_flat_mono[refine_mono]:  
+  fixes M :: "('a,(_,enat)acost) nrest"
+  shows 
+  "\<lbrakk> flat_ge M M'; \<And>x. flat_ge (f x) (f' x) \<rbrakk> \<Longrightarrow> flat_ge (bindT M f) (bindT M' f')"
+  apply (auto simp: refine_pw_simps pw_acost_flat_ge_iff nofailT_project_acost) 
+  by blast+  
+
+
+subsection \<open>Derived Program Constructs\<close>
+
+
+subsubsection \<open>Assertion\<close> 
+
+definition "iASSERT ret \<Phi> \<equiv> if \<Phi> then ret () else top"
+
+definition ASSERT where "ASSERT \<equiv> iASSERT RETURNT"
+
+lemma ASSERT_True[simp]: "ASSERT True = RETURNT ()" 
+  by (auto simp: ASSERT_def iASSERT_def)
+lemma ASSERT_False[simp]: "ASSERT False = FAILT" 
+  by (auto simp: ASSERT_def iASSERT_def) 
+
+lemma bind_ASSERT_eq_if:
+  fixes m :: "(_,'a::{complete_lattice,zero,monoid_add}) nrest"
+  shows "do { ASSERT \<Phi>; m } = (if \<Phi> then m else FAILT)"
+  unfolding ASSERT_def iASSERT_def by simp
+
+lemma pw_ASSERT[refine_pw_simps]:
+  "nofailT (ASSERT \<Phi>) \<longleftrightarrow> \<Phi>"
+  "inresT (ASSERT \<Phi>) x 0"
+  by (cases \<Phi>, simp_all)+
+
+lemma ASSERT_refine:
+  shows "(Q \<Longrightarrow> P) \<Longrightarrow> (ASSERT P::(_,enat)nrest) \<le> ASSERT Q"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma ASSERT_leI: 
+  fixes M :: "(_,enat) nrest"
+  shows "\<Phi> \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> ASSERT \<Phi> \<bind> (\<lambda>_. M) \<le> M'"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma ASSERT_leI_f: 
+  fixes M :: "(_,(_,enat)acost) nrest"
+  shows "\<Phi> \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> ASSERT \<Phi> \<bind> (\<lambda>_. M) \<le> M'"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma le_ASSERTI:
+  fixes M :: "(_,enat) nrest"
+  shows "(\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M')"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma inresT_ASSERT: "inresT (ASSERT Q \<bind> (\<lambda>_. M)) x ta = (Q \<longrightarrow> inresT M x ta)"
+  unfolding ASSERT_def iASSERT_def by auto
+
+
+lemma nofailT_ASSERT_bind:
+  fixes M :: "(_,enat) nrest"
+  shows "nofailT (ASSERT P \<bind> (\<lambda>_. M)) \<longleftrightarrow> (P \<and> nofailT M)"
+  by(auto simp: pw_bindT_nofailT pw_ASSERT)
+
+subsection \<open>SELECT\<close>
+
+
+ 
+definition emb' where "\<And>Q T. emb' Q (T::'a \<Rightarrow> _) = (\<lambda>x. if Q x then Some (T x) else None)"
+
+abbreviation "emb Q t \<equiv> emb' Q (\<lambda>_. t)" 
+
+lemma emb_eq_Some_conv: "\<And>T. emb' Q T x = Some t' \<longleftrightarrow> (t'=T x \<and> Q x)"
+  by (auto simp: emb'_def)
+
+lemma emb_le_Some_conv: "\<And>T. Some t' \<le> emb' Q T x \<longleftrightarrow> ( t'\<le>T x \<and> Q x)"
+  by (auto simp: emb'_def)
+
+
+lemma SPEC_REST_emb'_conv: "SPEC P t = REST (emb' P t)"
+  unfolding SPEC_def emb'_def by auto
+
+
+text \<open>Select some value with given property, or \<open>None\<close> if there is none.\<close>  
+definition SELECT :: "('a \<Rightarrow> bool) \<Rightarrow> 'c \<Rightarrow> ('a option,'c::{complete_lattice}) nrest"
+  where "SELECT P tf \<equiv> if \<exists>x. P x then REST (emb (\<lambda>r. case r of Some p \<Rightarrow> P p | None \<Rightarrow> False) tf)
+               else REST [None \<mapsto> tf]"
+
+                    
+lemma inresT_SELECT_Some: "inresT (SELECT Q tt) (Some x) t' \<longleftrightarrow> (Q x  \<and> (t' \<le> tt))"
+  by(auto simp: inresT_alt SELECT_def emb'_def) 
+
+lemma inresT_SELECT_None: "inresT (SELECT Q tt) None t' \<longleftrightarrow> (\<not>(\<exists>x. Q x) \<and> (t' \<le> tt))"
+  by(auto simp: inresT_alt SELECT_def emb'_def) 
+
+lemma inresT_SELECT[refine_pw_simps]:
+ "inresT (SELECT Q tt) x t' \<longleftrightarrow> ((case x of None \<Rightarrow> \<not>(\<exists>x. Q x) | Some x \<Rightarrow> Q x)  \<and> (t' \<le> tt))"
+  by(auto simp: inresT_alt SELECT_def emb'_def) 
+
+
+lemma nofailT_SELECT[refine_pw_simps]: "nofailT (SELECT Q tt)"
+  by(auto simp: nofailT_def SELECT_def)
+
+lemma s1:
+  fixes T::enat
+  shows "SELECT P T \<le> (SELECT P T') \<longleftrightarrow> T \<le> T'"
+  apply(cases "\<exists>x. P x") 
+   apply(auto simp: pw_le_iff refine_pw_simps split: option.splits)
+  subgoal 
+    by (metis (full_types) enat_ord_code(3) enat_ord_simps(1) lessI not_infinity_eq not_le order_mono_setup.refl) 
+  subgoal 
+    by (metis (full_types) enat_ord_code(3) enat_ord_simps(1) lessI not_enat_eq not_le order_mono_setup.refl) 
+  done
+     
+lemma s2:
+  fixes T::enat
+  shows  "SELECT P T \<le> (SELECT P' T) \<longleftrightarrow> (
+    (Ex P' \<longrightarrow> Ex P)  \<and> (\<forall>x. P x \<longrightarrow> P' x)) "
+  apply(auto simp: pw_le_iff refine_pw_simps split: option.splits)
+  subgoal 
+    by (metis enat_ile linear)                                          
+  subgoal 
+    by (metis enat_ile linear) 
+  done
+ 
+lemma SELECT_refine:
+  fixes T::enat
+    
+  assumes "\<And>x'. P' x' \<Longrightarrow> \<exists>x. P x"
+  assumes "\<And>x. P x \<Longrightarrow>   P' x"
+  assumes "T \<le> T'"
+  shows "SELECT P T \<le> (SELECT P' T')"
+proof -
+  have "SELECT P T \<le> SELECT P T'"
+    using s1 assms(3) by auto
+  also have "\<dots> \<le> SELECT P' T'"
+    unfolding s2 apply safe
+    using assms(1,2) by auto  
+  finally show ?thesis .
+qed
+
+
+
+section \<open>RECT\<close>
+
+definition "mono2 B \<equiv> flatf_mono_ge B \<and>  mono B"
+
+
+lemma trimonoD_flatf_ge: "mono2 B \<Longrightarrow> flatf_mono_ge B"
+  unfolding mono2_def by auto
+
+lemma trimonoD_mono: "mono2 B \<Longrightarrow> mono B"
+  unfolding mono2_def by auto
+
+definition "RECT B x = 
+  (if mono2 B then (gfp B x) else (top::'a::complete_lattice))"
+
+
+thm gfp_eq_flatf_gfp
+
+lemma RECT_flat_gfp_def: "RECT B x = 
+  (if mono2 B then (flatf_gfp B x) else (top::'a::complete_lattice))"
+  unfolding RECT_def
+  by (auto simp: gfp_eq_flatf_gfp[OF trimonoD_flatf_ge trimonoD_mono])
+
+lemma RECT_unfold: "\<lbrakk>mono2 B\<rbrakk> \<Longrightarrow> RECT B = B (RECT B)"
+  unfolding RECT_def [abs_def]  
+  by (auto dest: trimonoD_mono simp: gfp_unfold[ symmetric])
+
+
+definition whileT :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('a,_) nrest) \<Rightarrow> 'a \<Rightarrow> ('a,_) nrest" where
+  "whileT b c = RECT (\<lambda>whileT s. (if b s then bindT (c s) whileT else RETURNT s))"
+
+lemma trimonoI[refine_mono]: 
+  "\<lbrakk>flatf_mono_ge B; mono B\<rbrakk> \<Longrightarrow> mono2 B"
+  unfolding mono2_def by auto
+
+lemma [refine_mono]: "(\<And>f g x. (\<And>x. f x \<le> g x) \<Longrightarrow> B f x \<le> B g x) \<Longrightarrow> mono B"
+  apply(rule monoI) apply(rule le_funI)
+  by (simp add: le_funD)
+    
+thm refine_mono
+
+lemma whileT_unfold_enat:
+  fixes c :: "_\<Rightarrow>(_,enat) nrest"
+  shows
+   "whileT b c = (\<lambda>s. (if b s then bindT (c s) (whileT b c) else RETURNT s))"
+  unfolding whileT_def
+  apply(rule RECT_unfold) 
+  by ( refine_mono)    
+
+lemma whileT_unfold_acost:
+  fixes c :: "_\<Rightarrow>(_,(_,enat)acost) nrest"
+  shows
+   "whileT b c = (\<lambda>s. (if b s then bindT (c s) (whileT b c) else RETURNT s))"
+  unfolding whileT_def
+  apply(rule RECT_unfold) 
+  by ( refine_mono)    
+
+lemma RECT_mono[refine_mono]:
+  assumes [simp]: "mono2 B'"
+  assumes LE: "\<And>F x. (B' F x) \<le> (B F x) "
+  shows " (RECT B' x) \<le> (RECT B x)"
+  unfolding RECT_def
+  apply clarsimp  
+  by (meson LE gfp_mono le_fun_def)  
+
+lemma whileT_mono: 
+  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
+  shows " (whileT b c x) \<le> (whileT b c' x)"
+  oops
+
+lemma whileT_mono_enat: 
+  fixes c :: "_\<Rightarrow>(_,enat) nrest"
+  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
+  shows " (whileT b c x) \<le> (whileT b c' x)"
+  unfolding whileT_def apply(rule RECT_mono)
+    subgoal by(refine_mono)  
+    apply auto apply(rule bindT_mono) using assms by auto
+
+lemma whileT_mono_fenat: 
+  fixes c :: "_\<Rightarrow>(_,(_,enat)acost) nrest"
+  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
+  shows " (whileT b c x) \<le> (whileT b c' x)"
+  unfolding whileT_def apply(rule RECT_mono)
+    subgoal by(refine_mono)  
+  apply auto apply(rule bindT_acost_mono) using assms by auto
+
+
+find_theorems RECT
+lemma wf_fp_induct:
+  assumes fp: "\<And>x. f x = B (f) x"
+  assumes wf: "wf R"
+  assumes "\<And>x D. \<lbrakk>\<And>y. (y,x)\<in>R \<Longrightarrow> P y (D y)\<rbrakk> \<Longrightarrow> P x (B D x)"
+  shows "P x (f x)"
+  using wf
+  apply induction
+  apply (subst fp)
+  apply fact  
+  done
+
+thm wf_fp_induct[where f="RECT B" and B=B] RECT_unfold
+
+
+lemma RECT_wf_induct_aux:
+  assumes wf: "wf R"
+  assumes mono: "mono2 B"
+  assumes "(\<And>x D. (\<And>y. (y, x) \<in> R \<Longrightarrow> P y (D y)) \<Longrightarrow> P x (B D x))"
+  shows "P x (RECT B x)"
+  using wf_fp_induct[where f="RECT B" and B=B] RECT_unfold assms 
+     by metis 
+
+theorem RECT_wf_induct[consumes 1]:
+  assumes "RECT B x = r"
+  assumes "wf R"
+    and "mono2 B"
+    and "\<And>x D r. (\<And>y r. (y, x) \<in> R \<Longrightarrow> D y = r \<Longrightarrow> P y r) \<Longrightarrow> B D x = r \<Longrightarrow> P x r"
+  shows "P x r"
+ (* using RECT_wf_induct_aux[where P = "\<lambda>x fx. \<forall>r. fx=r \<longrightarrow> P x fx"] assms by metis *)
+  using RECT_wf_induct_aux[where P = "\<lambda>x fx.  P x fx"] assms by metis
+
+
+
+definition "monadic_WHILEIT I b f s \<equiv> do {
+  RECT (\<lambda>D s. do {
+    ASSERT (I s);
+    bv \<leftarrow> b s;
+    if bv then do {
+      s \<leftarrow> f s;
+      D s
+    } else do {RETURNT s}
+  }) s
+}"
 
 
 
