@@ -190,12 +190,16 @@ definition "hn_refine \<Gamma> c \<Gamma>' R m \<equiv>
       )
   )"
 
-
- 
-experiment
-begin
-
-thm htriple_vcgI[no_vars]
+lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
+  by(auto simp: STATE_def)
+  
+lemma hn_refineI[intro]: 
+  assumes "\<And>F s cr M. \<lbrakk> m = REST M; (\<Gamma>**F) (ll_\<alpha>(s,cr)) \<rbrakk>
+          \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<longrightarrow>
+                     (wp c (\<lambda>r s.  (\<Gamma>' ** R ra r ** F ** GC) (ll_\<alpha> s)) (s,cr+Ca)))"
+  shows "hn_refine \<Gamma> c \<Gamma>' R m"  
+  apply (auto simp add: hn_refine_def STATE_alt)  
+  apply(rule assms) by auto
 
 lemma hnr_vcgI[htriple_vcg_intros]: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M; llSTATE (\<Gamma>**F) (s,cr) \<rbrakk>
@@ -225,42 +229,54 @@ lemma hnr_RETURN_pass:
   done
 
 
-end
-
-
-
 
 lemma hn_refineD:
   assumes "hn_refine \<Gamma> c \<Gamma>' R m"
-  assumes "nofail m"
-  shows "llvm_htriple \<Gamma> c (\<lambda>r. \<Gamma>' ** (EXS x. R x r ** \<up>(RETURN x \<le> m)))"
-  using assms unfolding hn_refine_def by blast
+  assumes "m = REST M" "(\<Gamma> \<and>* F) (ll_\<alpha> (s,cr))"
+  shows  "(\<exists>ra Ca. M ra \<ge> Some Ca
+        \<longrightarrow> wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr+Ca)
+      )"
+  using assms by(auto simp: hn_refine_def STATE_alt nofailT_def)
+
+
 
 lemma hn_refine_preI: 
   assumes "\<And>h. \<Gamma> h \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a"
   shows "hn_refine \<Gamma> c \<Gamma>' R a"
-  using assms unfolding hn_refine_def
-  apply auto
-  using htripleI sep_conjD by blast
+  apply(rule hn_refineI) 
+  using sep_conjD assms  hn_refineD  by blast 
 
 lemma hn_refine_nofailI: 
-  assumes "nofail a \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a"  
+  assumes "nofailT a \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a"  
   shows "hn_refine \<Gamma> c \<Gamma>' R a"
   using assms by (auto simp: hn_refine_def)
 
 lemma hn_refine_false[simp]: "hn_refine sep_false c \<Gamma>' R m"
   by rule auto
 
-lemma hnr_FAIL[simp, intro!]: "hn_refine \<Gamma> c \<Gamma>' R FAIL"
+lemma hnr_FAIL[simp, intro!]: "hn_refine \<Gamma> c \<Gamma>' R FAILT"
   by rule auto
+thm sep_conj_impl1 wp_monoI  frame_rule
+
+lemma "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow> (P' ** Q ** F) s"
+  unfolding entails_def   
+  apply(subst (2) sep_conj_commute)
+  apply(subst sep_conj_assoc[symmetric])
+  apply(rule sep_conjI)    apply (auto  dest: sep_conjD)
+     apply(auto simp add: sep_algebra_simps )
 
 lemma hn_refine_frame:
-  assumes "hn_refine P' c Q' R m"
-  assumes "P \<turnstile> P' ** F"
+  assumes hnr: "hn_refine P' c Q' R m"
+  assumes ent: "P \<turnstile> P' ** F"
   shows "hn_refine P c (Q' ** F) R m"
-  using assms
-  unfolding hn_refine_def entails_def
-  apply clarsimp
+  apply (rule hn_refineI)
+  subgoal for Fa s cr M
+    using hnr[THEN hn_refineD, where F="Fa**F"]
+    apply(simp add: sep_algebra_simps pred_lift_extract_simps)
+    apply(drule sep_conjD) apply safe
+    apply(drule ent[unfolded entails_def, rule_format]) 
+    apply(simp add: sep_algebra_simps pred_lift_extract_simps)
+  apply clarsimp oops
   apply (rule cons_rule[where P="P'**F", rotated])
   apply simp
   apply simp
