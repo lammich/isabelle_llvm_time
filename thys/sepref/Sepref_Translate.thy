@@ -96,7 +96,7 @@ lemma trans_frame_rule:
   apply (rule hn_refine_frame[OF _ entails_refl])
   applyF (rule hn_refine_cons_pre)
     focus using assms(1) unfolding RECOVER_PURE_def apply assumption solved
-    
+    oops
     apply1 (rule assms)
     applyS (metis RECOVER_PURE_def assms(1) entails_eq_iff entails_preI frame_thms(2))
   solved

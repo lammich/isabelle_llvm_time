@@ -81,6 +81,35 @@ subsection \<open>Definition of Assertion\<close>
     unfolding array_assn_def by simp
   
   
+experiment
+begin
+
+  lemma [vcg_decomp_rules]: "DECOMP_HTRIPLE (hn_refine \<Gamma> c \<Gamma>' R a) \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a" by (simp add: vcg_tag_defs)
+
+  lemma "inresT (project_acost b m) x t \<longleftrightarrow> (\<exists>cr. inresT m x cr)"
+  
+
+  lemma "hn_refine 
+    (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
+    (array_nth xsi ii)
+    (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
+    id_assn
+    (do { ASSERT (i<length xs); RETURNT (xs!i) })"
+    apply vcg'
+    apply (clarsimp simp: refine_pw_simps pw_acost_eq_iff)
+    
+    find_theorems "inresT (project_acost _ _) _ _ = _"
+    
+
+
+
+end
+
+
+
+    
+    
+    
 subsection \<open>Interface Implementation\<close>  
     
 definition [simp]: "array_replicate_init i n \<equiv> replicate n i"
@@ -94,7 +123,7 @@ context
   (*notes [simp] = pure_def hn_ctxt_def is_array_def invalid_assn_def*)
 begin  
 
-  lemma array_get_hnr_aux: "(uncurry array_nth,uncurry (RETURN oo op_list_get)) 
+  lemma array_get_hnr_aux: "(uncurry array_nth,uncurry (RETURNT oo op_list_get)) 
     \<in> [\<lambda>(l,i). i<length l]\<^sub>a raw_array_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> id_assn"  
     unfolding snat_rel_def snat.assn_is_rel[symmetric]
     apply sepref_to_hoare
