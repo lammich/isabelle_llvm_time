@@ -120,6 +120,9 @@ text \<open>There is scott_continuous in Complete_Non_Orders.Fixed_Points\<close
 definition continuous :: "('a::{Sup} \<Rightarrow> 'b::{Sup}) \<Rightarrow> bool"  where
   "continuous f \<longleftrightarrow> (\<forall>A. Sup (f ` A) = f (Sup A) )"
 
+definition continuousInf :: "('a::{Inf} \<Rightarrow> 'b::{Inf}) \<Rightarrow> bool"  where
+  "continuousInf f \<longleftrightarrow> (\<forall>A. A\<noteq>{} \<longrightarrow> Inf (f ` A) = f (Inf A) )"
+
 
 term sup_continuous
 thm continuous_at_Sup_mono
@@ -129,6 +132,10 @@ lemma "continuous (f::'a::{complete_lattice}\<Rightarrow>'b::{complete_lattice})
   
 lemma continuousI: "(\<And>A. f (Sup A) = Sup (f ` A)) \<Longrightarrow> continuous f" by (auto simp: continuous_def)
 lemma continuousD: "continuous f \<Longrightarrow> f (Sup A) = Sup (f ` A)" by (auto simp: continuous_def)
+
+
+lemma continuousInfI: "(\<And>A. A\<noteq>{} \<Longrightarrow> f (Inf A) = Inf (f ` A)) \<Longrightarrow> continuousInf f" by (auto simp: continuousInf_def)
+lemma continuousInfD: "continuousInf f \<Longrightarrow> A\<noteq>{} \<Longrightarrow> f (Inf A) = Inf (f ` A)" by (auto simp: continuousInf_def)
 
 
 lemma continuous_Domain: "continuous Domain"
@@ -154,6 +161,15 @@ lemma
   unfolding Sup_fun_def  apply(rule ext) 
   apply(subst continuousD[OF *]) apply(subst image_image) apply(subst image_image) ..
 
+
+
+lemma 
+  continuousInf_fun:
+  assumes *: "continuousInf f" shows "continuousInf  (\<lambda>X x. (f (X x)))"
+  apply(rule continuousInfI)
+  unfolding Inf_fun_def  apply(rule ext) 
+  apply(subst continuousInfD[OF *]) subgoal apply simp done
+    apply(subst image_image) apply(subst image_image) ..
 
 
 lemma SupD: "Sup A = Some f \<Longrightarrow> A \<noteq> {} \<and> A\<noteq>{None}"
@@ -232,6 +248,22 @@ lemma continuous_option':
   assumes *: "continuous f"
   shows "continuous (case_option None (\<lambda>x. Some (f x)))"
   using continuous_option[OF *, unfolded comp_def]  .
+
+
+lemma continuousInf_option: (* or generally, adding a bottom element *)
+  assumes *: "continuousInf f"
+  shows "continuousInf (case_option None (\<lambda>x. Some (f x)))"
+  apply(rule continuousInfI)
+  unfolding Inf_option_def[unfolded my_these_def] 
+  apply (simp add: option_Some_image )
+  apply safe
+  subgoal by force
+  subgoal by(auto split: option.splits) 
+  subgoal apply(subst continuousInfD[OF *]) subgoal  
+    by (metis Collect_empty_eq Inf_lower \<open>\<And>A. Inf A = (if None \<in> A then None else Some (Inf {f. Some f \<in> A}))\<close> le_some_optE)  
+    apply(rule arg_cong[where f=Inf]) 
+    by  (auto split: option.splits  intro: rev_image_eqI)  
+  done
 
 
 abbreviation (input) "SUPREMUM S f \<equiv> Sup (f ` S)" 
@@ -894,6 +926,26 @@ lemma continuous_nrest: (* or generally, adding a top element *)
   apply  (auto split: nrest.splits)    
   using image_iff by fastforce
 
+
+
+lemma continuousInf_nrest: (* or generally, adding a top element *)
+  assumes *: "continuousInf f"
+  shows "continuousInf (case_nrest FAILi (\<lambda>x. REST (f x)))"
+  apply(rule continuousInfI)
+  unfolding Inf_nrest_def apply (auto split: nrest.splits)
+  subgoal  
+    by force   
+  subgoal 
+    apply(subst continuousInfD[OF *]) subgoal by auto
+    apply(rule arg_cong[where f=Inf]) 
+    apply  (auto split: nrest.splits)    
+    using image_iff by fastforce
+  done
+
+ 
+
+
+
 lemma continuous_the_acost: "continuous (\<lambda>x. the_acost x b)"
   apply(rule continuousI)  
   by (simp add: Sup_acost_def) 
@@ -1026,10 +1078,12 @@ lemma bindT_mono:
   by fastforce+      
 
 lemma bindT_acost_mono: 
-  "m \<le> m' \<Longrightarrow> (\<And>x. (\<exists>b t. inresT (project_acost b m) x t) \<Longrightarrow> nofailT m' \<Longrightarrow>  f x \<le> f' x)
+  fixes m :: "('a, ('b, enat) acost) nrest"
+  shows "m \<le> m' \<Longrightarrow> (\<And>x. (\<exists>b t. inresT (project_acost b m) x t) \<Longrightarrow> nofailT m' \<Longrightarrow>  f x \<le> f' x)
  \<Longrightarrow> bindT m f \<le> bindT  m' f'"
   apply(auto simp: pw_acost_le_iff refine_pw_simps nofailT_project_acost) 
   by force+
+
 
 lemma bindT_mono'[refine_mono]: 
   fixes m :: "('a,enat) nrest"
@@ -1042,6 +1096,7 @@ lemma bindT_acost_mono'[refine_mono]:
   shows "m \<le> m' \<Longrightarrow> (\<And>x.   f x \<le> f' x)
  \<Longrightarrow> bindT m f \<le> bindT  m' f'"
   apply(rule bindT_acost_mono) by auto 
+
  
 lemma bindT_flat_mono[refine_mono]:  
   fixes M :: "('a,enat) nrest"
@@ -1319,6 +1374,12 @@ definition "monadic_WHILEIT I b f s \<equiv> do {
     } else do {RETURNT s}
   }) s
 }"
+
+
+definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> 'c) \<Rightarrow> ('a \<Rightarrow> bool)
+                           \<Rightarrow> ('a \<Rightarrow> ('a,'c::{complete_lattice,plus,zero}) nrest)
+                           \<Rightarrow> 'a \<Rightarrow> ('a,'c) nrest" where
+  "\<And>E c. whileIET I E b c = whileT b c"
 
 
 
