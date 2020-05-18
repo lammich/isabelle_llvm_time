@@ -87,20 +87,63 @@ begin
   lemma [vcg_decomp_rules]: "DECOMP_HTRIPLE (hn_refine \<Gamma> c \<Gamma>' R a) \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a" by (simp add: vcg_tag_defs)
 
   lemma "inresT (project_acost b m) x t \<longleftrightarrow> (\<exists>cr. inresT m x cr)"
-  
+    oops
 
+
+
+
+lemma satminus_lift_acost: "satminus ta (the_acost (lift_acost t) b) = 0 \<longleftrightarrow> ta \<le> the_acost t b"
+  unfolding satminus_def lift_acost_def by auto
+
+term lift_acost
+lemma hnr_SPECT_D:
+  fixes \<Phi> :: "_ \<Rightarrow> ((_,enat) acost) option"
+  shows
+      "do { ASSERT P; consume (RETURNT x) (lift_acost t) } = SPECT \<Phi>
+      \<Longrightarrow> P \<and> Some (lift_acost t) \<le> \<Phi> x"
+  apply(simp add: pw_acost_eq_iff)
+  apply(simp add: refine_pw_simps)
+  apply(auto simp: satminus_lift_acost)
+  apply(cases "\<Phi> x")
+  subgoal    
+    by force  
+  subgoal  premises prems for e
+    apply(rule acost_componentwise_leI[where e=e] )
+    subgoal using prems by simp  
+    subgoal for b
+      using prems(2)[rule_format, where x=x and t="the_acost t b" and b=b]
+      using prems(3)      
+      by (auto simp: lift_acost_def)
+    done
+  done
+
+lemma lift_acost_plus_distrib[named_ss fri_prepare_simps]:
+  "$lift_acost (a + b) = ($lift_acost a ** $lift_acost b)"
+  sorry
+
+term "cost ''ofs_ptr'' (Suc 0)+t"
   lemma "hn_refine 
     (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
     (array_nth xsi ii)
     (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
     id_assn
-    (do { ASSERT (i<length xs); RETURNT (xs!i) })"
-    apply vcg'
-    apply (clarsimp simp: refine_pw_simps pw_acost_eq_iff)
+    (do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) })" 
+    unfolding hn_ctxt_def pure_def
+    apply(rule hnr_vcgI)
+     apply(drule hnr_SPECT_D, clarify)
+    apply(rule exI[where x="xs!i"])
+    apply(rule exI[where x="cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0)"])
+    apply (vcg')  
+    find_in_thms array_nth in vcg_framed_erules 
+     apply vcg_rl back back back back
+     apply vcg_try_solve 
+     apply vcg_try_solve 
+
+      apply (clarsimp simp: refine_pw_simps pw_acost_eq_iff)
     
     find_theorems "inresT (project_acost _ _) _ _ = _"
     
-
+    oops
 
 
 end
