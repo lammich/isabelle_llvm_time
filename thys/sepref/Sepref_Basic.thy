@@ -221,7 +221,7 @@ lemma hnr_vcg_aux2:
   by (metis add.commute cost_ecost_add_minus_cancel lift_acost_def) 
 
 
-lemma hnr_vcgI[htriple_vcg_intros]: 
+lemma hnr_vcgI: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M \<rbrakk>
           \<Longrightarrow> (\<exists>ra Ca. (llSTATE (\<Gamma>**F**$(lift_acost Ca)) (s,cr+(lift_acost Ca)) \<longrightarrow> (M ra \<ge> Some (lift_acost Ca) \<and>
                      EXTRACT (wp c (\<lambda>r. POSTCOND ll_\<alpha> (\<Gamma>' ** R ra r ** F ** GC)) (s,cr+lift_acost Ca)))))"
@@ -503,7 +503,7 @@ lemma bind_det_aux: "\<lbrakk> RETURN x \<le> m; RETURN y \<le> f x \<rbrakk> \<
   apply (rule order_refl)
   apply simp
   done
-
+*)
   
 definition "MK_FREE R f \<equiv> \<forall>a c. llvm_htriple (R a c) (f c) (\<lambda>_::unit. \<box>)"  
 
@@ -530,6 +530,8 @@ lemma mk_free_invalid: "MK_FREE (invalid_assn R) (\<lambda>_. return ())"
   apply rule unfolding invalid_assn_def
   by vcg
 
+(*  
+  
 lemma mk_free_pair: 
   assumes "MK_FREE R\<^sub>1 f\<^sub>1" 
   assumes "MK_FREE R\<^sub>2 f\<^sub>2"  
