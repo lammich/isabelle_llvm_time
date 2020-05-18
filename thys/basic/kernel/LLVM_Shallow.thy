@@ -2,7 +2,7 @@ section \<open>Shallow Embedding of LLVM Semantics\<close>
 theory LLVM_Shallow
 imports Main  
   "LLVM_Memory"
-  "../../nrest/Abstract_Cost"
+  "../../cost/Abstract_Cost"
 begin
 
   text \<open>We define a type synonym for the LLVM monad\<close>
