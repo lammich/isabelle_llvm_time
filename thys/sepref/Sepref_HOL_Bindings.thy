@@ -1754,11 +1754,11 @@ lemma entt_invalid_prod: "hn_invalid (prod_assn A B) p p' \<turnstile> hn_ctxt (
   by (auto split: prod.splits simp: entails_def pred_lift_extract_simps dest: pure_part_split_conj)
 
 lemma gen_merge_cons_left: "L\<turnstile>L' \<Longrightarrow> MERGE L' fl R fr M \<Longrightarrow> MERGE L fl R fr M"  
-  unfolding MERGE_def 
+  unfolding MERGE_def oops
   by (metis (mono_tags, lifting) cons_rule[where Q=Q and Q'=Q for Q] entails_def)
   
 lemma gen_merge_cons_right: "R\<turnstile>R' \<Longrightarrow> MERGE L fl R' fr M \<Longrightarrow> MERGE L fl R fr M"  
-  unfolding MERGE_def
+  unfolding MERGE_def oops
   by (metis (mono_tags, lifting) cons_rule[where Q=Q and Q'=Q for Q] entails_def)
   
 lemmas gen_merge_cons = gen_merge_cons_left gen_merge_cons_right

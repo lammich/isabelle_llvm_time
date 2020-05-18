@@ -128,22 +128,15 @@ term "cost ''ofs_ptr'' (Suc 0)+t"
     (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
     id_assn
     (do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) })" 
+    unfolding snat_rel_def snat.assn_is_rel[symmetric] 
     unfolding hn_ctxt_def pure_def
+    
     apply(rule hnr_vcgI)
      apply(drule hnr_SPECT_D, clarify)
     apply(rule exI[where x="xs!i"])
     apply(rule exI[where x="cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0)"])
     apply (vcg')  
-    find_in_thms array_nth in vcg_framed_erules 
-     apply vcg_rl back back back back
-     apply vcg_try_solve 
-     apply vcg_try_solve 
-
-      apply (clarsimp simp: refine_pw_simps pw_acost_eq_iff)
-    
-    find_theorems "inresT (project_acost _ _) _ _ = _"
-    
-    oops
+    done
 
 
 end
