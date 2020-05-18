@@ -18,8 +18,7 @@ no_notation pred_K ("\<langle>_\<rangle>")
 
 type_synonym assn = ll_assn
 
-
-
+abbreviation (input) "RETURN \<equiv> RETURNT" (* FIXME ! *)
 text \<open>
   In this theory, we define the basic concept of refinement 
   from a nondeterministic program specified in the 
@@ -186,27 +185,59 @@ definition "hn_refine \<Gamma> c \<Gamma>' R m \<equiv>
   (\<forall>F s cr M. m = REST M \<longrightarrow>
       llSTATE (\<Gamma> \<and>* F) (s,cr) \<longrightarrow> 
       (\<exists>ra Ca. M ra \<ge> Some Ca
-        \<longrightarrow> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr+Ca)
+        \<and> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr+Ca)
       )
   )"
+term "$$n"
 
 lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
   by(auto simp: STATE_def)
   
 lemma hn_refineI[intro]: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M; (\<Gamma>**F) (ll_\<alpha>(s,cr)) \<rbrakk>
-          \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<longrightarrow>
+          \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<and>
                      (wp c (\<lambda>r s.  (\<Gamma>' ** R ra r ** F ** GC) (ll_\<alpha> s)) (s,cr+Ca)))"
   shows "hn_refine \<Gamma> c \<Gamma>' R m"  
   apply (auto simp add: hn_refine_def STATE_alt)  
   apply(rule assms) by auto
 
-lemma hnr_vcgI[htriple_vcg_intros]: 
+lemma hnr_vcgI_aux: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M; llSTATE (\<Gamma>**F) (s,cr) \<rbrakk>
-          \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<longrightarrow>
+          \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<and>
                      EXTRACT (wp c (\<lambda>r. POSTCOND ll_\<alpha> (\<Gamma>' ** R ra r ** F ** GC)) (s,cr+Ca)))"
   shows "hn_refine \<Gamma> c \<Gamma>' R m"  
   using assms by (simp add: hn_refine_def vcg_tag_defs) 
+
+
+lemma hnr_vcg_aux1:
+  "P (s, cr) \<Longrightarrow> (P \<and>* $Ca) (s, cr + Ca)"
+  apply(rule sep_conjI[where y="(0,Ca)"])
+     apply (simp_all add: time_credits_assn_def sep_disj_prod_def sep_algebra_simps)
+  by (auto simp add: sep_disj_acost_def sep_disj_enat_def sep_algebra_simps)
+
+lemma hnr_vcg_aux2:
+  "(P \<and>* $(lift_acost Ca)) (s, cr + (lift_acost Ca)) \<Longrightarrow> P (s, cr)"
+  apply(drule sep_conjD) apply (auto simp:  lift_acost_def time_credits_assn_def sep_algebra_simps)
+  by (metis add.commute cost_ecost_add_minus_cancel lift_acost_def) 
+
+
+lemma hnr_vcgI[htriple_vcg_intros]: 
+  assumes "\<And>F s cr M. \<lbrakk> m = REST M \<rbrakk>
+          \<Longrightarrow> (\<exists>ra Ca. (llSTATE (\<Gamma>**F**$(lift_acost Ca)) (s,cr+(lift_acost Ca)) \<longrightarrow> (M ra \<ge> Some (lift_acost Ca) \<and>
+                     EXTRACT (wp c (\<lambda>r. POSTCOND ll_\<alpha> (\<Gamma>' ** R ra r ** F ** GC)) (s,cr+lift_acost Ca)))))"
+  shows "hn_refine \<Gamma> c \<Gamma>' R m"  
+  apply(rule hnr_vcgI_aux)
+  subgoal premises prems for F s cr M
+    using assms[OF prems(1), where F=F and s=s and cr=cr] apply -
+    apply(elim exE) 
+    subgoal for ra Ca apply(rule exI[where x=ra])
+      apply(rule exI[where x="lift_acost Ca"])
+      apply(erule mp)
+      using  prems(2)   
+      unfolding STATE_def ll_\<alpha>_def lift_\<alpha>_cost_def apply simp
+      apply(rule hnr_vcg_aux1[of "(\<Gamma> \<and>* F)", simplified]) .
+    done
+  done
 
 
 (* TODO: Move *)
@@ -223,7 +254,7 @@ lemma hnr_RETURN_pass:
   \<comment> \<open>Pass on a value from the heap as return value\<close>
   apply (subst invalidate_clone')
   unfolding hn_ctxt_def
-  apply(rule hnr_vcgI)
+  apply(rule hnr_vcgI_aux)
   apply(simp add: nrest_more_simps ecost_le_zero) 
   apply vcg
   done
@@ -234,7 +265,7 @@ lemma hn_refineD:
   assumes "hn_refine \<Gamma> c \<Gamma>' R m"
   assumes "m = REST M" "(\<Gamma> \<and>* F) (ll_\<alpha> (s,cr))"
   shows  "(\<exists>ra Ca. M ra \<ge> Some Ca
-        \<longrightarrow> wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr+Ca)
+        \<and> wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr+Ca)
       )"
   using assms by(auto simp: hn_refine_def STATE_alt nofailT_def)
 
@@ -257,7 +288,7 @@ lemma hn_refine_false[simp]: "hn_refine sep_false c \<Gamma>' R m"
 lemma hnr_FAIL[simp, intro!]: "hn_refine \<Gamma> c \<Gamma>' R FAILT"
   by rule auto
 thm sep_conj_impl1 wp_monoI  frame_rule
-
+(*
 lemma "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow> (P' ** Q ** F) s"
   unfolding entails_def   
   apply(subst (2) sep_conj_commute)
@@ -1185,5 +1216,5 @@ ML \<open>
 
   open STactical
 \<close>
-
+*)
 end
