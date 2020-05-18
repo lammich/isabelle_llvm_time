@@ -40,7 +40,7 @@ begin
 
   lemma curry_uncurry0_id[simp]: "curry0 (uncurry0 f) = f" by (simp add: curry0_def)
   lemma uncurry_curry0_id[simp]: "uncurry0 (curry0 g) = g" by (auto simp: curry0_def)
-  lemma param_uncurry0[param]: "(uncurry0,uncurry0) \<in> A \<rightarrow> (unit_rel\<rightarrow>A)" by auto
+(*  lemma param_uncurry0[param]: "(uncurry0,uncurry0) \<in> A \<rightarrow> (unit_rel\<rightarrow>A)" by auto *)
     
   text \<open>Abbreviations for higher-order uncurries\<close>    
   abbreviation "uncurry2 f \<equiv> uncurry (uncurry f)"

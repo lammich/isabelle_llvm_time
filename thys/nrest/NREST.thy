@@ -1,10 +1,12 @@
 theory NREST
-  imports "HOL-Library.Extended_Nat" "Refine_Monadic.RefineG_Domain"  Refine_Monadic.Refine_Misc  
+  imports
+ "HOL-Library.Extended_Nat" "Refine_Monadic.RefineG_Domain"  Refine_Monadic.Refine_Misc  
   "HOL-Library.Monad_Syntax"   "HOL-Library.Groups_Big_Fun"
   Complex_Main 
 
 (* "HOL-Library.Function_Algebras" *)
  "Abstract_Cost"
+
 begin
 
 
@@ -344,7 +346,7 @@ abbreviation "SUCCEEDT \<equiv> bot::(_,_) nrest"
 abbreviation SPECT where "SPECT \<equiv> REST"
 
 
-definition "consume M t \<equiv> case M of 
+definition consume where "consume M t \<equiv> case M of 
           FAILi \<Rightarrow> FAILT |
           REST X \<Rightarrow> REST (map_option ((+) t) o (X))"
 
@@ -695,7 +697,7 @@ interpretation pointwise_reasoning enat
 
 subsubsection \<open>Why does lifting to function or acost not work wit pointwise reasoning?\<close>
 
-instantiation "fun" :: (type, zero) zero
+(* instantiation "fun" :: (type, zero) zero
 begin
 definition "0 = (\<lambda>_. 0)"
 instance by standard
@@ -714,7 +716,7 @@ lemma "pointwise_reasoning (\<lambda>f. (\<lambda>y. enat ((f::'c\<Rightarrow>na
   subgoal for X using lift_Sup   unfolding Sup_fun_def    oops
   \<comment> \<open>Just does not hold. consider Sup { [a:=2,b:=1], [a:=1,b:=2]}\<close>
 
-end
+end *)
 
 
 subsection \<open>pw reasoning for lifting to functions\<close>
@@ -1007,7 +1009,7 @@ lemma project_acost_consume[refine_pw_simps]: "project_acost b (consume M t) = c
 
 lemma project_acost_bindT[refine_pw_simps]: "(project_acost b (bindT m f)) = bindT (project_acost b m) (\<lambda>x. project_acost b (f x))"
   unfolding bindT_alt
-  apply (auto split: nrest.splits simp: project_acost_Sup project_acost_SPECT) 
+  apply (auto split: nrest.splits simp: project_acost_Sup project_acost_SPECT') 
   apply(rule arg_cong[where f="Sup"])
   by (auto split: option.splits simp: project_acost_consume[symmetric]) 
 
@@ -1022,7 +1024,7 @@ lemma pw_bindT_nofailT[refine_pw_simps]: "nofailT (bindT M f) \<longleftrightarr
 lemma g_pw_bindT_nofailT[refine_pw_simps]:
   "nofailT (bindT M f) \<longleftrightarrow> (nofailT M \<and> (\<forall>b x t. inresT (project_acost b M) x t \<longrightarrow> nofailT (f x)))"
   unfolding bindT_def   
-  apply (auto elim: no_FAILTE simp: project_acost_SPECT refine_pw_simps split: nrest.splits option.splits) 
+  apply (auto elim: no_FAILTE simp: project_acost_SPECT' refine_pw_simps split: nrest.splits option.splits) 
   subgoal by force
   subgoal  
     by (metis enat_0_iff(1) i0_lb nofailT_simps(1))  
@@ -1420,7 +1422,7 @@ definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow>
 
 
 
-subsection \<open>Pw reasoning example\<close>
+subsection \<open>More Pw reasoning setup\<close>
 
 
 term bindT
@@ -1430,15 +1432,12 @@ declare nofailT_project_acost[refine_pw_simps]
 thm refine_pw_simps
 lemma pac_ASSERT[refine_pw_simps]:
   "project_acost b (ASSERT P) = (ASSERT P)"
-  sorry
+  by (auto simp: zero_acost_def project_acost_def iASSERT_def ASSERT_def RETURNT_def
+          split: nrest.splits) 
  
 lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
   by(auto simp: consume_def split: nrest.splits)
-
-lemma "inresT (consume M \<infinity>) x t' = G"
-  apply(auto simp add: consume_def split: nrest.splits)
-  sorry
-
+ 
 definition "satminus a b \<equiv> (if b=\<infinity> then 0 else a - the_enat b)"
 
 lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow> the_acost t b = \<infinity> \<or> ta \<le> the_enat (the_acost t b)"
@@ -1455,19 +1454,23 @@ lemma inresT_consume[refine_pw_simps]:
   subgoal for x2 z apply(cases z) by auto   
   done
 
-lemma "project_acost b (SPECT [x' \<mapsto> t']) = (SPECT [x' \<mapsto> the_acost t' b])"
-  sorry
-thm project_acost_SPECT'
 lemma project_acost_SPECT[refine_pw_simps]: 
   "project_acost b (SPECT \<Phi>) = SPECT (\<lambda>x. map_option (\<lambda>m. the_acost m b) (\<Phi> x))"
   unfolding project_acost_def by(auto simp: fun_eq_iff split: nrest.splits option.split)
 
-lemma
-  fixes \<Phi> :: "_ \<Rightarrow> ((_,enat) acost) option"
-  shows
-      "do { ASSERT P; consume (RETURNT x) t } = SPECT \<Phi>"
-  apply(simp add: pw_acost_eq_iff)
-  apply(simp add: refine_pw_simps)
-  apply auto oops
+lemma project_acost_SPECT_map:
+  "project_acost b (SPECT [x' \<mapsto> t']) = (SPECT [x' \<mapsto> the_acost t' b])"
+  by(auto simp add: project_acost_SPECT) 
+ 
+lemma acost_componentwise_leI:
+  fixes \<Phi> :: "'c \<Rightarrow> ('d, enat) acost option"
+  assumes "\<Phi> x = Some e"
+  shows "(\<And>b. the_acost t b \<le> the_acost e b ) \<Longrightarrow> Some t \<le> \<Phi> x"
+  using assms apply(cases "\<Phi> x")
+   apply simp
+  by (auto simp: less_eq_acost_def)
+
+
+
 
 end
