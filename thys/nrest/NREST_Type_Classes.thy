@@ -91,7 +91,7 @@ instance enat :: drm
 
 
 
-class needname_zero = needname + nonneg + drm +
+class needname_zero = needname + nonneg + drm + ordered_comm_monoid_add +
   assumes needname_minus_absorb: "x - 0 = x"
    and needname_plus_absorb: "0 + x = x"
 
@@ -104,7 +104,7 @@ instantiation acost :: (type, needname_zero) needname_zero
 begin
 instance
   apply standard
-  subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def diff_right_mono )
+  subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def plus_left_mono )  subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def diff_right_mono )
   subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def diff_left_mono )
   subgoal premises prems for R mt apply(cases mt) unfolding Inf_acost_def less_eq_acost_def minus_acost_alt  apply simp
     apply (subst image_image) apply (auto ) apply(subst ll) 
@@ -112,7 +112,6 @@ instance
      defer apply(rule minus_continuousInf) subgoal using prems by auto 
     apply (rule Inf_mono) apply auto
     by (metis acost.case_eq_if acost.sel order_mono_setup.refl)
-  subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def plus_left_mono )
   subgoal for x apply(cases x) by (auto simp: less_eq_acost_def zero_acost_def needname_nonneg)
   subgoal for x apply(cases x) by (auto simp: zero_acost_def needname_minus_absorb)
   subgoal for x apply(cases x) by (auto simp: zero_acost_def needname_plus_absorb)
