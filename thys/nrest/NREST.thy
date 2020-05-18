@@ -8,7 +8,7 @@ theory NREST
 begin
 
 
-
+declare [[coercion_enabled = false]]
 
 
 section "Auxiliaries"
@@ -548,12 +548,14 @@ locale pointwise_reasoning = pointwise_reasoning_defs lift for lift :: "'cc::{or
       lift_ord: "\<And>m n. (lift m \<le> lift n) = (m \<le> n)"
     and lift_le_zero: "lift t \<le> 0 \<longleftrightarrow> t \<le> 0"
     and lift_zero: "lift 0 = 0"
-    and lift_Sup: "X \<noteq> {} \<Longrightarrow> (\<lambda>x. lift t \<le> x) (Sup X) \<Longrightarrow> Sup ((\<lambda>x. lift t \<le> x)`X)"
+    and lift_Sup: "X \<noteq> {} \<Longrightarrow> (\<lambda>x. lift t \<le> x) (Sup X)
+                         \<Longrightarrow> Sup ((\<lambda>x. lift t \<le> x)`X)"
     and blab: "\<And>t t'. (\<And>tt. lift tt \<le> t \<Longrightarrow> lift tt \<le> t') \<Longrightarrow> t\<le>t'"
     and my_zero_le: "\<And>x. (x::'ac) \<ge> 0" "\<And>x. (x::'cc) \<ge> 0"    
 begin
 
-lemma inresT_alt: "inresT S x t = (case S of FAILi \<Rightarrow> True | REST X \<Rightarrow> (\<exists>t'. X x = Some t' \<and>  lift t\<le>t'))"
+lemma inresT_alt: "inresT S x t = (case S of FAILi \<Rightarrow> True
+                       | REST X \<Rightarrow> (\<exists>t'. X x = Some t' \<and>  lift t\<le>t'))"
   unfolding inresT_def apply(cases S)  
   by (auto dest!: le_funD[where x=x] simp: le_funI less_eq_option_def split: option.splits )
 
@@ -627,6 +629,10 @@ lemma inres_simps[simp]:
    apply (auto split: nrest.splits simp add: RETURNT_def bot_nrest_def)   
   by (metis antisym fun_upd_same le_funI less_eq_option_None option.distinct(1)) (* TODO: refactor *)
 
+lemma fixes a b :: nat
+  shows" (\<forall>t. t \<le> a \<longrightarrow> t \<le> b) \<longleftrightarrow> a \<le> b"  
+  by auto
+
 
 lemma pw_le_iff: 
   "S \<le> S' \<longleftrightarrow> (nofailT S'\<longrightarrow> (nofailT S \<and> (\<forall>x t. inresT S x t \<longrightarrow> inresT S' x t)))"
@@ -685,6 +691,31 @@ interpretation pointwise_reasoning enat
     using not_le by blast
    apply auto 
   done
+
+
+subsubsection \<open>Why does lifting to function or acost not work wit pointwise reasoning?\<close>
+
+instantiation "fun" :: (type, zero) zero
+begin
+definition "0 = (\<lambda>_. 0)"
+instance by standard
+end
+
+experiment
+begin
+
+lemma fixes f:: "_ \<Rightarrow> enat"
+  shows  "\<lbrakk>X \<noteq> {}\<rbrakk> \<Longrightarrow> f (Sup X) \<le> Sup (f ` X)"
+  oops
+
+lemma "pointwise_reasoning (\<lambda>f. (\<lambda>y. enat ((f::'c\<Rightarrow>nat) y) ))"
+  apply standard
+  prefer 4
+  subgoal for X using lift_Sup   unfolding Sup_fun_def    oops
+  \<comment> \<open>Just does not hold. consider Sup { [a:=2,b:=1], [a:=1,b:=2]}\<close>
+
+end
+
 
 subsection \<open>pw reasoning for lifting to functions\<close>
 
@@ -765,12 +796,17 @@ definition project_acost :: " 'b \<Rightarrow> ('a,(_,_) acost) nrest \<Rightarr
 lemma nofailT_project_acost: "nofailT (project_acost b S) = nofailT S"
   by(auto simp add: nofailT_def project_acost_def split: nrest.splits)
 
-lemma project_acost_SPECT: "project_acost b (SPECT M) = SPECT (\<lambda>x. case_option None (\<lambda>m. Some (the_acost m b)) (M x))"
+lemma project_acost_SPECT': "project_acost b (SPECT M) = SPECT (\<lambda>x. case_option None (\<lambda>m. Some (the_acost m b)) (M x))"
   unfolding project_acost_def by auto
 
 
 context pointwise_reasoning
 begin
+
+
+lemma "pointwise_reasoning (\<lambda>x. acostC (\<lambda>y. lift (the_acost x y) ))"
+  apply standard
+  oops
 
 lemma pw_acost_le_project: "(S \<le> S') \<longleftrightarrow> (\<forall>b. (project_acost b S) \<le> (project_acost b S'))"               
   apply(cases S; cases S')
@@ -965,7 +1001,7 @@ lemma project_acost_FAIL[simp]: "project_acost b FAILT = FAILT"
 lemma the_acost_plus: "the_acost (t + t') b = the_acost t b + the_acost t' b"
   apply(cases t; cases t') by auto
 
-lemma project_acost_consume: "project_acost b (consume M t) = consume (project_acost b M) (the_acost t b)"
+lemma project_acost_consume[refine_pw_simps]: "project_acost b (consume M t) = consume (project_acost b M) (the_acost t b)"
   unfolding consume_def project_acost_def
   by(auto simp: the_acost_plus split: option.splits nrest.splits)
 
@@ -1134,7 +1170,7 @@ lemma bind_ASSERT_eq_if:
 
 lemma pw_ASSERT[refine_pw_simps]:
   "nofailT (ASSERT \<Phi>) \<longleftrightarrow> \<Phi>"
-  "inresT (ASSERT \<Phi>) x 0"
+  "inresT (ASSERT \<Phi>) x t \<longleftrightarrow> (\<Phi> \<longrightarrow> t = 0)"
   by (cases \<Phi>, simp_all)+
 
 lemma ASSERT_refine:
@@ -1190,14 +1226,14 @@ definition SELECT :: "('a \<Rightarrow> bool) \<Rightarrow> 'c \<Rightarrow> ('a
                else REST [None \<mapsto> tf]"
 
                     
-lemma inresT_SELECT_Some: "inresT (SELECT Q tt) (Some x) t' \<longleftrightarrow> (Q x  \<and> (t' \<le> tt))"
+lemma inresT_SELECT_Some: "inresT (SELECT Q tt) (Some x) t' \<longleftrightarrow> (Q x  \<and> (enat t' \<le> tt))"
   by(auto simp: inresT_alt SELECT_def emb'_def) 
 
-lemma inresT_SELECT_None: "inresT (SELECT Q tt) None t' \<longleftrightarrow> (\<not>(\<exists>x. Q x) \<and> (t' \<le> tt))"
+lemma inresT_SELECT_None: "inresT (SELECT Q tt) None t' \<longleftrightarrow> (\<not>(\<exists>x. Q x) \<and> (enat t' \<le> tt))"
   by(auto simp: inresT_alt SELECT_def emb'_def) 
 
 lemma inresT_SELECT[refine_pw_simps]:
- "inresT (SELECT Q tt) x t' \<longleftrightarrow> ((case x of None \<Rightarrow> \<not>(\<exists>x. Q x) | Some x \<Rightarrow> Q x)  \<and> (t' \<le> tt))"
+ "inresT (SELECT Q tt) x t' \<longleftrightarrow> ((case x of None \<Rightarrow> \<not>(\<exists>x. Q x) | Some x \<Rightarrow> Q x)  \<and> (enat t' \<le> tt))"
   by(auto simp: inresT_alt SELECT_def emb'_def) 
 
 
@@ -1383,5 +1419,55 @@ definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow>
 
 
 
+
+subsection \<open>Pw reasoning example\<close>
+
+
+term bindT
+
+declare nofailT_project_acost[refine_pw_simps]
+
+thm refine_pw_simps
+lemma pac_ASSERT[refine_pw_simps]:
+  "project_acost b (ASSERT P) = (ASSERT P)"
+  sorry
+ 
+lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
+  by(auto simp: consume_def split: nrest.splits)
+
+lemma "inresT (consume M \<infinity>) x t' = G"
+  apply(auto simp add: consume_def split: nrest.splits)
+  sorry
+
+definition "satminus a b \<equiv> (if b=\<infinity> then 0 else a - the_enat b)"
+
+lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow> the_acost t b = \<infinity> \<or> ta \<le> the_enat (the_acost t b)"
+  unfolding satminus_def
+  by auto
+
+lemma inresT_consume[refine_pw_simps]:
+ "inresT (consume M t) x t' \<longleftrightarrow> (inresT M x (satminus t' t))"
+  unfolding satminus_def
+  apply(cases t)
+  apply(auto simp: consume_def  split: nrest.splits )
+  subgoal for n x2 z apply(cases z) by auto  
+  subgoal for n x2 z apply(cases z) by auto  
+  subgoal for x2 z apply(cases z) by auto   
+  done
+
+lemma "project_acost b (SPECT [x' \<mapsto> t']) = (SPECT [x' \<mapsto> the_acost t' b])"
+  sorry
+thm project_acost_SPECT'
+lemma project_acost_SPECT[refine_pw_simps]: 
+  "project_acost b (SPECT \<Phi>) = SPECT (\<lambda>x. map_option (\<lambda>m. the_acost m b) (\<Phi> x))"
+  unfolding project_acost_def by(auto simp: fun_eq_iff split: nrest.splits option.split)
+
+lemma
+  fixes \<Phi> :: "_ \<Rightarrow> ((_,enat) acost) option"
+  shows
+      "do { ASSERT P; consume (RETURNT x) t } = SPECT \<Phi>"
+  apply(simp add: pw_acost_eq_iff)
+  apply(simp add: refine_pw_simps)
+  apply auto oops
 
 end
