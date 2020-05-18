@@ -33,7 +33,8 @@ begin
   instantiation acost :: (type, ord) ord
   begin 
     definition "less_eq_acost a b = (\<forall>x. the_acost a x \<le> the_acost b x)"
-    definition "less_acost a b = (\<forall>x. the_acost a x < the_acost b x)"
+    definition "less_acost a b \<equiv> (\<forall>x. the_acost a x \<le> the_acost b x) \<and> (\<exists>x. the_acost a x < the_acost b x)"
+
     instance ..
   end
 
@@ -94,11 +95,12 @@ begin
   term "(a::cost) + b"
   term "(0::cost)"
 
-  definition cost :: "'a \<Rightarrow> 'b::{cancel_comm_monoid_add} \<Rightarrow> ('a,'b) acost" where
+  definition cost :: "'a \<Rightarrow> 'b::{comm_monoid_add} \<Rightarrow> ('a,'b) acost" where
     "cost n x = acostC ((the_acost 0)(n:=x))"
 
   lemma cost_same_curr_add: "cost n x + cost n y = cost n (x+y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
-  lemma cost_same_curr_minus: "cost n x - cost n y = cost n (x-y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
+  lemma cost_same_curr_minus:
+    "cost n (x::_::{cancel_comm_monoid_add}) - cost n y = cost n (x-y)" by (auto simp: cost_def fun_eq_iff zero_acost_def)
   lemma cost_zero: "cost n 0 = 0" by(auto simp: cost_def zero_acost_def)
 
   lemmas c_simps = cost_same_curr_add cost_same_curr_minus cost_zero add_ac[where a="_::(_,_) acost"]
@@ -122,8 +124,8 @@ begin
   
     instance ..
   
-  end
-  
+end
+
   instantiation acost :: (type, complete_lattice) complete_lattice
   begin                                                   
     definition "bot_acost = acostC (\<lambda>x. bot)"             
@@ -132,8 +134,9 @@ begin
 
     instance 
       apply standard
-                     apply(auto simp add: le_fun_def less_eq_acost_def less_acost_def split: acost.split)
-      subgoal for x y apply(cases x; cases y) by (auto simp: le_less less_fun_def le_fun_def)      
+     apply(auto simp add: le_fun_def less_eq_acost_def less_acost_def split: acost.split)
+      subgoal for x y apply(cases x; cases y) apply (auto simp: le_less less_fun_def le_fun_def)  
+        using less_not_sym by fastforce
       sorry (* TODO *)
   end
 
