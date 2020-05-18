@@ -793,7 +793,7 @@ subsection \<open>pw reasoning for lifting to acost\<close>
 definition project_acost :: " 'b \<Rightarrow> ('a,(_,_) acost) nrest \<Rightarrow>('a,_) nrest" where
   "project_acost b S  \<equiv> (case S of FAILi \<Rightarrow> FAILi | REST X \<Rightarrow> REST (\<lambda>x. case X x of None \<Rightarrow> None | Some m \<Rightarrow> Some (the_acost m b)))"
 
-lemma nofailT_project_acost: "nofailT (project_acost b S) = nofailT S"
+lemma nofailT_project_acost[refine_pw_simps]: "nofailT (project_acost b S) = nofailT S"
   by(auto simp add: nofailT_def project_acost_def split: nrest.splits)
 
 lemma project_acost_SPECT': "project_acost b (SPECT M) = SPECT (\<lambda>x. case_option None (\<lambda>m. Some (the_acost m b)) (M x))"
