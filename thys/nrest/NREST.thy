@@ -5,7 +5,7 @@ theory NREST
   Complex_Main 
 
 (* "HOL-Library.Function_Algebras" *)
- "Abstract_Cost"
+ "../cost/Abstract_Cost"
 
 begin
 
@@ -1414,7 +1414,7 @@ definition "monadic_WHILEIT I b f s \<equiv> do {
 }"
 
 
-definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> 'c) \<Rightarrow> ('a \<Rightarrow> bool)
+definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> _) \<Rightarrow> ('a \<Rightarrow> bool)
                            \<Rightarrow> ('a \<Rightarrow> ('a,'c::{complete_lattice,plus,zero}) nrest)
                            \<Rightarrow> 'a \<Rightarrow> ('a,'c) nrest" where
   "\<And>E c. whileIET I E b c = whileT b c"

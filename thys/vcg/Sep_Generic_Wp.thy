@@ -5,6 +5,7 @@ imports
   "../lib/Monad"
   "HOL-Library.Extended_Nat" (* TODO: This gives us Complex_Main. Too much for this theory! *)
   "../basic/kernel/LLVM_Shallow" (* TODO: Just used for acostC datatype. Move this datatype! *)
+  "../cost/Enat_Cost"
 begin
 
 
@@ -683,7 +684,6 @@ lemma "($c) (s,c') \<longleftrightarrow> s=0 \<and> c'=c"
   
 definition "lift_\<alpha>_cost \<alpha> \<equiv> \<lambda>(s,c). (\<alpha> s,c)"  
 
-definition "lift_acost c \<equiv> acostC (enat o the_acost c)"
 
 lemma cost_ecost_minus_add_assoc2: "le_cost_ecost x c \<Longrightarrow> minus_ecost_cost (c + d) x = minus_ecost_cost c x + d"
   apply(cases x; cases c; cases d) apply(auto simp: minus_ecost_cost_def le_cost_ecost_def)
