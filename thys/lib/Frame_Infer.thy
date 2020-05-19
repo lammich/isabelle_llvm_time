@@ -212,7 +212,7 @@ ML \<open>
     (**** Frame Inference Tactic *)
     fun start_tac ctxt = 
             asm_simp_named_tac ctxt @{named_simpset fri_prepare_simps}
-      THEN' REPEAT' (resolve_tac ctxt @{thms fri_exI fri_trueI})
+      THEN' REPEAT' (resolve_tac ctxt @{thms fri_exI fri_trueI} THEN' asm_simp_named_tac ctxt @{named_simpset fri_prepare_simps})
       THEN' resolve_tac ctxt @{thms fri_prepare}
       THEN' simp_only_tac @{thms sep_conj_assoc fri_empty_concl_simp} ctxt
   
