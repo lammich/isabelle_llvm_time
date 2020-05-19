@@ -17,6 +17,9 @@ no_notation pred_K ("\<langle>_\<rangle>")
 
 
 type_synonym assn = ll_assn
+translations
+  (type) "assn" \<leftharpoondown> (type) "llvm_amemory \<times> (char list, enat) acost \<Rightarrow> bool"
+
 
 abbreviation (input) "RETURN \<equiv> RETURNT" (* FIXME ! *)
 text \<open>
