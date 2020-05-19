@@ -1,7 +1,78 @@
 theory Hnr_Primitives_Experiment
 imports Sepref_Basic "../ds/LLVM_DS_Dflt"
 begin
-  
+  hide_const (open) LLVM_DS_Array.array_assn
+
+  subsubsection \<open>Composition\<close>
+  definition hr_comp :: "('b \<Rightarrow> 'c \<Rightarrow> assn) \<Rightarrow> ('b \<times> 'a) set \<Rightarrow> 'a \<Rightarrow> 'c \<Rightarrow> assn"
+    \<comment> \<open>Compose refinement assertion with refinement relation\<close>
+    where "hr_comp R1 R2 a c \<equiv> EXS b. R1 b c ** \<up>((b,a)\<in>R2)"
+
+  lemma hr_compI: "(b,a)\<in>R2 \<Longrightarrow> R1 b c \<turnstile> hr_comp R1 R2 a c"  
+    unfolding hr_comp_def
+    by (auto simp: sep_algebra_simps entails_def pred_lift_extract_simps)
+
+  lemma hr_comp_Id1[simp]: "hr_comp (pure Id) R = pure R"  
+    unfolding hr_comp_def[abs_def] pure_def
+    apply (intro ext)
+    by (auto simp: pred_lift_extract_simps)
+
+  lemma hr_comp_Id2[simp]: "hr_comp R Id = R"  
+    unfolding hr_comp_def[abs_def]
+    apply (intro ext)
+    by (auto simp: sep_algebra_simps pred_lift_extract_simps)
+    
+  lemma hr_comp_emp[simp]: "hr_comp (\<lambda>a c. \<box>) R a c = \<up>(\<exists>b. (b,a)\<in>R)"
+    unfolding hr_comp_def[abs_def]
+    apply (intro ext)
+    by (auto simp: sep_algebra_simps pred_lift_extract_simps)
+
+  lemma hr_comp_prod_conv[simp]:
+    "hr_comp (prod_assn Ra Rb) (Ra' \<times>\<^sub>r Rb') 
+    = prod_assn (hr_comp Ra Ra') (hr_comp Rb Rb')"  
+    unfolding hr_comp_def[abs_def] prod_assn_def[abs_def]
+    apply (intro ext)
+    apply (auto 0 3 simp: sep_algebra_simps pred_lift_extract_simps)
+    done
+
+  lemma hr_comp_pure: "hr_comp (pure R) S = pure (R O S)"  
+    apply (intro ext)
+    unfolding hr_comp_def[abs_def] pure_def
+    by (auto simp: sep_algebra_simps pred_lift_extract_simps)
+
+  lemma hr_comp_is_pure: "is_pure A \<Longrightarrow> is_pure (hr_comp A B)"
+    by (auto simp: hr_comp_pure is_pure_conv)
+
+  lemma hr_comp_the_pure: "is_pure A \<Longrightarrow> the_pure (hr_comp A B) = the_pure A O B"
+    unfolding is_pure_conv
+    by (clarsimp simp: hr_comp_pure)
+
+  lemma rdomp_hrcomp_conv[simp]: "rdomp (hr_comp A R) x \<longleftrightarrow> (\<exists>y. rdomp A y \<and> (y,x)\<in>R)"
+    by (auto simp: rdomp_def hr_comp_def sep_algebra_simps pred_lift_extract_simps)
+
+  lemma hr_comp_assoc: "hr_comp (hr_comp R S) T = hr_comp R (S O T)"
+    apply (intro ext)
+    unfolding hr_comp_def
+    by (auto simp: sep_algebra_simps pred_lift_extract_simps)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   abbreviation "raw_array_assn \<equiv> \<upharpoonleft>LLVM_DS_NArray.narray_assn"
 
 lemma satminus_lift_acost: "satminus ta (the_acost (lift_acost t) b) = 0 \<longleftrightarrow> ta \<le> the_acost t b"
@@ -173,7 +244,140 @@ definition "mop_to_wo_conv xs \<equiv> do { ASSERT (None\<notin>set xs); consume
 
 (* XXX: Need "array_assn A" first for this to be meaningful! ra-comp! *)  
   
+definition "some_rel \<equiv> br the (Not o is_None)"
+definition "array_assn A \<equiv> hr_comp (eoarray_assn A) (\<langle>some_rel\<rangle>list_rel)"
 
+lemma map_the_some_rel_list_rel_iff: "(xs, map the xs) \<in> \<langle>some_rel\<rangle>list_rel \<longleftrightarrow> None \<notin> set xs"
+  unfolding some_rel_def
+  apply (auto simp: map_in_list_rel_conv split: option.splits)
+  by (metis option.exhaust)
+
+  
+lemma map_in_list_rel_br_iff: "(map f xs, xs) \<in> \<langle>br \<alpha> I\<rangle>list_rel \<longleftrightarrow> (\<forall>x\<in>set xs. I (f x) \<and> \<alpha> (f x) = x)"  
+  apply (induction xs)
+  apply (auto simp: in_br_conv)
+  done
+  
+lemma in_br_list_rel_conv: "(xs,ys) \<in> \<langle>br \<alpha> I\<rangle>list_rel \<longleftrightarrow> (\<forall>x\<in>set xs. I x) \<and> ys = map \<alpha> xs"  
+  apply (rule)
+  subgoal premises prems
+    using prems
+    apply (induction rule: list_rel_induct)
+    by (auto simp: in_br_conv)
+  subgoal by (auto simp: map_in_list_rel_conv)
+  done
+  
+find_theorems "list_rel" "map"  
+  
+lemma in_some_rel_list_rel_conv: "(x,xi) \<in>\<langle>some_rel\<rangle>list_rel \<longleftrightarrow> x = map Some xi"
+  unfolding some_rel_def
+  by (auto simp: in_br_list_rel_conv map_idI split: option.splits)
+  
+  
+(* Conversion between implicit and explicit ownership array *)
+  
+lemma "hn_refine 
+  (hn_ctxt (eoarray_assn A) xs xsi)
+  (return xsi)
+  (hn_invalid (eoarray_assn A) xs xsi)
+  (array_assn A)
+  (mop_to_wo_conv xs)"
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_to_wo_conv_def
+    array_assn_def hr_comp_def
+  apply vcg'
+  apply (simp add: map_the_some_rel_list_rel_iff)
+  done
+
+lemma "hn_refine 
+  (hn_ctxt (array_assn A) xs xsi)
+  (return xsi)
+  (hn_invalid (array_assn A) xs xsi)
+  (eoarray_assn A)
+  (mop_to_eo_conv xs)"
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_to_eo_conv_def
+    array_assn_def hr_comp_def
+  supply [simp] = in_some_rel_list_rel_conv
+  by vcg
+  
+  
+find_theorems list_assn   
+  
+(* Array operations for pure content, backed by eoarray *)  
+
+find_theorems sep_is_pure_assn is_pure
+
+find_theorems sep_is_pure_assn pure_part
+
+find_theorems  the_pure
+
+
+lemma the_pure_pure_part_conv: "is_pure A \<Longrightarrow> the_pure A = {(c,a). pure_part (A a c)}"
+  apply safe
+  subgoal by (metis Sepref_Basic.pure_part_pure pure_the_pure)
+  subgoal by (metis Sepref_Basic.pure_part_pure pure_the_pure)
+  done
+  
+
+
+
+lemma is_pure_assn_pred_lift: "is_pure A \<Longrightarrow> A a c = \<up>((c,a)\<in>the_pure A)"
+  by (metis Sepref_Basic.pure_def pure_the_pure)
+
+
+lemma pure_list_assn_list_rel_conv: "is_pure A \<Longrightarrow> \<upharpoonleft>(list_assn (mk_assn A)) xs xsi = \<up>((xsi,xs)\<in>\<langle>the_pure A\<rangle>list_rel)"
+proof (induction xs arbitrary: xsi)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+  then show ?case 
+    apply (cases xsi; simp)
+    by (auto simp add: sep_algebra_simps pred_lift_extract_simps fun_eq_iff is_pure_assn_pred_lift)
+  
+qed
+
+term list_rel
+
+definition [to_relAPP]: "oelem_rel A \<equiv> {(c,a) . case a of None \<Rightarrow> True | Some b \<Rightarrow> (c,b)\<in>A}"
+
+lemma oelem_pure_assn_conv: "oelem_assn (mk_assn (pure A)) = mk_assn (pure (\<langle>A\<rangle>oelem_rel))"
+  unfolding oelem_assn_def sel_mk_assn oelem_rel_def
+  apply (rule arg_cong[where f=mk_assn])
+  by (auto simp: fun_eq_iff pure_def sep_algebra_simps split: option.split )
+
+  
+lemma map_some_oelem_list_rel_conv: "(xs, map Some ys) \<in> \<langle>\<langle>R\<rangle>oelem_rel\<rangle>list_rel \<longleftrightarrow> (xs,ys) \<in> \<langle>R\<rangle>list_rel"  
+proof (induction xs arbitrary: ys)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons a xs)
+  then show ?case 
+    apply (cases ys)
+    by (auto simp: oelem_rel_def)
+    
+qed
+
+
+  
+lemma pure_array_assn_alt:
+  assumes "is_pure A"  
+  shows "array_assn A = hr_comp raw_array_assn (\<langle>the_pure A\<rangle>list_rel)"  
+  apply (rewrite pure_the_pure[of A, symmetric, OF assms])
+  unfolding array_assn_def eoarray_assn_def nao_assn_def hr_comp_def
+  apply (auto 
+    simp: fun_eq_iff sep_algebra_simps pred_lift_extract_simps oelem_pure_assn_conv 
+    simp: pure_list_assn_list_rel_conv in_some_rel_list_rel_conv map_some_oelem_list_rel_conv
+  )
+  done
+
+oops  
+xxx: now we can use FCOMP (once we have it), to compose the
+  standard list operations on raw_array_assn with the list parametricity thms,
+  getting exactly the relation prescribed by thm pure_array_assn_alt, for pure elements!
+  
+  
+    
   
   
   
