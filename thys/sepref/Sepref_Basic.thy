@@ -398,6 +398,8 @@ lemma hn_refine_augment_res:
   apply (auto simp: pred_lift_extract_simps pw_le_iff pw_leof_iff)
   done
 
+*)  
+  
 subsection \<open>Product Types\<close>
 text \<open>Some notion for product types is already defined here, as it is used 
   for currying and uncurrying, which is fundamental for the sepref tool\<close>
@@ -418,6 +420,8 @@ lemma prod_assn_pair_conv[simp]:
 lemma prod_assn_true[simp]: "prod_assn (\<lambda>_ _. sep_true) (\<lambda>_ _. sep_true) = (\<lambda>_ _. sep_true)"
   by (auto intro!: ext simp: hn_ctxt_def prod_assn_def)
 
+  
+(*  
 subsection "Convenience Lemmas"
 
 lemma hn_refine_guessI:
