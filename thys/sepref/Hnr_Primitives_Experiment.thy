@@ -1,5 +1,5 @@
 theory Hnr_Primitives_Experiment
-imports Sepref_Basic
+imports Sepref_Basic "../ds/LLVM_DS_Dflt"
 begin
   
   abbreviation "raw_array_assn \<equiv> \<upharpoonleft>LLVM_DS_NArray.narray_assn"
@@ -62,14 +62,21 @@ lemma hnr_mop_vcgI[htriple_vcg_intros]:
 
 lemmas hnr_mop_vcgI_nopre[htriple_vcg_intros] = hnr_mop_vcgI[where \<Phi>=True, simplified]  
   
+abbreviation "cost'_narray_new n \<equiv> cost ''malloc'' n + cost ''free'' 1 + cost ''if'' 1 + cost ''if'' 1 + cost ''icmp_eq'' 1 + cost ''ptrcmp_eq'' 1"
+
+
+definition "mop_array_nth xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
+definition "mop_array_upd xs i x \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs[i:=x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
+definition "mop_array_new n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n (init))) (lift_acost (cost'_narray_new n)) }"
+
 
 lemma "hn_refine 
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   (array_nth xsi ii)
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   id_assn
-  (do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) })" 
-  unfolding hn_ctxt_def pure_def
+  (mop_array_nth xs i)" 
+  unfolding hn_ctxt_def pure_def mop_array_nth_def
   by vcg
 
 lemma "hn_refine 
@@ -77,21 +84,19 @@ lemma "hn_refine
   (array_upd xsi ii xi)
   (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt id_assn x xi)
   raw_array_assn
-  (do { ASSERT (i<length xs); consume (RETURNT (xs[i:=x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) })" 
-  unfolding hn_ctxt_def pure_def invalid_assn_def
+  (mop_array_upd xs i x)" 
+  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
   by vcg
   
   
-abbreviation "cost'_narray_new n \<equiv> cost ''malloc'' n + cost ''free'' 1 + cost ''if'' 1 + cost ''if'' 1 + cost ''icmp_eq'' 1 + cost ''ptrcmp_eq'' 1"
-
 
 lemma "hn_refine 
   (hn_ctxt snat_assn i ii)
   (narray_new TYPE('a::llvm_rep) ii)
   (hn_ctxt snat_assn i ii)
   raw_array_assn
-  (do { ASSERT (PROTECT True); consume (RETURNT (replicate i (init::'a))) (lift_acost (cost'_narray_new i)) })" 
-  unfolding hn_ctxt_def pure_def invalid_assn_def
+  (mop_array_new i)" 
+  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
   by vcg
   
 lemma "MK_FREE raw_array_assn narray_free"  
@@ -99,7 +104,79 @@ lemma "MK_FREE raw_array_assn narray_free"
   by vcg
 
 
+  
+  
+  
+  
+text \<open>Assertion that adds constraint on concrete value. Used to carry through concrete equalities.\<close>
+definition "cnc_assn \<phi> A a c \<equiv> \<up>(\<phi> c) ** A a c"
+  
+lemma norm_ceq_assn(*[named_ss sepref_frame_normrel]*): "hn_ctxt (cnc_assn \<phi> A) a c = (\<up>(\<phi> c) ** hn_ctxt A a c)"
+  unfolding hn_ctxt_def cnc_assn_def by simp
+  
 
+definition "mop_oarray_nth xs i \<equiv> do { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
+definition "mop_oarray_upd xs i x \<equiv> do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
+definition "mop_oarray_new n \<equiv> consume (RETURNT (replicate n None)) (lift_acost (cost'_narray_new n))"
+
+      
+  
+definition "eoarray_assn A \<equiv> \<upharpoonleft>(nao_assn (mk_assn A))"
+
+definition "eoarray_nth_impl xsi ii \<equiv> doM {
+  r \<leftarrow> array_nth xsi ii;
+  return (r,xsi)
+}"  
+  
+lemma "hn_refine 
+  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+  (eoarray_nth_impl xsi ii)
+  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+  (cnc_assn (\<lambda>(_,xsi'). xsi'=xsi) (A \<times>\<^sub>a eoarray_assn A))
+  (mop_oarray_nth xs i)"  
+  unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_nth_def eoarray_nth_impl_def
+  by vcg
+  
+lemma "hn_refine 
+  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+  (array_upd xsi ii xi)
+  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_invalid A x xi)
+  (cnc_assn (\<lambda>ri. ri=xsi) (eoarray_assn A))
+  (mop_oarray_upd xs i x)"  
+  unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_upd_def
+  by vcg
+  
+lemma "hn_refine 
+  (hn_ctxt snat_assn i ii)
+  (narrayo_new TYPE('a::llvm_rep) ii)
+  (hn_ctxt snat_assn i ii)
+  (eoarray_assn A)
+  (mop_oarray_new i)" 
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_new_def
+  by vcg
+    
+definition "mop_oarray_free xs \<equiv> do { ASSERT (set xs \<subseteq> {None}); consume (RETURNT ()) (lift_acost 0) }"
+  
+lemma "hn_refine 
+  (hn_ctxt (eoarray_assn A) xs xsi)
+  (narray_free xsi)
+  (hn_invalid (eoarray_assn A) xs xsi)
+  (id_assn)
+  (mop_oarray_free xs)"
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_free_def
+  by vcg
+  
+  
+(* Conversions between plain array and explicit ownership array*)  
+definition "mop_to_eo_conv xs \<equiv> do { consume (RETURNT (map Some xs)) (lift_acost 0) }"  
+definition "mop_to_wo_conv xs \<equiv> do { ASSERT (None\<notin>set xs); consume (RETURNT (map the xs)) (lift_acost 0) }"  
+
+(* XXX: Need "array_assn A" first for this to be meaningful! ra-comp! *)  
+  
+
+  
+  
+  
 end
 
 
