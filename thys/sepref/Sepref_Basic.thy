@@ -17,6 +17,9 @@ no_notation pred_K ("\<langle>_\<rangle>")
 
 
 type_synonym assn = ll_assn
+translations
+  (type) "assn" \<leftharpoondown> (type) "llvm_amemory \<times> (char list, enat) acost \<Rightarrow> bool"
+
 
 abbreviation (input) "RETURN \<equiv> RETURNT" (* FIXME ! *)
 text \<open>
@@ -288,6 +291,48 @@ lemma hn_refine_false[simp]: "hn_refine sep_false c \<Gamma>' R m"
 lemma hnr_FAIL[simp, intro!]: "hn_refine \<Gamma> c \<Gamma>' R FAILT"
   by rule auto
 thm sep_conj_impl1 wp_monoI  frame_rule
+
+
+(* Consequence rule for hn-refine *)
+(* TODO: Move *)
+lemma STATE_rev_mp: "STATE \<alpha> P s \<Longrightarrow> P\<turnstile>P' \<Longrightarrow> STATE \<alpha> P' s"
+  unfolding STATE_def entails_def by blast
+
+(* TODO: Move *)
+lemma wp_post_cons: "wp m (\<lambda>r. STATE \<alpha> (Q r)) s \<Longrightarrow> (\<And>r. Q r \<turnstile> Q' r) \<Longrightarrow> wp m (\<lambda>r. STATE \<alpha> (Q' r)) s"  
+  by (simp add: STATE_rev_mp wp_monoI)
+  
+lemma hn_refine_cons_complete:
+  assumes R: "hn_refine P' c Q R m"
+  assumes I: "P\<turnstile>P'"
+  assumes I': "Q\<turnstile>Q'"
+  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
+  assumes LE: "m\<le>m'"
+  shows "hn_refine P c Q' R' m'"
+  unfolding hn_refine_def
+  apply clarify
+  using LE apply (cases m; simp)
+  apply (drule STATE_rev_mp)
+  apply (sep_drule I; rule entails_refl)
+  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated])
+  apply simp
+  apply (elim exE conjE)
+  apply (intro exI conjI)
+  apply (rule order_trans, assumption, erule le_funD)
+  apply (erule wp_post_cons)
+  apply (sep_drule I')
+  apply (sep_drule R')
+  apply (rule ENTAILSD)
+  apply fri
+  done
+  
+lemmas hn_refine_cons = hn_refine_cons_complete[OF _ _ _ _ order_refl]  
+lemmas hn_refine_cons_pre = hn_refine_cons_complete[OF _ _ entails_refl entails_refl order_refl]  
+lemmas hn_refine_cons_post = hn_refine_cons_complete[OF _ entails_refl _ entails_refl order_refl]  
+lemmas hn_refine_cons_res = hn_refine_cons_complete[OF _ entails_refl entails_refl _ order_refl]  
+lemmas hn_refine_ref = hn_refine_cons_complete[OF _ entails_refl entails_refl entails_refl]
+
+
 (*
 lemma "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow> (P' ** Q ** F) s"
   unfolding entails_def   
@@ -398,6 +443,8 @@ lemma hn_refine_augment_res:
   apply (auto simp: pred_lift_extract_simps pw_le_iff pw_leof_iff)
   done
 
+*)  
+  
 subsection \<open>Product Types\<close>
 text \<open>Some notion for product types is already defined here, as it is used 
   for currying and uncurrying, which is fundamental for the sepref tool\<close>
@@ -418,6 +465,8 @@ lemma prod_assn_pair_conv[simp]:
 lemma prod_assn_true[simp]: "prod_assn (\<lambda>_ _. sep_true) (\<lambda>_ _. sep_true) = (\<lambda>_ _. sep_true)"
   by (auto intro!: ext simp: hn_ctxt_def prod_assn_def)
 
+  
+(*  
 subsection "Convenience Lemmas"
 
 lemma hn_refine_guessI:

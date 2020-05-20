@@ -1,3 +1,38 @@
+
+# Di 19.5.
+
+
+- Review Projektverlauf
+- evtl nur asymptotische schranke für intro_sort_aux (wegen AkkraBazzi/Master-Theorem), dann bringt fein-granulares time-reasoning z.b. bei sift-down wenig...
+- Ziel: introsort_time : O(n log n)
+
+
+## Introsort
+- introsort
+  - heap sort: n log n beweisen/annehmen
+  - introsort_aux: rekurrenz, evtl AkkraBazzi
+- insertion_sort
+  - äußere schleife linear of length O(|xs|*threshold)
+  - inneres sort_one_more_spec in O(threshold)=O(1), i0-1
+  - Invarianten zu schwach im Moment! (infos über slices werden aktuell weggeworfen)
+  - siehe gen_insertion_sort 
+
+- bei pdqsort
+  - introsort ist O(threshold²)=O(threshold*n) mit n=threshold
+  
+  
+## TODO
+
+### Peter
+- array mit explizitem ownership into Hnr_Primitives_Experiment
+- Abstrakter Teil von Introsort / PDQsort
+- Sepref anpassen (sepref_intf, FCOMP...) sobald genügend Sepref_Basis zur Verfügung.
+
+### Max
+- NREST eingliedern
+- Sepref anpassen
+
+
 # Do 14.5.
 
 Diskussion zum Thema Zeitanalyse

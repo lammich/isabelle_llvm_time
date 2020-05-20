@@ -237,7 +237,7 @@ definition "swap_eo xs i j \<equiv> doN {
     
 lemma swap_eo_refine: "(uncurry2 swap_eo,uncurry2 mop_list_swap) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nres_rel"  
   apply (rule frefI; clarsimp simp: swap_eo_def swap_def pw_nres_rel_iff refine_pw_simps map_update)
-  apply (safe; clarsimp?)
+  apply (safe; clarsimp?) oops
   apply (metis None_notin_image_Some list.set_map list_update_overwrite list_update_swap map_update)
   apply (metis None_notin_image_Some list.set_map list_update_overwrite list_update_swap map_update)
   apply (metis list_update_overwrite list_update_swap)
