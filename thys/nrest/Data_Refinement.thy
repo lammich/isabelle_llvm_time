@@ -580,4 +580,17 @@ lemma conc_fun_br: "\<Down> (br \<alpha> I1) (SPECT (emb I2 t))
   unfolding conc_fun_RES  apply auto apply(rule ext)    
       by (auto simp: emb'_def br_def bot_option_def Sup_option_def) 
 
+
+lemma project_acost_conc_fun_commute: "project_acost b (\<Down>R m) = \<Down>R (project_acost b m)"
+  unfolding project_acost_def conc_fun_def
+  apply(cases m)
+  subgoal by simp
+  subgoal
+    supply *[simp] = continuous_option'[OF continuous_the_acost, THEN continuousD]
+    apply simp
+    apply(rule ext)
+    apply(rule arg_cong[where f=Sup])
+    by auto
+  done
+
 end
