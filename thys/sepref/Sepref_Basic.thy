@@ -7,7 +7,7 @@ imports
   "Lib/Sepref_Misc"
   "Lib/Structured_Apply"
   Sepref_Id_Op
-  "../nrest/NREST"
+  "../nrest/NREST_Main"
 begin
 (*
 no_notation i_ANNOT (infixr ":::\<^sub>i" 10)

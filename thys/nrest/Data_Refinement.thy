@@ -19,6 +19,22 @@ lemma
   conc_fun_RES: "\<Down>R (REST X) = REST (\<lambda>c. Sup {X a| a. (c,a)\<in>R})"
   unfolding conc_fun_def by (auto split: nrest.split)
 
+  
+(* m \<le> \<Down>R m' *)  
+lemma 
+  "(SPECT m \<le> \<Down>R (SPECT m')) \<longleftrightarrow>
+  (\<forall>x c. m x = Some c \<longrightarrow> (\<exists>x' c'. (x,x')\<in>R \<and> c'\<ge>c \<and> m' x' =Some c'))"
+  apply (auto simp: conc_fun_RES)  
+  oops
+  
+lemma 
+  "(\<Up>R (SPECT m) \<le> (SPECT m')) \<longleftrightarrow>
+  (\<forall>x c. m x = Some c \<longrightarrow> (\<exists>x' c'. (x,x')\<in>R \<and> c'\<ge>c \<and> m' x' =Some c'))"
+  apply (auto simp: abs_fun_def)  
+  oops
+  
+  
+  
 (* 
 lemma conc_fun_RES_sv: "single_valued R \<Longrightarrow> 
   \<Down>R (REST X) = REST (\<lambda>c. if c\<in>Dom R then Some (X Sup {X a| a. (c,a)\<in>R})"
@@ -581,7 +597,7 @@ lemma conc_fun_br: "\<Down> (br \<alpha> I1) (SPECT (emb I2 t))
       by (auto simp: emb'_def br_def bot_option_def Sup_option_def) 
 
 
-lemma project_acost_conc_fun_commute: "project_acost b (\<Down>R m) = \<Down>R (project_acost b m)"
+lemma project_acost_conc_fun_commute[refine_pw_simps]: "project_acost b (\<Down>R m) = \<Down>R (project_acost b m)"
   unfolding project_acost_def conc_fun_def
   apply(cases m)
   subgoal by simp
@@ -593,4 +609,6 @@ lemma project_acost_conc_fun_commute: "project_acost b (\<Down>R m) = \<Down>R (
     by auto
   done
 
+  
+  
 end
