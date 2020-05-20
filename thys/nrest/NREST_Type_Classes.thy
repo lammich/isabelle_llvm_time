@@ -91,8 +91,8 @@ instance enat :: drm
 
 
 
-class needname_zero = needname + nonneg + drm + ordered_comm_monoid_add +
-  assumes needname_minus_absorb: "x - 0 = x"
+class needname_zero = needname + nonneg + drm + ordered_comm_monoid_add + mult_zero +
+  assumes needname_minus_absorb: "x - 0 = x"                                 
    and needname_plus_absorb: "0 + x = x"
 
 instance enat :: needname_zero 
@@ -102,6 +102,8 @@ lemma ll: "(case acostC x of acostC b \<Rightarrow> f b) = f x" by auto
 
 instantiation acost :: (type, needname_zero) needname_zero
 begin
+  definition "a*b = acostC (\<lambda>x. the_acost a x * the_acost b x)"
+
 instance
   apply standard
   subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def plus_left_mono )  subgoal for a b c apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def diff_right_mono )
@@ -113,6 +115,8 @@ instance
     apply (rule Inf_mono) apply auto
     by (metis acost.case_eq_if acost.sel order_mono_setup.refl)
   subgoal for x apply(cases x) by (auto simp: less_eq_acost_def zero_acost_def needname_nonneg)
+  subgoal for x apply(cases x) by (auto simp: less_eq_acost_def times_acost_def zero_acost_def)
+  subgoal for x apply(cases x) by (auto simp: less_eq_acost_def times_acost_def zero_acost_def)
   subgoal for x apply(cases x) by (auto simp: zero_acost_def needname_minus_absorb)
   subgoal for x apply(cases x) by (auto simp: zero_acost_def needname_plus_absorb)
   done
