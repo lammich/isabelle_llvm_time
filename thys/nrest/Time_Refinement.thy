@@ -35,6 +35,15 @@ definition wfR :: "('b \<Rightarrow> ('c, _::mult_zero) acost) \<Rightarrow> boo
   "wfR R = (finite {(s,f). the_acost (R s) f \<noteq> 0})"
 
 
+definition wfR2 :: "(('c, _::mult_zero) acost) \<Rightarrow> bool" where
+  "wfR2 R = (finite {f. the_acost R f \<noteq> 0})"
+
+
+lemma wfR2_enum:
+  fixes R :: "(('c::enum, _) acost)"
+  shows "wfR2 R"
+  unfolding wfR2_def by simp
+
 lemma wfR_fst: "\<And>y. wfR R \<Longrightarrow> finite {x. the_acost (R x) y \<noteq> 0}"
   unfolding wfR_def apply(rule finite_subset[where B="fst ` {(s, f). the_acost (R s) f \<noteq> 0}"])
   subgoal by auto
@@ -106,6 +115,8 @@ proof -
       apply(rule finite_Int)   using assms wfR_def by auto
     done    
 qed
+
+
 
 lemma wfR_finite_Sum_any: 
   assumes *: "wfR R"
