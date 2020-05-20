@@ -1,5 +1,5 @@
 theory NREST_Main                                                  
-imports NREST NREST_Type_Classes NREST_Backwards_Reasoning Time_Refinement
+imports NREST NREST_Type_Classes NREST_Backwards_Reasoning Time_Refinement Data_Refinement
 begin
 
 
