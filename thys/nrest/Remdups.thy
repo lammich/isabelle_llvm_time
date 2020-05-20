@@ -130,7 +130,7 @@ lemma rd_impl1_correct: "rd_impl1 as \<le> remdups_spec_abs as"
       mop_set_member_def mop_set_insert_def mop_push_list_def
       rd_ta_abs_def rd_inv_def
   apply(rule gwp_specifies_I)
-  apply (vcg' \<open>simp\<close> )  
+  apply (refine_vcg \<open>simp\<close> )  
   subgoal
     by(rule wfR2_enum) 
     unfolding Some_le_emb'_conv  

@@ -634,15 +634,15 @@ ML \<open>
 
 subsubsection \<open>VCG\<close>
 
-method_setup vcg_split_case = \<open>Scan.succeed (fn ctxt => SIMPLE_METHOD' (CHANGED o (VCG_Case_Splitter.split_tac ctxt)))\<close>
+method_setup refine_vcg_split_case = \<open>Scan.succeed (fn ctxt => SIMPLE_METHOD' (CHANGED o (VCG_Case_Splitter.split_tac ctxt)))\<close>
 
 
 named_theorems vcg_rules' 
-method vcg'_step methods solver uses rules =
-    (intro rules vcg_rules' | vcg_split_case 
+method refine_vcg_step methods solver uses rules =
+    (intro rules vcg_rules' | refine_vcg_split_case 
         | (progress simp;fail)  | (solver; fail))
 
-method vcg' methods solver uses rules = repeat_all_new \<open>vcg'_step solver rules: rules\<close>
+method refine_vcg methods solver uses rules = repeat_all_new \<open>refine_vcg_step solver rules: rules\<close>
 
 
 subsection "rules for gwp"
@@ -832,8 +832,8 @@ next
   show ?case 
     apply clarsimp
     apply safe 
-    subgoal apply (vcg' \<open>-\<close> rules: IH IS[THEN gwp_conseq]) by (auto split: if_splits)
-    subgoal apply (vcg' \<open>-\<close>) by (auto split: if_splits)
+    subgoal apply (refine_vcg \<open>-\<close> rules: IH IS[THEN gwp_conseq]) by (auto split: if_splits)
+    subgoal apply (refine_vcg \<open>-\<close>) by (auto split: if_splits)
     done
 
 qed
