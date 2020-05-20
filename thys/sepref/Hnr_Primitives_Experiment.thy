@@ -460,6 +460,32 @@ proof -
     done
 qed
 
+(* Without single-valued! Re-doing the proof on the low-level. *)  
+lemma hnr_array_nth': 
+  assumes PURE: "is_pure A"
+  shows "hn_refine 
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (array_nth xsi ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    A
+    (mop_array_nth xs i)" 
+proof -
+  have AR: "A = pure (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+  note [is_pure_rule] = PURE  
+    
+  show ?thesis  
+    unfolding pure_array_assn_alt[OF PURE]
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> AR)
+    unfolding hn_ctxt_def pure_def mop_array_nth_def hr_comp_def
+    supply [simp] = list_rel_imp_same_length
+    apply vcg'
+    apply parametricity
+    by simp
+
+qed
+
 
 (* TODO: Use FCOMP and parametricity lemma for mop_list_nth! *)  
 lemma hnr_array_upd: 
