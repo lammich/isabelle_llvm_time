@@ -56,22 +56,75 @@ begin
     by (auto simp: sep_algebra_simps pred_lift_extract_simps)
 
 
+lemma conc_fun_spec_ne_FAIL[simp]: "\<Down>R (SPECT M) \<noteq> FAILT" by (simp add: conc_fun_RES)   
+    
+(*lemma project_acost_conc_fun[refine_pw_simps]: "project_acost b (\<Down>R m) = \<Down>R (project_acost b m)" sorry*)
+  
 
 
+lemma aux:
+  fixes M :: "_ \<rightharpoonup> ecost"
+  assumes "single_valued RR"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  shows "\<forall>r\<in>dom M. \<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms
+  (* with single_valued RR *)
+  apply (auto simp: conc_fun_RES)
+  by (smt Sup_Some cSup_eq_maximum dual_order.refl le_fun_def le_some_optE mem_Collect_eq sv_the)
+  
+lemma aux':
+  fixes M :: "_ \<rightharpoonup> ecost"
+  assumes "single_valued RR"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  assumes "Some cr \<le> M r"
+  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms aux[of RR M M']
+  by fastforce
+  
+  
+lemma hn_refine_result:
+  assumes R: "hn_refine P c Q R m"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes SV: "single_valued RR"
+  shows "hn_refine P c Q (hr_comp R RR) m'"
+  unfolding hn_refine_def
+  apply clarify
+  using LE apply (cases m; simp)
+  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
+  apply (elim exE conjE)
+  apply (drule (1) aux'[OF SV])
+  apply (elim exE conjE)
+  
+  apply (intro exI conjI)
+  apply (rule order_trans, assumption+)  
 
+  apply (erule wp_post_cons)
+  unfolding hr_comp_def
+  apply (rule ENTAILSD)
+  apply fri
+  done
+    
+lemma hn_refine_cons_res_complete:
+  assumes R: "hn_refine P' c Q R m"
+  assumes I: "P\<turnstile>P'"
+  assumes I': "Q\<turnstile>Q'"
+  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes SV: "single_valued RR"
+  shows "hn_refine P c Q' (hr_comp R RR) m'"
+  apply (rule hn_refine_result)
+  apply (rule hn_refine_cons)
+  by (fact|simp)+
 
-
-
-
-
-
-
-
-
-
-
-
-
+  
+  
+  
+  
+  
+  
+  
+  
+    
 
   abbreviation "raw_array_assn \<equiv> \<upharpoonleft>LLVM_DS_NArray.narray_assn"
 
@@ -138,10 +191,10 @@ abbreviation "cost'_narray_new n \<equiv> cost ''malloc'' n + cost ''free'' 1 + 
 
 definition "mop_array_nth xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
 definition "mop_array_upd xs i x \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs[i:=x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
-definition "mop_array_new n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n (init))) (lift_acost (cost'_narray_new n)) }"
+definition "mop_array_new n x \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n x)) (lift_acost (cost'_narray_new n)) }"
 
 
-lemma "hn_refine 
+lemma hnr_raw_array_nth: "hn_refine 
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   (array_nth xsi ii)
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
@@ -150,7 +203,7 @@ lemma "hn_refine
   unfolding hn_ctxt_def pure_def mop_array_nth_def
   by vcg
 
-lemma "hn_refine 
+lemma hnr_raw_array_upd: "hn_refine 
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt id_assn x xi)
   (array_upd xsi ii xi)
   (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt id_assn x xi)
@@ -161,16 +214,16 @@ lemma "hn_refine
   
   
 
-lemma "hn_refine 
+lemma hnr_raw_array_new: "hn_refine 
   (hn_ctxt snat_assn i ii)
   (narray_new TYPE('a::llvm_rep) ii)
   (hn_ctxt snat_assn i ii)
   raw_array_assn
-  (mop_array_new i)" 
+  (mop_array_new i init)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
   by vcg
   
-lemma "MK_FREE raw_array_assn narray_free"  
+lemma FREE_raw_array_assn: "MK_FREE raw_array_assn narray_free"  
   apply rule
   by vcg
 
@@ -199,7 +252,7 @@ definition "eoarray_nth_impl xsi ii \<equiv> doM {
   return (r,xsi)
 }"  
   
-lemma "hn_refine 
+lemma hnr_eoarray_nth: "hn_refine 
   (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
   (eoarray_nth_impl xsi ii)
   (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
@@ -208,7 +261,7 @@ lemma "hn_refine
   unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_nth_def eoarray_nth_impl_def
   by vcg
   
-lemma "hn_refine 
+lemma hnr_eoarray_upd: "hn_refine 
   (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
   (array_upd xsi ii xi)
   (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_invalid A x xi)
@@ -217,7 +270,7 @@ lemma "hn_refine
   unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_upd_def
   by vcg
   
-lemma "hn_refine 
+lemma hnr_eoarray_new: "hn_refine 
   (hn_ctxt snat_assn i ii)
   (narrayo_new TYPE('a::llvm_rep) ii)
   (hn_ctxt snat_assn i ii)
@@ -228,7 +281,7 @@ lemma "hn_refine
     
 definition "mop_oarray_free xs \<equiv> do { ASSERT (set xs \<subseteq> {None}); consume (RETURNT ()) (lift_acost 0) }"
   
-lemma "hn_refine 
+lemma hnr_eoarray_free: "hn_refine 
   (hn_ctxt (eoarray_assn A) xs xsi)
   (narray_free xsi)
   (hn_invalid (eoarray_assn A) xs xsi)
@@ -267,8 +320,6 @@ lemma in_br_list_rel_conv: "(xs,ys) \<in> \<langle>br \<alpha> I\<rangle>list_re
   subgoal by (auto simp: map_in_list_rel_conv)
   done
   
-find_theorems "list_rel" "map"  
-  
 lemma in_some_rel_list_rel_conv: "(x,xi) \<in>\<langle>some_rel\<rangle>list_rel \<longleftrightarrow> x = map Some xi"
   unfolding some_rel_def
   by (auto simp: in_br_list_rel_conv map_idI split: option.splits)
@@ -276,7 +327,7 @@ lemma in_some_rel_list_rel_conv: "(x,xi) \<in>\<langle>some_rel\<rangle>list_rel
   
 (* Conversion between implicit and explicit ownership array *)
   
-lemma "hn_refine 
+lemma hnr_to_wo_conv: "hn_refine 
   (hn_ctxt (eoarray_assn A) xs xsi)
   (return xsi)
   (hn_invalid (eoarray_assn A) xs xsi)
@@ -284,11 +335,11 @@ lemma "hn_refine
   (mop_to_wo_conv xs)"
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_to_wo_conv_def
     array_assn_def hr_comp_def
-  apply vcg'
+  apply Basic_VCG.vcg'
   apply (simp add: map_the_some_rel_list_rel_iff)
   done
 
-lemma "hn_refine 
+lemma hnr_to_eo_conv: "hn_refine 
   (hn_ctxt (array_assn A) xs xsi)
   (return xsi)
   (hn_invalid (array_assn A) xs xsi)
@@ -299,30 +350,16 @@ lemma "hn_refine
   supply [simp] = in_some_rel_list_rel_conv
   by vcg
   
-  
-find_theorems list_assn   
-  
 (* Array operations for pure content, backed by eoarray *)  
-
-find_theorems sep_is_pure_assn is_pure
-
-find_theorems sep_is_pure_assn pure_part
-
-find_theorems  the_pure
-
 
 lemma the_pure_pure_part_conv: "is_pure A \<Longrightarrow> the_pure A = {(c,a). pure_part (A a c)}"
   apply safe
   subgoal by (metis Sepref_Basic.pure_part_pure pure_the_pure)
   subgoal by (metis Sepref_Basic.pure_part_pure pure_the_pure)
   done
-  
-
-
 
 lemma is_pure_assn_pred_lift: "is_pure A \<Longrightarrow> A a c = \<up>((c,a)\<in>the_pure A)"
   by (metis Sepref_Basic.pure_def pure_the_pure)
-
 
 lemma pure_list_assn_list_rel_conv: "is_pure A \<Longrightarrow> \<upharpoonleft>(list_assn (mk_assn A)) xs xsi = \<up>((xsi,xs)\<in>\<langle>the_pure A\<rangle>list_rel)"
 proof (induction xs arbitrary: xsi)
@@ -335,8 +372,6 @@ next
     by (auto simp add: sep_algebra_simps pred_lift_extract_simps fun_eq_iff is_pure_assn_pred_lift)
   
 qed
-
-term list_rel
 
 definition [to_relAPP]: "oelem_rel A \<equiv> {(c,a) . case a of None \<Rightarrow> True | Some b \<Rightarrow> (c,b)\<in>A}"
 
@@ -371,14 +406,156 @@ lemma pure_array_assn_alt:
   )
   done
 
-oops  
-xxx: now we can use FCOMP (once we have it), to compose the
-  standard list operations on raw_array_assn with the list parametricity thms,
-  getting exactly the relation prescribed by thm pure_array_assn_alt, for pure elements!
-  
-  
+(* TODO: Move *)  
+lemma hn_ctxt_hr_comp_extract: "hn_ctxt (hr_comp A R) a c = (EXS b. \<up>((b,a)\<in>R) ** hn_ctxt A b c)"  
+  unfolding hn_ctxt_def hr_comp_def
+  by (simp add: sep_algebra_simps)
+
+(* TODO: Move *)  
+lemma invalid_hr_comp_ctxt: "hn_invalid (hr_comp A R) a c = hn_ctxt (hr_comp (invalid_assn A) R) a c"  
+  unfolding invalid_assn_def hr_comp_def hn_ctxt_def
+  by (auto simp: sep_algebra_simps fun_eq_iff pred_lift_extract_simps pure_part_def)
     
+lemma hn_refine_extract_pre_ex: "hn_refine (EXS x. \<Gamma> x) c \<Gamma>' R a = (\<forall>x. hn_refine (\<Gamma> x) c \<Gamma>' R a)"  
+  unfolding hn_refine_def
+  by (auto simp: sep_algebra_simps STATE_extract; blast)
   
+lemma hn_refine_extract_pre_pure: "hn_refine (\<up>\<phi> ** \<Gamma>) c \<Gamma>' R a = (\<phi> \<longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a)"
+  unfolding hn_refine_def
+  by (auto simp: sep_algebra_simps STATE_extract)
+  
+(* TODO: Use FCOMP and parametricity lemma for this! Currently, it's FCOMP done manually! *)  
+lemma hnr_array_nth: 
+  assumes PURE: "is_pure A"
+  assumes SV: "single_valued (the_pure A)"
+  shows "hn_refine 
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (array_nth xsi ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    A
+    (mop_array_nth xs i)" 
+proof -
+  have AR: "A = hr_comp id_assn (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+    
+  show ?thesis  
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> AR)
+    apply (rewrite in \<open>hn_refine \<hole> _ _ _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite hn_ctxt_hr_comp_extract)
+    apply (clarsimp simp only: hn_refine_extract_pre_ex hn_refine_extract_pre_pure sep_algebra_simps sep_conj_assoc)
+    apply (rule hn_refine_cons_res_complete)
+    apply (rule hnr_raw_array_nth)
+    apply (rule)
+    apply (rewrite pure_array_assn_alt[OF PURE])
+    apply (rewrite hn_ctxt_hr_comp_extract)
+    apply (auto simp add: sep_algebra_simps pred_lift_extract_simps entails_def) []
+    apply (rule)
+    subgoal
+      unfolding mop_array_nth_def
+      apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+      apply parametricity
+      by simp
+    apply (rule SV)
+    done
+qed
+
+
+(* TODO: Use FCOMP and parametricity lemma for mop_list_nth! *)  
+lemma hnr_array_upd: 
+  assumes PURE: "is_pure A"
+  assumes SV: "single_valued (the_pure A)"
+  shows "hn_refine 
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+    (array_upd xsi ii xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
+    (array_assn A)
+    (mop_array_upd xs i x)" 
+proof -
+  have AR: "A = hr_comp id_assn (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+    
+  show ?thesis  
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_refine \<hole> _ _ _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_refine _ _ \<hole> _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_ctxt A\<close> in \<open>hn_refine \<hole> _ _ _ _\<close> AR)
+    apply (rewrite in \<open>hn_ctxt A\<close> in \<open>hn_refine _ _ \<hole> _ _\<close> AR)
+    
+    apply (simp only: hn_ctxt_hr_comp_extract invalid_hr_comp_ctxt)
+    apply (clarsimp simp: hn_refine_extract_pre_ex hn_refine_extract_pre_pure hn_ctxt_def pure_def sep_algebra_simps)
+    apply (rule hn_refine_cons_res_complete)
+    applyS (rule hnr_raw_array_upd[where x=xi and xi=xi])
+    
+    apply1 (clarsimp simp: hn_ctxt_def pure_def sep_algebra_simps entails_lift_extract_simps)
+    applyS rule
+    
+    apply1 (clarsimp simp: hn_ctxt_def pure_def sep_algebra_simps entails_lift_extract_simps)
+    apply1 (rule ENTAILSD) 
+    applyS fri
+    
+    applyS rule
+    
+    subgoal
+      unfolding mop_array_upd_def
+      apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+      apply parametricity
+      by simp
+    
+    applyS (simp add: list_rel_sv_iff SV)
+    done
+qed    
+    
+
+lemma hnr_array_new: 
+  assumes PURE: "is_pure A"
+  assumes SV: "single_valued (the_pure A)"
+  assumes INIT: "(init,x) \<in> the_pure A"
+  shows "hn_refine 
+    (hn_ctxt snat_assn i ii)
+    (narray_new TYPE('a::llvm_rep) ii)
+    (hn_ctxt snat_assn i ii)
+    (array_assn A)
+    (mop_array_new i x)" 
+proof -
+  have AR: "A = hr_comp id_assn (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+  show ?thesis  
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
+    apply (rule hn_refine_cons_res_complete)
+    applyS (rule hnr_raw_array_new)
+    applyS rule
+    applyS rule
+    applyS rule
+    subgoal     
+      unfolding mop_array_new_def
+      apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+      apply (parametricity add: INIT)
+      by simp
+    applyS (simp add: list_rel_sv_iff SV)
+    done
+qed
+
+(* TODO: Move *)
+lemma FREE_hrcompI:
+  assumes "MK_FREE (A) f"  
+  shows "MK_FREE (hr_comp A R) f"  
+  supply [vcg_rules] = MK_FREED[OF assms]
+  apply (rule)
+  unfolding hr_comp_def
+  by vcg
+
+
+lemma FREE_array_assn:
+  assumes PURE: "is_pure A"
+  shows "MK_FREE (array_assn A) narray_free"  
+  apply (rewrite pure_array_assn_alt[OF PURE])
+  apply (rule FREE_hrcompI)
+  apply (rule FREE_raw_array_assn)
+  done
+
   
   
 end
