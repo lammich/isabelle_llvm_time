@@ -1,10 +1,8 @@
 theory Data_Refinement
-imports NREST Time_Refinement
+imports NREST Time_Refinement 
 begin
 
 subsection \<open>Data Refinement\<close>
-
- 
 
 
 definition conc_fun  ("\<Down>") where
@@ -463,6 +461,108 @@ shows "\<Up> R (bindT m f) \<le> bindT m' f'"
 
 
 
+lemma aaah: "inresT (project_acost bc (timerefine E m')) x t
+    \<longleftrightarrow> (nofailT m' \<longrightarrow> (\<exists>v. (\<forall>ba. inresT (project_acost ba m') x (v ba))
+                           \<and> Sum_any (\<lambda>ba. enat (v ba) * the_acost (E ba) bc) \<ge> enat t))"
+  unfolding inresT_def project_acost_def timerefine_def
+  apply(cases m') apply simp
+  apply simp
+  unfolding le_fun_def apply (auto split: option.splits)
+  oops
+
+thm refine_pw_simps
+
+lemma inresT_project_acost_timerefine: "inresT (project_acost b (timerefine E m')) x' t 
+       \<Longrightarrow> \<exists>t b. inresT (project_acost b m') x' t"
+  unfolding inresT_def project_acost_def timerefine_def
+  apply(cases m'; auto simp: le_fun_def split: if_splits option.splits)
+  by (metis zero_enat_def zero_le)  
+
+lemma bindT_refine_abs_time:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR E" "\<Up> R' m \<le> timerefine E m'"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R';  \<exists>t b. inresT (project_acost b m) x t;  \<exists>t b. inresT (project_acost b m') x' t;
+    nofailT m; nofailT m'\<rbrakk> \<Longrightarrow> \<Up> R (f x) \<le> timerefine E (f' x') )"
+shows "\<Up> R (bindT m f) \<le> timerefine E (bindT m' f')"
+  using assms
+proof -
+  term "(timerefine E m')"
+  term timerefine
+  have "\<Up>R (bindT m (\<lambda>x.  (f x))) \<le> bindT (timerefine E m') (\<lambda>x. timerefine E (f' x))"
+    apply(rule bindT_refine_abs) apply(rule assms(2)) 
+    apply(rule assms(3))  
+    by (auto simp: refine_pw_simps dest: inresT_project_acost_timerefine) 
+  also have "\<dots> \<le> timerefine E (bindT m' f')"
+    apply(rule timerefine_bindT_ge) by(fact assms(1))
+  finally show ?thesis .
+qed
+
+
+lemma timerefine_mono: 
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR R'"
+  shows "R\<le>R' \<Longrightarrow> timerefine R c \<le> timerefine R' c"
+  unfolding timerefine_def apply(cases c)
+   apply (auto intro!: le_funI simp: less_eq_acost_def split: option.splits)
+  apply(rule Sum_any_mono)
+   apply(rule mult_left_mono) apply(auto simp: le_fun_def)
+  subgoal premises prems for x2 x x2a xa xb 
+    using prems(1)[rule_format, of xb] apply(cases "R xb"; cases "R' xb") apply auto 
+    unfolding less_eq_acost_def by auto
+  subgoal for x2 x x2a xa using assms(1) unfolding wfR_def
+    apply -
+    apply(rule finite_subset[where B="{x. the_acost (R' x) xa \<noteq> 0}"]) apply auto
+    apply(rule wfR_fst) apply (rule assms) done
+  done
+
+thm sup_fun_def
+
+
+lemma bindT_refine_abs_time_rule:
+  fixes E :: "_ \<Rightarrow> (_, enat) acost"
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR E1" "wfR E2" "\<Up> R' m \<le> timerefine E1 m'"
+    "(\<And>x x'. \<lbrakk>(x,x')\<in>R';  \<exists>t b. inresT (project_acost b m) x t;  \<exists>t b. inresT (project_acost b m') x' t;
+    nofailT m; nofailT m'\<rbrakk> \<Longrightarrow> \<Up> R (f x) \<le> timerefine E2 (f' x') )"
+  assumes "E = sup E1 E2"
+  shows "\<Up> R (bindT m f) \<le> timerefine E (bindT m' f')"
+proof -
+  from assms(5) have "E1 \<le> E" "E2 \<le> E" 
+    unfolding le_fun_def
+    by (auto simp add: le_funD)
+
+  have "wfR E"
+    unfolding assms(5)
+    apply(rule wfR_sup)
+    apply(rule assms(1))
+    apply(rule assms(2))
+    done
+  
+  note assms(3)
+  also have "timerefine E1 m' \<le> timerefine E m'" 
+    apply(rule timerefine_mono) by fact+
+  finally have m: "\<Up> R' m \<le> timerefine E m'" .
+
+  { fix x x'
+    assume "(x, x') \<in> R'" " \<exists>t b. inresT (project_acost b m) x t"
+          "\<exists>t b. inresT (project_acost b m') x' t"
+           "nofailT m" "nofailT m'"
+    note assms(4)[OF this]
+    also have "timerefine E2 (f' x') \<le> timerefine E (f' x')"
+      apply(rule timerefine_mono) by fact+
+    finally have "\<Up> R (f x) \<le> timerefine E (f' x')" .
+  } note f = this
+  
+  show ?thesis
+    apply(rule bindT_refine_abs_time)
+      apply fact
+    apply(rule m)
+    apply(rule f) apply simp+ done
+qed
+
+
 (* TODO: RECT *)
 
 lemma RECT_refine_abs:
@@ -471,6 +571,24 @@ lemma RECT_refine_abs:
   assumes RS: "\<And>f f' x x'. \<lbrakk> \<And>x x'. (x,x')\<in>R \<Longrightarrow> \<Up>S (f x) \<le> (f' x'); (x,x')\<in>R \<rbrakk> 
     \<Longrightarrow> \<Up>S (body f x) \<le> (body' f' x')"
   shows "\<Up>S (RECT (\<lambda>f x. body f x) x) \<le> (RECT (\<lambda>f' x'. body' f' x') x')"
+  unfolding RECT_flat_gfp_def
+  apply (clarsimp simp add: M) 
+  apply (rule flatf_fixp_transfer[where 
+        fp'="flatf_gfp body" 
+    and B'=body 
+    and P="\<lambda>x x'. (x',x)\<in>R", 
+    OF _ _ flatf_ord.fixp_unfold[OF M[THEN trimonoD_flatf_ge]] R0])
+  apply simp
+  apply (simp add: trimonoD_flatf_ge)
+  by (rule RS)
+
+
+lemma RECT_refine_abs_time:
+  assumes M: "mono2 body"
+  assumes R0: "(x,x')\<in>R"
+  assumes RS: "\<And>f f' x x'. \<lbrakk> \<And>x x'. (x,x')\<in>R \<Longrightarrow> \<Up>S (f x) \<le> timerefine E (f' x'); (x,x')\<in>R \<rbrakk> 
+    \<Longrightarrow> \<Up>S (body f x) \<le> timerefine E (body' f' x')"
+  shows "\<Up>S (RECT (\<lambda>f x. body f x) x) \<le> timerefine E (RECT (\<lambda>f' x'. body' f' x') x')"
   unfolding RECT_flat_gfp_def
   apply (clarsimp simp add: M) 
   apply (rule flatf_fixp_transfer[where 
@@ -495,7 +613,28 @@ lemma WHILET_refine_abs:
     subgoal by(refine_mono)  
      apply (fact R0)
     by(auto simp: COND_REF STEP_REF SV  intro: RETURNT_SV_refine bindT_refine_abs[where R'=R])
-  
+
+lemma timerefine_RETURNT[simp]: "timerefine E (RETURNT sa) = RETURNT sa" 
+  unfolding timerefine_def RETURNT_def by(auto split: if_splits simp: zero_acost_def )
+
+lemma WHILET_refine_abs_time:
+  fixes f :: "_ \<Rightarrow> (_,(_,enat)acost) nrest"
+  assumes R0: "(x,x')\<in>R"
+  assumes SV: "single_valued R"
+  assumes wf: "wfR E"
+  assumes COND_REF: "\<And>x x'. \<lbrakk> (x,x')\<in>R \<rbrakk> \<Longrightarrow> b x = b' x'"
+  assumes STEP_REF: 
+    "\<And>x x'. \<lbrakk> (x,x')\<in>R; b x; b' x' \<rbrakk> \<Longrightarrow> \<Up>R (f x) \<le> timerefine E (f' x')"
+  shows "\<Up>R (whileT b f x) \<le> timerefine E (whileT b' f' x')"
+  unfolding whileT_def apply(rule RECT_refine_abs_time)
+    subgoal by(refine_mono)  
+     apply (fact R0)
+    apply (auto simp: COND_REF  SV  intro: RETURNT_SV_refine )
+    apply(rule order.trans)
+     apply(rule bindT_refine_abs[where R'=R])
+      apply(rule STEP_REF) apply simp apply (simp add: COND_REF) apply simp
+     apply assumption apply(rule timerefine_bindT_ge) apply (rule wf) done
+
 
 
 (* 
@@ -509,6 +648,67 @@ lemma nrest_Rel_mono:
   unfolding conc_fun_def
   apply (auto split: nrest.split simp: le_fun_def)  
   by (smt complete_lattice_class.Sup_mono mem_Collect_eq)   
+
+
+term "project_acost b (timerefine R' m)"
+
+lemma "project_acost b (timerefine R' m) = g"
+  oops
+
+lemma pff: 
+  fixes m ::  "('f, ('b, enat) acost) nrest"
+  shows "(\<forall>b. inresT (project_acost b (timerefine R' m)) x t)
+    \<Longrightarrow> ((\<forall>b. ( \<exists>t.  inresT (project_acost b m) x t) ))"  
+  unfolding inresT_def project_acost_def timerefine_def
+  apply (auto split: nrest.splits option.splits simp: le_fun_def)
+   apply force
+  subgoal by (metis enat_ile le_cases)
+  done
+lemma pff2: 
+  fixes m ::  "('f, ('b, enat) acost) nrest"
+  shows "inresT (project_acost b (timerefine R' m)) x t
+    \<Longrightarrow> ((\<forall>b. ( \<exists>t.  inresT (project_acost b m) x t) ))"  
+  unfolding inresT_def project_acost_def timerefine_def
+  apply (auto split: nrest.splits option.splits simp: le_fun_def)
+   apply force
+  subgoal by (metis enat_ile le_cases)
+  done
+
+
+lemma datarefine_abs_timerefine_commute1':
+  fixes m ::  "('f, ('b, enat) acost) nrest"
+  assumes "wfR R'"
+  shows "\<Up> R (timerefine R' m) \<le> timerefine R' (\<Up> R m)"
+  apply(auto simp: pw_acost_le_iff refine_pw_simps)
+  subgoal apply(frule pff2) by blast
+  subgoal apply(frule pff2) by blast
+  subgoal apply(frule pff2)  
+  oops
+
+lemma datarefine_abs_timerefine_commute1:
+  fixes m ::  "('f, ('b, enat) acost) nrest"
+  assumes "wfR R'"
+  shows "\<Up> R (timerefine R' m) \<le> timerefine R' (\<Up> R m)"
+  unfolding abs_fun_def timerefine_def
+  apply(cases m)
+   apply auto
+  subgoal
+    by(auto split: option.splits) 
+  subgoal
+    apply(rule le_funI)
+    apply(rule Sup_least)
+    apply (auto split: option.splits)
+    subgoal 
+      by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some_None mem_Collect_eq)
+    unfolding less_eq_acost_def apply simp apply safe
+    apply(rule Sum_any_mono)
+     apply(rule mult_right_mono)
+    subgoal
+      by (metis (mono_tags, lifting) Sup_upper less_eq_acost_def less_eq_option_Some mem_Collect_eq)
+     apply simp
+    apply(rule wfR_finite_mult_left )
+    using assms by simp
+  done
 
 
 
@@ -532,6 +732,67 @@ lemma datarefine_timerefine_commute1:
   using assms by simp
 
 
+
+lemma aaah:
+  fixes m :: "'a \<Rightarrow> ('b::complete_lattice) option"
+  assumes "Sup (f`(Option.these (m`X))) = f (Sup (Option.these (m`X)))" 
+  shows "Sup ((\<lambda>x. case_option None (\<lambda>cm. Some (f cm)) (m x))`X) =
+          case_option None (\<lambda>cm. Some (f cm)) (Sup (m`X))"
+proof (cases "\<exists>x y. x\<in>X \<and> m x = Some y")
+  case True
+  then have ah: "\<exists>y. Some y \<in> m ` X" by force 
+  from ah have *: "(m ` X = {} \<or> m ` X = {None}) \<longleftrightarrow> False" by blast
+  from True have "\<exists>y. Some (f y) \<in> (\<lambda>x. case m x of None \<Rightarrow> None | Some x \<Rightarrow> Some (f x)) ` X" by force
+  then have **: "((\<lambda>x. case m x of None \<Rightarrow> None | Some x \<Rightarrow> Some (f x)) ` X = {} \<or>
+        (\<lambda>x. case m x of None \<Rightarrow> None | Some x \<Rightarrow> Some (f x)) ` X = {None}) \<longleftrightarrow> False" by blast
+
+  have p: "Sup (f`(Option.these (m`X))) = Sup (Option.these ((\<lambda>x. case m x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (f cm)) ` X))"
+    apply(rule arg_cong[where f=Sup])
+    apply auto
+      subgoal unfolding Option.these_def apply auto  
+        by (metis (mono_tags, lifting) imageI mem_Collect_eq option.sel option.simps(5))  
+      subgoal unfolding Option.these_def by (force intro!: imageI split: option.splits) 
+      done
+  show ?thesis
+    unfolding Sup_option_def * ** apply simp
+    unfolding p[symmetric]
+    using assms by simp
+next
+  case False
+  then have *: "Sup (m`X) = None"
+    by (metis SUP_eq_const empty_Sup image_empty not_None_eq)
+  show ?thesis unfolding * apply simp using False
+    by (smt "*" SUP_bot_conv(2) Sup_empty empty_Sup option.simps(4))  
+qed 
+
+lemma finite_sum_finite:
+  fixes f :: "_ \<Rightarrow> enat"
+  assumes "\<And>x. x\<in>X \<longrightarrow> f x<\<infinity>"
+  shows "finite X \<Longrightarrow> sum f X < \<infinity>"
+  oops
+
+
+lemma continuous_Sum_any_mult_left:
+  fixes g :: "_ \<Rightarrow> enat"
+  assumes "finite {a. g a \<noteq> 0}"
+  shows "continuous (\<lambda>f. Sum_any (\<lambda>a. f a * g a))"
+  apply(rule continuousI) oops (* just does not hold, only \<ge> does *)
+  
+
+  
+lemma datarefine_abs_timerefine_commute2: 
+  assumes "wfR R'" and sv: "single_valued R"
+  shows "\<Up> R (timerefine R' m) \<ge> timerefine R' (\<Up> R m)" 
+    unfolding abs_fun_def timerefine_def
+    apply(cases m) apply (auto split: option.splits)
+     prefer 2 
+    subgoal
+      by (simp add: domI subset_iff)
+    subgoal for x2
+      apply(rule le_funI) apply (auto split: option.splits)
+      subgoal for a sup 
+        apply(rule Sup_upper) apply simp
+  oops (* Some other side condition is needed to make this thing true ! *)
 
 lemma datarefine_timerefine_commute2: 
   assumes "wfR R'" and sv: "single_valued R"
@@ -604,7 +865,7 @@ lemma pw_conc_inres[refine_pw_simps]:
     done
   done 
 
-lemma bindT_refine':
+lemma bindT_conc_refine':
   fixes R' :: "('a\<times>'b) set" and R::"('c\<times>'d) set"
   assumes R1: "M \<le> \<Down> R' M'"
   assumes R2: "\<And>x x' t . \<lbrakk> (x,x')\<in>R'; inresT M x t; inresT M' x' t;
@@ -938,7 +1199,7 @@ lemma bindT_refine:
   assumes R2: "\<And>x x'. \<lbrakk> (x,x')\<in>R' \<rbrakk> 
     \<Longrightarrow> f x \<le> \<Down> R (f' x')"
   shows "bindT M (\<lambda>x. f x) \<le> \<Down> R (bind M' (\<lambda>x'. f' x'))"
-  apply (rule bindT_refine') using assms by auto
+  apply (rule bindT_conc_refine') using assms by auto
 
 subsection \<open>WHILET refine\<close>
 
