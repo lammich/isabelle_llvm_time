@@ -798,6 +798,10 @@ definition project_acost :: " 'b \<Rightarrow> ('a,(_,_) acost) nrest \<Rightarr
 lemma nofailT_project_acost[refine_pw_simps]: "nofailT (project_acost b S) = nofailT S"
   by(auto simp add: nofailT_def project_acost_def split: nrest.splits)
 
+
+lemma nofailT_project_all: "nofailT S \<longleftrightarrow> (\<forall>b. nofailT (project_acost b S))"
+  by(auto simp add: nofailT_def project_acost_def split: nrest.splits)
+
 lemma project_acost_SPECT': "project_acost b (SPECT M) = SPECT (\<lambda>x. case_option None (\<lambda>m. Some (the_acost m b)) (M x))"
   unfolding project_acost_def by auto
 

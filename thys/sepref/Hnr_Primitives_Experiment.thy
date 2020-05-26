@@ -59,9 +59,34 @@ begin
 lemma conc_fun_spec_ne_FAIL[simp]: "\<Down>R (SPECT M) \<noteq> FAILT" by (simp add: conc_fun_RES)   
     
 (*lemma project_acost_conc_fun[refine_pw_simps]: "project_acost b (\<Down>R m) = \<Down>R (project_acost b m)" sorry*)
+
+
+lemma aux_abs_help:
+  fixes M :: "_ \<rightharpoonup> ecost" 
+  assumes "\<Up> RR (SPECT M) \<le>  (SPECT M')"
+  shows "\<forall>r\<in>dom M. (\<exists>r'. (r,r')\<in>RR) \<and> (\<forall>r'. (r,r')\<in>RR \<longrightarrow> M r \<le> M' r')"
+  using assms
+  (* with single_valued RR *)
+  apply (auto simp: abs_fun_RES split: if_splits simp: le_fun_def) 
+  subgoal premises prems for r y r'
+    using prems(2)[rule_format, of r'] prems(3,4)  
+    by (metis (mono_tags, lifting) Sup_le_iff mem_Collect_eq)  
+  done
+
+lemma aux_abs:
+  fixes M :: "_ \<rightharpoonup> ecost" 
+  assumes "\<Up> RR (SPECT M) \<le>  (SPECT M')"
+  shows "\<forall>r\<in>dom M. \<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using aux_abs_help[OF assms] by blast
+
+lemma aux_abs':
+  fixes M :: "_ \<rightharpoonup> ecost" 
+  assumes "\<Up> RR (SPECT M) \<le> (SPECT M')"
+  assumes "Some cr \<le> M r"
+  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms aux_abs[of RR M M']
+  by fastforce
   
-
-
 lemma aux:
   fixes M :: "_ \<rightharpoonup> ecost"
   assumes "single_valued RR"
@@ -81,7 +106,27 @@ lemma aux':
   using assms aux[of RR M M']
   by fastforce
   
+  lemma hn_refine_result':
+  assumes R: "hn_refine P c Q R m"
+  assumes LE: "\<Up>RR m\<le>m'" 
+  shows "hn_refine P c Q (hr_comp R RR) m'"
+  unfolding hn_refine_def
+  apply clarify
+  using LE apply (cases m; simp)
+  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
+  apply (elim exE conjE)
+  apply (drule (1) aux_abs')
+  apply (elim exE conjE)
   
+  apply (intro exI conjI)
+  apply (rule order_trans, assumption+)  
+
+  apply (erule wp_post_cons)
+  unfolding hr_comp_def
+  apply (rule ENTAILSD)
+  apply fri
+  done
+
 lemma hn_refine_result:
   assumes R: "hn_refine P c Q R m"
   assumes LE: "m\<le>\<Down>RR m'"
