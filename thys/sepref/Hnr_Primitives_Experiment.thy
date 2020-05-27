@@ -582,7 +582,14 @@ lemma FREE_array_assn:
   apply (rule FREE_raw_array_assn)
   done
 
+
   
+  
+lemma "(xs,xsi)\<in>\<langle>A\<rangle>list_rel \<Longrightarrow> i<length xs \<Longrightarrow> mop_array_nth xs i \<le>\<Down>A (mop_array_nth xsi i)"  
+  apply (auto simp: mop_array_nth_def pw_acost_le_iff refine_pw_simps)
+  apply parametricity by simp
+  
+    
   
 end
 
