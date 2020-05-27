@@ -579,8 +579,7 @@ lemma mk_free_invalid: "MK_FREE (invalid_assn R) (\<lambda>_. return ())"
   apply rule unfolding invalid_assn_def
   by vcg
 
-(*  
-  
+
 lemma mk_free_pair: 
   assumes "MK_FREE R\<^sub>1 f\<^sub>1" 
   assumes "MK_FREE R\<^sub>2 f\<^sub>2"  
@@ -588,49 +587,122 @@ lemma mk_free_pair:
   supply [vcg_rules] = assms[THEN MK_FREED]
   apply (rule)
   by vcg
-  
-  
+
+lemma acost_plus_assoc: "a + (b + c) = (a + b) + (c::(char list, enat) acost)"
+  apply(cases a; cases b; cases c) by auto
+
+lemma "le_cost_ecost c (cr + Ca) \<Longrightarrow> le_cost_ecost c (cr + (Ca + Ca'))"
+  apply(simp add: acost_plus_assoc) apply(rule cost_ecost_add_increasing2) .
 
   
 lemma hnr_bind:
   assumes D1: "hn_refine \<Gamma> m' \<Gamma>1 Rh m"
   assumes D2: 
-    "\<And>x x'. RETURN x \<le> m \<Longrightarrow> hn_refine (hn_ctxt Rh x x' ** \<Gamma>1) (f' x') (\<Gamma>2 x x') R (f x)"
+    "\<And>x x'. RETURNT x \<le> m \<Longrightarrow> hn_refine (hn_ctxt Rh x x' ** \<Gamma>1) (f' x') (\<Gamma>2 x x') R (f x)"
   assumes IMP: "\<And>x x'. \<Gamma>2 x x' \<turnstile> hn_ctxt Rx x x' ** \<Gamma>'"
   assumes MKF: "MK_FREE Rx fr"
   shows "hn_refine \<Gamma> (doM {x\<leftarrow>m'; r \<leftarrow> f' x; fr x; return r}) \<Gamma>' R (m\<bind>f)"
   apply rule
   supply [vcg_rules] = D1[THEN hn_refineD]
-  supply [simp] = pw_bind_nofail
-  apply vcg
+  supply [simp] = pw_bindT_nofailT
 proof goal_cases
-  case C: (1 F r s x)
-  hence "nofail (f x)" by (simp add: refine_pw_simps pw_le_iff)
+  case C: (1 F s cr M)
+  hence "nofailT (m \<bind> f)" by auto
+  hence nfm: "nofailT m" and nff: "\<And>x t b. inresT (project_acost b m) x t \<Longrightarrow> nofailT (f x)"
+    by (auto simp: g_pw_bindT_nofailT)
+
+  from nfm obtain Mm where M: "m = SPECT Mm" by fastforce
+
+  from D1[THEN hn_refineD, OF M C(2)] obtain ra Ca where Mra: "Some Ca \<le> Mm ra"
+    and wp1: "wp m' (\<lambda>r s. (\<Gamma>1 \<and>* Rh ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)"
+    by blast
+  term "(run m' s)"
+  from wp1[unfolded wp_def mwp_def] obtain s' r c
+    where mH: "(\<Gamma>1 \<and>* Rh ra r \<and>* F \<and>* GC) (ll_\<alpha> (s', minus_ecost_cost (cr + Ca) c))"
+      and mle: "le_cost_ecost c (cr + Ca)"
+      and r1: "run m' s = SUCC r c s'"
+    by (auto split: mres.splits)
+
+  from M Mra have ram: "RETURNT ra \<le> m" apply(auto simp: le_fun_def RETURNT_def)
+    by (simp add: dual_order.trans needname_nonneg)
+  have noff: "nofailT (f ra)" apply(rule nff[where t=0]) using Mra M unfolding inresT_def
+    by (metis RETURNT_alt \<open>RETURNT ra \<le> m\<close> project_acost_RETURNT pw_acost_le_project zero_enat_def)
+  then obtain fM where fMra: "f ra = SPECT fM" by fastforce
+
+  from mH have mH': "((Rh ra r \<and>* \<Gamma>1) \<and>* F \<and>* GC) (ll_\<alpha> (s', minus_ecost_cost (cr + Ca) c))"
+    by (simp add: sep_conj_c)
+
+  from D2[OF ram, THEN hn_refineD, OF fMra, of r, unfolded hn_ctxt_def, OF mH'] obtain ra' Ca'
+    where fMra': "Some Ca' \<le> fM ra'"
+      and wp2: "wp (f' r) (\<lambda>rb s. (\<Gamma>2 ra r \<and>* R ra' rb \<and>* (F \<and>* GC) \<and>* GC) (ll_\<alpha> s))
+                      (s', minus_ecost_cost (cr + Ca) c + Ca')"
+    by blast
+
+  from wp2[unfolded wp_def mwp_def] obtain s'' r' c'
+    where mH2: "(\<Gamma>2 ra r \<and>* R ra' r' \<and>* F \<and>* GC) (ll_\<alpha> (s'', minus_ecost_cost (minus_ecost_cost (cr + Ca) c + Ca') c'))"
+      and mle2: "le_cost_ecost c' (minus_ecost_cost (cr + Ca) c + Ca')"
+      and r2: "run (f' r) s' = SUCC r' c' s''"
+    by (auto split: mres.splits)
+
+  from mH2 IMP have mH2': "(Rx ra r \<and>* (\<Gamma>' \<and>* R ra' r' \<and>* F \<and>* GC))
+                            (ll_\<alpha> (s'', minus_ecost_cost (minus_ecost_cost (cr + Ca) c + Ca') c'))"
+    by (smt entails_def hn_ctxt_def sep.mult_assoc sep_conj_impl1)
+
+  note wp3 = MKF[unfolded MK_FREE_def  htriple_def, rule_format, OF mH2']
+
+  from wp3[unfolded wp_def mwp_def] obtain s''' r'' c''
+    where mH3: "(GC \<and>* \<Gamma>' \<and>* R ra' r' \<and>* F \<and>* GC) (ll_\<alpha> (s''', minus_ecost_cost (minus_ecost_cost (minus_ecost_cost (cr + Ca) c + Ca') c') c''))"
+      and mle3: "le_cost_ecost c'' (minus_ecost_cost (minus_ecost_cost (cr + Ca) c + Ca') c')"
+      and r3: "run (fr r) s'' = SUCC r'' c'' s'''"
+    by (auto split: mres.splits)
+  from mH3 have  mH3': "(\<Gamma>' \<and>* R ra' r' \<and>* F \<and>* GC) (ll_\<alpha> (s''', minus_ecost_cost (minus_ecost_cost (minus_ecost_cost (cr + Ca) c + Ca') c') c''))"
+    by (metis (no_types, lifting) GC_move_left(3) sep_conj_left_commute)
   
-  note [vcg_rules] = D2[unfolded hn_ctxt_def, OF \<open>RETURN x \<le> m\<close>, THEN hn_refineD, OF \<open>nofail (f x)\<close>, of r]
-  
-  note [vcg_rules] = MKF[THEN MK_FREED]
-  
-  
-  have [fri_red_rules]: "is_sep_red (\<Gamma>') \<box> (\<Gamma>2 x x') (Rx x x')" for x x'
-    using IMP
-    apply (auto simp: is_sep_red_def hn_ctxt_def)
-  proof -
-    fix Ps :: "llvm_amemory \<Rightarrow> bool" and Qs :: "llvm_amemory \<Rightarrow> bool"
-    assume "\<Gamma>' \<and>* Ps \<turnstile> Qs"
-    then have f1: "Ps \<and>* \<Gamma>' \<turnstile> Qs"
-      by (simp add: sep.mult_commute)
-    have "\<Gamma>2 x x' \<turnstile> \<Gamma>' \<and>* Rx x x'"
-      by (metis (no_types) IMP hn_ctxt_def sep.mult_commute)
-    then have "Ps \<and>* \<Gamma>2 x x' \<turnstile> Qs \<and>* Rx x x'"
-      using f1 by (simp add: conj_entails_mono entails_mp)
-    then show "\<Gamma>2 x x' \<and>* Ps \<turnstile> Rx x x' \<and>* Qs"
-      by (simp add: sep.mult_commute)
-  qed
-  
-  note [simp] = refine_pw_simps pw_le_iff
-  show ?case using C by vcg
+  from Mra fMra' obtain Car Car' where PF: "Mm ra = Some Car" "fM ra' = Some Car'" by fastforce+
+
+  have "Some (Ca+Ca') \<le> Some (Car+Car')"
+    using PF Mra fMra' add_mono by fastforce
+  also
+  from  C(1) fMra M have
+    "Some ((Car+Car')) \<le> M ra' "
+    unfolding bindT_def  apply simp apply(drule nrest_Sup_SPECT_D[where x=ra'])
+    apply simp apply(rule Sup_upper) apply auto
+    apply(rule exI[where x="(map_option ((+) (Car)) \<circ> fM)"])
+    using PF
+    apply simp apply(rule exI[where x=ra]) apply(rule exI[where x="Car"])
+    by auto
+  finally have "Some (Ca+Ca') \<le> M ra' " .
+
+  have **: "minus_ecost_cost (cr + Ca) c + Ca'
+      = minus_ecost_cost (cr + (Ca + Ca')) c"
+    using mle
+    by (simp add: acost_plus_assoc cost_ecost_minus_add_assoc2)
+
+  show ?case
+    apply(rule exI[where x=ra'])
+    apply(rule exI[where x="Ca+Ca'"])
+    apply safe
+    subgoal apply fact done
+    apply(simp add: wp_bind)
+    apply(subst wp_def) apply(subst mwp_def)
+    apply (simp add: r1)
+    apply(simp add: wp_bind)
+    apply(subst wp_def) apply(subst mwp_def)
+    apply (simp add: r2)
+    apply(simp add: wp_bind)
+    apply(subst wp_def) apply(subst mwp_def)
+    apply (simp add: r3)
+    apply(simp add: wp_return)
+    apply safe
+    subgoal using mH3' unfolding ** .
+    subgoal using mle3 unfolding ** .
+    subgoal using mle2 unfolding ** .
+    subgoal using mle apply(simp add: acost_plus_assoc) apply(rule cost_ecost_add_increasing2) .
+    done
 qed  
+
+
+(*
 
 text \<open>Version fro manual synthesis, if freeing of bound variable has been inserted manually\<close>
 lemma hnr_bind_manual_free:
@@ -651,21 +723,21 @@ proof goal_cases
   note [simp] = refine_pw_simps pw_le_iff
   show ?case using C by vcg
 qed  
-
+*)
 
 
 
 
 subsubsection \<open>Recursion\<close>
-
+(*
 definition "hn_rel P m \<equiv> \<lambda>r. EXS x. \<up>(RETURN x \<le> m) ** P x r"
 
-lemma hn_refine_alt: "hn_refine Fpre c Fpost P m \<equiv> nofail m \<longrightarrow>
+lemma hn_refine_alt: "hn_refine Fpre c Fpost P m \<equiv> nofailT m \<longrightarrow>
   llvm_htriple Fpre c (\<lambda>r. hn_rel P m r ** Fpost)"
   apply (rule eq_reflection)
   unfolding hn_refine_def hn_rel_def
   by (auto simp: sep_conj_commute)
-
+*)
 
 term "Monad.REC  "
 find_theorems "Monad.REC"
@@ -677,10 +749,10 @@ lemma hnr_RECT:
   assumes M: "(\<And>x. M.mono_body (\<lambda>f. cB f x))"
   shows "hn_refine 
     (hn_ctxt Rx ax px ** F) (Monad.REC cB px) (F' ax px) Ry (RECT aB ax)"
-  unfolding RECT_def Monad.REC_def
+  unfolding RECT_flat_gfp_def Monad.REC_def
 proof (simp, intro conjI impI)
-  assume "trimono aB"
-  hence "flatf_mono_ge aB" by (simp add: trimonoD)
+  assume "mono2 aB"
+  hence "flatf_mono_ge aB" by (simp add: trimonoD_flatf_ge)
   have "\<forall>ax px. 
     hn_refine (hn_ctxt Rx ax px ** F) (M.fixp_fun cB px) (F' ax px) Ry 
       (flatf_gfp aB ax)"
@@ -690,7 +762,7 @@ proof (simp, intro conjI impI)
     apply (rule flatf_admissible_pointwise)
     apply simp
 
-    apply (auto simp: hn_refine_alt) []
+    apply (auto simp: hn_refine_def) []
 
     apply clarsimp
     apply (subst M.mono_body_fixp[of cB, OF M])
@@ -824,11 +896,12 @@ ML \<open>
 
     (* Destruct abs-fun, returns RETURN-flag, (f, args) *)
     val dest_hnr_absfun: term -> bool * (term * term list)
+(*
     (* Make abs-fun. *)
     val mk_hnr_absfun: bool * (term * term list) -> term
     (* Make abs-fun. Guess RETURN-flag from type. *)
     val mk_hnr_absfun': (term * term list) -> term
-    
+*)    
     (* Prove permutation of *. To be used with f_tac_conv. *)
     val star_permute_tac: Proof.context -> tactic
 
@@ -881,9 +954,9 @@ ML \<open>
 
   structure Sepref_Basic: SEPREF_BASIC = struct
 
-    fun is_nresT (Type (@{type_name nres},[_])) = true | is_nresT _ = false
-    fun mk_nresT T = Type(@{type_name nres},[T])
-    fun dest_nresT (Type (@{type_name nres},[T])) = T | dest_nresT T = raise TYPE("dest_nresT",[T],[])
+    fun is_nresT (Type (@{type_name nrest},[_])) = true | is_nresT _ = false
+    fun mk_nresT T = Type(@{type_name nrest},[T])
+    fun dest_nresT (Type (@{type_name nrest},[T])) = T | dest_nresT T = raise TYPE("dest_nresT",[T],[])
 
 
     fun dest_lambda_rc ctxt (Abs (x,T,t)) = let
@@ -983,8 +1056,8 @@ ML \<open>
   
     fun dest_hnr_absfun @{mpat "RETURN$?a"} = (true, strip_abs_args a)
       | dest_hnr_absfun f = (false, strip_abs_args f)
-  
-    fun mk_hnr_absfun (true,fa) = Autoref_Tagging.list_APP fa |> (fn a => @{mk_term "RETURN$?a"})
+  (*
+    fun mk_hnr_absfun (true,fa) = Autoref_Tagging.list_APP fa |> (fn a => @{mk_term "RETURNT$?a"})
       | mk_hnr_absfun (false,fa) = Autoref_Tagging.list_APP fa
   
     fun mk_hnr_absfun' fa = let
@@ -992,10 +1065,10 @@ ML \<open>
       val T = fastype_of t
     in
       case T of
-        Type (@{type_name nres},_) => t
+        Type (@{type_name nrest},_) => t
       | _ => @{mk_term "RETURN$?t"}
   
-    end  
+    end  *)
   
     fun dest_hn_refine @{mpat "hn_refine ?P ?c ?Q ?R ?a"} = (P,c,Q,R,a)
       | dest_hn_refine t = raise TERM("dest_hn_refine",[t])
@@ -1267,5 +1340,5 @@ ML \<open>
 
   open STactical
 \<close>
-*)
+
 end
