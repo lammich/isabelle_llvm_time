@@ -252,15 +252,6 @@ lemma ecost_le_zero: "(Ca::ecost) \<le> 0 \<longleftrightarrow> Ca=0"
   apply(cases Ca) by(auto simp: zero_acost_def less_eq_acost_def)
 
 
-lemma hnr_RETURN_pass:
-  "hn_refine (hn_ctxt R x p) (return p) (hn_invalid R x p) R (RETURNT x)"
-  \<comment> \<open>Pass on a value from the heap as return value\<close>
-  apply (subst invalidate_clone')
-  unfolding hn_ctxt_def
-  apply(rule hnr_vcgI_aux)
-  apply(simp add: nrest_more_simps ecost_le_zero) 
-  apply vcg
-  done
 
 
 
@@ -466,7 +457,6 @@ lemma prod_assn_true[simp]: "prod_assn (\<lambda>_ _. sep_true) (\<lambda>_ _. s
   by (auto intro!: ext simp: hn_ctxt_def prod_assn_def)
 
   
-(*  
 subsection "Convenience Lemmas"
 
 lemma hn_refine_guessI:
@@ -479,28 +469,37 @@ lemma hn_refine_guessI:
 
 lemma imp_correctI:
   assumes R: "hn_refine \<Gamma> c \<Gamma>' R a"
-  assumes C: "a \<le> SPEC \<Phi>"
-  shows "llvm_htriple \<Gamma> c (\<lambda>r'. EXS r. \<Gamma>' ** R r r' ** \<up>(\<Phi> r))"
+  assumes C: "a \<le> SPECT (emb \<Phi> T)"
+  shows "llvm_htriple (\<Gamma> ** $T) c (\<lambda>r'. EXS r. \<Gamma>' ** R r r' ** \<up>(\<Phi> r))" (*
   apply (rule cons_post_rule)
   apply (rule hn_refineD[OF R])
   apply (rule le_RES_nofailI[OF C])
   apply (force simp: sep_algebra_simps pred_lift_extract_simps dest: order_trans[OF _ C])
-  done
+  done *) oops
 
 lemma hnr_pre_ex_conv: 
   shows "hn_refine (EXS x. \<Gamma> x) c \<Gamma>' R a \<longleftrightarrow> (\<forall>x. hn_refine (\<Gamma> x) c \<Gamma>' R a)"
-  unfolding hn_refine_def
-  apply (safe; clarsimp?)
-  subgoal by (metis (mono_tags, lifting) cons_rule)
-  subgoal premises prems
-    supply [vcg_rules] = prems(1)[THEN spec]
-    by vcg
-  done
+proof -
+  have *: "\<And>x \<Gamma> F s cr. llSTATE (\<Gamma> x \<and>* F) (s, cr) \<Longrightarrow> llSTATE ((\<lambda>s. \<exists>x. \<Gamma> x s) \<and>* F) (s, cr)" 
+    by (metis (no_types, lifting) STATE_def sep_conj_impl1)  
+  have **: "\<And>x \<Gamma> F s cr.  llSTATE ((\<lambda>s. \<exists>x. \<Gamma> x s) \<and>* F) (s, cr) \<Longrightarrow> \<exists>x. llSTATE (\<Gamma> x \<and>* F) (s, cr)" 
+    by (smt STATE_def sep_conjE sep_conjI)
+
+  show ?thesis
+    unfolding hn_refine_def
+    apply (safe; clarsimp?)
+    subgoal premises prems for x F s cr
+      using prems(1)[rule_format] *[of \<Gamma>, OF prems(3)] by blast
+    subgoal premises prems for x F s cr
+      using prems(1)[rule_format] **[of \<Gamma>, OF prems(3)] by blast
+    done
+qed
 
 lemma hnr_pre_pure_conv:  
   shows "hn_refine (\<up>P ** \<Gamma>) c \<Gamma>' R a \<longleftrightarrow> (P \<longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a)"
   unfolding hn_refine_def
-  by (auto simp: sep_algebra_simps htriple_extract_pre_pure)
+  apply (auto simp: sep_algebra_simps htriple_extract_pre_pure STATE_def)
+  using pred_lift_extract_simps(2) by blast
 
 lemma hn_refine_split_post:
   assumes "hn_refine \<Gamma> c \<Gamma>' R a"
@@ -520,18 +519,21 @@ lemma hn_refine_post_other:
 subsubsection \<open>Return\<close>
 
 lemma hnr_RETURN_pass:
-  "hn_refine (hn_ctxt R x p) (return p) (hn_invalid R x p) R (RETURN x)"
+  "hn_refine (hn_ctxt R x p) (return p) (hn_invalid R x p) R (RETURNT x)"
   \<comment> \<open>Pass on a value from the heap as return value\<close>
   apply (subst invalidate_clone')
-  apply rule unfolding hn_ctxt_def
+  unfolding hn_ctxt_def
+  apply(rule hnr_vcgI_aux)
+  apply(simp add: ecost_le_zero) 
   apply vcg
   done
 
 lemma hnr_RETURN_pure:
   assumes "(c,a)\<in>R"
-  shows "hn_refine emp (return c) emp (pure R) (RETURN a)"
+  shows "hn_refine emp (return c) emp (pure R) (RETURNT a)"
   \<comment> \<open>Return pure value\<close>
-  unfolding hn_refine_def using assms
+  apply(rule hnr_vcgI_aux) using assms
+  apply(simp add: ecost_le_zero) 
   supply [simp] = pure_def
   by vcg
   
@@ -545,14 +547,15 @@ lemma hnr_ASSERT:
   by auto
 
 subsubsection \<open>Bind\<close>
-lemma bind_det_aux: "\<lbrakk> RETURN x \<le> m; RETURN y \<le> f x \<rbrakk> \<Longrightarrow> RETURN y \<le> m \<bind> f"
+lemma bind_det_aux:
+  fixes m :: "(_,(_,enat)acost) nrest"
+  shows  "\<lbrakk> RETURN x \<le> m; RETURN y \<le> f x \<rbrakk> \<Longrightarrow> RETURN y \<le> m \<bind> f"
   apply (rule order_trans[rotated])
-  apply (rule Refine_Basic.bind_mono)
+  apply (rule bindT_acost_mono')
   apply assumption
   apply (rule order_refl)
   apply simp
   done
-*)
   
 definition "MK_FREE R f \<equiv> \<forall>a c. llvm_htriple (R a c) (f c) (\<lambda>_::unit. \<box>)"  
 
