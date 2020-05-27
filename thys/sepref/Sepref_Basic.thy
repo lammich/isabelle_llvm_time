@@ -723,21 +723,21 @@ proof goal_cases
   note [simp] = refine_pw_simps pw_le_iff
   show ?case using C by vcg
 qed  
-
+*)
 
 
 
 
 subsubsection \<open>Recursion\<close>
-
+(*
 definition "hn_rel P m \<equiv> \<lambda>r. EXS x. \<up>(RETURN x \<le> m) ** P x r"
 
-lemma hn_refine_alt: "hn_refine Fpre c Fpost P m \<equiv> nofail m \<longrightarrow>
+lemma hn_refine_alt: "hn_refine Fpre c Fpost P m \<equiv> nofailT m \<longrightarrow>
   llvm_htriple Fpre c (\<lambda>r. hn_rel P m r ** Fpost)"
   apply (rule eq_reflection)
   unfolding hn_refine_def hn_rel_def
   by (auto simp: sep_conj_commute)
-
+*)
 
 term "Monad.REC  "
 find_theorems "Monad.REC"
@@ -749,10 +749,10 @@ lemma hnr_RECT:
   assumes M: "(\<And>x. M.mono_body (\<lambda>f. cB f x))"
   shows "hn_refine 
     (hn_ctxt Rx ax px ** F) (Monad.REC cB px) (F' ax px) Ry (RECT aB ax)"
-  unfolding RECT_def Monad.REC_def
+  unfolding RECT_flat_gfp_def Monad.REC_def
 proof (simp, intro conjI impI)
-  assume "trimono aB"
-  hence "flatf_mono_ge aB" by (simp add: trimonoD)
+  assume "mono2 aB"
+  hence "flatf_mono_ge aB" by (simp add: trimonoD_flatf_ge)
   have "\<forall>ax px. 
     hn_refine (hn_ctxt Rx ax px ** F) (M.fixp_fun cB px) (F' ax px) Ry 
       (flatf_gfp aB ax)"
@@ -762,7 +762,7 @@ proof (simp, intro conjI impI)
     apply (rule flatf_admissible_pointwise)
     apply simp
 
-    apply (auto simp: hn_refine_alt) []
+    apply (auto simp: hn_refine_def) []
 
     apply clarsimp
     apply (subst M.mono_body_fixp[of cB, OF M])
@@ -896,11 +896,12 @@ ML \<open>
 
     (* Destruct abs-fun, returns RETURN-flag, (f, args) *)
     val dest_hnr_absfun: term -> bool * (term * term list)
+(*
     (* Make abs-fun. *)
     val mk_hnr_absfun: bool * (term * term list) -> term
     (* Make abs-fun. Guess RETURN-flag from type. *)
     val mk_hnr_absfun': (term * term list) -> term
-    
+*)    
     (* Prove permutation of *. To be used with f_tac_conv. *)
     val star_permute_tac: Proof.context -> tactic
 
@@ -953,9 +954,9 @@ ML \<open>
 
   structure Sepref_Basic: SEPREF_BASIC = struct
 
-    fun is_nresT (Type (@{type_name nres},[_])) = true | is_nresT _ = false
-    fun mk_nresT T = Type(@{type_name nres},[T])
-    fun dest_nresT (Type (@{type_name nres},[T])) = T | dest_nresT T = raise TYPE("dest_nresT",[T],[])
+    fun is_nresT (Type (@{type_name nrest},[_])) = true | is_nresT _ = false
+    fun mk_nresT T = Type(@{type_name nrest},[T])
+    fun dest_nresT (Type (@{type_name nrest},[T])) = T | dest_nresT T = raise TYPE("dest_nresT",[T],[])
 
 
     fun dest_lambda_rc ctxt (Abs (x,T,t)) = let
@@ -1055,8 +1056,8 @@ ML \<open>
   
     fun dest_hnr_absfun @{mpat "RETURN$?a"} = (true, strip_abs_args a)
       | dest_hnr_absfun f = (false, strip_abs_args f)
-  
-    fun mk_hnr_absfun (true,fa) = Autoref_Tagging.list_APP fa |> (fn a => @{mk_term "RETURN$?a"})
+  (*
+    fun mk_hnr_absfun (true,fa) = Autoref_Tagging.list_APP fa |> (fn a => @{mk_term "RETURNT$?a"})
       | mk_hnr_absfun (false,fa) = Autoref_Tagging.list_APP fa
   
     fun mk_hnr_absfun' fa = let
@@ -1064,10 +1065,10 @@ ML \<open>
       val T = fastype_of t
     in
       case T of
-        Type (@{type_name nres},_) => t
+        Type (@{type_name nrest},_) => t
       | _ => @{mk_term "RETURN$?t"}
   
-    end  
+    end  *)
   
     fun dest_hn_refine @{mpat "hn_refine ?P ?c ?Q ?R ?a"} = (P,c,Q,R,a)
       | dest_hn_refine t = raise TERM("dest_hn_refine",[t])
@@ -1339,5 +1340,5 @@ ML \<open>
 
   open STactical
 \<close>
-*)
+
 end
