@@ -183,9 +183,79 @@ lemma domx2:
 definition "attains_sup m m' RR \<equiv> 
   \<forall>r M' M. m=SPECT M \<longrightarrow> m'=SPECT M' \<longrightarrow> r\<in>dom M \<longrightarrow> (\<exists>a. (r,a)\<in>RR) \<longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"  
 
-lemma sv_attains_sup: "single_valued RR \<Longrightarrow> attains_sup m m' RR"  
+(* Proving attains_sup *)  
+
+(* Single Valued *)
+lemma attains_sup_sv: "single_valued RR \<Longrightarrow> attains_sup m m' RR"  
   unfolding attains_sup_def
   using single_valued_SupinSup by fastforce  
+  
+
+(* Tiem does not depend on Result (one-time) *)
+ 
+definition "one_time m \<equiv> \<forall>M. m=SPECT M \<longrightarrow> (\<forall>x y s t. M x = Some s \<and> M y = Some t \<longrightarrow> s=t)"
+
+lemma one_time_attains_sup:
+  assumes one_time: "one_time m'"
+  shows "attains_sup m m' RR"
+  unfolding attains_sup_def 
+  apply clarify
+proof -
+  fix r M' M y aa
+  assume [simp]: "m' = SPECT M'" and "(r, aa) \<in> RR"
+  show "\<exists>aa. Sup {M' a |a. (r, a) \<in> RR} = M' aa \<and> (r, aa) \<in> RR" (is "\<exists>_. Sup ?MM = _ \<and> _")
+  proof (cases "\<exists>a c. (r,a)\<in>RR \<and> M' a = Some c")
+    case True
+    then obtain a c where 1: "(r,a)\<in>RR" "M' a = Some c" by blast
+    with one_time have "Some c \<in> ?MM" "?MM \<subseteq> {None,Some c}"
+      unfolding one_time_def
+      by (auto) metis
+    thus ?thesis using 1
+      by (smt Sup_insert Sup_le_iff Sup_subset_mono cSup_eq_maximum ccpo_Sup_singleton empty_Sup insert_commute) 
+  next
+    case False   
+    hence "?MM = {None}" using \<open>(r,aa)\<in>RR\<close> by force
+    thus ?thesis using False \<open>(r,aa)\<in>RR\<close> by auto
+  qed      
+qed  
+
+
+
+lemma OT_return: "one_time (RETURNT x)"
+  unfolding one_time_def by auto
+  
+lemma OT_consume: "one_time m \<Longrightarrow> one_time (consume m c)"  
+  unfolding one_time_def consume_def
+  by (auto split: nrest.splits; blast)
+  
+lemma OT_assert: "one_time (ASSERT \<Phi>)"  
+  unfolding one_time_def 
+  by (cases \<Phi>) auto
+  
+lemma OT_fail: "one_time FAILT"
+  unfolding one_time_def by auto
+
+lemma OT_spec: "one_time (SPEC P (\<lambda>_. c))"
+  unfolding one_time_def SPEC_def by auto
+  
+    
+lemma attains_sup_mop_return:
+  "attains_sup m (do {ASSERT \<Phi>; consume (RETURNT x) (c::ecost)}) R"
+  apply (rule one_time_attains_sup)
+  apply (cases \<Phi>; simp add: OT_consume OT_return OT_fail)
+  done
+
+lemma attains_sup_mop_spec:
+  "attains_sup m (do {ASSERT \<Phi>; SPEC P (\<lambda>_. c::ecost)}) R"
+  apply (rule one_time_attains_sup)
+  apply (cases \<Phi>; simp add: OT_consume OT_return OT_fail OT_spec)
+  done
+
+
+  
+  
+  
+  
   
 lemma hn_refine_result_loose:
   assumes R: "hn_refine P c Q R m"
@@ -222,7 +292,7 @@ lemma hn_refine_result_loose_SV:
   apply(rule hn_refine_result_loose)
     apply fact
    apply fact
-  apply(rule sv_attains_sup)
+  apply(rule attains_sup_sv)
    apply (rule SV)
   done
 
@@ -272,8 +342,6 @@ lemma hn_refine_cons_res_complete_loose:
   apply (rule hn_refine_result_loose)
   apply (rule hn_refine_cons)
   by (fact|simp)+
-  
-  
   
   
   
@@ -581,7 +649,7 @@ lemma hn_refine_extract_pre_pure: "hn_refine (\<up>\<phi> ** \<Gamma>) c \<Gamma
   by (auto simp: sep_algebra_simps STATE_extract)
   
 (* TODO: Use FCOMP and parametricity lemma for this! Currently, it's FCOMP done manually! *)  
-lemma hnr_array_nth: 
+lemma deprecated_hnr_array_nth: 
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
@@ -616,160 +684,11 @@ proof -
     done
 qed
 
-definition "one_time m \<equiv> \<forall>M. m=SPECT M \<longrightarrow> (\<forall>x y s t. M x = Some s \<and> M y = Some t \<longrightarrow> s=t)"
 
-lemma one_time_attains_sup:
-  assumes one_time: "one_time m'"
-  shows "attains_sup m m' RR"
-  unfolding attains_sup_def 
-  apply clarify
-proof -
-  fix r M' M y aa
-  assume [simp]: "m' = SPECT M'" and "(r, aa) \<in> RR"
-  show "\<exists>aa. Sup {M' a |a. (r, a) \<in> RR} = M' aa \<and> (r, aa) \<in> RR" (is "\<exists>_. Sup ?MM = _ \<and> _")
-  proof (cases "\<exists>a c. (r,a)\<in>RR \<and> M' a = Some c")
-    case True
-    then obtain a c where 1: "(r,a)\<in>RR" "M' a = Some c" by blast
-    with one_time have "Some c \<in> ?MM" "?MM \<subseteq> {None,Some c}"
-      unfolding one_time_def
-      by (auto) metis
-    thus ?thesis using 1
-      by (smt Sup_insert Sup_le_iff Sup_subset_mono cSup_eq_maximum ccpo_Sup_singleton empty_Sup insert_commute) 
-  next
-    case False   
-    hence "?MM = {None}" using \<open>(r,aa)\<in>RR\<close> by force
-    thus ?thesis using False \<open>(r,aa)\<in>RR\<close> by auto
-  qed      
-qed  
-
-
-definition "one_time' t m \<equiv> \<forall>M. m=SPECT M \<longrightarrow> (\<forall>x s. M x = Some s \<longrightarrow> s=t)"
-
-
-lemma one_time_to': "one_time m \<longleftrightarrow> (\<exists>t. one_time' t m)"
-  unfolding one_time_def one_time'_def
-  apply auto
-  subgoal by (metis nrest.inject)
-  by auto
-
-
-definition "lift_ctime t P \<equiv> case P of None \<Rightarrow> FAILT | Some P \<Rightarrow> SPEC P (\<lambda>_. t)"
-
-lemma one_time'_alt: "one_time' t m \<longleftrightarrow> (\<exists>P. m = lift_ctime t P)"
-  unfolding one_time'_def lift_ctime_def SPEC_def 
-  apply (cases m) apply (auto 0 0 split: if_splits option.splits)
-  subgoal for M
-    apply (rule exI[where x="Some (\<lambda>x. x\<in>dom M)"])
-    by fastforce
-  done
-
-
-(*
-lemma one_time'_alt: "one_time' t m \<longleftrightarrow> m\<noteq>FAILT \<longrightarrow> (\<exists>P. m = SPEC P (\<lambda>_. t))"
-  unfolding one_time'_def SPEC_def apply (cases m) apply (auto split: if_splits simp: )
-  subgoal for M
-    apply (rule exI[where x="\<lambda>x. x\<in>dom M"])
-    by fastforce
-  done
-*)  
-
-lemma one_time'_attains_sup: "one_time' t m' \<Longrightarrow> attains_sup m m' R"
-  using one_time_attains_sup one_time_to' by blast
-
-
-named_theorems one_timeI
-lemma [one_timeI]: "one_time' 0 (RETURNT x)"
-  unfolding one_time'_def by auto
-  
-lemma [one_timeI]: "one_time' cc m \<Longrightarrow> one_time' (c+cc) (consume m c)"  
-  unfolding one_time'_def consume_def
-  by (auto split: nrest.splits; blast)
-  
-lemma [one_timeI]: "one_time' 0 (ASSERT \<Phi>)"  
-  unfolding one_time'_def 
-  by (cases \<Phi>) auto
-  
-lemma [one_timeI,simp]: "one_time' t FAILT"
-  unfolding one_time'_def by auto
-  
-  
-lemma OT'_Spec: "one_time' t (SPECT M) \<Longrightarrow> M x = Some t' \<longleftrightarrow> (t'=t \<and> M x = Some t)"  
-  unfolding one_time'_def by auto
-  
-lemma OT'_fun_eq:
-  assumes "\<forall>x. one_time' cc (f x)"  
-  obtains F where "f = (\<lambda>x. lift_ctime cc (F x))"
-  using assms unfolding one_time'_alt
-  by metis
-  
-  
-lemma lift_ctime_eq_spec: "lift_ctime c P = SPECT M \<Longrightarrow> SPECT M = SPEC (the P) (\<lambda>_. c)"  
-  unfolding lift_ctime_def
-  by (auto split: option.splits)
-  
-lemma [simp]: "lift_ctime c None = FAILT"
-  unfolding lift_ctime_def by auto
-  
-lemma [simp]: "lift_ctime c (Some P) = SPEC P (\<lambda>_. c)"  
-  unfolding lift_ctime_def by auto
-  
-lemma consume_lift_ctime: "consume (lift_ctime c P) cc = lift_ctime (cc+c) P"
-  unfolding lift_ctime_def consume_def SPEC_def
-  by (auto split: option.splits simp: fun_eq_iff) 
-  
-  
-  
-  
-lemma [one_timeI]:
-  assumes "one_time' c m"
-  assumes "\<And>x. one_time' cc (f x)"
-  shows "one_time' (c+cc) (bindT m f)"
-proof -
-  from assms(2) obtain F where 1[simp]: "f = (\<lambda>x. lift_ctime cc (F x))"
-    using OT'_fun_eq by blast
-  
-  from assms(1) obtain P where [simp]: "m = lift_ctime c P"  
-    unfolding one_time'_alt
-    by auto
-    
-    
-    
-  show ?thesis proof (cases P) 
-    case None thus ?thesis by simp
-  next
-    case (Some PP)
-    show ?thesis sorry
-  qed
-qed
-
-(*    
-    have "{uu. \<exists>x. PP x \<and> uu = lift_ctime (c + cc) (F x)} = lift_ctime"  
-  
-  
-    apply (cases P)
-    apply simp_all
-    unfolding bindT_alt
-    apply (auto split: nrest.splits simp: SPEC_def consume_lift_ctime)
-    
-    
-    apply (drule lift_ctime_eq_spec)
-    apply
-    
-  apply (rule assms(2)[THEN OT'_fun_eq])
-  
-  
-  
-  using assms
-  unfolding bindT_alt one_time'_alt
-  apply (auto split: nrest.splits simp: )
-  apply (rewrite OT'_Spec, assumption)
-  apply simp
-*)  
-  
 (*
   With loose rule, and syntactic check that time does not depend on result
 *)
-lemma hnr_array_nth_loose: 
+lemma hnr_array_nth: 
   assumes PURE: "is_pure A"
   shows "hn_refine 
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
@@ -800,9 +719,8 @@ proof -
       apply parametricity
       by simp
     subgoal  
-      apply (rule one_time'_attains_sup)
       unfolding mop_array_nth_def
-      apply (rule one_timeI)+
+      apply (rule attains_sup_mop_return)
       done
     done
 qed
@@ -811,7 +729,7 @@ qed
 
 
 (* Without single-valued! Re-doing the proof on the low-level. *)  
-lemma hnr_array_nth': 
+lemma deprecated_hnr_array_nth': 
   assumes PURE: "is_pure A"
   shows "hn_refine 
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
@@ -838,7 +756,7 @@ qed
 
 
 (* TODO: Use FCOMP and parametricity lemma for mop_list_nth! *)  
-lemma hnr_array_upd: 
+lemma deprecated_hnr_array_upd_SV: 
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
@@ -882,11 +800,60 @@ proof -
     applyS (simp add: list_rel_sv_iff SV)
     done
 qed    
+
+
+lemma hnr_array_upd: 
+  assumes PURE: "is_pure A"
+  shows "hn_refine 
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+    (array_upd xsi ii xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
+    (array_assn A)
+    (mop_array_upd xs i x)" 
+proof -
+  have AR: "A = hr_comp id_assn (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+    
+  show ?thesis  
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_refine \<hole> _ _ _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_refine _ _ \<hole> _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_ctxt A\<close> in \<open>hn_refine \<hole> _ _ _ _\<close> AR)
+    apply (rewrite in \<open>hn_ctxt A\<close> in \<open>hn_refine _ _ \<hole> _ _\<close> AR)
+    
+    apply (simp only: hn_ctxt_hr_comp_extract invalid_hr_comp_ctxt)
+    apply (clarsimp simp: hn_refine_extract_pre_ex hn_refine_extract_pre_pure hn_ctxt_def pure_def sep_algebra_simps)
+    apply (rule hn_refine_cons_res_complete_loose)
+    applyS (rule hnr_raw_array_upd[where x=xi and xi=xi])
+    
+    apply1 (clarsimp simp: hn_ctxt_def pure_def sep_algebra_simps entails_lift_extract_simps)
+    applyS rule
+    
+    apply1 (clarsimp simp: hn_ctxt_def pure_def sep_algebra_simps entails_lift_extract_simps)
+    apply1 (rule ENTAILSD) 
+    applyS fri
+    
+    applyS rule
+    
+    subgoal
+      unfolding mop_array_upd_def
+      apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+      apply parametricity
+      by simp
+    
+    subgoal
+      unfolding mop_array_upd_def  
+      by (rule attains_sup_mop_return)
+      
+    done
+qed    
+
+
     
 
 lemma hnr_array_new: 
   assumes PURE: "is_pure A"
-  assumes SV: "single_valued (the_pure A)"
   assumes INIT: "(init,x) \<in> the_pure A"
   shows "hn_refine 
     (hn_ctxt snat_assn i ii)
@@ -900,7 +867,7 @@ proof -
 
   show ?thesis  
     apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
-    apply (rule hn_refine_cons_res_complete)
+    apply (rule hn_refine_cons_res_complete_loose)
     applyS (rule hnr_raw_array_new)
     applyS rule
     applyS rule
@@ -910,7 +877,9 @@ proof -
       apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
       apply (parametricity add: INIT)
       by simp
-    applyS (simp add: list_rel_sv_iff SV)
+    subgoal
+      unfolding mop_array_new_def
+      by (rule attains_sup_mop_return)
     done
 qed
 
