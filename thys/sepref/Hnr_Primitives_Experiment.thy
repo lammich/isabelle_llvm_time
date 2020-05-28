@@ -86,7 +86,10 @@ lemma aux_abs':
   shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
   using assms aux_abs[of RR M M']
   by fastforce
-  
+
+
+
+
 lemma aux:
   fixes M :: "_ \<rightharpoonup> ecost"
   assumes "single_valued RR"
@@ -126,6 +129,95 @@ lemma aux':
   apply (rule ENTAILSD)
   apply fri
   done
+
+lemma SomeSup_D: "Some y \<le> Sup {M' a |a. (r, a) \<in> RR} \<Longrightarrow> (\<exists>a. (r, a) \<in> RR)"
+  unfolding Sup_option_def by (auto split: if_splits)
+
+lemma aux_loose:
+  fixes M :: "_ \<rightharpoonup> ecost"
+  assumes "\<And>r. r\<in>dom M \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  shows "\<forall>r\<in>dom M. \<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms
+  (* with single_valued RR *)
+  apply (auto simp: conc_fun_RES)
+  unfolding le_fun_def 
+  subgoal premises p for r y using p(2)[rule_format, of r] p(1)[of r, OF _ SomeSup_D] p(3)
+    by force
+  done
+
+lemma aux_loose':
+  fixes M :: "_ \<rightharpoonup> ecost"
+  assumes "\<And>r. r\<in>dom M \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  assumes "Some cr \<le> M r"
+  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms aux_loose[of M RR M']
+  by fastforce
+
+
+lemma single_valued_SupinSup:
+  fixes M' :: "_ \<Rightarrow> (_::complete_lattice) option"
+  shows "single_valued RR \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+proof -
+  assume SV: "single_valued RR" and "(\<exists>a. (r,a)\<in>RR)"
+  then obtain a where "(r,a)\<in>RR" by auto
+  then have "{M' a| a. (r,a)\<in>RR} = {M' a}"
+    apply auto using SV[THEN single_valuedD] by auto
+  then show ?thesis by auto
+qed
+  
+
+lemma conc_fun_inRR: "SPECT x2 \<le> \<Down> RR (SPECT M) \<Longrightarrow> r \<in> dom x2 \<Longrightarrow> (\<exists>a. (r,a)\<in>RR)"
+  unfolding conc_fun_def apply auto unfolding le_fun_def 
+  subgoal premises p for y apply(rule SomeSup_D)
+    using p(1)[rule_format, of r] p(2) by simp
+  done
+
+lemma domx2:
+  fixes f :: "'d \<Rightarrow> (char list, enat) acost option"
+  shows "Some y \<le> f r \<Longrightarrow> r \<in> dom f"  
+  using ndomIff by fastforce
+
+lemma hn_refine_result_loose:
+  assumes R: "hn_refine P c Q R m"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes WB: "\<And>r M' M. m=SPECT M \<Longrightarrow> m'=SPECT M' \<Longrightarrow> r\<in>dom M \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+  shows "hn_refine P c Q (hr_comp R RR) m'"
+  unfolding hn_refine_def
+  apply clarify
+  using LE apply (cases m; simp)
+  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
+  apply (elim exE conjE)
+  subgoal premises p for F s cr M x2 ra Ca
+    using aux_loose'[OF WB[OF p(4,1)], simplified, OF _ p(3,5), simplified] p(5,6)
+    apply -
+    apply (elim exE conjE)
+
+    apply (intro exI conjI)
+     apply (rule order_trans, assumption+)  
+
+    apply (erule wp_post_cons)
+    unfolding hr_comp_def
+    apply (rule ENTAILSD)
+    apply fri
+    done
+  done
+
+
+lemma hn_refine_result_loose_SV:
+  assumes R: "hn_refine P c Q R m"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes SV: "single_valued RR"
+  shows "hn_refine P c Q (hr_comp R RR) m'"
+  apply(rule hn_refine_result_loose)
+    apply fact
+   apply fact
+  apply(rule single_valued_SupinSup)
+   apply (rule SV)
+  apply simp
+  done
+
 
 lemma hn_refine_result:
   assumes R: "hn_refine P c Q R m"
