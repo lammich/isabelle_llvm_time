@@ -161,8 +161,9 @@ subsubsection \<open>Composition Rules\<close>
   lemma hfcomp_tcomp_pre:
     assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nrest_rel)"
     assumes A: "(f,g) \<in> [P]\<^sub>a\<^sub>d RR' \<rightarrow> S"
+    assumes SC: "\<And>a1. BLA (U a1) (h a1)"
     shows "(f,h) \<in> [tcomp_pre Q T P]\<^sub>a\<^sub>d hrp_comp RR' T \<rightarrow> hrr_comp T S U"
-    using hfcomp[OF A B] by simp
+    using hfcomp[OF A B] using SC by simp
 
   lemma transform_pre_param:
     assumes A: "IMP_LIST Cns ((f, h) \<in> [tcomp_pre Q T P]\<^sub>a\<^sub>d hrp_comp RR' T \<rightarrow> hrr_comp T S U)"
