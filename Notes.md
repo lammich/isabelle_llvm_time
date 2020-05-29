@@ -1,3 +1,150 @@
+# Fr 29.5.2020
+
+## TODOS:
+    
+### Peter
+- solve seprefregister issue
+- prove_prems into Utils
+
+### max
+- issue erstellen für "sepref_register"
+- FCOMP sup_attains
+  - solver für "BLA"-goals
+- weitermachen mit Sepref_HOL_Bindings
+- hn_refine_frame rule beweisen
+
+## Probleme die uns noch bevor stehen:
+- Kosten von Produkte
+  - Lösung: erstmal im konkreten auf null setzen?
+    - insert_element, extract_element := 0
+  - Lösung: im abstrakten auf infinity setzen 
+
+
+## Notes
+
+    (* Prove premises of theorem by given tactics. Warning: Simultaneous semantics, 
+      will fail/misbehave if tactic instantiates schematic that occurs in later premise to be proved *)
+    val prove_prems: Proof.context -> thm -> (Proof.context -> int -> tactic) option list -> thm
+
+
+  |> prove_prems ctxt [NONE,NONE,SOME your_tac]
+
+  thm[OF _ _ tac1 tac2 _ ]
+  
+  
+  (a,b,c) <- while ... (a,b,c)
+  
+  pair1 = mop_pair b c
+  pair2 = mop_pair a pair1
+  
+  res <- while ... pair2
+
+
+# Donnerstag 28.5. 
+
+
+ref1: a1 <= SPEC P (%_. t)
+ref2: a2 <= R1 a1 
+ref3: a3 <= R2 a2 
+ref_impl: hn_refine a_impl a3 R3
+
+
+->
+
+ref_impl FCOMP (ref3 FCOMP ref2 FCOMP ref1)
+
+(ref_impl FCOMP ref3) FCOMP ref2 FCOMP ref1
+
+
+## mögliches vorgehen
+
+vorgehen "zusammenschieben":
+- refX beweisen
+- ref_impl synthestisieren von ref3
+- ref1-ref3 zusammenschieben -> ref3 <= R SPEC
+- composition mit SideCondition "sup_attains ref_impl SPEC R"
+-> neues hnr lemma
+
+
+## How to solve sup_attains Side conditions
+
+SV R ==> sup_attains R m
+sup_attains R (ASSERT; CONSUME (RETURN x) c)
+
+
+onetime ((ASSERT; CONSUME (RETURN x) c)) 
+onetime M ==> sup_attains R M
+
+m'  <= DOWN R2 m''
+
+LEMMA:
+impl  (hnr A)  m <= \Down R  m'
+sup_attains R m'
+------------
+impl (hnr (hr_comp A R)) m'
+
+## test für intuition
+side conditions bei 2 regel anwendungen vs sidecondition bei zusammen schieben und dann 1 regelanwendung:
+
+\exists m'. (
+SC1: sup_attains R m'
+m'  <= DOWN R2 m''
+SC2: sup_attains R2 m'' )
+--------------------------------
+sup_attains (R O R2) m''
+
+problem (glaub ich) :
+    sup_attains R1; sup_attains R2
+    =/=> sup_attains (R1 O R2)
+
+TODO: beispiel finden
+
+conjecture:
+sup_attains m (\down R2 m') R1
+==> sup_attains m m' (R1 O R2)
+    
+    
+    
+    lemma 
+        "sup_attains m (SPECT (emb' P (%_. t))) RR"
+        
+        
+Angenommen:
+- alle DS haben konstante Zeit  
+
+## kriterien für sup_attains
+
+m <= \Down R m'
+single_valued R
+
+single_costed R m' =
+single_valued ({(x,c) | (x,y) : R & m' y = Some c  }    )
+
+one_time m = single_costed UNIV m
+
+single_costed RR m'  ==> sup_attains m m' RR
+
+
+## Side Problem
+        
+R1: (n,c,xs) |-> take n xs   | n<=c & c=length xs     
+        
+A: snat x snat x array        
+     
+\Down (ER list_rel) mop_list_push
+>=        
+\Down R1 (mop_list_push xs a = xs@[a])
+>=
+dyn_array_push        
+>=hnr A
+push_impl        
+
+
+
+Side-Problem (verschieben):
+- Amortisierte DS von Basic Layer in NREST hochziehen
+
+
 
 # Di 19.5.
 

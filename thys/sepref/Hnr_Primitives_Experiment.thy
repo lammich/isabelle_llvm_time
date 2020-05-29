@@ -179,18 +179,97 @@ lemma domx2:
   shows "Some y \<le> f r \<Longrightarrow> r \<in> dom f"  
   using ndomIff by fastforce
 
+  
+definition "attains_sup m m' RR \<equiv> 
+  \<forall>r M' M. m=SPECT M \<longrightarrow> m'=SPECT M' \<longrightarrow> r\<in>dom M \<longrightarrow> (\<exists>a. (r,a)\<in>RR) \<longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"  
+
+(* Proving attains_sup *)  
+
+(* Single Valued *)
+lemma attains_sup_sv: "single_valued RR \<Longrightarrow> attains_sup m m' RR"  
+  unfolding attains_sup_def
+  using single_valued_SupinSup by fastforce  
+  
+
+(* Tiem does not depend on Result (one-time) *)
+ 
+definition "one_time m \<equiv> \<forall>M. m=SPECT M \<longrightarrow> (\<forall>x y s t. M x = Some s \<and> M y = Some t \<longrightarrow> s=t)"
+
+lemma one_time_attains_sup:
+  assumes one_time: "one_time m'"
+  shows "attains_sup m m' RR"
+  unfolding attains_sup_def 
+  apply clarify
+proof -
+  fix r M' M y aa
+  assume [simp]: "m' = SPECT M'" and "(r, aa) \<in> RR"
+  show "\<exists>aa. Sup {M' a |a. (r, a) \<in> RR} = M' aa \<and> (r, aa) \<in> RR" (is "\<exists>_. Sup ?MM = _ \<and> _")
+  proof (cases "\<exists>a c. (r,a)\<in>RR \<and> M' a = Some c")
+    case True
+    then obtain a c where 1: "(r,a)\<in>RR" "M' a = Some c" by blast
+    with one_time have "Some c \<in> ?MM" "?MM \<subseteq> {None,Some c}"
+      unfolding one_time_def
+      by (auto) metis
+    thus ?thesis using 1
+      by (smt Sup_insert Sup_le_iff Sup_subset_mono cSup_eq_maximum ccpo_Sup_singleton empty_Sup insert_commute) 
+  next
+    case False   
+    hence "?MM = {None}" using \<open>(r,aa)\<in>RR\<close> by force
+    thus ?thesis using False \<open>(r,aa)\<in>RR\<close> by auto
+  qed      
+qed  
+
+
+
+lemma OT_return: "one_time (RETURNT x)"
+  unfolding one_time_def by auto
+  
+lemma OT_consume: "one_time m \<Longrightarrow> one_time (consume m c)"  
+  unfolding one_time_def consume_def
+  by (auto split: nrest.splits; blast)
+  
+lemma OT_assert: "one_time (ASSERT \<Phi>)"  
+  unfolding one_time_def 
+  by (cases \<Phi>) auto
+  
+lemma OT_fail: "one_time FAILT"
+  unfolding one_time_def by auto
+
+lemma OT_spec: "one_time (SPEC P (\<lambda>_. c))"
+  unfolding one_time_def SPEC_def by auto
+  
+    
+lemma attains_sup_mop_return:
+  "attains_sup m (do {ASSERT \<Phi>; consume (RETURNT x) (c::ecost)}) R"
+  apply (rule one_time_attains_sup)
+  apply (cases \<Phi>; simp add: OT_consume OT_return OT_fail)
+  done
+
+lemma attains_sup_mop_spec:
+  "attains_sup m (do {ASSERT \<Phi>; SPEC P (\<lambda>_. c::ecost)}) R"
+  apply (rule one_time_attains_sup)
+  apply (cases \<Phi>; simp add: OT_consume OT_return OT_fail OT_spec)
+  done
+
+
+  
+  
+  
+  
+  
 lemma hn_refine_result_loose:
   assumes R: "hn_refine P c Q R m"
   assumes LE: "m\<le>\<Down>RR m'"
-  assumes WB: "\<And>r M' M. m=SPECT M \<Longrightarrow> m'=SPECT M' \<Longrightarrow> r\<in>dom M \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+  assumes WB: "attains_sup m m' RR"
   shows "hn_refine P c Q (hr_comp R RR) m'"
+  supply WB' = WB[unfolded attains_sup_def, rule_format]
   unfolding hn_refine_def
   apply clarify
   using LE apply (cases m; simp)
   apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
   apply (elim exE conjE)
   subgoal premises p for F s cr M x2 ra Ca
-    using aux_loose'[OF WB[OF p(4,1)], simplified, OF _ p(3,5), simplified] p(5,6)
+    using aux_loose'[OF WB'[OF p(4,1)], simplified, OF _ p(3,5), simplified] p(5,6)
     apply -
     apply (elim exE conjE)
 
@@ -213,9 +292,8 @@ lemma hn_refine_result_loose_SV:
   apply(rule hn_refine_result_loose)
     apply fact
    apply fact
-  apply(rule single_valued_SupinSup)
+  apply(rule attains_sup_sv)
    apply (rule SV)
-  apply simp
   done
 
 
@@ -253,8 +331,17 @@ lemma hn_refine_cons_res_complete:
   apply (rule hn_refine_cons)
   by (fact|simp)+
 
-  
-  
+lemma hn_refine_cons_res_complete_loose:
+  assumes R: "hn_refine P' c Q R m"
+  assumes I: "P\<turnstile>P'"
+  assumes I': "Q\<turnstile>Q'"
+  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes AS: "attains_sup m m' RR"
+  shows "hn_refine P c Q' (hr_comp R RR) m'"
+  apply (rule hn_refine_result_loose)
+  apply (rule hn_refine_cons)
+  by (fact|simp)+
   
   
   
@@ -562,7 +649,7 @@ lemma hn_refine_extract_pre_pure: "hn_refine (\<up>\<phi> ** \<Gamma>) c \<Gamma
   by (auto simp: sep_algebra_simps STATE_extract)
   
 (* TODO: Use FCOMP and parametricity lemma for this! Currently, it's FCOMP done manually! *)  
-lemma hnr_array_nth: 
+lemma deprecated_hnr_array_nth: 
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
@@ -597,8 +684,52 @@ proof -
     done
 qed
 
+
+(*
+  With loose rule, and syntactic check that time does not depend on result
+*)
+lemma hnr_array_nth: 
+  assumes PURE: "is_pure A"
+  shows "hn_refine 
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (array_nth xsi ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    A
+    (mop_array_nth xs i)" 
+proof -
+  have AR: "A = hr_comp id_assn (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+    
+  show ?thesis  
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> AR)
+    apply (rewrite in \<open>hn_refine \<hole> _ _ _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite hn_ctxt_hr_comp_extract)
+    apply (clarsimp simp only: hn_refine_extract_pre_ex hn_refine_extract_pre_pure sep_algebra_simps sep_conj_assoc)
+    apply (rule hn_refine_cons_res_complete_loose)
+    apply (rule hnr_raw_array_nth)
+    apply (rule)
+    apply (rewrite pure_array_assn_alt[OF PURE])
+    apply (rewrite hn_ctxt_hr_comp_extract)
+    apply (auto simp add: sep_algebra_simps pred_lift_extract_simps entails_def) []
+    apply (rule)
+    subgoal
+      unfolding mop_array_nth_def
+      apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+      apply parametricity
+      by simp
+    subgoal  
+      unfolding mop_array_nth_def
+      apply (rule attains_sup_mop_return)
+      done
+    done
+qed
+
+
+
+
 (* Without single-valued! Re-doing the proof on the low-level. *)  
-lemma hnr_array_nth': 
+lemma deprecated_hnr_array_nth': 
   assumes PURE: "is_pure A"
   shows "hn_refine 
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
@@ -625,7 +756,7 @@ qed
 
 
 (* TODO: Use FCOMP and parametricity lemma for mop_list_nth! *)  
-lemma hnr_array_upd: 
+lemma deprecated_hnr_array_upd_SV: 
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
@@ -669,11 +800,60 @@ proof -
     applyS (simp add: list_rel_sv_iff SV)
     done
 qed    
+
+
+lemma hnr_array_upd: 
+  assumes PURE: "is_pure A"
+  shows "hn_refine 
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+    (array_upd xsi ii xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
+    (array_assn A)
+    (mop_array_upd xs i x)" 
+proof -
+  have AR: "A = hr_comp id_assn (the_pure A)"
+    by (simp add: \<open>is_pure A\<close>)
+
+    
+  show ?thesis  
+    apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_refine \<hole> _ _ _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_refine _ _ \<hole> _ _\<close> pure_array_assn_alt[OF PURE])
+    apply (rewrite in \<open>hn_ctxt A\<close> in \<open>hn_refine \<hole> _ _ _ _\<close> AR)
+    apply (rewrite in \<open>hn_ctxt A\<close> in \<open>hn_refine _ _ \<hole> _ _\<close> AR)
+    
+    apply (simp only: hn_ctxt_hr_comp_extract invalid_hr_comp_ctxt)
+    apply (clarsimp simp: hn_refine_extract_pre_ex hn_refine_extract_pre_pure hn_ctxt_def pure_def sep_algebra_simps)
+    apply (rule hn_refine_cons_res_complete_loose)
+    applyS (rule hnr_raw_array_upd[where x=xi and xi=xi])
+    
+    apply1 (clarsimp simp: hn_ctxt_def pure_def sep_algebra_simps entails_lift_extract_simps)
+    applyS rule
+    
+    apply1 (clarsimp simp: hn_ctxt_def pure_def sep_algebra_simps entails_lift_extract_simps)
+    apply1 (rule ENTAILSD) 
+    applyS fri
+    
+    applyS rule
+    
+    subgoal
+      unfolding mop_array_upd_def
+      apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+      apply parametricity
+      by simp
+    
+    subgoal
+      unfolding mop_array_upd_def  
+      by (rule attains_sup_mop_return)
+      
+    done
+qed    
+
+
     
 
 lemma hnr_array_new: 
   assumes PURE: "is_pure A"
-  assumes SV: "single_valued (the_pure A)"
   assumes INIT: "(init,x) \<in> the_pure A"
   shows "hn_refine 
     (hn_ctxt snat_assn i ii)
@@ -687,7 +867,7 @@ proof -
 
   show ?thesis  
     apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
-    apply (rule hn_refine_cons_res_complete)
+    apply (rule hn_refine_cons_res_complete_loose)
     applyS (rule hnr_raw_array_new)
     applyS rule
     applyS rule
@@ -697,7 +877,9 @@ proof -
       apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
       apply (parametricity add: INIT)
       by simp
-    applyS (simp add: list_rel_sv_iff SV)
+    subgoal
+      unfolding mop_array_new_def
+      by (rule attains_sup_mop_return)
     done
 qed
 
@@ -719,7 +901,14 @@ lemma FREE_array_assn:
   apply (rule FREE_raw_array_assn)
   done
 
+
   
+  
+lemma "(xs,xsi)\<in>\<langle>A\<rangle>list_rel \<Longrightarrow> i<length xs \<Longrightarrow> mop_array_nth xs i \<le>\<Down>A (mop_array_nth xsi i)"  
+  apply (auto simp: mop_array_nth_def pw_acost_le_iff refine_pw_simps)
+  apply parametricity by simp
+  
+    
   
 end
 
