@@ -11,8 +11,9 @@ context fixes A :: "'a \<Rightarrow> 'ai \<Rightarrow> assn" begin
   sepref_register "PR_CONST (ASSN_ANNOT A)"
   lemma [def_pat_rules]: "ASSN_ANNOT$A \<equiv> UNPROTECT (ASSN_ANNOT A)" by simp
   lemma [sepref_fr_rules]: "(return o (\<lambda>x. x), RETURN o PR_CONST (ASSN_ANNOT A)) \<in> A\<^sup>d\<rightarrow>\<^sub>aA"
-    by sepref_to_hoare vcg
-    
+    apply sepref_to_hoare
+    by vcg
+
 end  
 
 lemma annotate_assn: "x \<equiv> ASSN_ANNOT A x" by simp
@@ -484,12 +485,12 @@ lemma b_assn_intf[intf_of_assn]: "intf_of_assn V I \<Longrightarrow> intf_of_ass
 
 text \<open>Introduce extra goal for bounded result\<close>
 lemma hfref_bassn_resI:
-  assumes "\<And>xs. \<lbrakk>rdomp (fst As) xs; C xs\<rbrakk> \<Longrightarrow> a xs \<le>\<^sub>n SPEC P"
+  assumes "\<And>xs. \<lbrakk>rdomp (fst As) xs; C xs\<rbrakk> \<Longrightarrow> a xs \<le>\<^sub>n SPEC P t"
   assumes "(c,a)\<in>[C]\<^sub>a As \<rightarrow> R"
   shows "(c,a)\<in>[C]\<^sub>a As \<rightarrow> b_assn R P"
   apply rule
   apply (rule hn_refine_preI)
-  apply (rule hn_refine_cons[rotated])
+  apply (rule hn_refine_cons)
   apply (rule hn_refine_augment_res)
   apply (rule assms(2)[to_hnr, unfolded hn_ctxt_def autoref_tag_defs])
   apply simp
@@ -561,28 +562,35 @@ context standard_opr_abstraction begin
     
   abbreviation (input) sepref_assn where "sepref_assn \<equiv> pure rel"  
 
+
+lemma lift_acost_cost: "lift_acost (cost name 1) = (cost name 1)"
+  by (auto simp: one_enat_def zero_enat_def lift_acost_def cost_def zero_acost_def)
+
+
+  abbreviation (in -) "SPECc1 name aop == (\<lambda>a. SPECT [(aop a)\<mapsto>(cost name 1)])"
+
   lemma hn_un_op:
-    assumes "is_un_op PRE cop xmop aop"  
-    shows "(cop,(RETURN o aop)) \<in> [\<lambda>a. PRE TYPE('c) a]\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
+    assumes "is_un_op name PRE cop xmop aop"  
+    shows "(cop,SPECc1 name aop) \<in> [\<lambda>a. PRE TYPE('c) a]\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
     unfolding assn_is_rel[symmetric]
     apply sepref_to_hoare
-    supply [vcg_rules] = un_op_tmpl[OF assms]
+    supply [vcg_rules] = un_op_tmpl[OF assms, unfolded lift_acost_cost] 
     by vcg
       
   lemma hn_bin_op:
-    assumes "is_bin_op PRE cop xmop aop"  
-    shows "(uncurry cop,uncurry (RETURN oo aop)) \<in> [\<lambda>(a,b). PRE TYPE('c) a b]\<^sub>a sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
+    assumes "is_bin_op name PRE cop xmop aop"  
+    shows "(uncurry cop,SPECc1 name (uncurry aop)) \<in> [\<lambda>(a,b). PRE TYPE('c) a b]\<^sub>a sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
     unfolding assn_is_rel[symmetric]
     apply sepref_to_hoare
-    supply [vcg_rules] = bin_op_tmpl[OF assms]
+    supply [vcg_rules] = bin_op_tmpl[OF assms, unfolded lift_acost_cost]
     by vcg
     
   lemma hn_cmp_op:  
-    assumes "is_cmp_op cop xmop aop"
-    shows "(uncurry cop, uncurry (RETURN oo aop)) \<in> sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow>\<^sub>a bool.sepref_assn"
+    assumes "is_cmp_op name cop xmop aop"
+    shows "(uncurry cop,SPECc1 name (uncurry aop)) \<in> sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow>\<^sub>a bool.sepref_assn"
     unfolding assn_is_rel[symmetric] bool.assn_is_rel[symmetric]
     apply sepref_to_hoare
-    supply [vcg_rules] = cmp_op_tmpl[OF assms]
+    supply [vcg_rules] = cmp_op_tmpl[OF assms, unfolded lift_acost_cost]
     by vcg
     
 
@@ -623,20 +631,27 @@ lemma bool_const_refine[sepref_import_param]:
   by (auto simp: bool1_rel_def bool.rel_def in_br_conv)
   
 
-lemma hn_bool_ops[sepref_fr_rules]:
-  "(uncurry ll_and, uncurry (RETURN \<circ>\<circ> (\<and>))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_or, uncurry (RETURN \<circ>\<circ> (\<or>))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_xor, uncurry (RETURN \<circ>\<circ> (op_neq))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(ll_not1, RETURN \<circ> Not) \<in> bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+lemma hn_bool_ops:
+  "(uncurry ll_and, SPECc1 ''and'' (uncurry (\<and>))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_or, SPECc1 ''or'' (uncurry (\<or>))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_xor, SPECc1 ''xor'' (uncurry (op_neq))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(ll_not1, SPECc1 ''add'' Not) \<in> bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn" (* TODO: this is strange, but LLVM seems to implement Not, with an add opration *)
   using bool_bin_ops[THEN bool.hn_bin_op, folded bool1_rel_def, unfolded to_hfref_post]
     and bool_un_ops[THEN bool.hn_un_op, folded bool1_rel_def]
   unfolding op_neq_def  
   by simp_all
 
+lemmas f = hn_bool_ops[to_hnr,]
+lemmas hn_bool_ops[sepref_fr_rules] (* TODO: strange error *)
+
 text \<open>We define an implies connective, using sepref\<close>
-sepref_definition ll_implies is "uncurry (RETURN oo (\<longrightarrow>))" :: "bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+sepref_definition ll_implies is "\<lambda>(x,y). do { x \<leftarrow> SPECc1 ''add'' Not x; SPECc1 ''or'' (uncurry (\<or>)) (x,y) }" :: "bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
   unfolding imp_conv_disj
-  by sepref
+  apply sepref_dbg_preproc
+  apply sepref_dbg_cons_init
+  apply sepref_dbg_id
+  apply sepref_dbg_monadify (* TODO: some how stop monadify from looking in too deep *)
+  oops
 
 declare ll_implies_def[llvm_inline]
 declare ll_implies.refine[sepref_fr_rules]
