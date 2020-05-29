@@ -68,9 +68,6 @@ subsection \<open>Operations with Precondition\<close>
     using assms mop_spec_rl by simp
  
 
-  definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
-    "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
-
   lemma mop_leof_rl_from_def:  
     assumes "f \<equiv> mop P g"
     assumes "P x \<Longrightarrow> g x \<le>\<^sub>n z"

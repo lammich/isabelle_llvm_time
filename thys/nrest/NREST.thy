@@ -504,6 +504,8 @@ lemma consume_FAIL:
 lemma consume_Fails[simp]: "consume FAILT t = FAILT" by(auto simp: consume_def)
 
 
+
+
 section "pointwise reasoning"
 
 named_theorems refine_pw_simps 
@@ -870,7 +872,9 @@ lemma pw_acost_eqI':
 
 end
 
-
+subsection \<open> le_or_fail \<close>
+  definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
+    "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
 
 section \<open> Monad Operators \<close>
 
