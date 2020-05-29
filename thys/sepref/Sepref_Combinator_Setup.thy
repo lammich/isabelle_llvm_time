@@ -172,7 +172,7 @@ ML \<open>
       val t = cert t
       val tyt = cert tyt
     in
-      Drule.infer_instantiate' ctxt [SOME t, SOME tyt] @{thm itypeI}
+      Drule.infer_instantiate' ctxt [SOME t, SOME tyt] @{thm Sepref_Id_Op.itypeI}
     end
 
     (* Generate mcomb-theorem, required for monadify transformation.
@@ -344,9 +344,9 @@ ML \<open>
         val Lvars = Term.add_tvar_namesT L []
         val Rvars = Term.add_tvar_namesT R []
 
-        val _ = subset (=) (Rvars, Lvars) orelse (
+        val _ = subset op = (Rvars, Lvars) orelse (
           let
-            val frees = subtract (=) Lvars Rvars
+            val frees = subtract op = Lvars Rvars
               |> map (Term.string_of_vname)
               |> Pretty.str_list "[" "]"
               |> Pretty.string_of

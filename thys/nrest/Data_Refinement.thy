@@ -102,7 +102,7 @@ lemma conc_fun_RES_sv: "single_valued R \<Longrightarrow>
 *)
 
 lemma nrest_Rel_mono:
-  fixes A :: "('a,'b::complete_lattice) nrest"
+  fixes A :: "('a,'b::{complete_lattice,monoid_add}) nrest"
   shows "A \<le> B \<Longrightarrow> \<Down> R A \<le> \<Down> R B"
   unfolding conc_fun_def
   apply (auto split: nrest.split simp: le_fun_def)  
@@ -220,7 +220,7 @@ proof -
 qed
 
 
-lemma "(x,x')\<in>R \<Longrightarrow> (RETURNT x ::(_,'a::{nonneg,order,complete_lattice,zero}) nrest ) \<le> \<Down>R (RETURNT x')"
+lemma "(x,x')\<in>R \<Longrightarrow> (RETURNT x ::(_,'a::{nonneg,order,complete_lattice,monoid_add}) nrest ) \<le> \<Down>R (RETURNT x')"
   unfolding conc_fun_def RETURNT_def apply (auto simp: le_fun_def) 
 proof -
   consider "{uu:: 'a option. \<exists>a. (a = x' \<longrightarrow> uu = Some 0) \<and> (a \<noteq> x' \<longrightarrow> uu = None \<and> (x, a) \<in> R)} = { Some 0, None}"
@@ -476,7 +476,7 @@ lemma conc_fun_chain:
 
 
 lemma conc_fun_complete_lattice_chain:
-  fixes M :: "(_,'b::complete_lattice) nrest"
+  fixes M :: "(_,'b::{complete_lattice,monoid_add}) nrest"
   shows "\<Down>R (\<Down>S M) = \<Down>(R O S) M"
   apply(cases M)
   subgoal by simp
@@ -514,7 +514,7 @@ lemma conc_fun_fail_iff[simp]:
 
 
 lemma conc_trans[trans]:
-  fixes B :: "(_,'a::complete_lattice) nrest"
+  fixes B :: "(_,'a::{complete_lattice,monoid_add}) nrest"
   assumes A: "C \<le> \<Down>R B" and B: "B \<le> \<Down>R' A" 
   shows "C \<le> \<Down>R (\<Down>R' A)"
   apply(rule order.trans)

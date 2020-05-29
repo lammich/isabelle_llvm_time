@@ -280,11 +280,11 @@ lemma "(a::enat) + x \<ge> b  \<longleftrightarrow> x \<ge> myminus b a "
 
 section "NREST"
 
-datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::complete_lattice) option"
-
+datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{complete_lattice,monoid_add}) option"
+(*abbreviation "REST \<equiv> REST :: ('a \<Rightarrow> ('b::{complete_lattice,monoid_add}) option) \<Rightarrow> _"*)
 
                    
-instantiation nrest :: (type,complete_lattice) complete_lattice
+instantiation nrest :: (type,"{complete_lattice,monoid_add}") complete_lattice
 begin
 
 fun less_eq_nrest where
@@ -339,10 +339,10 @@ instance
 end
 
 
-definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, zero}) nrest" where
+definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, monoid_add}) nrest" where
   "RETURNT x \<equiv> REST (\<lambda>e. if e=x then Some 0 else None)"
-abbreviation "FAILT \<equiv> top::(_,_) nrest"
-abbreviation "SUCCEEDT \<equiv> bot::(_,_) nrest"
+abbreviation "FAILT \<equiv> top::(_,_::{complete_lattice, monoid_add}) nrest"
+abbreviation "SUCCEEDT \<equiv> bot::(_,_::{complete_lattice, monoid_add}) nrest"
 abbreviation SPECT where "SPECT \<equiv> REST"
 
 
@@ -355,7 +355,7 @@ definition "SPEC P t = REST (\<lambda>v. if P v then Some (t v) else None)"
 
 
 lemma consume_mono:
-  fixes  t :: "'a::{ordered_ab_semigroup_add,complete_lattice}"
+  fixes  t :: "'a::{ordered_ab_semigroup_add,complete_lattice,monoid_add}"
   shows "t\<le>t' \<Longrightarrow> M \<le> M' \<Longrightarrow> consume M t \<le> consume M' t'"
   unfolding consume_def apply (auto split: nrest.splits )
   unfolding le_fun_def apply auto
@@ -541,13 +541,13 @@ lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
 subsection "pw reasoning for enat"
 
 locale pointwise_reasoning_defs =
-  fixes  lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero}"
+  fixes  lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero,monoid_add}"
 begin
   definition inresT :: "(_,'ac) nrest \<Rightarrow> _ \<Rightarrow> 'cc \<Rightarrow> bool"
     where "inresT S x t \<equiv> REST ([x\<mapsto>lift t]) \<le> S"
 end
 
-locale pointwise_reasoning = pointwise_reasoning_defs lift for lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero}" +
+locale pointwise_reasoning = pointwise_reasoning_defs lift for lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero,monoid_add}" +
   assumes 
       lift_ord: "\<And>m n. (lift m \<le> lift n) = (m \<le> n)"
     and lift_le_zero: "lift t \<le> 0 \<longleftrightarrow> t \<le> 0"
@@ -722,7 +722,7 @@ end *)
 
 
 subsection \<open>pw reasoning for lifting to functions\<close>
-
+(*
 definition project_fun :: " 'b \<Rightarrow> ('a,'b\<Rightarrow>_) nrest \<Rightarrow>('a,_) nrest" where
   "project_fun b S  \<equiv> (case S of FAILi \<Rightarrow> FAILi | REST X \<Rightarrow> REST (\<lambda>x. case X x of None \<Rightarrow> None | Some m \<Rightarrow> Some (m b)))"
 
@@ -790,7 +790,7 @@ lemma pw_fun_eqI':
 
 
 end
-
+*)
  
 subsection \<open>pw reasoning for lifting to acost\<close>
 
@@ -969,7 +969,7 @@ lemma continuous_nrest: (* or generally, adding a top element *)
   unfolding Sup_nrest_def apply (auto split: nrest.splits)
   apply(subst continuousD[OF *])
   apply(rule arg_cong[where f=Sup]) 
-  apply  (auto split: nrest.splits)    
+  apply  (auto split: nrest.splits)
   using image_iff by fastforce
 
 
@@ -1231,7 +1231,7 @@ lemma SPEC_REST_emb'_conv: "SPEC P t = REST (emb' P t)"
 
 
 text \<open>Select some value with given property, or \<open>None\<close> if there is none.\<close>  
-definition SELECT :: "('a \<Rightarrow> bool) \<Rightarrow> 'c \<Rightarrow> ('a option,'c::{complete_lattice}) nrest"
+definition SELECT :: "('a \<Rightarrow> bool) \<Rightarrow> 'c \<Rightarrow> ('a option,'c::{complete_lattice,monoid_add}) nrest"
   where "SELECT P tf \<equiv> if \<exists>x. P x then REST (emb (\<lambda>r. case r of Some p \<Rightarrow> P p | None \<Rightarrow> False) tf)
                else REST [None \<mapsto> tf]"
 

@@ -573,6 +573,10 @@ lemma hn_ASSUME_bind[sepref_comb_rules]:
   apply (auto simp: vassn_tag_def)
   done
     
+  
+term bindT
+term RETURNT  
+  
 text \<open>Manual deallocation. Frees data before its variable goes out of scope\<close>  
 definition "mop_free x \<equiv> RETURNT ()"
 sepref_register mop_free (* HERE *)
