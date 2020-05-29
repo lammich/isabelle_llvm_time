@@ -13,7 +13,7 @@ lemma CONS_init:
   assumes "\<Gamma>' \<turnstile> \<Gamma>c'"
   assumes "\<And>a c. hn_ctxt R a c \<turnstile> hn_ctxt Rc a c"
   shows "hn_refine \<Gamma> c \<Gamma>c' Rc a"
-  apply (rule hn_refine_cons)
+  apply (rule hn_refine_cons[rotated])
   apply (rule entails_refl)
   apply (rule assms[unfolded hn_ctxt_def])+
   done
@@ -312,28 +312,52 @@ method_setup sepref_to_hoare = \<open>
 subsubsection \<open>Copying of Parameters\<close>
 lemma fold_COPY: "x = COPY x" by simp
 
-sepref_register COPY
+sepref_register COPY (* TODO *)
+
+lemma entailsD: "P s \<Longrightarrow> entails P P' \<Longrightarrow> P' s" unfolding entails_def by blast
+lemma entails_GC: "A \<turnstile> A \<and>* GC"
+  by (metis conj_entails_mono empty_ent_GC infer_post_triv sep_conj_empty)   
+
 
 text \<open>Copy is treated as normal operator, and one can just declare rules for it! \<close>
 lemma hnr_pure_COPY[sepref_fr_rules]:
   "CONSTRAINT is_pure R \<Longrightarrow> (return, RETURN o COPY) \<in> R\<^sup>k \<rightarrow>\<^sub>a R"
   apply (intro hfrefI hn_refineI) unfolding is_pure_conv pure_def
-  by vcg
+  apply simp apply(rule exI[where x=0]) apply(auto simp: wp_return) 
+  apply(rule entailsD) apply assumption
+  apply(simp add: sep_algebra_simps)      
+  by (metis conj_entails_mono empty_ent_GC infer_post_triv sep_conj_empty)   
   
 
 lemma hn_id[sepref_fr_rules]: "(\<lambda>x. return x,RETURN o id) \<in> A\<^sup>d \<rightarrow>\<^sub>a A"
   apply sepref_to_hoare
-  by vcg
+  apply (auto simp: wp_return sep_algebra_simps)
+  apply(rule exI[where x=0])
+  apply simp 
+  apply(rule entailsD) apply assumption 
+  by (metis conj_entails_mono empty_ent_GC infer_post_triv sep_conj_empty)  
   
 subsubsection \<open>Destructors\<close>  
-  
+
+lemma pffD: "(A ** B) x \<Longrightarrow> \<exists>aa bb. A (aa,bb)"
+  apply(drule sep_conjD) by auto
+lemma zero_if_le_zero_acost:
+  fixes Ca :: "ecost" 
+  shows "Ca \<le> 0 \<Longrightarrow> Ca = 0" apply(cases Ca) by (auto simp: less_eq_acost_def zero_acost_def)
 lemma hn_MK_FREEI:
   assumes "(free,RETURN o freea) \<in> A\<^sup>d \<rightarrow>\<^sub>a unit_assn"  
   shows "MK_FREE A free"
 proof -  
-  note [vcg_rules] = assms[to_hnr, THEN hn_refineD, unfolded hn_ctxt_def invalid_assn_def pure_def, simplified]
+  note x[vcg_rules] = assms[to_hnr, THEN hn_refineD, unfolded hn_ctxt_def invalid_assn_def pure_def, simplified]
   show ?thesis
-    by rule vcg
+    apply rule
+    unfolding htriple_def
+    apply auto
+    subgoal premises p for a c F aa b
+      using x[of "[()\<mapsto>0]", simplified, OF p] p[THEN pffD]
+      apply (auto simp: sep_algebra_simps pred_lift_def pure_part_def sep_conj_c  ) 
+      apply(drule zero_if_le_zero_acost) by simp 
+    done
 qed  
   
 lemma MK_FREE_hrcompI[sepref_frame_free_rules]:

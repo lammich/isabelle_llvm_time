@@ -195,7 +195,7 @@ term "$$n"
 
 lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
   by(auto simp: STATE_def)
-  
+
 lemma hn_refineI[intro]: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M; (\<Gamma>**F) (ll_\<alpha>(s,cr)) \<rbrakk>
           \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<and>
@@ -324,13 +324,15 @@ lemmas hn_refine_cons_res = hn_refine_cons_complete[OF _ entails_refl entails_re
 lemmas hn_refine_ref = hn_refine_cons_complete[OF _ entails_refl entails_refl entails_refl]
 
 
-(*
 lemma "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow> (P' ** Q ** F) s"
   unfolding entails_def   
   apply(subst (2) sep_conj_commute)
   apply(subst sep_conj_assoc[symmetric])
-  apply(rule sep_conjI)    apply (auto  dest: sep_conjD)
-     apply(auto simp add: sep_algebra_simps )
+  apply (drule sep_conjD)
+  apply safe
+  apply(rule sep_conjI)
+  by(auto simp add: sep_algebra_simps ) 
+
 
 lemma hn_refine_frame:
   assumes hnr: "hn_refine P' c Q' R m"
@@ -343,7 +345,9 @@ lemma hn_refine_frame:
     apply(drule sep_conjD) apply safe
     apply(drule ent[unfolded entails_def, rule_format]) 
     apply(simp add: sep_algebra_simps pred_lift_extract_simps)
-  apply clarsimp oops
+    apply clarsimp sorry
+  done
+(*
   apply (rule cons_rule[where P="P'**F", rotated])
   apply simp
   apply simp
@@ -351,7 +355,9 @@ lemma hn_refine_frame:
   apply (erule frame_rule)
   apply (auto simp: sep_algebra_simps pred_lift_extract_simps)
   by (metis sep.mult_commute)
+*)
 
+(*
 lemma hn_refine_frame': "hn_refine \<Gamma> c \<Gamma>' R m \<Longrightarrow> hn_refine (\<Gamma>**F) c (\<Gamma>'**F) R m"  
   by (simp add: hn_refine_frame)
   

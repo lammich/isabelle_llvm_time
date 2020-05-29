@@ -94,11 +94,11 @@ lemma trans_frame_rule:
   shows "hn_refine (\<Gamma>**F) c (\<Gamma>''**F) R a"
   apply (rule hn_refine_vassn_tagI)
   apply (rule hn_refine_frame[OF _ entails_refl])
-  applyF (rule hn_refine_cons_pre)
+  applyF (rule hn_refine_cons_pre[rotated])
     focus using assms(1) unfolding RECOVER_PURE_def apply assumption solved
-    oops
-    apply1 (rule assms)
-    applyS (metis RECOVER_PURE_def assms(1) entails_eq_iff entails_preI frame_thms(2))
+    apply1 (rule assms)  
+    applyS (metis (mono_tags) RECOVER_PURE_def assms(1) entails_eqI entails_preI entails_refl sep_rule(2))  
+    (* applyS (metis RECOVER_PURE_def assms(1) entails_eq_iff entails_preI frame_thms(2)) *)
   solved
   done
 
@@ -126,7 +126,7 @@ lemma cons_pre_rule: \<comment> \<open>Consequence rule to be applied if no dire
   assumes "P \<turnstile> P'"
   assumes "hn_refine P' c Q R m"
   shows "hn_refine P c Q R m"
-  using assms(2-) by (rule hn_refine_cons_pre)
+  using assms(2-) by (rule hn_refine_cons_pre[rotated])
 
 
 \<comment> \<open>Bounds-Solver\<close>
@@ -443,8 +443,13 @@ lemma hn_pass[sepref_fr_rules]:
   shows "hn_refine (hn_ctxt P x x') (return x') (hn_invalid P x x') P (PASS$x)"
   apply rule
   apply (subst invalidate_clone') unfolding hn_ctxt_def
-  apply vcg
-  done
+  apply(rule exI[where x=x])
+  apply(rule exI[where x=0]) apply (simp add: wp_return invalid_assn_def)
+  unfolding pred_lift_def pure_part_def
+  apply auto
+  subgoal using mod_starD by fastforce
+  subgoal sorry
+  done (* TODO: REFACTOR *)
 
 (*lemma hn_pass_pure[sepref_fr_rules]:
   shows "hn_refine (hn_val P x x') (return x') (hn_val P x x') (pure P) (PASS$x)"
@@ -460,7 +465,7 @@ lemma hn_bind[sepref_comb_rules]:
       hn_refine (hn_ctxt Rh x x' ** \<Gamma>1) (f' x') (\<Gamma>2 x x') R (f x)"
   assumes IMP: "\<And>x x'. \<Gamma>2 x x' \<turnstile> hn_ctxt Rx x x' ** \<Gamma>'"
   assumes "MK_FREE Rx fr"
-  shows "hn_refine \<Gamma> (doM {x\<leftarrow>m'; r\<leftarrow>f' x; fr x; return r}) \<Gamma>' R (Refine_Basic.bind$m$(\<lambda>\<^sub>2x. f x))"
+  shows "hn_refine \<Gamma> (doM {x\<leftarrow>m'; r\<leftarrow>f' x; fr x; return r}) \<Gamma>' R (NREST.bindT$m$(\<lambda>\<^sub>2x. f x))"
   using assms
   unfolding APP_def PROTECT2_def bind_ref_tag_def
   by (rule hnr_bind)
@@ -481,7 +486,7 @@ lemma hn_RECT'[sepref_comb_rules]:
     (P) (Monad.REC cB px) (hn_ctxt Rx' ax px ** F) Ry 
         (RECT$(\<lambda>\<^sub>2D x. aB D x)$ax)"
   unfolding APP_def PROTECT2_def 
-  apply (rule hn_refine_cons_pre[OF FR])
+  apply (rule hn_refine_cons_pre[OF _ FR])
   apply (rule hnr_RECT)
 
   apply (rule hn_refine_cons_post[OF _ FR'])
@@ -509,32 +514,21 @@ lemma hn_refine_synthI:
 lemma hn_refine_extract_pre_val: 
   "hn_refine (hn_val S xa xc ** \<Gamma>) c \<Gamma>' R m \<longleftrightarrow> ((xc,xa)\<in>S \<longrightarrow> hn_refine \<Gamma> c \<Gamma>' R m)"
   unfolding hn_refine_def hn_ctxt_def pure_def
-  by (auto simp: sep_algebra_simps pred_lift_extract_simps htriple_extract_pre_pure)
-  
-lemma hnr_freeI:
-  assumes "MK_FREE R fr"
-  assumes "hn_refine \<Gamma> c \<Gamma>' R' m"
-  shows "hn_refine (hn_ctxt R x y ** \<Gamma>) (doM { fr y; c}) \<Gamma>' R' m"  
-proof (rule hn_refine_nofailI)  
-  assume "nofail m"
-  note [vcg_rules] = MK_FREED[OF assms(1)] hn_refineD[OF assms(2) \<open>nofail m\<close>]
-  show ?thesis unfolding hn_ctxt_def
-    by rule vcg
-qed  
+  by (auto simp: STATE_def sep_algebra_simps pred_lift_extract_simps htriple_extract_pre_pure)
   
 lemma drop_hn_val: "hn_val R x y \<turnstile> \<box>" by (auto simp: hn_ctxt_def pure_def entails_def pred_lift_extract_simps)
 lemma drop_hn_invalid: "hn_invalid R x y \<turnstile> \<box>" by (auto simp: hn_ctxt_def invalid_assn_def entails_def pred_lift_extract_simps)
 
   
   
-definition [simp]: "op_ASSERT_bind I m \<equiv> Refine_Basic.bind (ASSERT I) (\<lambda>_. m)"
+definition [simp]: "op_ASSERT_bind I m \<equiv> NREST.bindT (ASSERT I) (\<lambda>_. m)"
 lemma pat_ASSERT_bind[def_pat_rules]:
-  "Refine_Basic.bind$(ASSERT$I)$(\<lambda>\<^sub>2_. m) \<equiv> UNPROTECT (op_ASSERT_bind I)$m"
+  "NREST.bindT$(ASSERT$I)$(\<lambda>\<^sub>2_. m) \<equiv> UNPROTECT (op_ASSERT_bind I)$m"
   by simp
 
 term "PR_CONST (op_ASSERT_bind I)"
 lemma id_op_ASSERT_bind[id_rules]: 
-  "PR_CONST (op_ASSERT_bind I) ::\<^sub>i TYPE('a nres \<Rightarrow> 'a nres)"
+  "PR_CONST (op_ASSERT_bind I) ::\<^sub>i TYPE((_,'a) nrest \<Rightarrow> (_,'a) nrest)"
   by simp
 
 lemma arity_ASSERT_bind[sepref_monadify_arity]:
@@ -549,14 +543,19 @@ lemma hn_ASSERT_bind[sepref_comb_rules]:
   apply (cases I)
   apply auto
   done
+(* TODO: MOVE *)
+definition "iASSUME r \<Phi> \<equiv> if \<Phi> then r () else bot"
+definition ASSUME where "ASSUME \<equiv> iASSUME RETURN"
+lemma ASSUME_True[simp]: "ASSUME True = RETURN ()"
+  by(auto simp: ASSUME_def iASSUME_def)
 
-definition [simp]: "op_ASSUME_bind I m \<equiv> Refine_Basic.bind (ASSUME I) (\<lambda>_. m)"
+definition [simp]: "op_ASSUME_bind I m \<equiv> NREST.bindT (ASSUME I) (\<lambda>_. m)"
 lemma pat_ASSUME_bind[def_pat_rules]:
-  "Refine_Basic.bind$(ASSUME$I)$(\<lambda>\<^sub>2_. m) \<equiv> UNPROTECT (op_ASSUME_bind I)$m"
+  "NREST.bindT$(ASSUME$I)$(\<lambda>\<^sub>2_. m) \<equiv> UNPROTECT (op_ASSUME_bind I)$m"
   by simp
 
 lemma id_op_ASSUME_bind[id_rules]: 
-  "PR_CONST (op_ASSUME_bind I) ::\<^sub>i TYPE('a nres \<Rightarrow> 'a nres)"
+  "PR_CONST (op_ASSUME_bind I) ::\<^sub>i TYPE((_,'a) nrest \<Rightarrow> (_,'a) nrest)"
   by simp
 
 lemma arity_ASSUME_bind[sepref_monadify_arity]:
@@ -575,8 +574,12 @@ lemma hn_ASSUME_bind[sepref_comb_rules]:
   done
     
 text \<open>Manual deallocation. Frees data before its variable goes out of scope\<close>  
-definition "mop_free x \<equiv> RETURN ()"
-sepref_register mop_free
+definition "mop_free x \<equiv> RETURNT ()"
+sepref_register mop_free (* HERE *)
+
+lemma heo: "(R a c \<and>* F) (ll_\<alpha> (s, cr)) \<Longrightarrow> \<exists>aa cc. R a c (aa,cc)"
+    apply(drule sep_conjD) by auto
+  
 
 lemma mop_free_hnr[sepref_fr_rules]:
   assumes "MK_FREE R f"  
@@ -584,22 +587,55 @@ lemma mop_free_hnr[sepref_fr_rules]:
   unfolding mop_free_def
   apply (rule hfrefI)
   apply (rule hn_refineI)
-  apply (rule htriple_pure_preI)
+  unfolding RETURNT_def apply simp
+  apply(rule exI[where x=0]) apply auto 
   apply (clarsimp 
-    simp: hn_ctxt_def pure_def sep_algebra_simps invalid_assn_def)
-  supply [vcg_rules] = MK_FREED[OF assms]
-  by vcg
-    
+    simp: hn_ctxt_def pure_def pure_part_def pred_lift_def sep_algebra_simps invalid_assn_def)
+  subgoal for c a F s cr
+    apply(rule wp_post_cons[unfolded STATE_def])
+    apply(rule MK_FREED[OF assms, unfolded htriple_def, rule_format, of a c F "(s,cr)"])
+     apply auto
+    apply(drule heo) apply auto 
+    by (simp add: pure_true_conv sep.mult_commute) 
+  done
+
+thm hnr_bind
+
+lemma hnr_freeI:
+  assumes "MK_FREE R fr"
+  assumes "hn_refine \<Gamma> c \<Gamma>' R' m"
+  shows "hn_refine (hn_ctxt R x y ** \<Gamma>) (doM { fr y; c}) \<Gamma>' R' m"  
+proof -
+  have "hn_refine (hn_ctxt R x y ** \<Gamma>) (doM { x \<leftarrow> fr y; r\<leftarrow>(\<lambda>_. c) x; return (); return r})
+                               \<Gamma>' R' (mop_free x \<then> m)"
+    apply(rule hnr_bind)
+       apply(rule hn_refine_frame)
+        apply(rule mop_free_hnr[OF assms(1), to_hnr, unfolded autoref_tag_defs])
+       apply (rule entails_refl)
+      apply(rule hn_refine_frame)
+       apply(rule assms(2))
+      apply (rule ENTAILSD)
+      apply fri
+     focus 
+    unfolding invalid_assn_def hn_ctxt_def apply (rule ENTAILSD)
+    apply fri
+    solved  
+    apply(rule mk_free_invalid[unfolded invalid_assn_def])
+    done 
+
+  thus ?thesis by (simp add: mop_free_def)
+qed
+
 subsection "Import of Parametricity Theorems"
 lemma pure_hn_refineI:
   assumes "Q \<longrightarrow> (c,a)\<in>R"
   shows "hn_refine (\<up>Q) (return c) (\<up>Q) (pure R) (RETURN a)"
-  unfolding hn_refine_def pure_def using assms by vcg
+  unfolding hn_refine_def pure_def using assms sorry
 
 lemma pure_hn_refineI_no_asm:
   assumes "(c,a)\<in>R"
   shows "hn_refine \<box> (return c) \<box> (pure R) (RETURN a)"
-  unfolding hn_refine_def pure_def using assms by vcg
+  unfolding hn_refine_def pure_def using assms sorry
 
 lemma import_param_0:
   "(P\<Longrightarrow>Q) \<equiv> Trueprop (PROTECT P \<longrightarrow> Q)"

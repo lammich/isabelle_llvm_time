@@ -18,7 +18,7 @@ subsection \<open> Setup of Extraction-Tools \<close>
     ("(_\<^sup>?)" [1000] 999)
     where "R\<^sup>? \<equiv> hf_pres R UNSPEC"
 
-  definition SYNTH :: "('a \<Rightarrow> 'r nres) \<Rightarrow> (('ai \<Rightarrow>'ri llM) \<times> ('a \<Rightarrow> 'r nres)) set \<Rightarrow> bool"
+  definition SYNTH :: "('a \<Rightarrow> (_,'r) nrest) \<Rightarrow> (('ai \<Rightarrow>'ri llM) \<times> ('a \<Rightarrow> (_,'r) nrest)) set \<Rightarrow> bool"
     where "SYNTH f R \<equiv> True"
 
   definition [simp]: "CP_UNCURRY _ _ \<equiv> True"

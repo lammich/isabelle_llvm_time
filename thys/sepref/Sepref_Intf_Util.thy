@@ -19,7 +19,7 @@ subsection \<open>Relation Interface Binding\<close>
 
     "INTF_OF_REL R TYPE('a) \<Longrightarrow> INTF_OF_REL (\<langle>R\<rangle>option_rel) TYPE('a option)"
     "INTF_OF_REL R TYPE('a) \<Longrightarrow> INTF_OF_REL (\<langle>R\<rangle>list_rel) TYPE('a list)"
-    "INTF_OF_REL R TYPE('a) \<Longrightarrow> INTF_OF_REL (\<langle>R\<rangle>nres_rel) TYPE('a nres)"
+    "INTF_OF_REL R TYPE('a) \<Longrightarrow> INTF_OF_REL (\<langle>R\<rangle>nrest_rel) TYPE(('a,_) nrest)"
     "\<lbrakk>INTF_OF_REL R TYPE('a); INTF_OF_REL S TYPE('b)\<rbrakk> \<Longrightarrow> INTF_OF_REL (R\<times>\<^sub>rS) TYPE('a\<times>'b)"
     "\<lbrakk>INTF_OF_REL R TYPE('a); INTF_OF_REL S TYPE('b)\<rbrakk> \<Longrightarrow> INTF_OF_REL (\<langle>R,S\<rangle>sum_rel) TYPE('a+'b)"
     "\<lbrakk>INTF_OF_REL R TYPE('a); INTF_OF_REL S TYPE('b)\<rbrakk> \<Longrightarrow> INTF_OF_REL (R\<rightarrow>S) TYPE('a\<Rightarrow>'b)"
@@ -33,26 +33,29 @@ subsection \<open>Relation Interface Binding\<close>
 
 
 subsection \<open>Operations with Precondition\<close>
-  definition mop :: "('a\<Rightarrow>bool) \<Rightarrow> ('a\<Rightarrow>'b nres) \<Rightarrow> 'a \<Rightarrow> 'b nres"
+  definition mop :: "('a\<Rightarrow>bool) \<Rightarrow> ('a\<Rightarrow>('b,_) nrest) \<Rightarrow> 'a \<Rightarrow> ('b,_) nrest"
     \<comment> \<open>Package operation with precondition\<close>
-    where [simp]: "mop P f \<equiv> \<lambda>x. doN {ASSERT (P x); f x}"
+    where [simp]: "mop P f \<equiv> \<lambda>x. do {ASSERT (P x); f x}"
   
   lemma param_op_mop_iff:
     assumes "(Q,P)\<in>R\<rightarrow>bool_rel"
     shows 
-    "(f, g) \<in> [P]\<^sub>f R \<rightarrow> \<langle>S\<rangle>nres_rel
+    "(f, g) \<in> [P]\<^sub>f R \<rightarrow> \<langle>S\<rangle>nrest_rel
     \<longleftrightarrow> 
-    (mop Q f, mop P g) \<in> R \<rightarrow>\<^sub>f \<langle>S\<rangle>nres_rel
+    (mop Q f, mop P g) \<in> R \<rightarrow>\<^sub>f \<langle>S\<rangle>nrest_rel
     "
     using assms
-    by (auto 
-      simp: mop_def fref_def pw_nres_rel_iff refine_pw_simps
-      dest: fun_relD)
+    apply(auto simp: mop_def fref_def nrest_rel_def)
+    subgoal for x y apply(cases "Q x") by (auto dest: fun_relD)
+    subgoal premises p for x y apply(cases "P y")
+      using p(2)[rule_format, OF p(4)]  p(1,3) p(4)
+      by (auto dest: fun_relD)
+    done
 
   lemma param_mopI:
-    assumes "(f,g) \<in> [P]\<^sub>f R \<rightarrow> \<langle>S\<rangle>nres_rel"  
+    assumes "(f,g) \<in> [P]\<^sub>f R \<rightarrow> \<langle>S\<rangle>nrest_rel"  
     assumes "(Q,P) \<in> R \<rightarrow> bool_rel"
-    shows "(mop Q f, mop P g) \<in> R \<rightarrow>\<^sub>f \<langle>S\<rangle>nres_rel"
+    shows "(mop Q f, mop P g) \<in> R \<rightarrow>\<^sub>f \<langle>S\<rangle>nrest_rel"
     using assms by (simp add: param_op_mop_iff)
 
   lemma mop_spec_rl: "P x \<Longrightarrow> mop P f x \<le> f x" by simp
@@ -63,16 +66,21 @@ subsection \<open>Operations with Precondition\<close>
     assumes "g x \<le> z"
     shows "f x \<le> z"
     using assms mop_spec_rl by simp
+ 
+
+  definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
+    "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
 
   lemma mop_leof_rl_from_def:  
     assumes "f \<equiv> mop P g"
     assumes "P x \<Longrightarrow> g x \<le>\<^sub>n z"
     shows "f x \<le>\<^sub>n z"
     using assms 
-    by (simp add: pw_leof_iff refine_pw_simps)
+    unfolding mop_def le_or_fail_def apply(cases "P x")
+    by auto 
+ 
 
-
-  lemma assert_true_bind_conv: "doN {ASSERT True; m} = m" by simp 
+  lemma assert_true_bind_conv: "do {ASSERT True; m} = m" by simp 
 
   lemmas mop_alt_unfolds = curry_def curry0_def mop_def uncurry_apply uncurry0_apply o_apply assert_true_bind_conv
 
@@ -154,7 +162,7 @@ subsubsection \<open>Premises\<close>
 
 subsubsection \<open>Composition Rules\<close>
   lemma hfcomp_tcomp_pre:
-    assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nres_rel)"
+    assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nrest_rel)"
     assumes A: "(f,g) \<in> [P]\<^sub>a\<^sub>d RR' \<rightarrow> S"
     shows "(f,h) \<in> [tcomp_pre Q T P]\<^sub>a\<^sub>d hrp_comp RR' T \<rightarrow> hrr_comp T S U"
     using hfcomp[OF A B] by simp
@@ -179,7 +187,9 @@ subsubsection \<open>Composition Rules\<close>
   lemma hfref_mop_conv: "((g,mop P f) \<in> [Q]\<^sub>a\<^sub>d R \<rightarrow> S) \<longleftrightarrow> (g,f) \<in> [\<lambda>x. P x \<and> Q x]\<^sub>a\<^sub>d R \<rightarrow> S"
     apply (simp add: hfref_to_ASSERT_conv)
     apply (fo_rule arg_cong fun_cong)+
-    by (auto intro!: ext simp: pw_eq_iff refine_pw_simps)
+    apply(rule ext)
+    subgoal for x apply(cases "Q x", cases "P x") by auto 
+    done
   
   lemma hfref_op_to_mop:
     assumes R: "(impl,f) \<in> [Q]\<^sub>a\<^sub>d R \<rightarrow> S"
@@ -729,8 +739,8 @@ subsection \<open>ML-Level Declarations\<close>
         val _ = dbg_trace lthy "Convert both, relation and operation to uncurried form, and add nres"
         val _ = dbg_trace lthy "Convert relation (arguments have already been separated by analyze-rel)"
         val res = case res of 
-          @{mpat "\<lambda>_. \<langle>_\<rangle>nres_rel"} => res
-        | _ => @{mk_term "\<lambda>x. \<langle>?res x\<rangle>nres_rel"}
+          @{mpat "\<lambda>_. \<langle>_\<rangle>nrest_rel"} => res
+        | _ => @{mk_term "\<lambda>x. (\<langle>?res x\<rangle>nrest_rel ::  ((_,ecost)nrest\<times>_) set )"}
         val relt = mk_rel (SOME pre,args,res)
         
         val _ = dbg_trace_term lthy "Converted relation" relt
@@ -754,7 +764,7 @@ subsection \<open>ML-Level Declarations\<close>
           (* Add RETURN o...o if necessary*)
           val opc = 
             if op_is_nres then opc
-            else mk_compN_pre op_ar (Const(@{const_name Refine_Basic.RETURN},dummyT)) opc
+            else mk_compN_pre op_ar (Const(@{const_name NREST.RETURNT},dummyT)) opc
   
           (* Add uncurry if necessary *)  
           val opc = mk_uncurryN_pre op_ar opc
@@ -1298,29 +1308,35 @@ subsection \<open>Obsolete Manual Specification Helpers\<close>
   (* Generate VCG-rules for operations *)
   lemma vcg_of_RETURN_np:  
     assumes "f \<equiv> RETURN r"
-    shows "SPEC (\<lambda>x. x=r) \<le> m \<Longrightarrow> f \<le> m"
-      and "SPEC (\<lambda>x. x=r) \<le>\<^sub>n m \<Longrightarrow> f \<le>\<^sub>n m"
+    shows "SPEC (\<lambda>x. x=r) (\<lambda>_. 0) \<le> m \<Longrightarrow> f \<le> m"
+      and "SPEC (\<lambda>x. x=r) (\<lambda>_. 0) \<le>\<^sub>n m \<Longrightarrow> f \<le>\<^sub>n m"
     using assms
-    by (auto simp: pw_le_iff pw_leof_iff)
+    by (auto simp: RETURNT_def SPEC_def)
 
   lemma vcg_of_RETURN:
     assumes "f \<equiv> do { ASSERT \<Phi>; RETURN r }"
-    shows "\<lbrakk>\<Phi>; SPEC (\<lambda>x. x=r) \<le> m\<rbrakk> \<Longrightarrow> f \<le> m"
-      and "\<lbrakk>\<Phi> \<Longrightarrow> SPEC (\<lambda>x. x=r) \<le>\<^sub>n m\<rbrakk> \<Longrightarrow> f \<le>\<^sub>n m"
+    shows "\<lbrakk>\<Phi>; SPEC (\<lambda>x. x=r) (\<lambda>_. 0) \<le> m\<rbrakk> \<Longrightarrow> f \<le> m"
+      and "\<lbrakk>\<Phi> \<Longrightarrow> SPEC (\<lambda>x. x=r) (\<lambda>_. 0) \<le>\<^sub>n m\<rbrakk> \<Longrightarrow> f \<le>\<^sub>n m"
     using assms
-    by (auto simp: pw_le_iff pw_leof_iff refine_pw_simps)
+     apply (auto simp: ASSERT_def iASSERT_def SPEC_def le_or_fail_def )
+    by(auto simp: RETURNT_def)
 
   lemma vcg_of_SPEC:  
-    assumes "f \<equiv> do { ASSERT pre; SPEC post }"
-    shows "\<lbrakk>pre; SPEC post \<le> m\<rbrakk> \<Longrightarrow> f \<le> m"
-      and "\<lbrakk>pre \<Longrightarrow> SPEC post \<le>\<^sub>n m\<rbrakk> \<Longrightarrow> f \<le>\<^sub>n m"
+    assumes "f \<equiv> do { ASSERT pre; SPEC post t }"
+    shows "\<lbrakk>pre; SPEC post t \<le> m\<rbrakk> \<Longrightarrow> f \<le> m"
+      and "\<lbrakk>pre \<Longrightarrow> SPEC post t \<le>\<^sub>n m\<rbrakk> \<Longrightarrow> f \<le>\<^sub>n m"
     using assms
-    by (auto simp: pw_le_iff pw_leof_iff refine_pw_simps)
+    apply(cases pre)
+      apply (auto simp:   SPEC_def le_or_fail_def  )
+    using assms
+    apply(cases pre)
+     apply (auto simp:   SPEC_def le_or_fail_def  )
+    done
 
   lemma vcg_of_SPEC_np:  
-    assumes "f \<equiv> SPEC post"
-    shows "SPEC post \<le> m \<Longrightarrow> f \<le> m"
-      and "SPEC post \<le>\<^sub>n m \<Longrightarrow> f \<le>\<^sub>n m"
+    assumes "f \<equiv> SPEC post t"
+    shows "SPEC post t \<le> m \<Longrightarrow> f \<le> m"
+      and "SPEC post t \<le>\<^sub>n m \<Longrightarrow> f \<le>\<^sub>n m"
     using assms
     by auto 
 
@@ -1331,95 +1347,101 @@ subsection \<open>Obsolete Manual Specification Helpers\<close>
     plain operations to monadic ones. Use with FCOMP.
   *)  
   lemma mk_mop_rl1:
-    assumes "\<And>x. mf x \<equiv> doN {ASSERT (P x); RETURN (f x)}"
-    shows "(RETURN o f, mf) \<in> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    assumes "\<And>x. mf x \<equiv> do {ASSERT (P x); RETURN (f x)}"
+    shows "(RETURN o f, mf) \<in> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+      apply (auto intro!: nrest_relI)
+    subgoal for x apply (cases "P x") by auto
+    done
 
   lemma mk_mop_rl2:
-    assumes "\<And>x y. mf x y \<equiv> doN {ASSERT (P x y); RETURN (f x y)}"
-    shows "(RETURN oo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    assumes "\<And>x y. mf x y \<equiv> do {ASSERT (P x y); RETURN (f x y)}"
+    shows "(RETURN oo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+    apply (auto intro!: nrest_relI)
+    subgoal for a b apply(cases "P a b") by auto
+    done
 
   lemma mk_mop_rl3:
-    assumes "\<And>x y z. mf x y z \<equiv> doN {ASSERT (P x y z); RETURN (f x y z)}"
-    shows "(RETURN ooo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    assumes "\<And>x y z. mf x y z \<equiv> do {ASSERT (P x y z); RETURN (f x y z)}"
+    shows "(RETURN ooo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+    apply (auto intro!: nrest_relI)
+    subgoal for a b c apply(cases "P a b c") by auto
+    done
 
   lemma mk_mop_rl0_np:
     assumes "mf \<equiv> RETURN f"
-    shows "(RETURN f, mf) \<in> \<langle>Id\<rangle>nres_rel"
+    shows "(RETURN f, mf) \<in> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+    by (auto intro!: nrest_relI) 
 
   lemma mk_mop_rl1_np:
     assumes "\<And>x. mf x \<equiv> RETURN (f x)"
-    shows "(RETURN o f, mf) \<in> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    shows "(RETURN o f, mf) \<in> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+    by (auto intro!: nrest_relI) 
 
   lemma mk_mop_rl2_np:
     assumes "\<And>x y. mf x y \<equiv> RETURN (f x y)"
-    shows "(RETURN oo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    shows "(RETURN oo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+    by (auto intro!: nrest_relI) 
 
   lemma mk_mop_rl3_np:
     assumes "\<And>x y z. mf x y z \<equiv> RETURN (f x y z)"
-    shows "(RETURN ooo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    shows "(RETURN ooo f, mf) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding assms[abs_def]
-    by (auto intro!: nres_relI simp: pw_le_iff refine_pw_simps)
+    by (auto intro!: nrest_relI) 
 
 
 
   lemma mk_op_rl0_np:
     assumes "mf \<equiv> RETURN f"
-    shows "(uncurry0 mf, uncurry0 (RETURN f)) \<in> unit_rel \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    shows "(uncurry0 mf, uncurry0 (RETURN f)) \<in> unit_rel \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
   lemma mk_op_rl1:
-    assumes "\<And>x. mf x \<equiv> doN {ASSERT (P x); RETURN (f x)}"
-    shows "(mf, RETURN o f) \<in> [P]\<^sub>f Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    assumes "\<And>x. mf x \<equiv> do {ASSERT (P x); RETURN (f x)}"
+    shows "(mf, RETURN o f) \<in> [P]\<^sub>f Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
   lemma mk_op_rl1_np:
     assumes "\<And>x. mf x \<equiv> RETURN (f x)"
-    shows "(mf, (RETURN o f)) \<in> Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    shows "(mf, (RETURN o f)) \<in> Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
   lemma mk_op_rl2:
-    assumes "\<And>x y. mf x y \<equiv> doN {ASSERT (P x y); RETURN (f x y)}"
-    shows "(uncurry mf, uncurry (RETURN oo f)) \<in> [uncurry P]\<^sub>f Id\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    assumes "\<And>x y. mf x y \<equiv> do {ASSERT (P x y); RETURN (f x y)}"
+    shows "(uncurry mf, uncurry (RETURN oo f)) \<in> [uncurry P]\<^sub>f Id\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
   lemma mk_op_rl2_np:
     assumes "\<And>x y. mf x y \<equiv> RETURN (f x y)"
-    shows "(uncurry mf, uncurry (RETURN oo f)) \<in> Id\<times>\<^sub>rId \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    shows "(uncurry mf, uncurry (RETURN oo f)) \<in> Id\<times>\<^sub>rId \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
   lemma mk_op_rl3:
-    assumes "\<And>x y z. mf x y z \<equiv> doN {ASSERT (P x y z); RETURN (f x y z)}"
-    shows "(uncurry2 mf, uncurry2 (RETURN ooo f)) \<in> [uncurry2 P]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    assumes "\<And>x y z. mf x y z \<equiv> do {ASSERT (P x y z); RETURN (f x y z)}"
+    shows "(uncurry2 mf, uncurry2 (RETURN ooo f)) \<in> [uncurry2 P]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
   lemma mk_op_rl3_np:
     assumes "\<And>x y z. mf x y z \<equiv> RETURN (f x y z)"
-    shows "(uncurry2 mf, uncurry2 (RETURN ooo f)) \<in> (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
-    apply (intro frefI nres_relI)
+    shows "(uncurry2 mf, uncurry2 (RETURN ooo f)) \<in> (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
+    apply (intro frefI nrest_relI)
     apply (auto simp: assms)
     done
 
