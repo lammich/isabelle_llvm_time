@@ -6,12 +6,12 @@ imports
   (* Refine_Monadic_Add *)
   "Lib/Sepref_Misc"
   "Lib/Structured_Apply"
-  Sepref_Id_Op
   "../nrest/NREST_Main"
+  Sepref_Id_Op
 begin
-(*
+
 no_notation i_ANNOT (infixr ":::\<^sub>i" 10)
-no_notation CONST_INTF (infixr "::\<^sub>i" 10) *)
+no_notation CONST_INTF (infixr "::\<^sub>i" 10)
 
 no_notation pred_K ("\<langle>_\<rangle>")
 
