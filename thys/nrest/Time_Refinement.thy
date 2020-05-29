@@ -628,5 +628,25 @@ lemma timerefine_bindT_ge:
     done
   done
 
- 
+
+
+lemma timerefine_R_mono: 
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR R'"
+  shows "R\<le>R' \<Longrightarrow> timerefine R c \<le> timerefine R' c"
+  unfolding timerefine_def apply(cases c)
+   apply (auto intro!: le_funI simp: less_eq_acost_def split: option.splits)
+  apply(rule Sum_any_mono)
+   apply(rule mult_left_mono) apply(auto simp: le_fun_def)
+  subgoal premises prems for x2 x x2a xa xb 
+    using prems(1)[rule_format, of xb] apply(cases "R xb"; cases "R' xb") apply auto 
+    unfolding less_eq_acost_def by auto
+  subgoal for x2 x x2a xa using assms(1) unfolding wfR_def
+    apply -
+    apply(rule finite_subset[where B="{x. the_acost (R' x) xa \<noteq> 0}"]) apply auto
+    apply(rule wfR_fst) apply (rule assms) done
+  done
+
+
+
 end
