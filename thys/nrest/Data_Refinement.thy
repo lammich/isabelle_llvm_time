@@ -23,6 +23,9 @@ lemma
   abs_fun_RES: "\<Up>R (REST X) = (if dom X\<subseteq>Domain R then REST (\<lambda>a. Sup {X c| c. (c,a)\<in>R}) else FAILT)"
   unfolding abs_fun_def by (auto split: nrest.split)
 
+
+lemma conc_fun_spec_ne_FAIL[simp]: "\<Down>R (SPECT M) \<noteq> FAILT" by (simp add: conc_fun_RES)   
+
 notepad begin
   fix m m' :: "bool \<Rightarrow> ( (string,enat) acost) option" and R co x
   assume m: "m = [ True \<mapsto> acostC ((\<lambda>_. 0)(''a'':=2,''b'':=2)) ]"

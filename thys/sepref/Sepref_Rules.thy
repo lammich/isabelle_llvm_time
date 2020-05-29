@@ -499,6 +499,197 @@ lemma pwD2:
 (*
     apply (meson assms(1) assms(2) assms(3) inresT_def nrest_relD pwD2 inresT_abs_fun)
     *) oops
+
+
+
+lemma SomeSup_D: "Some y \<le> Sup {M' a |a. (r, a) \<in> RR} \<Longrightarrow> (\<exists>a. (r, a) \<in> RR)"
+  unfolding Sup_option_def by (auto split: if_splits)
+
+lemma aux:
+  fixes M :: "_ \<rightharpoonup> ecost"
+  assumes "\<And>r. r\<in>dom M \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  shows "\<forall>r\<in>dom M. \<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms
+  (* with single_valued RR *)
+  apply (auto simp: conc_fun_RES)
+  unfolding le_fun_def 
+  subgoal premises p for r y using p(2)[rule_format, of r] p(1)[of r, OF _ SomeSup_D] p(3)
+    by force
+  done
+
+lemma aux':
+  fixes M :: "_ \<rightharpoonup> ecost"
+  assumes "\<And>r. r\<in>dom M \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  assumes "Some cr \<le> M r"
+  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+  using assms aux[of M RR M']
+  by fastforce
+
+
+lemma single_valued_SupinSup:
+  fixes M' :: "_ \<Rightarrow> (_::complete_lattice) option"
+  shows "single_valued RR \<Longrightarrow> (\<exists>a. (r,a)\<in>RR) \<Longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"
+proof -
+  assume SV: "single_valued RR" and "(\<exists>a. (r,a)\<in>RR)"
+  then obtain a where "(r,a)\<in>RR" by auto
+  then have "{M' a| a. (r,a)\<in>RR} = {M' a}"
+    apply auto using SV[THEN single_valuedD] by auto
+  then show ?thesis by auto
+qed
+  
+
+lemma conc_fun_inRR: "SPECT x2 \<le> \<Down> RR (SPECT M) \<Longrightarrow> r \<in> dom x2 \<Longrightarrow> (\<exists>a. (r,a)\<in>RR)"
+  unfolding conc_fun_def apply auto unfolding le_fun_def 
+  subgoal premises p for y apply(rule SomeSup_D)
+    using p(1)[rule_format, of r] p(2) by simp
+  done
+
+paragraph \<open>attains_sup\<close>
+  
+definition "attains_sup m m' RR \<equiv> 
+  \<forall>r M' M. m=SPECT M \<longrightarrow> m'=SPECT M' \<longrightarrow> r\<in>dom M \<longrightarrow> (\<exists>a. (r,a)\<in>RR) \<longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"  
+
+(* Proving attains_sup *)  
+
+(* Single Valued *)
+lemma attains_sup_sv: "single_valued RR \<Longrightarrow> attains_sup m m' RR"  
+  unfolding attains_sup_def
+  using single_valued_SupinSup by fastforce  
+  
+
+(* Time does not depend on Result (one-time) *)
+ 
+definition "one_time m \<equiv> \<forall>M. m=SPECT M \<longrightarrow> (\<forall>x y s t. M x = Some s \<and> M y = Some t \<longrightarrow> s=t)"
+
+lemma one_time_attains_sup:
+  assumes one_time: "one_time m'"
+  shows "attains_sup m m' RR"
+  unfolding attains_sup_def 
+  apply clarify
+proof -
+  fix r M' M y aa
+  assume [simp]: "m' = SPECT M'" and "(r, aa) \<in> RR"
+  show "\<exists>aa. Sup {M' a |a. (r, a) \<in> RR} = M' aa \<and> (r, aa) \<in> RR" (is "\<exists>_. Sup ?MM = _ \<and> _")
+  proof (cases "\<exists>a c. (r,a)\<in>RR \<and> M' a = Some c")
+    case True
+    then obtain a c where 1: "(r,a)\<in>RR" "M' a = Some c" by blast
+    with one_time have "Some c \<in> ?MM" "?MM \<subseteq> {None,Some c}"
+      unfolding one_time_def
+      by (auto) metis
+    thus ?thesis using 1
+      by (smt Sup_insert Sup_le_iff Sup_subset_mono cSup_eq_maximum ccpo_Sup_singleton empty_Sup insert_commute) 
+  next
+    case False   
+    hence "?MM = {None}" using \<open>(r,aa)\<in>RR\<close> by force
+    thus ?thesis using False \<open>(r,aa)\<in>RR\<close> by auto
+  qed      
+qed  
+
+
+
+lemma OT_return: "one_time (RETURNT x)"
+  unfolding one_time_def by auto
+  
+lemma OT_consume: "one_time m \<Longrightarrow> one_time (consume m c)"  
+  unfolding one_time_def consume_def
+  by (auto split: nrest.splits; blast)
+  
+lemma OT_assert: "one_time (ASSERT \<Phi>)"  
+  unfolding one_time_def 
+  by (cases \<Phi>) auto
+  
+lemma OT_fail: "one_time FAILT"
+  unfolding one_time_def by auto
+
+lemma OT_spec: "one_time (SPEC P (\<lambda>_. c))"
+  unfolding one_time_def SPEC_def by auto
+  
+    
+lemma attains_sup_mop_return:
+  "attains_sup m (do {ASSERT \<Phi>; consume (RETURNT x) (c::ecost)}) R"
+  apply (rule one_time_attains_sup)
+  apply (cases \<Phi>; simp add: OT_consume OT_return OT_fail)
+  done
+
+lemma attains_sup_mop_spec:
+  "attains_sup m (do {ASSERT \<Phi>; SPEC P (\<lambda>_. c::ecost)}) R"
+  apply (rule one_time_attains_sup)
+  apply (cases \<Phi>; simp add: OT_consume OT_return OT_fail OT_spec)
+  done
+
+
+  
+  
+  
+  
+  
+lemma hn_refine_result:
+  assumes R: "hn_refine P c Q R m"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes WB: "attains_sup m m' RR"
+  shows "hn_refine P c Q (hr_comp R RR) m'"
+  supply WB' = WB[unfolded attains_sup_def, rule_format]
+  unfolding hn_refine_def
+  apply clarify
+  using LE apply (cases m; simp)
+  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
+  apply (elim exE conjE)
+  subgoal premises p for F s cr M x2 ra Ca
+    using aux'[OF WB'[OF p(4,1)], simplified, OF _ p(3,5), simplified] p(5,6)
+    apply -
+    apply (elim exE conjE)
+
+    apply (intro exI conjI)
+     apply (rule order_trans, assumption+)  
+
+    apply (erule wp_post_cons)
+    unfolding hr_comp_def
+    apply (rule ENTAILSD)
+    apply fri
+    done
+  done
+
+
+lemma hn_refine_result_SV:
+  assumes R: "hn_refine P c Q R m"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes SV: "single_valued RR"
+  shows "hn_refine P c Q (hr_comp R RR) m'"
+  apply(rule hn_refine_result)
+    apply fact
+   apply fact
+  apply(rule attains_sup_sv)
+   apply (rule SV)
+  done
+
+
+    
+lemma hn_refine_cons_res_complete:
+  assumes R: "hn_refine P' c Q R m"
+  assumes I: "P\<turnstile>P'"
+  assumes I': "Q\<turnstile>Q'"
+  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes SV: "single_valued RR"
+  shows "hn_refine P c Q' (hr_comp R RR) m'"
+  apply (rule hn_refine_result)
+  apply (rule hn_refine_cons)
+  by (fact|rule attains_sup_sv|simp)+
+
+lemma hn_refine_cons_res_complete_loose:
+  assumes R: "hn_refine P' c Q R m"
+  assumes I: "P\<turnstile>P'"
+  assumes I': "Q\<turnstile>Q'"
+  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
+  assumes LE: "m\<le>\<Down>RR m'"
+  assumes AS: "attains_sup m m' RR"
+  shows "hn_refine P c Q' (hr_comp R RR) m'"
+  apply (rule hn_refine_result)
+  apply (rule hn_refine_cons)
+  by (fact|simp)+
+
     
     
   definition "hrr_comp R R1 R2 x y a c \<equiv> 
