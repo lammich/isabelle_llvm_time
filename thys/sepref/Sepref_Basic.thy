@@ -196,6 +196,39 @@ term "$$n"
 lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
   by(auto simp: STATE_def)
 
+
+lemma hn_refineI_SPECT: 
+  assumes "llvm_htriple ($(cost name t) ** \<Gamma>) c (\<lambda>r. \<Gamma>' ** R x r)"
+  shows "hn_refine \<Gamma> c \<Gamma>' R (SPECT [x\<mapsto>cost name t])"  
+  apply (auto simp add: hn_refine_def STATE_alt)
+  apply(rule exI[where x="cost name t"]) apply simp
+proof (goal_cases)
+  fix F s cr
+  assume "(\<Gamma> ** F) (ll_\<alpha> (s, cr))"
+  then have "((\<Gamma> ** F) ** $(cost name t)) (ll_\<alpha> (s, cr + cost name t))"
+  unfolding lift_\<alpha>_cost_def ll_\<alpha>_def
+    apply(rule sep_conjI[where y="(0,cost name t)"])
+    subgoal by(simp add: time_credits_assn_def sep_algebra_simps)  
+    subgoal by(simp add: sep_disj_enat_def sep_disj_acost_def sep_algebra_simps)  
+    subgoal by(simp add: sep_disj_enat_def sep_disj_acost_def sep_algebra_simps)  
+    done
+  then have "(($cost name t \<and>* \<Gamma>) \<and>* F) (ll_\<alpha> (s, cr + cost name t))"
+    by (simp add: sep_conj_c)
+
+  from assms[unfolded htriple_def, rule_format, OF this]
+  show "wp c (\<lambda>r s. (\<Gamma>' \<and>* R x r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + cost name t)"
+    by (simp add: sep_algebra_simps sep_conj_c) 
+qed
+
+lemma hn_refineI': 
+  assumes "llvm_htriple \<Gamma> c (\<lambda>r. \<Gamma>' ** R x r)"
+  shows "hn_refine \<Gamma> c \<Gamma>' R (RETURNT x)"  
+  apply (auto simp add: hn_refine_def STATE_alt)
+  apply(rule exI[where x=0]) apply simp
+  using assms unfolding htriple_def
+  by (simp add: sep_conj_c) 
+
+
 lemma hn_refineI[intro]: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M; (\<Gamma>**F) (ll_\<alpha>(s,cr)) \<rbrakk>
           \<Longrightarrow> (\<exists>ra Ca. M ra \<ge> Some Ca \<and>
@@ -350,21 +383,38 @@ lemma hn_refine_frame:
 lemma hn_refine_frame': "hn_refine \<Gamma> c \<Gamma>' R m \<Longrightarrow> hn_refine (\<Gamma>**F) c (\<Gamma>'**F) R m"  
   by (simp add: hn_refine_frame) 
  
-(*
+
 lemma hn_refine_augment_res:
   assumes A: "hn_refine \<Gamma> f \<Gamma>' R g"
-  assumes B: "g \<le>\<^sub>n SPEC \<Phi>"
+  assumes B: "g \<le>\<^sub>n SPEC \<Phi> t"
   shows "hn_refine \<Gamma> f \<Gamma>' (\<lambda>a c. R a c ** \<up>(\<Phi> a)) g"
   apply (rule hn_refineI)
-  apply (rule cons_post_rule)
-  apply (erule A[THEN hn_refineD])
-  apply (erule sep_conj_impl, simp)
-  apply clarsimp apply (rule exI)
-  apply (erule sep_conj_impl, simp)
-  using B
-  apply (auto simp: pred_lift_extract_simps pw_le_iff pw_leof_iff)
-  done
-*)
+proof -
+  fix F s cr M
+  assume g: "g = SPECT M" and h:"(\<Gamma> \<and>* F) (ll_\<alpha> (s, cr))"
+
+  from A[THEN hn_refineD, OF this] obtain ra Ca
+    where s: "Some Ca \<le> M ra"
+      and w: "wp f (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)"
+    by blast
+
+  from B g have "\<And>x. M x \<le> (if \<Phi> x then Some (t x) else None)"
+    by(auto simp: le_or_fail_def SPEC_def le_fun_def)
+  from this[of ra] have *: "\<Phi> ra"
+    using s apply(auto split: if_splits simp: less_eq_option_None_is_None )
+    using less_eq_option_Some_None order.trans by blast
+
+  show "\<exists>ra Ca.
+              Some Ca \<le> M ra \<and>
+              wp f (\<lambda>r s. (\<Gamma>' \<and>* (R ra r \<and>* \<up>\<Phi> ra) \<and>* F \<and>* GC) (ll_\<alpha> s))
+               (s, cr + Ca)"
+    apply(rule exI[where x=ra])
+    apply(rule exI[where x=Ca])
+    apply safe
+     apply fact
+    apply(simp add: pure_def pred_lift_def * sep_algebra_simps)
+    by fact
+qed
   
 subsection \<open>Product Types\<close>
 text \<open>Some notion for product types is already defined here, as it is used 

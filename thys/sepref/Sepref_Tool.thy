@@ -299,7 +299,7 @@ method_setup sepref_to_hoare = \<open>
     in
       Sepref.preproc_tac ctxt 
       THEN' Sepref_Frame.weaken_post_tac ctxt 
-      THEN' resolve_tac ctxt @{thms hn_refineI}
+      THEN' resolve_tac ctxt @{thms hn_refineI_SPECT hn_refineI' hn_refineI}
       THEN' asm_full_simp_tac ss
     end  
   in
@@ -331,11 +331,7 @@ lemma hnr_pure_COPY[sepref_fr_rules]:
 
 lemma hn_id[sepref_fr_rules]: "(\<lambda>x. return x,RETURN o id) \<in> A\<^sup>d \<rightarrow>\<^sub>a A"
   apply sepref_to_hoare
-  apply (auto simp: wp_return sep_algebra_simps)
-  apply(rule exI[where x=0])
-  apply simp 
-  apply(rule entailsD) apply assumption 
-  by (metis conj_entails_mono empty_ent_GC infer_post_triv sep_conj_empty)  
+  by vcg  
   
 subsubsection \<open>Destructors\<close>  
 
