@@ -1,3 +1,45 @@
+# Fr 29.5.2020
+
+## TODOS:
+    
+### Peter
+- solve seprefregister issue
+- prove_prems into Utils
+
+### max
+- issue erstellen für "sepref_register"
+- FCOMP sup_attains
+  - solver für "BLA"-goals
+- weitermachen mit Sepref_HOL_Bindings
+- hn_refine_frame rule beweisen
+
+## Probleme die uns noch bevor stehen:
+- Kosten von Produkte
+  - Lösung: erstmal im konkreten auf null setzen?
+    - insert_element, extract_element := 0
+  - Lösung: im abstrakten auf infinity setzen 
+
+
+## Notes
+
+    (* Prove premises of theorem by given tactics. Warning: Simultaneous semantics, 
+      will fail/misbehave if tactic instantiates schematic that occurs in later premise to be proved *)
+    val prove_prems: Proof.context -> thm -> (Proof.context -> int -> tactic) option list -> thm
+
+
+  |> prove_prems ctxt [NONE,NONE,SOME your_tac]
+
+  thm[OF _ _ tac1 tac2 _ ]
+  
+  
+  (a,b,c) <- while ... (a,b,c)
+  
+  pair1 = mop_pair b c
+  pair2 = mop_pair a pair1
+  
+  res <- while ... pair2
+
+
 # Donnerstag 28.5. 
 
 
