@@ -228,7 +228,7 @@ lemma minus_potential_continuousInf:
 subsection "mii"
 
 
-definition minus_p_m :: "('a \<Rightarrow> ('b::{minus,complete_lattice}) option) \<Rightarrow> ('a,'b) nrest \<Rightarrow> 'a \<Rightarrow> 'b option" where 
+definition minus_p_m :: "('a \<Rightarrow> ('b::{minus,complete_lattice,monoid_add}) option) \<Rightarrow> ('a,'b) nrest \<Rightarrow> 'a \<Rightarrow> 'b option" where 
   "minus_p_m Qf M x =  (case M of FAILi \<Rightarrow> None | REST Mf \<Rightarrow> (minus_potential Qf Mf) x)"
                                                            
 
@@ -240,7 +240,7 @@ lemma minus_p_m_Failt: "minus_p_m Q FAILT x = None" unfolding minus_p_m_def by a
 
 
 lemma minus_p_m_antimono: 
-  fixes x y :: "('a,'b::{complete_lattice,minus,ord,top,drm}) nrest"
+  fixes x y :: "('a,'b::{complete_lattice,minus,ord,top,drm,monoid_add}) nrest"
   shows "x \<le> y \<Longrightarrow> minus_p_m q x \<ge> minus_p_m q y"
   unfolding minus_p_m_def 
   apply(rule le_funI)
@@ -254,7 +254,7 @@ lemma continuousInf_Map_empty: "continuousInf Map.empty"
   by simp
 
 lemma continuousInf_minus_p_m:
-  fixes m :: "(_ ,'d::{minus,ord,top,complete_lattice,drm}) nrest"
+  fixes m :: "(_ ,'d::{minus,ord,top,complete_lattice,drm,monoid_add}) nrest"
   shows "continuousInf (\<lambda>s. minus_p_m s m x)"
   unfolding minus_p_m_def 
   apply(cases m)
@@ -262,7 +262,7 @@ lemma continuousInf_minus_p_m:
  
  
 lemma minus_p_m_continuousInf:
-  fixes m :: "(_ ,'d::{minus,ord,top,complete_lattice,drm}) nrest"
+  fixes m :: "(_ ,'d::{minus,ord,top,complete_lattice,drm,monoid_add}) nrest"
   shows  "minus_p_m (\<lambda>x. Inf {f y x|y. True}) m x = Inf {minus_p_m (%x. f y x) m x|y. True}"
 proof - 
   have *: "\<And>x. Inf {f y x|y. True} = Inf ((\<lambda>y. f y x)`UNIV)" 
@@ -293,7 +293,7 @@ lemma "minus_p_m Q (Sup M) x = Inf ((\<lambda>m. minus_p_m Q m x) ` M)"
   oops                                         
 
 lemma minus_p_m_continuous:
-  fixes t :: "'b::{complete_lattice,minus,ord,top,drm} option"
+  fixes t :: "'b::{complete_lattice,minus,ord,top,drm,monoid_add} option"
   shows "(minus_p_m Q (Sup {F x t1 |x t1. P x t1}) x \<ge> t) = (\<forall>y t1. P y t1 \<longrightarrow> minus_p_m Q (F y t1) x \<ge> t)"
   unfolding minus_p_m_alt apply auto apply (auto simp: nrest_Sup_FAILT less_eq_option_None_is_None' split: nrest.splits)
   subgoal by (smt nrest_Sup_FAILT(2) mem_Collect_eq nres_order_simps(1) top_greatest) 
@@ -391,7 +391,7 @@ lemma pw_gwp_eqI:
 
 
 lemma lem:
-  fixes t :: "('b::{minus,complete_lattice,plus,needname}) option"
+  fixes t :: "('b::{minus,complete_lattice,plus,needname,monoid_add}) option"
   shows
     "\<forall>t1. M y = Some t1 \<longrightarrow> t \<le> minus_p_m Q (SPECT (map_option ((+) t1) \<circ> x2)) x \<Longrightarrow> f y = SPECT x2 \<Longrightarrow> t \<le> minus_p_m (\<lambda>y. minus_p_m Q (f y) x) (SPECT M) y"
   unfolding minus_p_m_def apply (auto split: nrest.splits)
@@ -409,7 +409,7 @@ lemma le_top_option: "t \<le> Some (top::'a::complete_lattice)"
     apply(cases t) by(auto simp: less_eq_option_def )  
 
 lemma lem2:
-  fixes t :: "('b::{minus,complete_lattice,plus,needname}) option"
+  fixes t :: "('b::{minus,complete_lattice,plus,needname,monoid_add}) option"
   shows "t \<le> minus_p_m (\<lambda>y. minus_p_m Q (f y) x) (SPECT M) y \<Longrightarrow> M y = Some t1 \<Longrightarrow> f y = SPECT fF \<Longrightarrow> t \<le> minus_p_m Q (SPECT (map_option ((+) t1) \<circ> fF)) x"
   apply (simp add: minus_p_m_def minus_potential_def) apply(cases "fF x") apply auto 
   apply(cases "Q x") apply (auto simp: le_top_option le_None split: if_splits option.splits) 
