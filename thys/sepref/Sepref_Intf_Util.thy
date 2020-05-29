@@ -68,9 +68,6 @@ subsection \<open>Operations with Precondition\<close>
     using assms mop_spec_rl by simp
  
 
-  definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
-    "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
-
   lemma mop_leof_rl_from_def:  
     assumes "f \<equiv> mop P g"
     assumes "P x \<Longrightarrow> g x \<le>\<^sub>n z"
@@ -164,8 +161,9 @@ subsubsection \<open>Composition Rules\<close>
   lemma hfcomp_tcomp_pre:
     assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nrest_rel)"
     assumes A: "(f,g) \<in> [P]\<^sub>a\<^sub>d RR' \<rightarrow> S"
+    assumes SC: "\<And>a1. BLA (U a1) (h a1)"
     shows "(f,h) \<in> [tcomp_pre Q T P]\<^sub>a\<^sub>d hrp_comp RR' T \<rightarrow> hrr_comp T S U"
-    using hfcomp[OF A B] by simp
+    using hfcomp[OF A B] using SC by simp
 
   lemma transform_pre_param:
     assumes A: "IMP_LIST Cns ((f, h) \<in> [tcomp_pre Q T P]\<^sub>a\<^sub>d hrp_comp RR' T \<rightarrow> hrr_comp T S U)"

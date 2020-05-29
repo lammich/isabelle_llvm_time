@@ -324,7 +324,7 @@ lemmas hn_refine_cons_res = hn_refine_cons_complete[OF _ entails_refl entails_re
 lemmas hn_refine_ref = hn_refine_cons_complete[OF _ entails_refl entails_refl entails_refl]
 
 
-lemma "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow> (P' ** Q ** F) s"
+lemma zz: "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow> (P' ** Q ** F) s"
   unfolding entails_def   
   apply(subst (2) sep_conj_commute)
   apply(subst sep_conj_assoc[symmetric])
@@ -333,99 +333,24 @@ lemma "(P \<and>* Q) s \<Longrightarrow> P \<turnstile> P' ** F \<Longrightarrow
   apply(rule sep_conjI)
   by(auto simp add: sep_algebra_simps ) 
 
-
+thm frame_rule
 lemma hn_refine_frame:
   assumes hnr: "hn_refine P' c Q' R m"
   assumes ent: "P \<turnstile> P' ** F"
   shows "hn_refine P c (Q' ** F) R m"
   apply (rule hn_refineI)
   subgoal for Fa s cr M
-    using hnr[THEN hn_refineD, where F="Fa**F"]
-    apply(simp add: sep_algebra_simps pred_lift_extract_simps)
-    apply(drule sep_conjD) apply safe
-    apply(drule ent[unfolded entails_def, rule_format]) 
-    apply(simp add: sep_algebra_simps pred_lift_extract_simps)
-    apply clarsimp sorry
-  done
-(*
-  apply (rule cons_rule[where P="P'**F", rotated])
-  apply simp
-  apply simp
-  apply (rule cons_post_rule)
-  apply (erule frame_rule)
-  apply (auto simp: sep_algebra_simps pred_lift_extract_simps)
-  by (metis sep.mult_commute)
-*)
+    apply(drule zz[OF _ ent])
+    apply(drule hnr[THEN hn_refineD, where F="Fa**F"])
+     apply simp
+    apply(auto simp add: sep_conj_aci sep_algebra_simps pred_lift_extract_simps) 
+    done
+  done 
 
-(*
 lemma hn_refine_frame': "hn_refine \<Gamma> c \<Gamma>' R m \<Longrightarrow> hn_refine (\<Gamma>**F) c (\<Gamma>'**F) R m"  
-  by (simp add: hn_refine_frame)
-  
-lemma hn_refine_cons:
-  assumes I: "P\<turnstile>P'"
-  assumes R: "hn_refine P' c Q R m"
-  assumes I': "Q\<turnstile>Q'"
-  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
-  shows "hn_refine P c Q' R' m"
-  using R unfolding hn_refine_def
-  apply clarify
-  apply (erule cons_rule)
-  using I apply (simp add: entails_def)
-  using I' R'
-  by (smt entails_def sep_conj_impl)
-
-(*lemma hn_refine_cons:
-  assumes I: "P\<Longrightarrow>\<^sub>AP'"
-  assumes R: "hn_refine P' c Q R m"
-  assumes I': "Q\<Longrightarrow>\<^sub>AQ'"
-  assumes R': "\<And>x y. R x y \<Longrightarrow>\<^sub>A R' x y"
-  shows "hn_refine P c Q' R' m"
-  using R unfolding hn_refine_def
-  apply clarsimp
-  apply (rule cons_pre_rule[OF I])
-  apply (erule cons_post_rule)
-  apply (rule ent_star_mono ent_refl I' R' ent_ex_preI ent_ex_postI)+
-  done
-*)
-lemma hn_refine_cons_pre:
-  assumes I: "P \<turnstile> P'"
-  assumes R: "hn_refine P' c Q R m"
-  shows "hn_refine P c Q R m"
-  apply (rule hn_refine_cons[OF I R])
-  by auto
-
-lemma hn_refine_cons_post:
-  assumes R: "hn_refine P c Q R m"
-  assumes I: "Q\<turnstile>Q'"
-  shows "hn_refine P c Q' R m"
-  using assms
-  by (rule hn_refine_cons[OF entails_refl _ _ entails_refl])
-
-lemma hn_refine_cons_res: 
-  "\<lbrakk> hn_refine \<Gamma> f \<Gamma>' R g; \<And>a c. R a c \<turnstile> R' a c \<rbrakk> \<Longrightarrow> hn_refine \<Gamma> f \<Gamma>' R' g"
-  by (erule hn_refine_cons[OF entails_refl]) auto
-
-lemma hn_refine_ref:
-  assumes LE: "m\<le>m'"
-  assumes R: "hn_refine P c Q R m"
-  shows "hn_refine P c Q R m'"
-  apply rule
-  apply (rule cons_post_rule)
-  apply (rule hn_refineD[OF R])
-  using LE apply (simp add: pw_le_iff)
-  by (smt LE order_trans pred_lift_extract_simps(2) sep_conj_commute sep_conj_impl)
-
-lemma hn_refine_cons_complete:
-  assumes I: "P\<turnstile>P'"
-  assumes R: "hn_refine P' c Q R m"
-  assumes I': "Q\<turnstile>Q'"
-  assumes R': "\<And>x y. R x y \<turnstile> R' x y"
-  assumes LE: "m\<le>m'"
-  shows "hn_refine P c Q' R' m'"
-  apply (rule hn_refine_ref[OF LE])
-  apply (rule hn_refine_cons[OF I R I' R'])
-  done
+  by (simp add: hn_refine_frame) 
  
+(*
 lemma hn_refine_augment_res:
   assumes A: "hn_refine \<Gamma> f \<Gamma>' R g"
   assumes B: "g \<le>\<^sub>n SPEC \<Phi>"
@@ -439,8 +364,7 @@ lemma hn_refine_augment_res:
   using B
   apply (auto simp: pred_lift_extract_simps pw_le_iff pw_leof_iff)
   done
-
-*)  
+*)
   
 subsection \<open>Product Types\<close>
 text \<open>Some notion for product types is already defined here, as it is used 
