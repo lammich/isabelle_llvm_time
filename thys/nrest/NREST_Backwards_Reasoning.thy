@@ -421,7 +421,7 @@ lemma lem2:
   
 
 lemma minus_p_m_bindT: 
-  fixes t :: "('b::{minus,complete_lattice,plus,needname,drm}) option"
+  fixes t :: "('b::{minus,complete_lattice,plus,needname,zero,monoid_add,drm}) option"
   shows "(t \<le> minus_p_m Q (bindT m f) x) \<longleftrightarrow> (\<forall>y. t \<le> minus_p_m (\<lambda>y. minus_p_m Q (f y) x) m y)"
 proof -
   { fix M
@@ -1090,7 +1090,8 @@ lemma auxx: "(if b then Some (lift_acost (x)) else None)
 
 lemma While[vcg_rules']:   
   assumes  "\<And>s. wfR2 (if I s then E s else 0)"                                               
-  assumes  "I s0"  "(\<And>s. I s \<Longrightarrow> b s \<Longrightarrow> Some 0 \<le> gwp (C s) (\<lambda>s'. mm3 (lift_acost (E s)) (if I s' then Some (lift_acost (E s')) else None)))"
+  assumes  "I s0"  "(\<And>s. I s \<Longrightarrow> b s \<Longrightarrow> Some 0 \<le> gwp (C s) (\<lambda>s'. mm3 (lift_acost (E s)) 
+                                                        (if I s' then Some (lift_acost (E s')) else None)))"
      "(\<And>s. progress (C s))"
      "(\<And>x. \<not> b x \<Longrightarrow>  I x \<Longrightarrow>  (E x) \<le> (E s0) \<Longrightarrow>   Some (t + lift_acost ((E s0) - E x)) \<le> Q x)"
    shows   "Some t \<le> gwp (whileIET I E b C s0) Q"
