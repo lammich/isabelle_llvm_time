@@ -1,5 +1,5 @@
 theory Hnr_Primitives_Experiment
-imports Sepref_Rules "../ds/LLVM_DS_Dflt"
+imports Sepref "../ds/LLVM_DS_Dflt"
 begin
   hide_const (open) LLVM_DS_Array.array_assn
 
@@ -135,8 +135,11 @@ lemma lift_acost_plus_distrib[named_ss fri_prepare_simps]:
   apply (auto simp add: sep_algebra_simps fun_eq_iff sep_conj_def sep_disj_acost_def sep_disj_enat_def)
   done
 
-abbreviation "snat_assn \<equiv> \<upharpoonleft>snat.assn"
- 
+(* BEWARE, conflicting abbreviation snat_assn *)
+abbreviation "snat_assn2 \<equiv> \<upharpoonleft>snat.assn"
+lemma "snat_assn2 = snat_assn" 
+  by (simp add: snat.assn_is_rel snat_rel_def)  
+                                     
 lemma DECOMP_HNR[vcg_decomp_rules]: "DECOMP_HTRIPLE (hn_refine \<Gamma> c \<Gamma>' R a) \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a" by (simp add: vcg_tag_defs)
 
 lemma hn_refine_pre_pureI:
@@ -167,20 +170,22 @@ definition "mop_array_nth xs i \<equiv> do { ASSERT (i<length xs); consume (RETU
 definition "mop_array_upd xs i x \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs[i:=x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
 definition "mop_array_new n x \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n x)) (lift_acost (cost'_narray_new n)) }"
 
-
+thm vcg_rules
 lemma hnr_raw_array_nth: "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
   (array_nth xsi ii)
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
   id_assn
   (mop_array_nth xs i)" 
   unfolding hn_ctxt_def pure_def mop_array_nth_def
+  apply vcg_step
+  apply vcg_step
   by vcg
 
 lemma hnr_raw_array_upd: "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt id_assn x xi)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
   (array_upd xsi ii xi)
-  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt id_assn x xi)
+  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
   raw_array_assn
   (mop_array_upd xs i x)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
@@ -189,9 +194,9 @@ lemma hnr_raw_array_upd: "hn_refine
   
 
 lemma hnr_raw_array_new: "hn_refine 
-  (hn_ctxt snat_assn i ii)
+  (hn_ctxt snat_assn2 i ii)
   (narray_new TYPE('a::llvm_rep) ii)
-  (hn_ctxt snat_assn i ii)
+  (hn_ctxt snat_assn2 i ii)
   raw_array_assn
   (mop_array_new i init)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
@@ -227,27 +232,27 @@ definition "eoarray_nth_impl xsi ii \<equiv> doM {
 }"  
   
 lemma hnr_eoarray_nth: "hn_refine 
-  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
   (eoarray_nth_impl xsi ii)
-  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
   (cnc_assn (\<lambda>(_,xsi'). xsi'=xsi) (A \<times>\<^sub>a eoarray_assn A))
   (mop_oarray_nth xs i)"  
   unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_nth_def eoarray_nth_impl_def
   by vcg
   
 lemma hnr_eoarray_upd: "hn_refine 
-  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
   (array_upd xsi ii xi)
-  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_invalid A x xi)
+  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_invalid A x xi)
   (cnc_assn (\<lambda>ri. ri=xsi) (eoarray_assn A))
   (mop_oarray_upd xs i x)"  
   unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_upd_def
   by vcg
   
 lemma hnr_eoarray_new: "hn_refine 
-  (hn_ctxt snat_assn i ii)
+  (hn_ctxt snat_assn2 i ii)
   (narrayo_new TYPE('a::llvm_rep) ii)
-  (hn_ctxt snat_assn i ii)
+  (hn_ctxt snat_assn2 i ii)
   (eoarray_assn A)
   (mop_oarray_new i)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_new_def
@@ -403,9 +408,9 @@ lemma deprecated_hnr_array_nth:
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     (array_nth xsi ii)
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     A
     (mop_array_nth xs i)" 
 proof -
@@ -441,9 +446,9 @@ qed
 lemma hnr_array_nth: 
   assumes PURE: "is_pure A"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     (array_nth xsi ii)
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     A
     (mop_array_nth xs i)" 
 proof -
@@ -482,9 +487,9 @@ qed
 lemma deprecated_hnr_array_nth': 
   assumes PURE: "is_pure A"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     (array_nth xsi ii)
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     A
     (mop_array_nth xs i)" 
 proof -
@@ -510,9 +515,9 @@ lemma deprecated_hnr_array_upd_SV:
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
     (array_upd xsi ii xi)
-    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt A x xi)
     (array_assn A)
     (mop_array_upd xs i x)" 
 proof -
@@ -555,9 +560,9 @@ qed
 lemma hnr_array_upd: 
   assumes PURE: "is_pure A"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
     (array_upd xsi ii xi)
-    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt A x xi)
     (array_assn A)
     (mop_array_upd xs i x)" 
 proof -
@@ -606,9 +611,9 @@ lemma hnr_array_new:
   assumes PURE: "is_pure A"
   assumes INIT: "(init,x) \<in> the_pure A"
   shows "hn_refine 
-    (hn_ctxt snat_assn i ii)
+    (hn_ctxt snat_assn2 i ii)
     (narray_new TYPE('a::llvm_rep) ii)
-    (hn_ctxt snat_assn i ii)
+    (hn_ctxt snat_assn2 i ii)
     (array_assn A)
     (mop_array_new i x)" 
 proof -
