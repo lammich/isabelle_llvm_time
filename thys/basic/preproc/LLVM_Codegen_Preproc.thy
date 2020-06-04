@@ -552,7 +552,6 @@ subsection \<open>Code Generator Driver\<close>
   definition [llvm_inline]: "prod_gep_fst \<equiv> ll_gep_fst :: ('a::llvm_rep \<times> 'b::llvm_rep) ptr \<Rightarrow> 'a ptr llM"
   definition [llvm_inline]: "prod_gep_snd \<equiv> ll_gep_snd :: ('a::llvm_rep \<times> 'b::llvm_rep) ptr \<Rightarrow> 'b ptr llM"
 
-  (*
   lemma prod_ops_simp:
     "prod_insert_fst = (\<lambda>(_,b) a. return (a,b))"
     "prod_insert_snd = (\<lambda>(a,_) b. return (a,b))"
@@ -569,7 +568,6 @@ subsection \<open>Code Generator Driver\<close>
       split: prod.splits
       )
     done
-  *)
     
   subsection \<open>Ad-Hoc Regression Tests\<close>
   
