@@ -545,6 +545,32 @@ lemma is_init_id_assn[sepref_gen_algo_rules]: "GEN_ALGO init (is_init id_assn)"
   
 subsection \<open>Arithmetics\<close>
 
+
+
+  definition "SPECc1' c aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>c]))"
+  definition "SPECc1 name aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>(cost name 1)]))"
+  definition "SPECc2 name aop == ( (\<lambda>a b. SPECT ( [(aop a b)\<mapsto>(cost name 1)])))"
+
+
+context 
+  fixes name :: ecost and g:: "('a \<Rightarrow> 'c)"
+begin
+  sepref_register timed_unop': "SPECc1' name g"
+end
+
+context 
+  fixes name :: string and g:: "('a \<Rightarrow> 'c)"
+begin
+  sepref_register timed_unop: "SPECc1 name g"
+end
+
+context 
+  fixes name :: string and f:: "('a \<Rightarrow> 'b \<Rightarrow> 'c)"
+begin
+  sepref_register timed_binop: "SPECc2 name f"
+end
+
+
 subsubsection \<open>Connecting to Standard Operation Abstraction from LLVM-RS\<close>
 
 text \<open>We will hide the connection behind an additional abstraction layer, 
@@ -562,40 +588,33 @@ context standard_opr_abstraction begin
     
   abbreviation (input) sepref_assn where "sepref_assn \<equiv> pure rel"  
 
-
-lemma lift_acost_cost: "lift_acost (cost name 1) = (cost name 1)"
-  by (auto simp: one_enat_def zero_enat_def lift_acost_def cost_def zero_acost_def)
-
-
-  abbreviation (in -) "SPECc1 name aop == (\<lambda>a. SPECT [(aop a)\<mapsto>(cost name 1)])"
-
+ 
   lemma hn_un_op:
     assumes "is_un_op name PRE cop xmop aop"  
     shows "(cop,SPECc1 name aop) \<in> [\<lambda>a. PRE TYPE('c) a]\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
-    unfolding assn_is_rel[symmetric]
+    unfolding assn_is_rel[symmetric] SPECc1_def
     apply sepref_to_hoare
-    supply [vcg_rules] = un_op_tmpl[OF assms, unfolded lift_acost_cost] 
+    supply [vcg_rules] = un_op_tmpl[OF assms, unfolded one_enat_def lift_acost_cost, folded one_enat_def] 
     by vcg
-      
+
   lemma hn_bin_op:
     assumes "is_bin_op name PRE cop xmop aop"  
-    shows "(uncurry cop,SPECc1 name (uncurry aop)) \<in> [\<lambda>(a,b). PRE TYPE('c) a b]\<^sub>a sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
-    unfolding assn_is_rel[symmetric]
+    shows "(uncurry cop,uncurry (SPECc2 name aop)) \<in> [\<lambda>(a,b). PRE TYPE('c) a b]\<^sub>a sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow> sepref_assn"
+    unfolding assn_is_rel[symmetric] SPECc2_def
     apply sepref_to_hoare
-    supply [vcg_rules] = bin_op_tmpl[OF assms, unfolded lift_acost_cost]
+    supply [vcg_rules] = bin_op_tmpl[OF assms, unfolded one_enat_def lift_acost_cost, folded one_enat_def]
     by vcg
     
   lemma hn_cmp_op:  
     assumes "is_cmp_op name cop xmop aop"
-    shows "(uncurry cop,SPECc1 name (uncurry aop)) \<in> sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow>\<^sub>a bool.sepref_assn"
-    unfolding assn_is_rel[symmetric] bool.assn_is_rel[symmetric]
+    shows "(uncurry cop,uncurry (SPECc2 name aop)) \<in> sepref_assn\<^sup>k *\<^sub>a sepref_assn\<^sup>k \<rightarrow>\<^sub>a bool.sepref_assn"
+    unfolding assn_is_rel[symmetric] bool.assn_is_rel[symmetric] SPECc2_def
     apply sepref_to_hoare
-    supply [vcg_rules] = cmp_op_tmpl[OF assms, unfolded lift_acost_cost]
+    supply [vcg_rules] = cmp_op_tmpl[OF assms, unfolded one_enat_def lift_acost_cost, folded one_enat_def]
     by vcg
     
 
 end
-
 subsubsection \<open>Operator Setup\<close>
 
 text \<open>Not-Equals is an operator in LLVM, but not in HOL\<close>
@@ -631,27 +650,32 @@ lemma bool_const_refine[sepref_import_param]:
   by (auto simp: bool1_rel_def bool.rel_def in_br_conv)
   
 
+
 lemma hn_bool_ops:
-  "(uncurry ll_and, SPECc1 ''and'' (uncurry (\<and>))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_or, SPECc1 ''or'' (uncurry (\<or>))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_xor, SPECc1 ''xor'' (uncurry (op_neq))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(ll_not1, SPECc1 ''add'' Not) \<in> bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn" (* TODO: this is strange, but LLVM seems to implement Not, with an add opration *)
+  "(uncurry ll_and, uncurry (PR_CONST (SPECc2 ''and'' (\<and>)))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+   "(uncurry ll_or, uncurry (PR_CONST (SPECc2 ''or'' (\<or>)))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_xor, uncurry (PR_CONST (SPECc2 ''xor'' (op_neq)))) \<in> bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"  
+  "(ll_not1, PR_CONST (SPECc1 ''add'' Not)) \<in> bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn" (* TODO: this is strange, but LLVM seems to implement Not, with an add opration *)
   using bool_bin_ops[THEN bool.hn_bin_op, folded bool1_rel_def, unfolded to_hfref_post]
     and bool_un_ops[THEN bool.hn_un_op, folded bool1_rel_def]
-  unfolding op_neq_def  
+  unfolding op_neq_def
   by simp_all
 
-lemmas f = hn_bool_ops[to_hnr,]
+lemmas f = hn_bool_ops[to_hnr]
 lemmas hn_bool_ops[sepref_fr_rules] (* TODO: strange error *)
+thm f[to_hfref]
+thm sepref_fr_rules
+
+thm hnr_bind
+thm app_rule app'_rule
+thm id_rules pat_rules
+definition "mop_impl x y = do { nx \<leftarrow> SPECc1 ''add'' Not x; SPECc2 ''and'' (\<and>) nx y }"
 
 text \<open>We define an implies connective, using sepref\<close>
-sepref_definition ll_implies is "\<lambda>(x,y). do { x \<leftarrow> SPECc1 ''add'' Not x; SPECc1 ''or'' (uncurry (\<or>)) (x,y) }" :: "bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  unfolding imp_conv_disj
-  apply sepref_dbg_preproc
-  apply sepref_dbg_cons_init
-  apply sepref_dbg_id
-  apply sepref_dbg_monadify (* TODO: some how stop monadify from looking in too deep *)
-  oops
+sepref_definition ll_implies is "uncurry mop_impl" :: "bool1_assn\<^sup>k *\<^sub>a bool1_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  unfolding imp_conv_disj mop_impl_def
+  by sepref  
+
 
 declare ll_implies_def[llvm_inline]
 declare ll_implies.refine[sepref_fr_rules]
@@ -666,13 +690,14 @@ subsubsection \<open>Direct Word Arithmetic\<close>
 
 abbreviation "word_rel \<equiv> (Id::(_::len word \<times> _) set)"
 abbreviation "word_assn \<equiv> (id_assn::_::len word \<Rightarrow> _)"
-abbreviation word_assn' :: "'a::len itself \<Rightarrow> 'a word \<Rightarrow> 'a word \<Rightarrow> llvm_amemory \<Rightarrow> bool" 
+abbreviation word_assn' :: "'a::len itself \<Rightarrow> 'a word \<Rightarrow> 'a word \<Rightarrow> (llvm_amemory*_) \<Rightarrow> bool" 
   where "word_assn' _ \<equiv> word_assn"
 
 (* TODO: Move *)  
 definition ll_not :: "'a::len word \<Rightarrow> 'a word llM" where 
   [llvm_inline]: "ll_not a \<equiv> doM { a \<leftarrow> ll_sub 0 a; ll_sub a 1 }"
   
+(* plain wrong with time
 context llvm_prim_arith_setup begin
   
   lemma ll_not_normalize[vcg_normalize_simps]: "ll_not a = return (~~a)"
@@ -680,7 +705,7 @@ context llvm_prim_arith_setup begin
     supply [simp] = NOT_eq
     by vcg_normalize
   
-end  
+end *)
 
 
 context begin  
@@ -721,21 +746,42 @@ lemma word_param_imports[sepref_import_param]:
 sepref_register 
   not_word: "bitNOT:: _ word \<Rightarrow> _"  
 
-lemma hn_word_NOT[sepref_fr_rules]: "(ll_not,RETURN o bitNOT) \<in> word_assn\<^sup>k \<rightarrow>\<^sub>a word_assn"
-  by sepref_to_hoare vcg
-  
+lemma hn_word_NOT_aux: "cost ''sub'' 2 = cost ''sub'' 1 + cost ''sub'' 1"
+  by (auto simp add: cost_same_curr_add) 
+
+lemma time_credits_add: "($A ** $B) = $(A+B)"   
+  by (simp add: EXACT_split SND_conj_conv sep_disj_acost_def sep_disj_enat_def time_credits_assn_def)  
+
+lemma lift_acost_add: "lift_acost t + lift_acost t' = lift_acost (t+t')"
+  unfolding lift_acost_def by (cases t; cases t'; auto)
+
+lemma hn_word_NOT_aux2: "$(lift_acost (t + t')) = ($(lift_acost t) ** $(lift_acost t'))"
+  by (simp add: time_credits_add lift_acost_add)
+
+lemma hn_word_NOT[sepref_fr_rules]: "(ll_not,PR_CONST (SPECc1' (cost ''sub'' (enat 2)) bitNOT)) \<in> word_assn\<^sup>k \<rightarrow>\<^sub>a word_assn"
+  unfolding SPECc1'_def ll_not_def hn_word_NOT_aux PR_CONST_def
+  unfolding hn_word_NOT_aux one_enat_def lift_acost_cost[symmetric]
+  apply sepref_to_hoare
+  apply(simp only: hn_word_NOT_aux2)
+  supply [simp] = NOT_eq
+  by vcg
+
+
+
 sepref_register 
   div_word: "(div):: _ word \<Rightarrow> _"  
   mod_word: "(mod):: _ word \<Rightarrow> _"  
   sdiv_word: "(sdiv):: _ word \<Rightarrow> _"  
   smod_word: "(smod):: _ word \<Rightarrow> _"  
-  
+thm vcg_rules
 lemma hn_word_div_op[sepref_fr_rules]:
-  "(uncurry (ll_udiv),uncurry (RETURN oo (div))) \<in> [\<lambda>(_,d). d\<noteq>0]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
-  "(uncurry (ll_urem),uncurry (RETURN oo (mod))) \<in> [\<lambda>(_,d). d\<noteq>0]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
-  "(uncurry (ll_sdiv),uncurry (RETURN oo (sdiv))) \<in> [\<lambda>(c,d). d\<noteq>0 \<and> in_srange (sdiv) c d]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
-  "(uncurry (ll_srem),uncurry (RETURN oo (smod))) \<in> [\<lambda>(c,d). d\<noteq>0 \<and> in_srange (sdiv) c d]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
-  by (sepref_to_hoare; vcg; fail)+
+  "(uncurry (ll_udiv),uncurry (PR_CONST (SPECc2 ''udiv'' (div)))) \<in> [\<lambda>(_,d). d\<noteq>0]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
+  "(uncurry (ll_urem),uncurry (PR_CONST (SPECc2 ''urem'' (mod)))) \<in> [\<lambda>(_,d). d\<noteq>0]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
+  "(uncurry (ll_sdiv),uncurry (PR_CONST (SPECc2 ''sdiv'' (sdiv)))) \<in> [\<lambda>(c,d). d\<noteq>0 \<and> in_srange (sdiv) c d]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
+  "(uncurry (ll_srem),uncurry (PR_CONST (SPECc2 ''srem'' (smod)))) \<in> [\<lambda>(c,d). d\<noteq>0 \<and> in_srange (sdiv) c d]\<^sub>a word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow> word_assn"  
+  unfolding SPECc2_def PR_CONST_def
+      unfolding one_enat_def lift_acost_cost[symmetric]
+      by (sepref_to_hoare, vcg')+
 
 sepref_register 
   eq_word: "(=):: _ word \<Rightarrow> _"  
@@ -746,16 +792,16 @@ sepref_register
   sle_word: "(<=s):: _ word \<Rightarrow> _"  
     
 lemma hn_word_icmp_op[sepref_fr_rules]:
-  "(uncurry (ll_icmp_eq), uncurry (RETURN oo (=))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry (ll_icmp_ne), uncurry (RETURN oo (op_neq))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry (ll_icmp_ult), uncurry (RETURN oo (<))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry (ll_icmp_ule), uncurry (RETURN oo (\<le>))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry (ll_icmp_slt), uncurry (RETURN oo (\<lambda>a b. a <s b))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry (ll_icmp_sle), uncurry (RETURN oo (\<lambda>a b. a <=s b))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  unfolding bool1_rel_def bool.rel_def
-  supply [simp] = in_br_conv
-  apply (sepref_to_hoare; vcg; fail)+
-  done
+  "(uncurry (ll_icmp_eq), uncurry (PR_CONST (SPECc2 ''icmp_eq'' (=)))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry (ll_icmp_ne), uncurry (PR_CONST (SPECc2 ''icmp_ne'' (op_neq)))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry (ll_icmp_ult), uncurry (PR_CONST (SPECc2 ''icmp_ult'' (<)))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry (ll_icmp_ule), uncurry (PR_CONST (SPECc2 ''icmp_ule'' (\<le>)))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry (ll_icmp_slt), uncurry (PR_CONST (SPECc2 ''icmp_slt'' (\<lambda>a b. a <s b)))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry (ll_icmp_sle), uncurry (PR_CONST (SPECc2 ''icmp_sle'' (\<lambda>a b. a <=s b)))) \<in> word_assn\<^sup>k *\<^sub>a word_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  unfolding bool1_rel_def bool.rel_def PR_CONST_def SPECc2_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
+       supply [simp] = in_br_conv
+  by (sepref_to_hoare, vcg)+
   
   
 lemma is_init_word[sepref_gen_algo_rules]:
@@ -795,23 +841,27 @@ lemma hn_sint_0[sepref_import_param]:
   by (auto simp: sint_rel_def sint.rel_def in_br_conv)
 
 lemma hn_sint_1[sepref_fr_rules]:
-  "LENGTH('a)\<noteq>1 \<Longrightarrow> hn_refine \<box> (return 1) \<box> (sint_assn' TYPE('a::len)) (RETURN$PR_CONST (sint_const TYPE('a) 1))"
+  "LENGTH('a)\<noteq>1 \<Longrightarrow> hn_refine \<box> (return 1::_ llM) \<box> (sint_assn' TYPE('a::len)) (RETURNTecost$PR_CONST (sint_const TYPE('a) 1))"
+  unfolding APP_def
   apply sepref_to_hoare unfolding sint_rel_def sint.rel_def in_br_conv by vcg
 
 lemma hn_sint_minus_1[sepref_fr_rules]:
-  "hn_refine \<box> (return (-1)) \<box> (sint_assn' TYPE('a::len)) (RETURN$PR_CONST (sint_const TYPE('a) (-1)))"
+  "hn_refine \<box> (return (-1)::_ llM) \<box> (sint_assn' TYPE('a::len)) (RETURN$PR_CONST (sint_const TYPE('a) (-1)))"
+  unfolding APP_def
   apply sepref_to_hoare unfolding sint_rel_def sint.rel_def in_br_conv by vcg
   
 lemma hn_sint_numeral[sepref_fr_rules]:
   "\<lbrakk>numeral n \<in> sints LENGTH('a)\<rbrakk> \<Longrightarrow> 
-    hn_refine \<box> (return (numeral n)) \<box> (sint_assn' TYPE('a::len)) (RETURN$(PR_CONST (sint_const TYPE('a) (numeral n))))"
+    hn_refine \<box> (return (numeral n)::_ llM) \<box> (sint_assn' TYPE('a::len)) (RETURN$(PR_CONST (sint_const TYPE('a) (numeral n))))"
+  unfolding APP_def
   apply sepref_to_hoare unfolding sint_rel_def sint.rel_def in_br_conv 
   apply vcg'
   by (auto simp: sbintrunc_mod2p min_sint_def max_sint_def ll_const_signed_aux)
 
 lemma hn_sint_minus_numeral[sepref_fr_rules]:
   "\<lbrakk>-numeral n \<in> sints LENGTH('a)\<rbrakk> \<Longrightarrow> 
-    hn_refine \<box> (return (-numeral n)) \<box> (sint_assn' TYPE('a::len)) (RETURN$(PR_CONST (sint_const TYPE('a) (-numeral n))))"
+    hn_refine \<box> (return (-numeral n)::_ llM) \<box> (sint_assn' TYPE('a::len)) (RETURN$(PR_CONST (sint_const TYPE('a) (-numeral n))))"
+  unfolding APP_def
   apply sepref_to_hoare unfolding sint_rel_def sint.rel_def in_br_conv 
   apply vcg'
   apply (auto simp: sbintrunc_mod2p min_sint_def max_sint_def ll_const_signed_aux)
@@ -843,22 +893,22 @@ thm sint_cmp_ops[THEN sint.hn_cmp_op, folded sint_rel_def, unfolded to_hfref_pos
 thm sint_bin_ops[THEN sint.hn_bin_op, folded sint_rel_def, unfolded to_hfref_post]  
   
 lemma hn_sint_ops[sepref_fr_rules]:
-  "(uncurry ll_add, uncurry (RETURN \<circ>\<circ> (+)))
+  "(uncurry ll_add, uncurry (PR_CONST (SPECc2 ''add'' (+))))
     \<in> [\<lambda>(a, b). a + b \<in> sints LENGTH('a)]\<^sub>a sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow> sint_assn' TYPE('a::len)"
-  "(uncurry ll_sub, uncurry (RETURN \<circ>\<circ> (-)))
+  "(uncurry ll_sub, uncurry (PR_CONST (SPECc2 ''sub'' (-))))
     \<in> [\<lambda>(a, b). a - b \<in> sints LENGTH('a)]\<^sub>a sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow> sint_assn' TYPE('a::len)"
-  "(uncurry ll_mul, uncurry (RETURN \<circ>\<circ> (*)))
+  "(uncurry ll_mul, uncurry (PR_CONST (SPECc2 ''mul'' (*))))
     \<in> [\<lambda>(a, b). a * b \<in> sints LENGTH('a)]\<^sub>a sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow> sint_assn' TYPE('a::len)"
-  "(uncurry ll_sdiv, uncurry (RETURN \<circ>\<circ> (sdiv)))
+  "(uncurry ll_sdiv, uncurry (PR_CONST (SPECc2 ''sdiv'' (sdiv))))
     \<in> [\<lambda>(a, b). b \<noteq> 0 \<and> a sdiv b \<in> sints LENGTH('a)]\<^sub>a sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow> sint_assn' TYPE('a::len)"
-  "(uncurry ll_srem, uncurry (RETURN \<circ>\<circ> (smod)))
+  "(uncurry ll_srem, uncurry (PR_CONST (SPECc2 ''srem'' (smod))))
     \<in> [\<lambda>(a, b). b \<noteq> 0 \<and> a sdiv b \<in> sints LENGTH('a)]\<^sub>a sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow> sint_assn' TYPE('a::len)"
     
-  "(uncurry ll_icmp_eq, uncurry (RETURN \<circ>\<circ> (=))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_ne, uncurry (RETURN \<circ>\<circ> (op_neq))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_sle, uncurry (RETURN \<circ>\<circ> (\<le>))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_slt, uncurry (RETURN \<circ>\<circ> (<))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  unfolding op_neq_def
+  "(uncurry ll_icmp_eq, uncurry (PR_CONST (SPECc2 ''icmp_eq''  (=)))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_ne, uncurry (PR_CONST (SPECc2 ''icmp_ne''  (op_neq)))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_sle, uncurry (PR_CONST (SPECc2 ''icmp_sle'' (\<le>)))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_slt, uncurry (PR_CONST (SPECc2 ''icmp_slt'' (<)))) \<in> sint_assn\<^sup>k *\<^sub>a sint_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  unfolding op_neq_def PR_CONST_def
   using sint_bin_ops[THEN sint.hn_bin_op, folded sint_rel_def, unfolded to_hfref_post]
     and sint_cmp_ops[THEN sint.hn_cmp_op, folded sint_rel_def bool1_rel_def, unfolded to_hfref_post]
   apply simp_all
@@ -924,14 +974,16 @@ lemma fold_unat:
 
   
 lemma hn_unat_0[sepref_fr_rules]:
-  "hn_refine \<box> (return 0) \<box> (unat_assn' TYPE('a::len)) (RETURN$PR_CONST (unat_const TYPE('a) 0))"
+  "hn_refine \<box> (return 0::_ llM) \<box> (unat_assn' TYPE('a::len)) (RETURN$PR_CONST (unat_const TYPE('a) 0))"
+  unfolding APP_def
   apply sepref_to_hoare
   unfolding unat_rel_def unat.rel_def in_br_conv
   apply vcg
   done
   
 lemma hn_unat_1[sepref_fr_rules]:
-  "hn_refine \<box> (return 1) \<box> (unat_assn' TYPE('a::len)) (RETURN$PR_CONST (unat_const TYPE('a) 1))"
+  "hn_refine \<box> (return 1::_ llM) \<box> (unat_assn' TYPE('a::len)) (RETURN$PR_CONST (unat_const TYPE('a) 1))"
+  unfolding APP_def
   apply sepref_to_hoare
   unfolding unat_rel_def unat.rel_def in_br_conv
   apply vcg
@@ -940,29 +992,30 @@ lemma hn_unat_1[sepref_fr_rules]:
   
 lemma hn_unat_numeral[sepref_fr_rules]:
   "\<lbrakk>numeral n \<in> unats LENGTH('a)\<rbrakk> \<Longrightarrow> 
-    hn_refine \<box> (return (numeral n)) \<box> (unat_assn' TYPE('a::len)) (RETURN$(PR_CONST (unat_const TYPE('a) (numeral n))))"
+    hn_refine \<box> (return (numeral n)::_ llM) \<box> (unat_assn' TYPE('a::len)) (RETURN$(PR_CONST (unat_const TYPE('a) (numeral n))))"
+  unfolding APP_def
   apply sepref_to_hoare unfolding unat_rel_def unat.rel_def in_br_conv 
   apply vcg'
   by (metis in_unats_conv int_nat_eq of_nat_numeral uint_nonnegative unat_bintrunc unat_def word_of_int_numeral word_uint.Rep_inverse' word_unat.Rep_cases)
 
   
 lemma hn_unat_ops[sepref_fr_rules]:
-  "(uncurry ll_add, uncurry (RETURN \<circ>\<circ> (+))) \<in> [\<lambda>(a, b). a + b < max_unat LENGTH('a)]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('a::len)"
-  "(\<lambda>x. ll_add x 1, (RETURN \<circ> Suc)) \<in> [\<lambda>a. Suc a < max_unat LENGTH('a)]\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('a)"
-  "(uncurry ll_sub, uncurry (RETURN \<circ>\<circ> (-))) \<in> [\<lambda>(a, b). b \<le> a]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn"
-  "(uncurry ll_mul, uncurry (RETURN \<circ>\<circ> (*))) \<in> [\<lambda>(a, b). a * b < max_unat LENGTH('a)]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('a::len)"
-  "(uncurry ll_udiv, uncurry (RETURN \<circ>\<circ> (div))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn"
-  "(uncurry ll_urem, uncurry (RETURN \<circ>\<circ> (mod))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn"
+  "(uncurry ll_add, uncurry (PR_CONST (SPECc2 ''add'' (+)))) \<in> [\<lambda>(a, b). a + b < max_unat LENGTH('a)]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('a::len)"
+  "(\<lambda>x. ll_add x 1, (PR_CONST (SPECc1 ''add'' Suc))) \<in> [\<lambda>a. Suc a < max_unat LENGTH('a)]\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('a)"
+  "(uncurry ll_sub, uncurry (PR_CONST (SPECc2 ''sub'' (-)))) \<in> [\<lambda>(a, b). b \<le> a]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn"
+  "(uncurry ll_mul, uncurry (PR_CONST (SPECc2 ''mul'' (*)))) \<in> [\<lambda>(a, b). a * b < max_unat LENGTH('a)]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('a::len)"
+  "(uncurry ll_udiv, uncurry (PR_CONST (SPECc2 ''udiv'' (div)))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn"
+  "(uncurry ll_urem, uncurry (PR_CONST (SPECc2 ''urem'' (mod)))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> unat_assn"
   
-  "(uncurry ll_and, uncurry (RETURN \<circ>\<circ> (AND))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn"
-  "(uncurry ll_or, uncurry (RETURN \<circ>\<circ> (OR))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn"
-  "(uncurry ll_xor, uncurry (RETURN \<circ>\<circ> (XOR))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn"
+  "(uncurry ll_and, uncurry (PR_CONST (SPECc2 ''and'' (AND)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn"
+  "(uncurry ll_or, uncurry (PR_CONST (SPECc2 ''or'' (OR)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn"
+  "(uncurry ll_xor, uncurry (PR_CONST (SPECc2 ''xor'' (XOR)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn"
   
-  "(uncurry ll_icmp_eq, uncurry (RETURN \<circ>\<circ> (=))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_ne, uncurry (RETURN \<circ>\<circ> (op_neq))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_ule, uncurry (RETURN \<circ>\<circ> (\<le>))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_ult, uncurry (RETURN \<circ>\<circ> (<))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"  
-  unfolding op_neq_def
+  "(uncurry ll_icmp_eq, uncurry (PR_CONST (SPECc2 ''icmp_eq'' (=)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_ne, uncurry (PR_CONST (SPECc2 ''icmp_ne'' (op_neq)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_ule, uncurry (PR_CONST (SPECc2 ''icmp_ule'' (\<le>)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_ult, uncurry (PR_CONST (SPECc2 ''icmp_ult'' (<)))) \<in> unat_assn\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"  
+  unfolding op_neq_def PR_CONST_def
   
   using unat_bin_ops[THEN unat.hn_bin_op, folded unat_rel_def]
     and unat_un_ops[THEN unat.hn_un_op, folded unat_rel_def]
@@ -988,21 +1041,27 @@ lemma exists_pure_conv:
   by (auto intro!: exI[of _ a] simp: pure_true_conv pred_lift_def)
 
 lemma bit_lshift_unat_assn[sepref_fr_rules]:
-  \<open>(uncurry ll_lshr, uncurry (RETURN oo (>>))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a
+  \<open>(uncurry ll_lshr, uncurry (PR_CONST (SPECc2 ''lshr'' (>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a
     (unat_assn' TYPE('a::len2))\<^sup>k *\<^sub>a (unat_assn)\<^sup>k \<rightarrow> (unat_assn)\<close>
+  unfolding PR_CONST_def SPECc2_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   apply sepref_to_hoare
   apply (vcg)
+  subgoal for b  bi a ai F aa ba
+  apply(rule wp_monoI[OF llvm_prim_arith_setup.ll_lshr_rule[THEN htripleD, where F=F]])
+  unfolding WBOUNDS_def STATE_def
   apply (auto simp: unat_rel_def unat.rel_def br_def unat_def ll_lshr_def wp_return
      op_lift_arith2_def Let_def fcheck_def shift_ovf_def word_to_lint_to_uint_conv bitLSHR'_def
      nat_div_distrib nat_power_eq pred_lift_merge_simps
      cnv_snat_to_uint(1) in_br_conv snat.rel_def snat_invar_def
    simp flip: word_to_lint_lshr)
-  apply (simp_all add: POSTCOND_def STATE_extract(2) shiftr_div_2n shiftr_nat_def exists_pure_conv)
+  apply (simp_all add: POSTCOND_def STATE_def STATE_extract(2) shiftr_div_2n shiftr_nat_def exists_pure_conv)
+  by (simp add: pred_lift_extract_simps(2) shiftr_div_2n)  
+  (* TODO: problem with Suc 0 and 1 *)
   done
 
-
 lemma bit_shiftl_unat_assn[sepref_fr_rules]:
-  \<open>(uncurry ll_shl, uncurry (RETURN oo (<<))) \<in> [\<lambda>(a,b). b < LENGTH('a) \<and> (a << b) < max_unat LENGTH('a)]\<^sub>a
+  \<open>(uncurry ll_shl, uncurry (PR_CONST (SPECc2 ''shl'' (<<)))) \<in> [\<lambda>(a,b). b < LENGTH('a) \<and> (a << b) < max_unat LENGTH('a)]\<^sub>a
     (unat_assn' TYPE('a::len2))\<^sup>k *\<^sub>a (unat_assn)\<^sup>k \<rightarrow> (unat_assn)\<close>
 proof -
   have [simp]: \<open>nat (bi) < LENGTH('a :: len2) \<Longrightarrow>
@@ -1011,16 +1070,22 @@ proof -
     by (metis (full_types) max_unat_def nat_less_numeral_power_cancel_iff shiftl_int_def uint_mult_lem
       uint_power_lower uint_word_arith_bintrs(3) word_size)
   show ?thesis
+  unfolding PR_CONST_def SPECc2_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
     apply sepref_to_hoare
-    apply (vcg)
-    apply (auto simp: unat_rel_def unat.rel_def br_def unat_def ll_shl_def wp_return
-       op_lift_arith2_def Let_def fcheck_def shift_ovf_def word_to_lint_to_uint_conv bitSHL'_def
-       nat_div_distrib nat_power_eq pred_lift_merge_simps
-       cnv_snat_to_uint(1) in_br_conv snat.rel_def snat_invar_def
-     simp flip: word_to_lint_shl)
+    apply (vcg) (* TODO: same problem as above *)
+  subgoal for b  bi a ai F aa ba
+    apply(rule wp_monoI[OF llvm_prim_arith_setup.ll_shl_rule[THEN htripleD, where F=F]])
+    unfolding WBOUNDS_def STATE_def
+      apply (auto simp: unat_rel_def unat.rel_def br_def unat_def ll_shl_def wp_return
+        op_lift_arith2_def Let_def fcheck_def shift_ovf_def word_to_lint_to_uint_conv bitSHL'_def
+        nat_div_distrib nat_power_eq pred_lift_merge_simps
+        cnv_snat_to_uint(1) in_br_conv snat.rel_def snat_invar_def
+        simp flip: word_to_lint_shl) (* TODO: problem with Suc *)
     apply (simp_all add: POSTCOND_def STATE_extract(2) shiftr_div_2n shiftl_nat_def
-      uint_shiftl exists_pure_conv)
-    done
+        uint_shiftl exists_pure_conv STATE_def)
+    by (smt \<open>\<And>bi ai. \<lbrakk>nat bi < LENGTH('a); nat (uint ai * 2 ^ nat bi) < max_unat LENGTH('a)\<rbrakk> \<Longrightarrow> nat (bintrunc (size ai) (uint ai << nat bi)) = nat (uint ai * 2 ^ nat bi)\<close> mult.commute pred_lift_extract_simps(2) shiftl_int_def shiftl_t2n uint_power_lower uint_word_arith_bintrs(3) wsst_TYs(3))
+  done
 qed
 
 subsubsection \<open>Natural Numbers by Signed Word\<close>
@@ -1071,7 +1136,8 @@ lemma snat_invar_numeral: "\<lbrakk> numeral a < max_snat LENGTH('a::len2) \<rbr
   
   
 lemma hn_snat_0[sepref_fr_rules]:
-  "hn_refine \<box> (return 0) \<box> (snat_assn' TYPE('a::len2)) (RETURN$PR_CONST (snat_const TYPE('a) 0))"
+  "hn_refine \<box> (return 0::_ llM) \<box> (snat_assn' TYPE('a::len2)) (RETURN$PR_CONST (snat_const TYPE('a) 0))"
+  unfolding APP_def
   apply sepref_to_hoare
   unfolding snat_rel_def snat.rel_def in_br_conv
   supply [simp] = snat_invar_0
@@ -1079,7 +1145,8 @@ lemma hn_snat_0[sepref_fr_rules]:
   done
   
 lemma hn_snat_1[sepref_fr_rules]:
-  "hn_refine \<box> (return 1) \<box> (snat_assn' TYPE('a::len2)) (RETURN$PR_CONST (snat_const TYPE('a) 1))"
+  "hn_refine \<box> (return 1::_ llM) \<box> (snat_assn' TYPE('a::len2)) (RETURN$PR_CONST (snat_const TYPE('a) 1))"
+  unfolding APP_def
   apply sepref_to_hoare
   unfolding snat_rel_def snat.rel_def in_br_conv
   supply [simp] = snat_invar_1
@@ -1089,24 +1156,25 @@ lemma hn_snat_1[sepref_fr_rules]:
   
 lemma hn_snat_numeral[sepref_fr_rules]:
   "\<lbrakk>numeral n \<in> snats LENGTH('a)\<rbrakk> \<Longrightarrow> 
-    hn_refine \<box> (return (numeral n)) \<box> (snat_assn' TYPE('a::len2)) (RETURN$(PR_CONST (snat_const TYPE('a) (numeral n))))"
+    hn_refine \<box> (return (numeral n)::_ llM) \<box> (snat_assn' TYPE('a::len2)) (RETURN$(PR_CONST (snat_const TYPE('a) (numeral n))))"
+  unfolding APP_def
   apply sepref_to_hoare unfolding snat_rel_def snat.rel_def in_br_conv 
   supply [simp] = snat_invar_numeral
   apply vcg'
   done
   
 lemma hn_snat_ops[sepref_fr_rules]:
-  "(uncurry ll_add, uncurry (RETURN \<circ>\<circ> (+))) \<in> [\<lambda>(a, b). a + b < max_snat LENGTH('a)]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn' TYPE('a::len2)"
-  "(\<lambda>x. ll_add x 1, (RETURN \<circ> Suc)) \<in> [\<lambda>a. Suc a < max_snat LENGTH('a)]\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn' TYPE('a::len2)"
-  "(uncurry ll_sub, uncurry (RETURN \<circ>\<circ> (-))) \<in> [\<lambda>(a, b). b \<le> a]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn"
-  "(uncurry ll_mul, uncurry (RETURN \<circ>\<circ> (*))) \<in> [\<lambda>(a, b). a * b < max_snat LENGTH('a)]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn' TYPE('a::len2)"
-  "(uncurry ll_udiv, uncurry (RETURN \<circ>\<circ> (div))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn"
-  "(uncurry ll_urem, uncurry (RETURN \<circ>\<circ> (mod))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn"
+  "(uncurry ll_add, uncurry (PR_CONST (SPECc2 ''add'' (+)))) \<in> [\<lambda>(a, b). a + b < max_snat LENGTH('a)]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn' TYPE('a::len2)"
+  "(\<lambda>x. ll_add x 1, (PR_CONST (SPECc1 ''add'' Suc))) \<in> [\<lambda>a. Suc a < max_snat LENGTH('a)]\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn' TYPE('a::len2)"
+  "(uncurry ll_sub, uncurry (PR_CONST (SPECc2 ''sub'' (-)))) \<in> [\<lambda>(a, b). b \<le> a]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn"
+  "(uncurry ll_mul, uncurry (PR_CONST (SPECc2 ''mul'' (*)))) \<in> [\<lambda>(a, b). a * b < max_snat LENGTH('a)]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn' TYPE('a::len2)"
+  "(uncurry ll_udiv, uncurry (PR_CONST (SPECc2 ''udiv'' (div)))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn"
+  "(uncurry ll_urem, uncurry (PR_CONST (SPECc2  ''urem'' (mod)))) \<in> [\<lambda>(a, b). b \<noteq> 0]\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> snat_assn"
   
-  "(uncurry ll_icmp_eq, uncurry (RETURN \<circ>\<circ> (=))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_ne, uncurry (RETURN \<circ>\<circ> (op_neq))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_sle, uncurry (RETURN \<circ>\<circ> (\<le>))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-  "(uncurry ll_icmp_slt, uncurry (RETURN \<circ>\<circ> (<))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"  
+  "(uncurry ll_icmp_eq, uncurry (PR_CONST (SPECc2 ''icmp_eq'' (=)))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_ne, uncurry (PR_CONST (SPECc2 ''icmp_ne'' (op_neq)))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_sle, uncurry (PR_CONST (SPECc2 ''icmp_sle'' (\<le>)))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  "(uncurry ll_icmp_slt, uncurry (PR_CONST (SPECc2 ''icmp_slt'' (<)))) \<in> snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"  
   unfolding op_neq_def
   using snat_bin_ops[THEN snat.hn_bin_op, folded snat_rel_def]
     and snat_un_ops[THEN snat.hn_un_op, folded snat_rel_def]
@@ -1115,20 +1183,26 @@ lemma hn_snat_ops[sepref_fr_rules]:
   
 
 lemma bit_lshift_snat_assn[sepref_fr_rules]:
-  \<open>(uncurry ll_lshr, uncurry (RETURN oo (>>))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a
+  \<open>(uncurry ll_lshr, uncurry (PR_CONST (SPECc2 ''lshr'' (>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a
     (snat_assn' TYPE('a::len2))\<^sup>k *\<^sub>a (snat_assn)\<^sup>k \<rightarrow> (snat_assn)\<close>
+  unfolding PR_CONST_def SPECc2_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   apply sepref_to_hoare
   apply (vcg)
-  apply (auto simp: unat_rel_def unat.rel_def br_def unat_def ll_lshr_def wp_return
-     op_lift_arith2_def Let_def fcheck_def shift_ovf_def word_to_lint_to_uint_conv bitLSHR'_def
-     nat_div_distrib nat_power_eq pred_lift_merge_simps snat_rel_def
-     cnv_snat_to_uint(1) in_br_conv snat.rel_def snat_invar_def
-   simp flip: word_to_lint_lshr)
-  apply (simp_all add: POSTCOND_def STATE_extract(2) shiftr_div_2n shiftr_nat_def exists_pure_conv)
+  subgoal for b  bi a ai F aa ba
+    apply(rule wp_monoI[OF llvm_prim_arith_setup.ll_lshr_rule[THEN htripleD, where F=F]])
+    unfolding WBOUNDS_def STATE_def
+      apply (auto simp: unat_rel_def unat.rel_def br_def unat_def ll_lshr_def wp_return
+        op_lift_arith2_def Let_def fcheck_def shift_ovf_def word_to_lint_to_uint_conv bitLSHR'_def
+        nat_div_distrib nat_power_eq pred_lift_merge_simps snat_rel_def
+        cnv_snat_to_uint(1) in_br_conv snat.rel_def snat_invar_def
+        simp flip: word_to_lint_lshr)
+    apply (simp_all add: POSTCOND_def STATE_def STATE_extract(2) shiftr_div_2n shiftr_nat_def exists_pure_conv)
+    by (simp add: cnv_snat_to_uint(1) pred_lift_extract_simps(2) shiftr_div_2n snat_invar_def) 
   done
 
 lemma bit_shiftl_snat_assn[sepref_fr_rules]:
-  \<open>(uncurry ll_shl, uncurry (RETURN oo (<<))) \<in> [\<lambda>(a,b). b < LENGTH('a) \<and> (a << b) < max_snat LENGTH('a)]\<^sub>a
+  \<open>(uncurry ll_shl, uncurry (PR_CONST (SPECc2 ''shl'' (<<)))) \<in> [\<lambda>(a,b). b < LENGTH('a) \<and> (a << b) < max_snat LENGTH('a)]\<^sub>a
     (snat_assn' TYPE('a::len2))\<^sup>k *\<^sub>a (snat_assn)\<^sup>k \<rightarrow> (snat_assn)\<close>
 proof -
   have H: \<open>nat (bi) < LENGTH('a :: len2) \<Longrightarrow>
@@ -1143,13 +1217,15 @@ proof -
     using nat_less_numeral_power_cancel_iff snat_in_bounds_aux by blast
 
   show ?thesis
+  unfolding PR_CONST_def SPECc2_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   proof (sepref_to_hoare, vcg)
     fix bi ai :: \<open>'a word\<close> and  a b F s
     assume
        le: \<open>b < LENGTH('a)\<close>  \<open>a << b < max_snat LENGTH('a)\<close> and
        a: \<open>(ai, a) \<in> snat_rel\<close> and
        b: \<open>(bi, b) \<in> snat_rel\<close> and
-       state: \<open>llSTATE F s\<close>
+       state: \<open>llSTATE ($lift_acost (cost ''shl'' (Suc 0)) \<and>* F) s\<close>
    have \<open>nat (uint ai) << nat (uint bi) < 2 ^ (LENGTH('a) - Suc 0)\<close>
      using le a b
      by (auto simp: sint_uint word_size uint_shiftl br_def nat_shiftr_div
@@ -1157,8 +1233,9 @@ proof -
        nat_mult_distrib nat_power_eq)
    then have \<open>(uint ai) << nat (uint bi) < 2 ^ (LENGTH('a) - Suc 0)\<close>
      using le a b unfolding shiftr_int_def
-     by (smt int_nat_eq nat_2 nat_shiftr_div numeral_2_eq_2 of_nat_less_iff of_nat_mult
-       semiring_1_class.of_nat_power shiftl_int_def uint_nonnegative)
+     using int_nat_eq nat_2 nat_shiftr_div numeral_2_eq_2 of_nat_less_iff of_nat_mult
+       semiring_1_class.of_nat_power shiftl_int_def uint_nonnegative
+     by (smt br_def cnv_snat_to_uint(1) diff_less len_gt_0 lessI mem_Collect_eq prod.simps(2) snat.rel_def snat_rel_def uint_power_lower unat_def unat_power_lower)
    then have le': \<open>ai << nat (uint bi) < 2 ^ (LENGTH('a) - Suc 0)\<close>
      using le apply (auto simp: max_snat_def)
      apply (subst (asm) nat_less_eq_zless[symmetric], simp, subst word_less_alt)
@@ -1212,11 +1289,12 @@ proof -
          (\<lambda>r. llPOST
                ((\<up>((ai, a) \<in> snat_rel) \<and>*
                  \<up>((bi, b) \<in> snat_rel) \<and>*
-                 (\<lambda>s. \<exists>x. (\<up>((r, x) \<in> snat_rel) \<and>* \<up>(x = a << b)) s)) \<and>*
+                 \<up>((r, a << b) \<in> snat_rel) \<and>* GC) \<and>*
                 F))
          s\<close>
+     apply(rule wp_monoI[OF llvm_prim_arith_setup.ll_shl_rule[THEN htripleD, where F=F]])
      using le a b state
-     unfolding snat_rel_def snat.rel_def br_def
+     unfolding snat_rel_def snat.rel_def br_def WBOUNDS_def STATE_def
      apply (auto simp: br_def snat_def ll_shl_def wp_return
         op_lift_arith2_def Let_def fcheck_def shift_ovf_def word_to_lint_to_uint_conv bitSHL'_def
         nat_div_distrib nat_power_eq pred_lift_merge_simps sint_eq_uint max_snat_def
@@ -1224,6 +1302,8 @@ proof -
       simp flip: word_to_lint_shl)
      apply (simp_all add: POSTCOND_def STATE_extract(2) shiftr_div_2n shiftl_nat_def
        uint_shiftl exists_pure_conv)
+     subgoal by (simp add: unat_def)
+     subgoal by (simp add: STATE_alt \<open>nat (sint (ai << nat (uint bi))) = nat (uint ai * 2 ^ nat (uint bi))\<close> pred_lift_extract_simps(2) unat_def)
     done
   qed
 qed
@@ -1247,7 +1327,7 @@ lemma annot_num_const_cong:
   "\<And>a b. sint_const a b = sint_const a b" 
   "\<And>a b. unat_const a b = unat_const a b" 
   "ASSERT \<Phi> = ASSERT \<Phi>"
-  "WHILEIT I = WHILEIT I"
+ (* "WHILEIT I = WHILEIT I"  TODO *)
   by simp_all
   
 lemma unat_const_fold: 
@@ -1287,7 +1367,7 @@ method annot_unat_const for T::"'a::len itself" =
   (simp only: unat_const_fold[where 'a='a] cong: annot_num_const_cong),
   (rule CNV_I)
   
-  
+\<^cancel>\<open>  
 subsubsection \<open>Casting\<close>  
 (* TODO: Add other casts *)
   
@@ -1438,8 +1518,10 @@ lemma of_nat_word_refine[sepref_import_param]:
   "(id,of_nat) \<in> unat_rel' TYPE('a::len) \<rightarrow> word_rel"
   by (auto simp: unat_rel_def unat.rel_def in_br_conv)
 
+\<close>
 
 
+\<^cancel>\<open>
 subsubsection \<open>Bit-Shifting\<close>
 
 sepref_register 
@@ -1486,7 +1568,7 @@ lemma ashr_hnr_snat[sepref_fr_rules]: "(uncurry ll_ashr,uncurry (RETURN oo (>>>)
   
       
 end
-
+\<close>
 subsubsection \<open>Bounds Solver Setup\<close>
 
 
@@ -1515,6 +1597,57 @@ subsection \<open>HOL Combinators\<close>
 
 subsubsection \<open>If\<close>
 
+thm htripleD
+  lemma htripleD2:  
+    assumes q': "\<And>r. Q' r = (Q r ** F)"
+    assumes "(P**F) (\<alpha> s)"
+    assumes "htriple \<alpha> P c Q"
+    shows "wp c (\<lambda>r s'. (Q' r) (\<alpha> s')) s"
+    unfolding q' apply(rule htripleD) 
+    using assms by auto
+
+lemma consume_two_steps: "NREST.consume m t' = doN { SPECT [()\<mapsto>t']; m}"
+  by (auto simp: bindT_def consume_def split: nrest.splits)
+
+lemma hnr_consume_aux: "t' = lift_acost t \<Longrightarrow> hn_refine \<Gamma> (ll_consume t) \<Gamma> (unit_assn) (SPECT [() \<mapsto> t'])"
+  apply(rule hn_refineI_SPECT) unfolding pure_def by vcg
+
+lemma hnr_consume: "hn_refine \<Gamma> c \<Gamma>' R m \<Longrightarrow> t' = lift_acost t \<Longrightarrow> hn_refine \<Gamma> (doM { ll_consume t; c }) \<Gamma>' R (NREST.consume m t')"
+  unfolding consume_two_steps
+  apply(rule hnr_bind_manual_free)
+   apply(rule hnr_consume_aux) apply simp
+  by(simp add: hn_refine_extract_pre_val)  
+
+lemma hn_refine_extract_pre_val': 
+  "((xc,xa)\<in>S \<longrightarrow> hn_refine (hn_val S xa xc ** \<Gamma>) c \<Gamma>' R m) \<Longrightarrow> hn_refine (hn_val S xa xc ** \<Gamma>) c \<Gamma>' R m"
+  unfolding hn_refine_def hn_ctxt_def pure_def
+  by (auto simp: STATE_def sep_algebra_simps pred_lift_extract_simps htriple_extract_pre_pure)
+
+lemma hnr_postprocess:
+  assumes hnr: "hn_refine \<Gamma>1 b' \<Gamma>2b R b"
+  assumes ht: "llvm_htriple \<Gamma>2b fb (\<lambda>r. \<Gamma>')"
+  shows "hn_refine \<Gamma>1 (doM { r \<leftarrow> b'; fb; return r }) \<Gamma>' R b"
+proof (rule)
+  fix F s cr M
+  assume "b = SPECT M" "(\<Gamma>1 \<and>* F) (ll_\<alpha> (s, cr))"
+  from hnr[THEN hn_refineD, OF this] obtain ra Ca
+    where "Some Ca \<le> M ra" and wpb: "wp b' (\<lambda>r s. (\<Gamma>2b \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)" 
+    by blast
+
+  show "\<exists>ra Ca. Some Ca \<le> M ra \<and> wp (doM { r \<leftarrow> b'; fb; return r })
+                                      (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)"
+    apply(rule exI[where x=ra])
+    apply(rule exI[where x=Ca])
+    apply safe apply fact
+    apply(simp add: wp_bind)
+    apply(rule wp_monoI[OF wpb])
+    apply(simp add: wp_bind)
+    apply(rule wp_monoI[OF ht[THEN htripleD]])
+     apply(simp)
+    apply (simp add: wp_return) 
+    by (simp add: GC_move_left(4) sep_conj_commute sep_conj_left_commute)  
+qed
+
 lemma hn_if_aux:
   assumes P: "\<Gamma> \<turnstile> hn_val bool1_rel a a' ** \<Gamma>1"
   assumes RT: "a \<Longrightarrow> hn_refine (hn_val bool1_rel a a' ** \<Gamma>1) b' \<Gamma>2b R b"
@@ -1522,35 +1655,61 @@ lemma hn_if_aux:
   assumes MERGE: "MERGE \<Gamma>2b fb \<Gamma>2c fc \<Gamma>'"
   shows "hn_refine \<Gamma> 
     (llc_if a' (doM {r\<leftarrow>b'; fb; return r}) (doM {r\<leftarrow>c'; fc; return r})) 
-    \<Gamma>' R (if a then b else c)"
+    \<Gamma>' R (consume (if a then b else c) (cost ''if'' 1))"
   apply (rule hn_refine_nofailI)  
-  apply (rule hn_refine_cons_pre[OF P])
-proof (cases a, goal_cases)
-  assume NF: "nofail (if a then b else c)"
+  apply (rule hn_refine_cons_pre[OF _ P])
+  apply(rule hn_refine_extract_pre_val') 
+proof (rule, cases a, goal_cases)
+  assume "nofailT (NREST.consume (if a then b else c) (cost ''if'' 1))"
+  then have NF: "nofailT (if a then b else c)"
+    by (simp add: refine_pw_simps)
   
   have [vcg_normalize_simps, named_ss fri_prepare_simps]: "hn_val bool1_rel = \<upharpoonleft>bool.assn"
     unfolding bool1_rel_def bool.assn_is_rel hn_ctxt_def ..
   
-  note [vcg_rules] = MERGED[OF MERGE]  
-    
+  note me[vcg_rules] = MERGED[OF MERGE]  
+
   {
-    case [simp]: 1
-    from NF have [simp]: "nofail b" by simp
-  
-    note [vcg_rules] = RT[THEN hn_refineD, simplified]
-  
-    show ?case by rule vcg
+    case 1
+    from 1 NF have [simp]: "nofailT b" by simp
+    then obtain Mb where Mb: "b = SPECT Mb" apply(cases b) by auto
+
+    from 1(2,3) have a': "to_bool a'"  
+      by (simp add: bool.rel_def bool1_rel_def in_br_conv)  
+
+    show ?case
+      unfolding llc_if_def
+      apply(subst (2) 1(3)) apply(subst a')
+      apply simp
+      apply(rule hnr_consume)
+      apply(rule hnr_postprocess)
+      apply(rule RT[OF 1(3)])
+       apply(rule me(1))
+      apply(subst lift_acost_cost)
+      by(simp add:  one_enat_def)  
   }
   {
-    case [simp]: 2
-    from NF have [simp]: "nofail c" by simp
-  
-    note [vcg_rules] = RE[THEN hn_refineD, simplified]
-  
-    show ?case by rule vcg
-  }  
+    case 2
+    from 2 NF have [simp]: "nofailT c" by simp
+    then obtain Mc where Mc: "c = SPECT Mc" apply(cases c) by auto
+
+    from 2(2,3) have a': "\<not> to_bool a'"  
+      by (simp add: bool.rel_def bool1_rel_def in_br_conv)  
+
+    show ?case
+      unfolding llc_if_def
+      apply(subst (2) 2(3)) apply(subst a')
+      apply simp
+      apply(rule hnr_consume)
+      apply(rule hnr_postprocess)
+      apply(rule RE[OF 2(3)])
+       apply(rule me(2))
+      apply(subst lift_acost_cost)
+      by(simp add:  one_enat_def)  
+  }
 qed    
 
+definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
 
 lemma hn_if[sepref_comb_rules]:
   assumes P: "\<Gamma> \<turnstile> hn_val bool1_rel a a' ** \<Gamma>1"
@@ -1559,19 +1718,20 @@ lemma hn_if[sepref_comb_rules]:
   assumes MERGE: "TERM If \<Longrightarrow> MERGE \<Gamma>2b fb \<Gamma>2c fc \<Gamma>'"
   shows "hn_refine \<Gamma> 
     (llc_if a' (doM {r\<leftarrow>b'; fb; return r}) (doM {r\<leftarrow>c'; fc; return r})) 
-    \<Gamma>' R (If$a$b$c)"
+    \<Gamma>' R (MIf$a$b$c)"
   using P RT RE MERGE[OF TERMI]
-  unfolding APP_def PROTECT2_def 
+  unfolding APP_def PROTECT2_def MIf_def
   by (rule hn_if_aux)
 
 
+term whileT
 subsubsection \<open>While\<close>  
 (* TODO: Move WHILE-stuff to HOL-Bindings Theory *)
 lemma WHILEIT_pat[def_pat_rules]:
-  "WHILEIT$I \<equiv> UNPROTECT (WHILEIT I)"
-  "WHILET \<equiv> PR_CONST (WHILEIT (\<lambda>_. True))"
-  by (simp_all add: WHILET_def)
-
+  "whileIET$I \<equiv> UNPROTECT (whileIET I)"
+(*  "whileT \<equiv> PR_CONST (whileIET (\<lambda>_. True) undefined)" *)
+  by (simp_all add: whileIET_def)
+\<^cancel>\<open>
 lemma id_WHILEIT[id_rules]: 
   "PR_CONST (WHILEIT I) ::\<^sub>i TYPE(('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> 'a nres) \<Rightarrow> 'a \<Rightarrow> 'a nres)"
   by simp
@@ -1606,12 +1766,24 @@ lemma monadic_WHILEIT_comb[sepref_monadify_comb]:
       SP (PR_CONST (monadic_WHILEIT I))$b$f$s
     )"
   by (simp)
-  
+  \<close>
   
 lemma hn_refine_add_invalid: (* Very customized rule for manual derivation of while *)
   "hn_refine (hn_ctxt Rs a b ** \<Gamma>) c \<Gamma>' R m \<Longrightarrow> hn_refine (hn_ctxt Rs a b ** \<Gamma>) c (hn_invalid Rs a b ** \<Gamma>') R m"
   by (smt hn_refine_frame' invalidate_clone' sep_conj_commute sep_conj_left_commute)
-  
+
+
+definition "monadic_WHILEITc I b f s \<equiv> do {
+  consume (RECT (\<lambda>D s. do {
+    ASSERT (I s);
+    bv \<leftarrow> b s;
+    MIf bv (do {
+      s \<leftarrow> f s;
+      consume (D s) (cost ''call'' 1)
+    }) (do {RETURNT s})
+  }) s) (cost ''call'' 1)
+}"
+
 lemma hn_monadic_WHILE_aux:
   assumes FR: "P \<turnstile> hn_ctxt Rs s' s ** \<Gamma>"
   assumes b_ref: "\<And>s s'. I s' \<Longrightarrow> hn_refine 
@@ -1631,26 +1803,31 @@ lemma hn_monadic_WHILE_aux:
   assumes f_fr: "\<And>s' s. \<Gamma>f s' s \<turnstile> hn_ctxt Rsf s' s ** \<Gamma>"
   assumes free: "MK_FREE Rsf fr"
   (*assumes PREC: "precise Rs"*)
-  shows "hn_refine (P) (llc_while b (\<lambda>s. doM {r \<leftarrow> f s; fr s; return r}) s) (hn_invalid Rs s' s ** \<Gamma>) Rs (monadic_WHILEIT I b' f' s')"
-  apply1 (rule hn_refine_cons_pre[OF FR])
+  shows "hn_refine (P) (llc_while b (\<lambda>s. doM {r \<leftarrow> f s; fr s; return r}) s) (hn_invalid Rs s' s ** \<Gamma>) Rs (monadic_WHILEITc I b' f' s')"
+  apply1 (rule hn_refine_cons_pre[OF _ FR])                                                                        
   apply (rule hn_refine_add_invalid)
   
   apply (rule hn_refine_synthI)
-  unfolding monadic_WHILEIT_def
+  unfolding monadic_WHILEITc_def
+  apply (rule hnr_consume[rotated])
+  apply(subst lift_acost_cost) unfolding one_enat_def apply simp
   focus (rule hnr_RECT[where F'="\<lambda>s' s. \<Gamma>" and Ry=Rs])
     apply1 (rule hnr_ASSERT)
     focus (rule hnr_bind_manual_free)
       applyS (rule b_ref; simp)
-      apply1 (rule hn_refine_cons_pre, sep_drule b_fr, rule entails_refl)
+      apply1 (rule hn_refine_cons_pre[rotated], sep_drule b_fr, rule entails_refl)
+      unfolding MIf_def
       focus (rule hn_if_aux[OF _ _ _ MERGE_triv])
         apply (fri_rotate entails_pre_cong :-1) apply (rule conj_entails_mono[OF entails_refl]) apply (rule entails_refl)
         focus (* Then-Part *)
-          apply1 (rule hn_refine_cons_pre, sep_drule drop_hn_val, simp, rule entails_refl)
+          apply1 (rule hn_refine_cons_pre[rotated], sep_drule drop_hn_val, simp, rule entails_refl)
           apply (rule hnr_bind_manual_free)
           applyS (rule f_ref, simp)
-          apply1 (rule hn_refine_cons_pre, sep_drule f_fr, simp, rule entails_refl)
+          apply1 (rule hn_refine_cons_pre[rotated], sep_drule f_fr, simp, rule entails_refl)
           apply (rule hnr_freeI[OF free])
-          apply (rule hn_refine_cons_pre[rotated], assumption)
+          apply (rule hnr_consume[rotated])
+          focus (subst lift_acost_cost) unfolding one_enat_def apply simp solved          
+          apply (rule hn_refine_cons_pre, assumption)
           applyS (simp add: sep_conj_ac; rule entails_refl)
           solved
         focus (* Else-Part *)  
@@ -1665,7 +1842,7 @@ lemma hn_monadic_WHILE_aux:
       solved
     focus apply pf_mono_prover solved
     solved
-  subgoal by (simp add: llc_while_def mwhile_def llc_if_def cong: if_cong)
+      subgoal by (simp add: ll_call_def REC'_def llc_while_def mwhile_def llc_if_def cong: if_cong)      
   subgoal ..
   subgoal ..
   done
@@ -1679,7 +1856,7 @@ lemma hn_monadic_WHILE_lin[sepref_comb_rules]:
     (\<Gamma>b s' s)
     (pure bool1_rel)
     (b' s')"
-  assumes b_fr: "\<And>s' s. TERM (monadic_WHILEIT,''cond'') \<Longrightarrow> \<Gamma>b s' s \<turnstile> hn_ctxt Rs s' s ** \<Gamma>"
+  assumes b_fr: "\<And>s' s. TERM (monadic_WHILEITc,''cond'') \<Longrightarrow> \<Gamma>b s' s \<turnstile> hn_ctxt Rs s' s ** \<Gamma>"
 
   assumes f_ref: "\<And>s' s. I s' \<Longrightarrow> hn_refine
     (hn_ctxt Rs s' s ** \<Gamma>)
@@ -1687,14 +1864,14 @@ lemma hn_monadic_WHILE_lin[sepref_comb_rules]:
     (\<Gamma>f s' s)
     Rs
     (f' s')"
-  assumes f_fr: "\<And>s' s. TERM (monadic_WHILEIT,''body'') \<Longrightarrow> \<Gamma>f s' s \<turnstile> hn_ctxt Rsf s' s ** \<Gamma>"
-  assumes free: "TERM (monadic_WHILEIT,''free-old-state'') \<Longrightarrow> MK_FREE Rsf fr"
+  assumes f_fr: "\<And>s' s. TERM (monadic_WHILEITc,''body'') \<Longrightarrow> \<Gamma>f s' s \<turnstile> hn_ctxt Rsf s' s ** \<Gamma>"
+  assumes free: "TERM (monadic_WHILEITc,''free-old-state'') \<Longrightarrow> MK_FREE Rsf fr"
   shows "hn_refine 
     P 
     (llc_while b (\<lambda>s. doM {r \<leftarrow> f s; fr s; return r}) s) 
     (hn_invalid Rs s' s ** \<Gamma>)
     Rs 
-    (PR_CONST (monadic_WHILEIT I)$(\<lambda>\<^sub>2s'. b' s')$(\<lambda>\<^sub>2s'. f' s')$(s'))"
+    (PR_CONST (monadic_WHILEITc I)$(\<lambda>\<^sub>2s'. b' s')$(\<lambda>\<^sub>2s'. f' s')$(s'))"
   using assms(2-)
   unfolding APP_def PROTECT2_def CONSTRAINT_def PR_CONST_def
   by (rule hn_monadic_WHILE_aux)
@@ -1703,9 +1880,10 @@ lemma hn_monadic_WHILE_lin[sepref_comb_rules]:
   
 subsubsection \<open>Let\<close>
 lemma hn_let[sepref_comb_rules]:
-  "hn_refine \<Gamma> c \<Gamma>' R (Refine_Basic.bind$(PASS$v)$(\<lambda>\<^sub>2x. f x)) \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R (Let$v$(\<lambda>\<^sub>2x. f x))" 
+  "hn_refine \<Gamma> c \<Gamma>' R (NREST.bindT$(PASS$v)$(\<lambda>\<^sub>2x. f x)) \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R (Let$v$(\<lambda>\<^sub>2x. f x))" 
   by simp
-    
+
+
 subsection \<open>Unit\<close>
 
 lemma unit_hnr[sepref_import_param]: "((),())\<in>unit_rel" by auto
@@ -1769,11 +1947,11 @@ lemma entt_invalid_prod: "hn_invalid (prod_assn A B) p p' \<turnstile> hn_ctxt (
   by (auto split: prod.splits simp: entails_def pred_lift_extract_simps dest: pure_part_split_conj)
 
 lemma gen_merge_cons_left: "L\<turnstile>L' \<Longrightarrow> MERGE L' fl R fr M \<Longrightarrow> MERGE L fl R fr M"  
-  unfolding MERGE_def oops
+  unfolding MERGE_def
   by (metis (mono_tags, lifting) cons_rule[where Q=Q and Q'=Q for Q] entails_def)
   
 lemma gen_merge_cons_right: "R\<turnstile>R' \<Longrightarrow> MERGE L fl R' fr M \<Longrightarrow> MERGE L fl R fr M"  
-  unfolding MERGE_def oops
+  unfolding MERGE_def
   by (metis (mono_tags, lifting) cons_rule[where Q=Q and Q'=Q for Q] entails_def)
   
 lemmas gen_merge_cons = gen_merge_cons_left gen_merge_cons_right
@@ -1787,7 +1965,6 @@ lemma prod_assn_ctxt: "prod_assn A1 A2 x y = z \<Longrightarrow> hn_ctxt (prod_a
 lemma drop_pureD: "is_pure A \<Longrightarrow> hn_ctxt A a b \<turnstile> \<box>"
   by (auto simp: is_pure_def entails_def pred_lift_extract_simps hn_ctxt_def)
   
-
 lemma hn_case_prod_aux:
   assumes FR: "\<Gamma> \<turnstile> hn_ctxt (prod_assn P1 P2) p' p ** \<Gamma>1"
   assumes Pair: "\<And>a1 a2 a1' a2'. \<lbrakk>p'=(a1',a2'); p=(a1,a2)\<rbrakk> 
@@ -1796,13 +1973,13 @@ lemma hn_case_prod_aux:
   assumes PURE: "Sepref_Basic.is_pure XX1"
   shows "hn_refine \<Gamma> (case_prod f p) (hn_ctxt (prod_assn P1' P2') p' p ** \<Gamma>1')
     (R (fst p') (snd p') (fst p) (snd p)) (case_prod f' p')" (is "?G \<Gamma>")
-    apply1 (rule hn_refine_cons_pre[OF FR])
+    apply1 (rule hn_refine_cons_pre[OF _ FR])
     apply1 extract_hnr_invalids
-    apply1 (cases p; cases p'; simp add: prod_assn_pair_conv[THEN prod_assn_ctxt])
-    apply (rule hn_refine_cons[OF _ Pair _ entails_refl])
+  apply1 (cases p; cases p'; simp add: prod_assn_pair_conv[THEN prod_assn_ctxt]) 
+    apply (rule hn_refine_cons[OF Pair _ _ entails_refl])
+    applyS simp
+    applyS simp
     applyS (simp add: hn_ctxt_def)
-    applyS simp
-    applyS simp
     using PURE apply (sep_drule drop_pureD[OF PURE])
     by (simp add: hn_ctxt_def sep_conj_ac)
   
@@ -1845,12 +2022,16 @@ lemma hn_case_prod_simple'[sepref_comb_rules]:
 lemma hn_Pair[sepref_fr_rules]: "(uncurry (return oo Pair), uncurry (RETURN oo Pair)) \<in> A\<^sup>d *\<^sub>a B\<^sup>d \<rightarrow>\<^sub>a A\<times>\<^sub>aB"    
   by sepref_to_hoare vcg
     
-(*
+
 lemma fst_hnr[sepref_fr_rules]: "(return o fst,RETURN o fst) \<in> (prod_assn A B)\<^sup>d \<rightarrow>\<^sub>a A"
-  by sepref_to_hoare vcg
+  apply sepref_to_hoare
+  apply vcg
+  oops (* TODO *)
 lemma snd_hnr[sepref_fr_rules]: "(return o snd,RETURN o snd) \<in> (prod_assn A B)\<^sup>d \<rightarrow>\<^sub>a B"
-  by sepref_to_hoare sep_auto
-*)
+  apply sepref_to_hoare
+  apply vcg
+  oops (* TODO *)
+
 
 lemmas [constraint_simps] = prod_assn_pure_conv
 lemmas [sepref_import_param] = param_prod_swap
@@ -1870,7 +2051,7 @@ lemma option_patterns[def_pat_rules]:
   apply (all \<open>rule eq_reflection\<close>)
   by (auto split: option.splits)
 
-  
+  \<^cancel>\<open>
 text \<open>Option type via unused implementation value\<close>  
 locale dflt_option =   
   fixes dflt and A :: "'a \<Rightarrow> 'c::llvm_rep \<Rightarrow> assn" and is_dflt
@@ -2076,8 +2257,9 @@ interpretation snat: dflt_pure_option "-1" snat_assn "ll_icmp_eq (-1)"
 
 abbreviation snat_option_assn' :: "'a itself \<Rightarrow> nat option \<Rightarrow> 'a::len2 word \<Rightarrow> llvm_amemory \<Rightarrow> bool" where
   "snat_option_assn' _ \<equiv> snat.option_assn"
+  \<close>
   
-  
+\<^cancel>\<open>
 subsection \<open>Additional Operations\<close>  
 
 text \<open>Additional operations, for which we need the basic framework already set up.\<close>
@@ -2098,12 +2280,12 @@ sepref_definition snat_sub_ovf_impl [llvm_inline] is "uncurry (RETURN oo op_nat_
   
 declare snat_sub_ovf_impl.refine[sepref_fr_rules]
   
-  
+  \<close>
   
   
   
     
-
+\<^cancel>\<open>
 
 subsection \<open>Ad-Hoc Regression Tests\<close>  
   
@@ -2183,5 +2365,7 @@ llvm_deps example4n
 export_llvm example4n
  
 (* TODO: Characters as i8 *)  
-  
+  *)
+\<close>
+
 end

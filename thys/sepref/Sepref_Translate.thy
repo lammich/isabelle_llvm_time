@@ -511,10 +511,6 @@ lemma hn_refine_synthI:
   shows "hn_refine \<Gamma> c' \<Gamma>'' R'' m"
   using assms by (blast intro: hn_refine_cons_post)
   
-lemma hn_refine_extract_pre_val: 
-  "hn_refine (hn_val S xa xc ** \<Gamma>) c \<Gamma>' R m \<longleftrightarrow> ((xc,xa)\<in>S \<longrightarrow> hn_refine \<Gamma> c \<Gamma>' R m)"
-  unfolding hn_refine_def hn_ctxt_def pure_def
-  by (auto simp: STATE_def sep_algebra_simps pred_lift_extract_simps htriple_extract_pre_pure)
   
 lemma drop_hn_val: "hn_val R x y \<turnstile> \<box>" by (auto simp: hn_ctxt_def pure_def entails_def pred_lift_extract_simps)
 lemma drop_hn_invalid: "hn_invalid R x y \<turnstile> \<box>" by (auto simp: hn_ctxt_def invalid_assn_def entails_def pred_lift_extract_simps)
@@ -611,7 +607,7 @@ lemma hnr_freeI:
   shows "hn_refine (hn_ctxt R x y ** \<Gamma>) (doM { fr y; c}) \<Gamma>' R' m"  
 proof -
   have "hn_refine (hn_ctxt R x y ** \<Gamma>) (doM { x \<leftarrow> fr y; r\<leftarrow>(\<lambda>_. c) x; return (); return r})
-                               \<Gamma>' R' (mop_free x \<then> m)"
+                               \<Gamma>' R' (doN { _\<leftarrow> mop_free x; m })"
     apply(rule hnr_bind)
        apply(rule hn_refine_frame)
         apply(rule mop_free_hnr[OF assms(1), to_hnr, unfolded autoref_tag_defs])
