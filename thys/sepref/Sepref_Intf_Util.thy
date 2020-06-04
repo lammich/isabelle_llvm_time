@@ -759,10 +759,12 @@ subsection \<open>ML-Level Declarations\<close>
           val _ = op_ar = length args orelse 
             raise TERM("Operation/relation arity mismatch: " ^ string_of_int op_ar ^ " vs " ^ string_of_int (length args),[opc,relt])
   
+          val nrestdummyT = Type (@{type_name nrest}, [dummyT, @{typ ecost}])
+
           (* Add RETURN o...o if necessary*)
           val opc = 
             if op_is_nres then opc
-            else mk_compN_pre op_ar (Const(@{const_name NREST.RETURNT},dummyT)) opc
+            else mk_compN_pre op_ar (Const(@{const_name NREST.RETURNT},dummyT --> nrestdummyT)) opc
   
           (* Add uncurry if necessary *)  
           val opc = mk_uncurryN_pre op_ar opc
