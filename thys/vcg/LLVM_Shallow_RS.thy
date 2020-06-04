@@ -975,25 +975,24 @@ lemma (in llvm_prim_arith_setup) llvm_from_bool_inline[llvm_inline]:
   done
 
 subsubsection \<open>Products\<close>
-(*  
+  
 lemma inline_prod_case[llvm_inline]: "(\<lambda>(a,b). f a b) = (\<lambda>x. doM { a\<leftarrow>prod_extract_fst x; b \<leftarrow> prod_extract_snd x; f a b })"  
   by (auto simp: prod_ops_simp)
-*)  
+
   
 lemma inline_return_prod_case[llvm_inline]: 
   "return (case x of (a,b) \<Rightarrow> f a b) = (case x of (a,b) \<Rightarrow> return (f a b))" by (rule prod.case_distrib)
   
-(*  
+
 lemma inline_return_prod[llvm_inline]: "return (a,b) = doM { x \<leftarrow> prod_insert_fst init a; x \<leftarrow> prod_insert_snd x b; return x }"  
   by (auto simp: prod_ops_simp)
-*)  
   
 context begin
 interpretation llvm_prim_setup .
 
 lemma ll_extract_pair_pair:
-  "ll_extract_fst (a,b) = consume1r ''extract_fst'' a" 
-  "ll_extract_snd (a,b) = consume1r ''extract_snd'' b" 
+  "ll_extract_fst (a,b) = \<^cancel>\<open>consume1r ''extract_fst''\<close> return a" 
+  "ll_extract_snd (a,b) = \<^cancel>\<open>consume1r ''extract_snd''\<close> return b" 
   unfolding ll_extract_fst_def ll_extract_snd_def checked_split_pair_def checked_from_val_def
   by auto 
 

@@ -228,11 +228,12 @@ begin
     fcheck (STATIC_ERROR ''Expected pair'') (llvm_is_pair v);
     return (llvm_the_pair v)
   }"
-  
-  definition ll_extract_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep llM" where "ll_extract_fst p = doM { consume (cost ''extract_fst'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val a }"
-  definition ll_extract_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep llM" where "ll_extract_snd p = doM { consume (cost ''extract_snd'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val b }"
-  definition ll_insert_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep \<Rightarrow> 't llM" where "ll_insert_fst p x = doM { consume (cost ''insert_fst'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair (to_val x) b) }" 
-  definition ll_insert_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep \<Rightarrow> 't llM" where "ll_insert_snd p x = doM { consume (cost ''insert_snd'' 1); (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair a (to_val x)) }" 
+
+  (* TODO: reinsert costs for products and push it to the abstract level. *)
+  definition ll_extract_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep llM" where "ll_extract_fst p = doM { \<^cancel>\<open>consume (cost ''extract_fst'' 1);\<close> (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val a }"
+  definition ll_extract_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep llM" where "ll_extract_snd p = doM { \<^cancel>\<open>consume (cost ''extract_snd'' 1);\<close> (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val b }"
+  definition ll_insert_fst :: "'t::llvm_rep \<Rightarrow> 't\<^sub>1::llvm_rep \<Rightarrow> 't llM" where "ll_insert_fst p x = doM { \<^cancel>\<open>consume (cost ''insert_fst'' 1);\<close> (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair (to_val x) b) }" 
+  definition ll_insert_snd :: "'t::llvm_rep \<Rightarrow> 't\<^sub>2::llvm_rep \<Rightarrow> 't llM" where "ll_insert_snd p x = doM { \<^cancel>\<open>consume (cost ''insert_snd'' 1);\<close> (a,b) \<leftarrow> checked_split_pair (to_val p); checked_from_val (llvm_pair a (to_val x)) }" 
     
   (*  
   definition ll_extract_fst :: "('a::llvm_rep \<times> 'b::llvm_rep) \<Rightarrow> 'a llM" where "ll_extract_fst ab \<equiv> return (fst ab)"
