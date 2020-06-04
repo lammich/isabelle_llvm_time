@@ -1782,14 +1782,14 @@ definition "SC f = f"
           THEN' TRY o hyp_subst_tac ctxt
           THEN' simp_only ctxt @{thms triv_forall_equality}
           THEN' (
-            resolve_tac ctxt @{thms hn_refine_cons[rotated]} 
+            resolve_tac ctxt @{thms hn_refine_cons} 
             THEN' (resolve_tac ctxt [thm] THEN_ALL_NEW assume_tac ctxt))
           THEN_ALL_NEW simp_only ctxt 
             @{thms hn_ctxt_def entails_refl pure_unit_rel_eq_empty
               mult_ac mult_1 mult_1_right keep_drop_sels}  
     
         (* Prove theorem *)  
-        val result = Thm.cterm_of ctxt result
+        val result = Thm.cterm_of ctxt result |> @{print}
         val rthm = Goal.prove_internal ctxt [] result (fn _ => ALLGOALS (tac ctxt))
     
         (* Export statement to original context *)
