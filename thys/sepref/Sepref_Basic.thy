@@ -197,26 +197,32 @@ lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
   by(auto simp: STATE_def)
 
 
+
+lemma hn_refine_extract_pre_val: 
+  "hn_refine (hn_val S xa xc ** \<Gamma>) c \<Gamma>' R m \<longleftrightarrow> ((xc,xa)\<in>S \<longrightarrow> hn_refine \<Gamma> c \<Gamma>' R m)"
+  unfolding hn_refine_def hn_ctxt_def pure_def
+  by (auto simp: STATE_def sep_algebra_simps pred_lift_extract_simps htriple_extract_pre_pure)
+
 lemma hn_refineI_SPECT: 
-  assumes "llvm_htriple ($(cost name t) ** \<Gamma>) c (\<lambda>r. \<Gamma>' ** R x r)"
-  shows "hn_refine \<Gamma> c \<Gamma>' R (SPECT [x\<mapsto>cost name t])"  
+  assumes "llvm_htriple ($t ** \<Gamma>) c (\<lambda>r. \<Gamma>' ** R x r)"
+  shows "hn_refine \<Gamma> c \<Gamma>' R (SPECT [x\<mapsto>t])"  
   apply (auto simp add: hn_refine_def STATE_alt)
-  apply(rule exI[where x="cost name t"]) apply simp
+  apply(rule exI[where x="t"]) apply simp
 proof (goal_cases)
   fix F s cr
   assume "(\<Gamma> ** F) (ll_\<alpha> (s, cr))"
-  then have "((\<Gamma> ** F) ** $(cost name t)) (ll_\<alpha> (s, cr + cost name t))"
+  then have "((\<Gamma> ** F) ** $(t)) (ll_\<alpha> (s, cr + t))"
   unfolding lift_\<alpha>_cost_def ll_\<alpha>_def
-    apply(rule sep_conjI[where y="(0,cost name t)"])
+    apply(rule sep_conjI[where y="(0,t)"])
     subgoal by(simp add: time_credits_assn_def sep_algebra_simps)  
     subgoal by(simp add: sep_disj_enat_def sep_disj_acost_def sep_algebra_simps)  
     subgoal by(simp add: sep_disj_enat_def sep_disj_acost_def sep_algebra_simps)  
     done
-  then have "(($cost name t \<and>* \<Gamma>) \<and>* F) (ll_\<alpha> (s, cr + cost name t))"
+  then have "(($t \<and>* \<Gamma>) \<and>* F) (ll_\<alpha> (s, cr + t))"
     by (simp add: sep_conj_c)
 
   from assms[unfolded htriple_def, rule_format, OF this]
-  show "wp c (\<lambda>r s. (\<Gamma>' \<and>* R x r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + cost name t)"
+  show "wp c (\<lambda>r s. (\<Gamma>' \<and>* R x r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + t)"
     by (simp add: sep_algebra_simps sep_conj_c) 
 qed
 
@@ -228,6 +234,13 @@ lemma hn_refineI':
   using assms unfolding htriple_def
   by (simp add: sep_conj_c) 
 
+lemma hn_refineI'': 
+  assumes "\<Phi> \<Longrightarrow> llvm_htriple \<Gamma> c (\<lambda>r. \<Gamma>' ** R x r)"
+  shows "hn_refine \<Gamma> c \<Gamma>' R (doN { _ \<leftarrow> ASSERT \<Phi>; RETURNT x })"  
+  apply (auto simp add: hn_refine_def STATE_alt ASSERT_def iASSERT_def)
+  apply(rule exI[where x=0]) apply simp
+  using assms unfolding htriple_def
+  by (simp add: sep_conj_c) 
 
 lemma hn_refineI[intro]: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M; (\<Gamma>**F) (ll_\<alpha>(s,cr)) \<rbrakk>
@@ -295,7 +308,6 @@ lemma hn_refineD:
         \<and> wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr+Ca)
       )"
   using assms by(auto simp: hn_refine_def STATE_alt nofailT_def)
-
 
 
 lemma hn_refine_preI: 
@@ -382,6 +394,8 @@ lemma hn_refine_frame:
 
 lemma hn_refine_frame': "hn_refine \<Gamma> c \<Gamma>' R m \<Longrightarrow> hn_refine (\<Gamma>**F) c (\<Gamma>'**F) R m"  
   by (simp add: hn_refine_frame) 
+lemma hn_refine_frame'': "hn_refine \<Gamma> c \<Gamma>' R m \<Longrightarrow> hn_refine (F**\<Gamma>) c (F**\<Gamma>') R m"  
+  using hn_refine_frame' sep_conj_c by smt 
  
 
 lemma hn_refine_augment_res:
@@ -576,7 +590,6 @@ lemma acost_plus_assoc: "a + (b + c) = (a + b) + (c::(char list, enat) acost)"
 
 lemma "le_cost_ecost c (cr + Ca) \<Longrightarrow> le_cost_ecost c (cr + (Ca + Ca'))"
   apply(simp add: acost_plus_assoc) apply(rule cost_ecost_add_increasing2) .
-
   
 lemma hnr_bind:
   assumes D1: "hn_refine \<Gamma> m' \<Gamma>1 Rh m"
@@ -683,33 +696,21 @@ proof goal_cases
     subgoal using mle apply(simp add: acost_plus_assoc) apply(rule cost_ecost_add_increasing2) .
     done
 qed  
-
-
-(*
+ 
+  
 
 text \<open>Version fro manual synthesis, if freeing of bound variable has been inserted manually\<close>
 lemma hnr_bind_manual_free:
+  fixes m' :: "_ llM"
   assumes D1: "hn_refine \<Gamma> m' \<Gamma>1 Rh m"
   assumes D2: 
     "\<And>x x'. RETURN x \<le> m \<Longrightarrow> hn_refine (hn_ctxt Rh x x' ** \<Gamma>1) (f' x') (\<Gamma>') R (f x)"
   shows "hn_refine \<Gamma> (m'\<bind>f') \<Gamma>' R (m\<bind>f)"
-  apply rule
-  supply [vcg_rules] = D1[THEN hn_refineD]
-  supply [simp] = pw_bind_nofail
-  apply vcg
-proof goal_cases
-  case C: (1 F r s x)
-  hence "nofail (f x)" by (simp add: refine_pw_simps pw_le_iff)
-  
-  note [vcg_rules] = D2[unfolded hn_ctxt_def, OF \<open>RETURN x \<le> m\<close>, THEN hn_refineD, OF \<open>nofail (f x)\<close>, of r]
-  
-  note [simp] = refine_pw_simps pw_le_iff
-  show ?case using C by vcg
-qed  
-*)
-
-
-
+  apply(rule hnr_bind[OF D1 _ entails_refl, of f' "\<lambda>x x'. hn_invalid Rh x x'" \<Gamma>' R f "\<lambda>_. return ()", simplified])
+  subgoal for x x' apply(subst invalidate_clone')  
+    apply(drule D2[THEN hn_refine_frame'', where F=" (hn_invalid Rh) x x'", of _ x']) unfolding hn_ctxt_def using sep_conj_ac by smt
+  subgoal unfolding MK_FREE_def invalid_assn_def hn_ctxt_def by vcg
+  done
 
 subsubsection \<open>Recursion\<close>
 (*
@@ -937,9 +938,9 @@ ML \<open>
 
   structure Sepref_Basic: SEPREF_BASIC = struct
 
-    fun is_nresT (Type (@{type_name nrest},[_])) = true | is_nresT _ = false
-    fun mk_nresT T = Type(@{type_name nrest},[T])
-    fun dest_nresT (Type (@{type_name nrest},[T])) = T | dest_nresT T = raise TYPE("dest_nresT",[T],[])
+    fun is_nresT (Type (@{type_name nrest},[_,_])) = true | is_nresT _ = false
+    fun mk_nresT T = Type(@{type_name nrest},[T,@{typ ecost}])
+    fun dest_nresT (Type (@{type_name nrest},[T,_])) = T | dest_nresT T = raise TYPE("dest_nresT",[T],[])
 
 
     fun dest_lambda_rc ctxt (Abs (x,T,t)) = let

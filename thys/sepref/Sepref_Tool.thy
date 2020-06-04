@@ -299,7 +299,7 @@ method_setup sepref_to_hoare = \<open>
     in
       Sepref.preproc_tac ctxt 
       THEN' Sepref_Frame.weaken_post_tac ctxt 
-      THEN' resolve_tac ctxt @{thms hn_refineI_SPECT hn_refineI' hn_refineI}
+      THEN' resolve_tac ctxt @{thms hn_refineI_SPECT hn_refineI'' hn_refineI' hn_refineI}
       THEN' asm_full_simp_tac ss
     end  
   in
