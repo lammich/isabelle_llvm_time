@@ -1,3 +1,312 @@
+# Mo 8.6.2020
+
+## Fragestellung
+
+Wie sieht das 'interface' fuer eine DS aus?
+  - funktionale Korrektheit (klar)  
+  - Timing ???
+
+## TODO
+
+### Max:
+    - sepref_decl_op -> sepref_register und param lemma umschreiben (in Sorting_setup)
+    - [params] regeln für nrest_rules
+    -
+
+### Peter:
+    - FCOMP bug with raw assns.
+
+## Notizen
+
+Interface:
+    (mop_list_nth c) xs i == 
+
+
+NEXT STEPS:
+    - sepref_decl_op / sepref_decl_inft weglassen
+    - statt dessen sepref_register verwenden (mit context T)
+    - param_mop regel beweisen
+    - FCOMP verwenden um hnr theoreme zusammenzubauen (element verfeinerung mit hnr_raw lemma + param lemma), fcomp_norm_simps verwenden um hr_comp zusammenzufassen
+    - 
+
+
+FCOMP
+FCOMP (unchecked)
+
+
+ param(114): ((⤜), (⤜)) ∈ ⟨?Ra⟩nres_rel → (?Ra → ⟨?Rb⟩nres_rel) → ⟨?Rb⟩nres_rel
+ 
+Results
+  param(113): ⟦(?Φ, ?Ψ) ∈ bool_rel; ⟦?Φ; ?Ψ⟧ ⟹ (?f, ?g) ∈ ⟨?R⟩nres_rel⟧ ⟹ (do {
+                                                                                  _ ← ASSERT ?Φ;
+                                                                                  ?f
+                                                                                }, do {
+                                                                                  _ ← ASSERT ?Ψ;
+                                                                                  ?g
+                                                                                })
+                                                                               ∈ ⟨?R⟩nres_rel
+
+
+*********************************
+(uncurry extract_impl, uncurry mop_eo_extract) ∈ eo_assn⇧d *⇩a snat_assn⇧k →⇩a⇩d (λx (ai, uu_). elem_assn ×⇩a cnc_assn (λx. x = ai) eo_assn)
+
+
+
+hn_refine (hn_ctxt (eoarray_assn ?A) ?a ?ai ∧* hn_val snat_rel ?b ?bi) (eo_extract_impl $ ?ai $ ?bi) (hn_invalid (eoarray_assn ?A) ?a ?ai ∧* hn_val snat_rel ?b ?bi)
+ (?A ×⇩a eoarray_assn ?A) (mop_eo_extract $ ?a $ ?b)
+
+
+weitergehts um 12:45 (UKtime)
+
+- "flexibilität die man im abstrakten nicht hat, kann man im konkreten nicht erwarten"
+
+- erst konzentration ohne BFS4/9 idee:
+
+xs <- list_append (List4op) xs a
+
+1. Schritt
+C = do { ... list_append (cost_array_list_append) xs a 
+... }
+<= E  do { ... list_append (1 $List4op) xs a ... } = E A
+
+
+A= do { ..... mop (1 $c) xs a ,..... }
+
+C= do { ..... mop c' xs a ,..... }
+
+list_append (E c) xs a <=E list_append c xs a
+ c' = ?E c 
+ 
+ c'' = ?E c
+ 
+ 
+ ?c <= E a
+ 
+ 
+ list_append cost_array_list = cosume ... (SPEC ())
+
+sepref_decl_op list_append
+
+list_append_param: list_append,list_append : A rel_list -> A -> A rel_list rel_nrest
+
+sepref_decl_impl: hnr_thm
+  -> list_append_param[FCOMP hnr_thm]
+  
+  hnr_thm: hnr (raw_array_assn xs xsi) ...
+  
+ hnr (hf_comp (raw_array_assn) (A list_rel)) ...  
+ definition [symmetric, fcomp_norm_simp]: "array_assn A == hf_comp (raw_array_assn) (A list_rel)"
+  
+***************************************
+  
+  a *<param>* b <hnr> c
+  
+  a <hnr> c
+  
+
+
+ 
+ sepref_decl_op
+ - definiert op
+ - definiert mop
+ - definiert tmop
+ 
+ sepref_decl_impl
+ - wrapper für FCOMP
+ - 
+ 
+mop_list_append = ...
+tmop_list_append T  := consume T mop_list_append
+ 
+ 
+mop_set_insert ($HASH_comp + $ARRAY_UPDATE) 
+....
+mop_set_insert (int_hash_comp + array_list_update) 
+ 
+ 
+ 
+list_append (sup array_list linked_list) xs x
+
+sup E1 E2 = (%x. sup (E1 x) (E2 x))
+
+fun E =
+where "E $A $B = 1"
+"E $A _ = 0"
+" ...."
+konkreter vorgang:
+    - C explizit angeben (in do notation)
+    - C <= ?E A   beweisen (refine_rcg) 
+
+2 möglichkeiten:
+    - C angeben und E synthetisieren (uniform mitrefinement approach jetzt, ist aber nur ne Notlösung)
+    - E angeben und C synthetisieren (
+list_append (E c) xs a <=E list_append c xs a
+
+dann: Sepref
+
+simplify E list4op -> cost_array_list_append
+
+
+xs <- list_append (cost_array_list_append) xs a
+
+cost_array_list_append: basic layer costs
+definition cost_array_list_append = cost ''ll_call'' 1 + ...
+
+2. Schritt
+
+hnr (array_list) ... (list_append (cost_array_list_append) xs a)
+
+
+->
+
+
+
+---------
+
+
+
+basic layer: ll_call, ll_read, ll_write
+
+hnr 
+(array_list xs xsi) *?c* ?Gamma ?R
+?a (list_append (list4) xs a)
+
+
+
+
+consume O(1) list_append
+tmop = consume (???) mop_...
+
+mimpl <= R,E SPEC(sort,__ n*47*$CMP __)  
+                         i                           iiiiiiiiiiiiiiiiii
+
+t' n = n*47*$CMP
+
+t = E(t')
+
+t'' = E1 E2 E3 * SPEC
+
+t'' 
+
+t :: param => ([currency*** =>] enat)
+ t A1 = (cost call 15 + cost read 16) 
+
+hnr .....       (E SPEC (sort, t')
+
+E -> t' ---> t
+
+< $ t A1 * assn C1 A2...> c C1 C2 <...> 
+
+Time Algorithmus c a <= %a. Sum(t a) 
+
+/\  Sum (t a) UNIV : THETA ( F )
+
+-------------------------
+(\exists t:Theta F. <$t ...> c <> )
+<==>
+(\exists t:O( F ). <$t ...> c <> )
+<==>
+"c ist functional correct und läuft in WCET O(F)"
+
+
+Sum t <= O(NlogN)
+f_proj S1 t <= O(NlogN)
+f_proj S2 t <= O(N)
+S1 union S2 = UNIV
+
+
+
+Sum(t)  : O(n...) 
+<--->
+\forall x. t x <= O(...)
+
+
+Sum t = { t x | x:UNIV }
+
+
+
+proj_ll_lookup t   : O(n....)
+proj_ll_le t   : O(n....)
+
+O(nlogn($CMP+$MOV+1))
+
+element: int
+$CMP->1 $ LL_call
+$CMP->1 $ LL_read
+$MOV->O(1)
+
+-> O(nlogn)
+
+
+SUM_projection f = sum 
+
+SUM_projection (%xs. intro_sort xs) : O( n log n)
+
+
+
+needed: mechanism that makes sure that no operations/costs are dropped
+- projection alone does not make sure that things are dropped
+
+
+mop_list_append t x xs = SPECT [ xs @ [x] |-> t ]
+= consume [ ... ] t
+
+lists_app_O1 = list_append (1 $constant_list_append) x xs
+O(1) 
+
+DS1: append     OP1
+DS2 : append    OP2
+
+E * OP1 + V * Op2
+
+E * (OP1+OP2) + V* (Op1+Op2)
+
+Op2: V,      E+V
+
+
+do {
+    ...
+
+ys <. list_append (1 $constant_list_append) x xs
+O(1) 
+
+
+}
+
+https://en.cppreference.com/w/cpp/container/vector
+
+
+
+
+
+
+Effekt:
+    - abstrakte datenstrukturen mit unterschiedlichen konkreten datenstrukturen verfeinern,
+      - dazu unterschiedliche Currencies einführen?
+
+Umrechnung bei Seprefschritt:
+    - JA:
+- 
+    - NEIN:
+        
+        
+- interfaces weiter aufteilen
+  - bisher: zwischen interfaces aufteilen (listen, sets, maps)
+  - weiteraufteilen in (log-lookup-sets, amortized-linear-sets,.. .)
+  - operations spezifisch zusätzlich die gewüschte timing charakteristik (listen operation mit O(1))
+  - dann adhoc:        
+      
+      
+        
+Ablauf Sepref:
+    - abstraktes NREST programm
+    - manuelle rewrites an den stellen der Konstruktoren der Datenstrukturen (rewrite X )
+    - id_phase (operationen flachklopfen, z.b. map_update)
+    - monadification
+    - jetzt nach sepref (HNR)
+    - Synthese
+
+
 # Fr 29.5.2020
 
 ## TODOS:
