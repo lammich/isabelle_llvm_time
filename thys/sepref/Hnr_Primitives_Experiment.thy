@@ -240,9 +240,9 @@ subsection \<open>Monadic Option List Operations\<close>
 context
   fixes  T :: "(nat \<times> unit) \<Rightarrow> (char list, enat) acost"
 begin
-  definition mop_olist_extract  :: "'a option list \<Rightarrow> nat \<Rightarrow> (_, _) nrest"
-    where [simp]: "mop_olist_extract xs i \<equiv> do { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (T (length xs,())) }"
-  sepref_register "mop_olist_extract"
+  definition mop_eo_extract  :: "'a option list \<Rightarrow> nat \<Rightarrow> (_, _) nrest"
+    where [simp]: "mop_eo_extract xs i \<equiv> do { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (T (length xs,())) }"
+  sepref_register "mop_eo_extract"
 end
 
 (* TODO:  is it not parametric?
@@ -258,8 +258,8 @@ lemma param_mop_olist_get:
 context
   fixes  T :: "(nat \<times> unit \<times> unit) \<Rightarrow> (char list, enat) acost"
 begin
-  definition [simp]: "mop_olist_set xs i x \<equiv> do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (T (length xs,(),())) }"
-  sepref_register "mop_olist_set"
+  definition [simp]: "mop_eo_set xs i x \<equiv> do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (T (length xs,(),())) }"
+  sepref_register "mop_eo_set"
   print_theorems
 end
 
@@ -296,10 +296,10 @@ lemma norm_ceq_assn(*[named_ss sepref_frame_normrel]*): "hn_ctxt (cnc_assn \<phi
   unfolding hn_ctxt_def cnc_assn_def by simp
   
 
-definition "mop_oarray_extract \<equiv> mop_olist_extract (\<lambda>_. lift_acost mop_array_nth_cost)"
+definition "mop_oarray_extract \<equiv> mop_eo_extract (\<lambda>_. lift_acost mop_array_nth_cost)"
 lemma "mop_oarray_extract xs i = doN { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (lift_acost mop_array_nth_cost) }"
   by(auto simp: mop_oarray_extract_def)
-definition "mop_oarray_upd \<equiv> mop_olist_set (\<lambda>_. lift_acost mop_array_upd_cost)"
+definition "mop_oarray_upd \<equiv> mop_eo_set (\<lambda>_. lift_acost mop_array_upd_cost)"
 lemma "mop_oarray_upd xs i x = do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (lift_acost mop_array_upd_cost) }"
   by(auto simp: mop_oarray_upd_def)
 definition "mop_oarray_new \<equiv> mop_olist_new (\<lambda>n. lift_acost (cost'_narray_new n))"
@@ -500,6 +500,10 @@ next
     by (auto simp: oelem_rel_def)
     
 qed
+
+
+  definition "unborrow src dst \<equiv> doN {ASSERT (src=dst); RETURN ()}"
+  sepref_register unborrow
 
 
 subsection \<open>Array\<close>
