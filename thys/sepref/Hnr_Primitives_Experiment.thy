@@ -162,54 +162,132 @@ lemma hnr_mop_vcgI[htriple_vcg_intros]:
   using assms by blast
 
 lemmas hnr_mop_vcgI_nopre[htriple_vcg_intros] = hnr_mop_vcgI[where \<Phi>=True, simplified]  
-  
+
+
+section \<open>List Operations\<close>
+
+subsection \<open>Monadic List Operations\<close>
+
+context
+  fixes  T :: "(nat \<times> unit) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_list_get  :: "'a list \<Rightarrow> nat \<Rightarrow> ('a, _) nrest"
+    where [simp]: "mop_list_get xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (T (length xs,())) }"
+  sepref_register "mop_list_get"
+end
+
+lemma param_mop_list_get:
+  "(mop_list_get T, mop_list_get T) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> \<langle>the_pure A\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_list_get_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by simp 
+
+
+context
+  fixes  T :: "(nat \<times> unit \<times> unit) \<Rightarrow> (char list, enat) acost"
+begin
+  definition [simp]: "mop_list_set xs i x \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs[i:=x])) (T (length xs,(),())) }"
+  sepref_register "mop_list_set"
+  print_theorems
+end
+
+lemma param_mop_list_set:
+  "(mop_list_set T, mop_list_set T) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> (the_pure A) \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_list_set_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by simp 
+
+context
+  fixes  T :: "(nat \<times> unit) \<Rightarrow> (char list, enat) acost"
+begin
+  definition [simp]: "mop_list_replicate n x \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n x)) (T (n,())) }"
+  sepref_register "mop_list_replicate"
+end
+
+lemma param_mop_list_replicate:
+  "(mop_list_replicate T, mop_list_replicate T) \<in> nat_rel \<rightarrow> (the_pure A) \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_list_replicate_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by simp 
+
+
+context
+  fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition [simp]: "mop_list_init n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n init)) (T (n)) }"
+  sepref_register "mop_list_init"
+end
+
+(* TODO: is it parametric ?
+lemma param_mop_list_init:
+  "(mop_list_init T, mop_list_init T) \<in> nat_rel \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_list_init_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by simp 
+*)
+
+
+subsection \<open>Monadic Option List Operations\<close>
+
+context
+  fixes  T :: "(nat \<times> unit) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_olist_extract  :: "'a option list \<Rightarrow> nat \<Rightarrow> (_, _) nrest"
+    where [simp]: "mop_olist_extract xs i \<equiv> do { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (T (length xs,())) }"
+  sepref_register "mop_olist_extract"
+end
+
+(* TODO:  is it not parametric?
+lemma param_mop_olist_get:
+  "(mop_olist_get T, mop_olist_get T) \<in> \<langle>\<langle>the_pure A\<rangle> option_rel\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> \<langle>the_pure A\<times>\<^sub>r\<langle>\<langle>the_pure A\<rangle> option_rel\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_olist_get_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by simp 
+*)
+
+context
+  fixes  T :: "(nat \<times> unit \<times> unit) \<Rightarrow> (char list, enat) acost"
+begin
+  definition [simp]: "mop_olist_set xs i x \<equiv> do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (T (length xs,(),())) }"
+  sepref_register "mop_olist_set"
+  print_theorems
+end
+
+context
+  fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition [simp]: "mop_olist_new n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n None)) (T n) }"
+  sepref_register "mop_olist_new"
+end
+
+lemma param_mop_olist_new:
+  "(mop_olist_new T, mop_olist_new T) \<in> nat_rel \<rightarrow> \<langle>\<langle>\<langle>the_pure A\<rangle> option_rel\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_olist_new_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by simp 
+
+
+subsection \<open>Array Operation costs\<close>
+
+abbreviation "mop_array_nth_cost \<equiv> (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))"
+abbreviation "mop_array_upd_cost \<equiv> (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))"
 abbreviation "cost'_narray_new n \<equiv> cost ''malloc'' n + cost ''free'' 1 + cost ''if'' 1 + cost ''if'' 1 + cost ''icmp_eq'' 1 + cost ''ptrcmp_eq'' 1"
 
-abbreviation "mop_array_nth_cost \<equiv> (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0)))"
-definition "mop_array_nth xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) mop_array_nth_cost }"
-definition "mop_array_upd xs i x \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs[i:=x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
-definition "mop_array_new n x \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n x)) (lift_acost (cost'_narray_new n)) }"
-
-thm vcg_rules
-lemma hnr_raw_array_nth: "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
-  (array_nth xsi ii)
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
-  id_assn
-  (mop_array_nth xs i)" 
-  unfolding hn_ctxt_def pure_def mop_array_nth_def
-  apply vcg_step
-  apply vcg_step
-  by vcg
-
-lemma hnr_raw_array_upd: "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
-  (array_upd xsi ii xi)
-  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
-  raw_array_assn
-  (mop_array_upd xs i x)" 
-  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
-  by vcg
   
-  
-
-lemma hnr_raw_array_new: "hn_refine 
-  (hn_ctxt snat_assn2 i ii)
-  (narray_new TYPE('a::llvm_rep) ii)
-  (hn_ctxt snat_assn2 i ii)
-  raw_array_assn
-  (mop_array_new i init)" 
-  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
-  by vcg
-  
-lemma FREE_raw_array_assn: "MK_FREE raw_array_assn narray_free"  
-  apply rule
-  by vcg
-
-
-  
-  
-  
+subsection \<open>Option Array\<close>
+    
   
 text \<open>Assertion that adds constraint on concrete value. Used to carry through concrete equalities.\<close>
 definition "cnc_assn \<phi> A a c \<equiv> \<up>(\<phi> c) ** A a c"
@@ -218,9 +296,15 @@ lemma norm_ceq_assn(*[named_ss sepref_frame_normrel]*): "hn_ctxt (cnc_assn \<phi
   unfolding hn_ctxt_def cnc_assn_def by simp
   
 
-definition "mop_oarray_nth xs i \<equiv> do { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (lift_acost (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
-definition "mop_oarray_upd xs i x \<equiv> do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (lift_acost (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))) }"
-definition "mop_oarray_new n \<equiv> consume (RETURNT (replicate n None)) (lift_acost (cost'_narray_new n))"
+definition "mop_oarray_extract \<equiv> mop_olist_extract (\<lambda>_. lift_acost mop_array_nth_cost)"
+lemma "mop_oarray_extract xs i = doN { ASSERT (i<length xs \<and> xs!i\<noteq>None); consume (RETURNT (the (xs!i), xs[i:=None])) (lift_acost mop_array_nth_cost) }"
+  by(auto simp: mop_oarray_extract_def)
+definition "mop_oarray_upd \<equiv> mop_olist_set (\<lambda>_. lift_acost mop_array_upd_cost)"
+lemma "mop_oarray_upd xs i x = do { ASSERT (i<length xs \<and> xs!i=None); consume (RETURNT (xs[i:=Some x])) (lift_acost mop_array_upd_cost) }"
+  by(auto simp: mop_oarray_upd_def)
+definition "mop_oarray_new \<equiv> mop_olist_new (\<lambda>n. lift_acost (cost'_narray_new n))"
+lemma "mop_oarray_new n = consume (RETURNT (replicate n None)) (lift_acost (cost'_narray_new n))"
+  by(auto simp: mop_oarray_new_def)
 
       
   
@@ -236,8 +320,8 @@ lemma hnr_eoarray_nth: "hn_refine
   (eoarray_nth_impl xsi ii)
   (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
   (cnc_assn (\<lambda>(_,xsi'). xsi'=xsi) (A \<times>\<^sub>a eoarray_assn A))
-  (mop_oarray_nth $ xs $ i)"  
-  unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_nth_def eoarray_nth_impl_def
+  (mop_oarray_extract $ xs $ i)"  
+  unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_extract_def eoarray_nth_impl_def
   by vcg 
 \<comment> \<open>thm hnr_eoarray_nth[sepref_fr_rules] (* BEWARE: needs $ for APP *) \<close>
 
@@ -249,10 +333,12 @@ lemma hnr_eoarray_nth: "hn_refine
    (hn_invalid (eoarray_assn ?A) ?a ?ai \<and>* hn_val snat_rel ?b ?bi)
  (?A \<times>\<^sub>a eoarray_assn ?A) (mop_eo_extract $ ?a $ ?b) *)
 term eoarray_assn
-lemma hnr_eoarray_nth'[sepref_fr_rules]: "(uncurry eoarray_nth_impl, uncurry mop_oarray_nth)
+
+lemma hnr_eoarray_nth'[sepref_fr_rules]: "(uncurry eoarray_nth_impl, uncurry mop_oarray_extract)
        \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn2\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x (ai, _). A \<times>\<^sub>a cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
   apply(rule hfrefI)
-  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_nth_def eoarray_nth_impl_def
+  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst mop_oarray_extract_def hn_ctxt_def
+            pure_def invalid_assn_def cnc_assn_def eoarray_assn_def eoarray_nth_impl_def
   by vcg
 
 lemma hnr_eoarray_upd: "hn_refine 
@@ -264,9 +350,17 @@ lemma hnr_eoarray_upd: "hn_refine
   unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_upd_def
   by vcg
 
-(* TODO: write in higher order form *)
-thm hnr_eoarray_upd[sepref_fr_rules]
-  
+(* write in higher order form *)
+lemma hnr_eoarray_upd'[sepref_fr_rules]: "(uncurry2 array_upd, uncurry2 mop_oarray_upd)
+       \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn2\<^sup>k *\<^sub>a A\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x ((ai, _), _). cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
+  apply(rule hfrefI)
+  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst mop_oarray_upd_def hn_ctxt_def pure_def
+            invalid_assn_def cnc_assn_def eoarray_assn_def eoarray_nth_impl_def
+  by vcg
+
+(* thm hnr_eoarray_upd[sepref_fr_rules] *)
+(* thm hnr_eoarray_upd[to_hfref] TODO: BUG, to_hfref loops here*)
+   
 lemma hnr_eoarray_new: "hn_refine 
   (hn_ctxt snat_assn2 i ii)
   (narrayo_new TYPE('a::llvm_rep) ii)
@@ -275,18 +369,35 @@ lemma hnr_eoarray_new: "hn_refine
   (mop_oarray_new i)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_new_def
   by vcg
+
+lemma hnr_eoarray_new'[sepref_fr_rules]: "( (narrayo_new TYPE('a::llvm_rep)), mop_oarray_new )
+       \<in> snat_assn2\<^sup>k \<rightarrow>\<^sub>a (eoarray_assn A)"
+  apply(rule hfrefI)
+  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def mop_oarray_new_def cnc_assn_def eoarray_assn_def eoarray_nth_impl_def
+  by vcg
+
     
 definition "mop_oarray_free xs \<equiv> do { ASSERT (set xs \<subseteq> {None}); consume (RETURNT ()) (lift_acost 0) }"
   
-lemma hnr_eoarray_free: "hn_refine 
+lemma hnr_eoarray_free[sepref_fr_rules]: "hn_refine 
   (hn_ctxt (eoarray_assn A) xs xsi)
   (narray_free xsi)
   (hn_invalid (eoarray_assn A) xs xsi)
   (id_assn)
-  (mop_oarray_free xs)"
+  (mop_oarray_free $ xs)"
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_free_def
+  apply vcg_step
+  apply vcg_step
   by vcg
   
+lemma FREE_eoarray_assn[sepref_frame_free_rules]:
+  shows "MK_FREE (eoarray_assn A) narray_free"  
+  apply (rule MK_FREEI)
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_free_def
+  apply vcg_step
+  apply vcg_step
+  apply vcg_step
+  sorry
   
 (* Conversions between plain array and explicit ownership array*)  
 definition "mop_to_eo_conv xs \<equiv> do { consume (RETURNT (map Some xs)) (lift_acost 0) }"  
@@ -324,24 +435,24 @@ lemma in_some_rel_list_rel_conv: "(x,xi) \<in>\<langle>some_rel\<rangle>list_rel
   
 (* Conversion between implicit and explicit ownership array *)
   
-lemma hnr_to_wo_conv: "hn_refine 
+lemma hnr_to_wo_conv[sepref_fr_rules]: "hn_refine 
   (hn_ctxt (eoarray_assn A) xs xsi)
   (return xsi)
   (hn_invalid (eoarray_assn A) xs xsi)
   (array_assn A)
-  (mop_to_wo_conv xs)"
+  (mop_to_wo_conv $ xs)"
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_to_wo_conv_def
     array_assn_def hr_comp_def
   apply Basic_VCG.vcg'
   apply (simp add: map_the_some_rel_list_rel_iff)
   done
 
-lemma hnr_to_eo_conv: "hn_refine 
+lemma hnr_to_eo_conv[sepref_fr_rules]: "hn_refine 
   (hn_ctxt (array_assn A) xs xsi)
   (return xsi)
   (hn_invalid (array_assn A) xs xsi)
   (eoarray_assn A)
-  (mop_to_eo_conv xs)"
+  (mop_to_eo_conv $ xs)"
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_to_eo_conv_def
     array_assn_def hr_comp_def
   supply [simp] = in_some_rel_list_rel_conv
@@ -391,6 +502,57 @@ next
 qed
 
 
+subsection \<open>Array\<close>
+
+definition "mop_array_nth \<equiv> mop_list_get (\<lambda>_. lift_acost mop_array_nth_cost) "
+definition "mop_array_upd \<equiv> mop_list_set (\<lambda>_. lift_acost mop_array_upd_cost)"
+definition "mop_array_new \<equiv> mop_list_init (\<lambda>(n). lift_acost (cost'_narray_new n))"
+
+
+subsubsection \<open>Raw hnr rules\<close>
+
+thm vcg_rules
+lemma hnr_raw_array_nth: "hn_refine 
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
+  (array_nth xsi ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
+  id_assn
+  (mop_array_nth xs i)" 
+  unfolding hn_ctxt_def pure_def mop_array_nth_def
+  apply vcg_step
+  apply vcg_step
+  by vcg
+
+lemma hnr_raw_array_upd: "hn_refine 
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
+  (array_upd xsi ii xi)
+  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
+  raw_array_assn
+  (mop_array_upd $ xs $ i $ x)" 
+  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
+  by vcg
+
+
+
+
+  
+
+lemma hnr_raw_array_new: "hn_refine 
+  (hn_ctxt snat_assn2 i ii)
+  (narray_new TYPE('a::llvm_rep) ii)
+  (hn_ctxt snat_assn2 i ii)
+  raw_array_assn
+  (mop_array_new $ i)" 
+  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
+  by vcg
+  
+lemma FREE_raw_array_assn: "MK_FREE raw_array_assn narray_free"  
+  apply rule
+  by vcg
+
+
+
+subsubsection \<open>hnr rules\<close>
   
 lemma pure_array_assn_alt:
   assumes "is_pure A"  
@@ -457,15 +619,38 @@ proof -
     done
 qed
 
-context
-  fixes  T :: "(char list, enat) acost"
-begin
-  definition mop_list_get  :: "'a list \<Rightarrow> nat \<Rightarrow> ('a, _) nrest"
-    where [simp]: "mop_list_get xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) T }"
 
-  sepref_register "mop_list_get"
-  print_theorems
+
+              
+thm hnr_raw_array_upd
+lemma hnr_raw_array_upd': "hn_refine 
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
+  (array_upd xsi ii xi)
+  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
+  raw_array_assn
+  (mop_array_upd $ xs $  i $  x)" 
+  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
+  by vcg
+
+lemma hnr_raw_array_upd'_h: "((uncurry2 array_upd, uncurry2 mop_array_upd)
+       \<in> [\<lambda>((a, b), x). True]\<^sub>a raw_array_assn\<^sup>d *\<^sub>a snat_assn2\<^sup>k *\<^sub>a id_assn\<^sup>k \<rightarrow> raw_array_assn)"
+  apply(intro hfrefI)
+  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
+  by vcg
+
+context
+  fixes A :: "'a  \<Rightarrow> 'b:: llvm_rep \<Rightarrow> assn"
+  assumes [fcomp_norm_simps]: "is_pure A"
+begin
+lemmas hm = hnr_raw_array_upd'_h[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], simplified pure_array_assn_alt[symmetric] fcomp_norm_simps,
+      folded mop_array_upd_def]
+thm hm[no_vars]
+lemmas hm[sepref_fr_rules]
+
 end
+
+
+
 
 
 lemma hnr_raw_array_nth': "hn_refine 
@@ -473,22 +658,12 @@ lemma hnr_raw_array_nth': "hn_refine
   (array_nth xsi ii)
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
   id_assn
-  (mop_list_get mop_array_nth_cost xs i)" 
-  unfolding hn_ctxt_def pure_def mop_list_get_def
-  apply vcg_step
-  apply vcg_step
+  (mop_array_nth xs i)" 
+  unfolding hn_ctxt_def pure_def mop_array_nth_def
   by vcg
 
 thm mop_list_get.mcomb
 thm mop_list_get_def
-
-lemma param_mop_list_get:
-  "(mop_list_get T, mop_list_get T) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> \<langle>the_pure A\<rangle> nrest_rel"
-  apply(intro nrest_relI fun_relI)
-  unfolding mop_list_get_def
-  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
-  apply parametricity
-  by simp 
 
 lemma param_mop_array_nth:
   "(mop_array_nth, mop_array_nth) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> \<langle>the_pure A\<rangle> nrest_rel"
@@ -514,7 +689,12 @@ thm hnr_raw_array_nth[FCOMP param_mop_array_nth[of A], simplified pure_array_ass
 thm hnr_raw_array_nth[FCOMP param_mop_array_nth[of A]]
 
 
-thm hnr_raw_array_nth'[FCOMP param_mop_list_get[of _ A]] (* still raw! *)
+lemmas hnr_array_nth = hnr_raw_array_nth'[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def] (* still raw! *)
+
+(* thm hnr_array_nth[sepref_fr_rules] *)
+
+
+
 end
 
 
@@ -522,14 +702,15 @@ end
 (*
   With loose rule, and syntactic check that time does not depend on result
 *)
-lemma hnr_array_nth: 
+thm hnr_array_nth
+lemma hnr_array_nth'[sepref_fr_rules]: 
   assumes PURE: "is_pure A"
   shows "hn_refine 
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     (array_nth xsi ii)
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
     A
-    (mop_array_nth xs i)" 
+    (mop_array_nth $ xs $ i)" 
 proof -
   have AR: "A = hr_comp id_assn (the_pure A)"
     by (simp add: \<open>is_pure A\<close>)
@@ -554,6 +735,7 @@ proof -
       by simp
     subgoal  
       unfolding mop_array_nth_def
+      apply simp
       apply (rule attains_sup_mop_return)
       done
     done
@@ -677,29 +859,31 @@ proof -
       by simp
     
     subgoal
-      unfolding mop_array_upd_def  
+      unfolding mop_array_upd_def 
+      apply simp
       by (rule attains_sup_mop_return)
       
     done
 qed    
 
+text \<open>Array new\<close>
 
-    
 
-lemma hnr_array_new: 
+lemma hnr_array_new[sepref_fr_rules]: 
   assumes PURE: "is_pure A"
-  assumes INIT: "(init,x) \<in> the_pure A"
+  assumes INIT: "(init,init) \<in> the_pure A"
   shows "hn_refine 
     (hn_ctxt snat_assn2 i ii)
     (narray_new TYPE('a::llvm_rep) ii)
     (hn_ctxt snat_assn2 i ii)
     (array_assn A)
-    (mop_array_new i x)" 
+    (mop_array_new $ i)" 
 proof -
   have AR: "A = hr_comp id_assn (the_pure A)"
     by (simp add: \<open>is_pure A\<close>)
 
   show ?thesis  
+    unfolding APP_def
     apply (rewrite in \<open>hn_refine _ _ _ \<hole> _\<close> pure_array_assn_alt[OF PURE])
     apply (rule hn_refine_cons_res_complete_loose)
     applyS (rule hnr_raw_array_new)
@@ -712,7 +896,7 @@ proof -
       apply (parametricity add: INIT)
       by simp
     subgoal
-      unfolding mop_array_new_def
+      unfolding mop_array_new_def mop_list_init_def
       by (rule attains_sup_mop_return)
     done
 qed
@@ -727,7 +911,7 @@ lemma FREE_hrcompI:
   by vcg
 
 
-lemma FREE_array_assn:
+lemma FREE_array_assn[sepref_frame_free_rules]:
   assumes PURE: "is_pure A"
   shows "MK_FREE (array_assn A) narray_free"  
   apply (rewrite pure_array_assn_alt[OF PURE])
@@ -741,30 +925,10 @@ lemma FREE_array_assn:
 lemma "(xs,xsi)\<in>\<langle>A\<rangle>list_rel \<Longrightarrow> i<length xs \<Longrightarrow> mop_array_nth xs i \<le>\<Down>A (mop_array_nth xsi i)"  
   apply (auto simp: mop_array_nth_def pw_acost_le_iff refine_pw_simps)
   apply parametricity by simp
+
+
   
-     
-(* TODO
-
-* für list mops und tmops definieren:
-- replicate
-- nth ( mop_list_get T )
-- update
-
-* HNR implementierungen mit arrays [sepref_fr_rules]
-- nth ( hnr (...) array_nth (...) R  (mop_list_get mop_array_nth_cost) )
-    @{thm hnr_raw_array_nth'[FCOMP param_mop_list_get[of _ A]]}
-- replicate
-- update
-
-
-* 
-
-
-
-*)
-
-
-
+thm sepref_fr_rules
 
 
 end
