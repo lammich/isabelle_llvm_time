@@ -1234,6 +1234,10 @@ definition "SC f = f"
 
       (* FCOMP-attribute *)
       val fcomp_attrib: attribute context_parser
+
+      (* Check FCOMP-result for artifacts that should be removed by normalization *)      
+      val check_fcomp_result: Proof.context -> thm -> unit
+      
     end
 
     structure Sepref_Rules: SEPREF_RULES = struct
@@ -1810,6 +1814,33 @@ definition "SC f = f"
       (***********************************)
       (* Composition *)
 
+    
+      fun check_fcomp_result ctxt thm = let
+        val (_,R,S) = case Thm.concl_of thm of
+          @{mpat "Trueprop (_\<in>hfref ?P ?R ?S)"} => (P,R,S)
+        | _ => raise THM("FCOMP chk_result: Expected hfref-theorem",~1,[thm])  
+    
+        fun err t = let
+          val ts = Syntax.pretty_term ctxt t |> Pretty.string_of
+        in
+          raise THM ("FCOMP chk_result: Invalid pattern left in assertions: " ^ ts,~1,[thm])
+        end  
+        fun check_invalid (t as @{mpat "hr_comp _ _"}) = err t 
+          | check_invalid (t as @{mpat "hrp_comp _ _"}) = err t
+          | check_invalid (t as @{mpat "hrr_comp _ _ _"}) = err t
+          | check_invalid (t as @{mpat "pure (the_pure _)"}) = err t
+          | check_invalid (t as @{mpat "_ O _"}) = err t
+          | check_invalid _ = false
+          
+    
+        val _ = exists_subterm check_invalid R 
+        val _ = exists_subterm check_invalid S
+      in
+        ()
+      end
+      
+      
+      
       local
         fun norm_set_of ctxt = {
           trans_rules = Named_Theorems.get ctxt @{named_theorems fcomp_norm_trans},
@@ -1898,6 +1929,10 @@ definition "SC f = f"
       val cfg_simp_precond = 
         Attrib.setup_config_bool @{binding fcomp_simp_precond} (K true)
 
+      val cfg_check_result = 
+        Attrib.setup_config_bool @{binding fcomp_check_result} (K true)
+        
+        
       local
         fun mk_simp_thm ctxt t = let
           val st = t
@@ -1985,12 +2020,19 @@ definition "SC f = f"
 
       end  
 
+      fun check_result_if_cfg ctxt thm = 
+        if Config.get ctxt cfg_check_result then
+          (check_fcomp_result ctxt thm; thm)
+        else thm
+      
+      
       (* fref O fref *)
       fun compose_ff ctxt A B = 
           (@{thm fref_compI_PRE} OF [A,B])
         |> norm_fcomp_rule ctxt
         |> simplify_precond_if_cfg ctxt
         |> Conv.fconv_rule Thm.eta_conversion
+        |> check_result_if_cfg ctxt
 
       (* hfref O fref *)
       fun compose_hf ctxt A B =
@@ -2000,6 +2042,7 @@ definition "SC f = f"
         |> Conv.fconv_rule Thm.eta_conversion
         |> add_pure_constraints_rule ctxt
         |> Conv.fconv_rule Thm.eta_conversion
+        |> check_result_if_cfg ctxt
 
       fun ensure_fref ctxt thm = case rthm_type thm of
         RT_HOPARAM => to_fref ctxt thm
@@ -2037,7 +2080,9 @@ definition "SC f = f"
       end
 
       val parse_fcomp_flags = Refine_Util.parse_paren_lists 
-        (Refine_Util.parse_bool_config "prenorm" cfg_simp_precond)
+        (Refine_Util.parse_bool_config "prenorm" cfg_simp_precond
+          || Refine_Util.parse_bool_config "check" cfg_check_result
+        )
 
       val fcomp_attrib = parse_fcomp_flags |-- Attrib.thm >> (fn B => Thm.rule_attribute [] (fn context => fn A => 
       let
