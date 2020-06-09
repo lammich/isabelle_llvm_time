@@ -209,7 +209,7 @@ begin
 end
 
 lemma param_mop_list_replicate:
-  "(mop_list_replicate T, mop_list_replicate T) \<in> nat_rel \<rightarrow> (the_pure A) \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  "(mop_list_replicate T, mop_list_replicate T) \<in> nat_rel \<rightarrow> (A) \<rightarrow> \<langle>\<langle>A\<rangle> list_rel\<rangle> nrest_rel"
   apply(intro nrest_relI fun_relI)
   unfolding mop_list_replicate_def
   apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
@@ -220,19 +220,25 @@ lemma param_mop_list_replicate:
 context
   fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
 begin
-  definition [simp]: "mop_list_init n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n init)) (T (n)) }"
-  sepref_register "mop_list_init"
+  definition [simp]: "mop_list_init x n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n x)) (T n) }"
+  definition [simp]: "mop_list_init_raw n \<equiv> do { ASSERT (PROTECT True); consume (RETURNT (replicate n init)) (T n) }"
+  context fixes x begin sepref_register "mop_list_init x" end
+  sepref_register "mop_list_init_raw"
 end
 
-(* TODO: is it parametric ?
-lemma param_mop_list_init:
-  "(mop_list_init T, mop_list_init T) \<in> nat_rel \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+find_theorems is_init
+(* TODO: is it parametric ? It is with a precondition! *)
+lemma refine_mop_list_init_raw:
+  assumes "GEN_ALGO x (is_init A)"
+  shows "(mop_list_init_raw T, PR_CONST (mop_list_init T x)) \<in> nat_rel \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  using assms
   apply(intro nrest_relI fun_relI)
-  unfolding mop_list_init_def
+  unfolding mop_list_init_def mop_list_init_raw_def
+  unfolding GEN_ALGO_def is_init_def
   apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
   apply parametricity
   by simp 
-*)
+
 
 
 subsection \<open>Monadic Option List Operations\<close>
@@ -390,6 +396,8 @@ lemma hnr_eoarray_free[sepref_fr_rules]: "hn_refine
   apply vcg_step
   by vcg
   
+(* This rule does not hold! The elements must be de-allocated first!  
+  for explicit ownership management, free the array manually using mop_oarray_free!   
 lemma FREE_eoarray_assn[sepref_frame_free_rules]:
   shows "MK_FREE (eoarray_assn A) narray_free"  
   apply (rule MK_FREEI)
@@ -398,6 +406,9 @@ lemma FREE_eoarray_assn[sepref_frame_free_rules]:
   apply vcg_step
   apply vcg_step
   sorry
+  
+*)  
+  
   
 (* Conversions between plain array and explicit ownership array*)  
 definition "mop_to_eo_conv xs \<equiv> do { consume (RETURNT (map Some xs)) (lift_acost 0) }"  
@@ -510,7 +521,12 @@ subsection \<open>Array\<close>
 
 definition "mop_array_nth \<equiv> mop_list_get (\<lambda>_. lift_acost mop_array_nth_cost) "
 definition "mop_array_upd \<equiv> mop_list_set (\<lambda>_. lift_acost mop_array_upd_cost)"
-definition "mop_array_new \<equiv> mop_list_init (\<lambda>(n). lift_acost (cost'_narray_new n))"
+definition mop_array_new :: "('a \<Rightarrow> 'c \<Rightarrow> assn) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> ('a list, ecost) nrest"
+  where "mop_array_new A \<equiv> mop_list_init (\<lambda>n. lift_acost (cost'_narray_new n))"
+
+context fixes A :: "'a \<Rightarrow> 'c \<Rightarrow> assn" and x :: 'a begin
+  sepref_register "mop_array_new A x"
+end
 
 
 subsubsection \<open>Raw hnr rules\<close>
@@ -527,7 +543,7 @@ lemma hnr_raw_array_nth: "hn_refine
   apply vcg_step
   by vcg
 
-lemma hnr_raw_array_upd: "hn_refine 
+(*lemma hnr_raw_array_upd: "hn_refine 
   (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
   (array_upd xsi ii xi)
   (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
@@ -535,20 +551,31 @@ lemma hnr_raw_array_upd: "hn_refine
   (mop_array_upd $ xs $ i $ x)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
   by vcg
+*)  
+
+lemma hnr_raw_array_upd: "((uncurry2 array_upd, uncurry2 mop_array_upd)
+       \<in> [\<lambda>((a, b), x). True]\<^sub>a raw_array_assn\<^sup>d *\<^sub>a snat_assn2\<^sup>k *\<^sub>a id_assn\<^sup>k \<rightarrow> raw_array_assn)"
+  apply(intro hfrefI)
+  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
+  by vcg
 
 
-
-
+lemma hnr_raw_array_new: 
+  "(narray_new TYPE('a::llvm_rep), mop_list_init_raw (\<lambda>n. lift_acost (cost'_narray_new n))) : snat_assn2\<^sup>k \<rightarrow>\<^sub>a raw_array_assn"
+  apply (rule hfrefI)
+  unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def mop_list_init_raw_def
+  by vcg
   
-
+(*
 lemma hnr_raw_array_new: "hn_refine 
   (hn_ctxt snat_assn2 i ii)
   (narray_new TYPE('a::llvm_rep) ii)
   (hn_ctxt snat_assn2 i ii)
   raw_array_assn
-  (mop_array_new $ i)" 
+  (mop_li $ i)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
   by vcg
+*)  
   
 lemma FREE_raw_array_assn: "MK_FREE raw_array_assn narray_free"  
   apply rule
@@ -569,6 +596,72 @@ lemma pure_array_assn_alt:
   )
   done
 
+lemma norm_array_assn[fcomp_norm_simps]:
+  assumes "CONSTRAINT is_pure A"  
+  shows "hr_comp raw_array_assn (\<langle>the_pure A\<rangle>list_rel) = array_assn A"
+  using pure_array_assn_alt[OF assms[THEN CONSTRAINT_D]] by simp
+    
+
+context
+  fixes A :: "'a  \<Rightarrow> 'b:: llvm_rep \<Rightarrow> assn"
+  assumes [fcomp_norm_simps]: "CONSTRAINT is_pure A"
+begin
+  lemmas hnr_array_upd[sepref_fr_rules] = hnr_raw_array_upd[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], folded mop_array_upd_def]
+
+  lemmas hnr_array_nth[sepref_fr_rules] = hnr_raw_array_nth[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def]
+  
+end  
+
+context 
+  fixes A :: "'a  \<Rightarrow> 'c:: llvm_rep \<Rightarrow> assn"
+    and x :: 'a
+  assumes INIT: "GEN_ALGO x (is_init A)"
+begin  
+  private lemma PURE: "CONSTRAINT is_pure A"
+    using INIT unfolding GEN_ALGO_def CONSTRAINT_def is_init_def by simp
+  
+  context
+    notes PURE[fcomp_norm_simps]
+  begin
+    lemmas hnr_array_new[sepref_fr_rules] 
+      = hnr_raw_array_new[FCOMP refine_mop_list_init_raw[OF INIT], folded mop_array_new_def[of A]]
+      
+  end  
+  
+end  
+  
+
+(* TODO: Move *)
+lemma FREE_hrcompI:
+  assumes "MK_FREE (A) f"  
+  shows "MK_FREE (hr_comp A R) f"  
+  supply [vcg_rules] = MK_FREED[OF assms]
+  apply (rule)
+  unfolding hr_comp_def
+  by vcg
+
+
+lemma FREE_array_assn[sepref_frame_free_rules]:
+  assumes PURE: "is_pure A"
+  shows "MK_FREE (array_assn A) narray_free"  
+  apply (rewrite pure_array_assn_alt[OF PURE])
+  apply (rule FREE_hrcompI)
+  apply (rule FREE_raw_array_assn)
+  done
+
+
+
+  
+  
+(* ************************************************************
+  Deprecated from here !?
+
+*)  
+  
+(*  
+  
+    
+  
 (* TODO: Move *)  
 lemma hn_ctxt_hr_comp_extract: "hn_ctxt (hr_comp A R) a c = (EXS b. \<up>((b,a)\<in>R) ** hn_ctxt A b c)"  
   unfolding hn_ctxt_def hr_comp_def
@@ -636,20 +729,18 @@ lemma hnr_raw_array_upd': "hn_refine
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
   by vcg
 
-lemma hnr_raw_array_upd'_h: "((uncurry2 array_upd, uncurry2 mop_array_upd)
-       \<in> [\<lambda>((a, b), x). True]\<^sub>a raw_array_assn\<^sup>d *\<^sub>a snat_assn2\<^sup>k *\<^sub>a id_assn\<^sup>k \<rightarrow> raw_array_assn)"
-  apply(intro hfrefI)
-  unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
-  by vcg
 
 context
   fixes A :: "'a  \<Rightarrow> 'b:: llvm_rep \<Rightarrow> assn"
-  assumes [fcomp_norm_simps]: "is_pure A"
+  assumes [fcomp_norm_simps]: "CONSTRAINT is_pure A"
 begin
-lemmas hm = hnr_raw_array_upd'_h[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], simplified pure_array_assn_alt[symmetric] fcomp_norm_simps,
+
+
+(*lemmas hm = hnr_raw_array_upd'_h[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], simplified pure_array_assn_alt[symmetric] fcomp_norm_simps,
       folded mop_array_upd_def]
 thm hm[no_vars]
 lemmas hm[sepref_fr_rules]
+*)
 
 end
 
@@ -677,27 +768,12 @@ lemma param_mop_array_nth:
   apply parametricity
   by simp 
 
-thm hnr_raw_array_nth
-thm fcomp_norm_unfold 
-thm fcomp_norm_simps
-lemmas pure_array_assn_alt[symmetric, fcomp_norm_unfold]
-thm fcomp_norm_unfold
 context
   fixes A :: "'a  \<Rightarrow> 'b:: llvm_rep \<Rightarrow> assn"
-  assumes [fcomp_norm_simps]: "is_pure A"
+  assumes [fcomp_norm_simps]: "CONSTRAINT is_pure A"
 begin
-thm param_mop_array_nth[of A] hnr_raw_array_nth
-thm param_mop_array_nth[of A, simplified pure_array_assn_alt[of A, symmetric] fcomp_norm_simps]
-(* TODO: FCOMP bug ? hr_comp triggers error here instead of in sepref_decl_impl *)
-thm hnr_raw_array_nth[FCOMP param_mop_array_nth[of A], simplified pure_array_assn_alt[symmetric] fcomp_norm_simps]
-thm hnr_raw_array_nth[FCOMP param_mop_array_nth[of A]]
 
-
-lemmas hnr_array_nth = hnr_raw_array_nth'[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def] (* still raw! *)
-
-(* thm hnr_array_nth[sepref_fr_rules] *)
-
-
+lemmas hnr_array_nth[sepref_fr_rules] = hnr_raw_array_nth'[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def]
 
 end
 
@@ -707,7 +783,7 @@ end
   With loose rule, and syntactic check that time does not depend on result
 *)
 thm hnr_array_nth
-lemma hnr_array_nth'[sepref_fr_rules]: 
+lemma hnr_array_nth': 
   assumes PURE: "is_pure A"
   shows "hn_refine 
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
@@ -822,7 +898,7 @@ proof -
 qed    
 
 
-lemma hnr_array_upd: 
+lemma deprecated_hnr_array_upd: 
   assumes PURE: "is_pure A"
   shows "hn_refine 
     (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
@@ -872,8 +948,16 @@ qed
 
 text \<open>Array new\<close>
 
+thm hnr_raw_array_new
 
-lemma hnr_array_new[sepref_fr_rules]: 
+context  
+  
+thm hnr_raw_array_new[FCOMP (no_check) refine_mop_list_init_raw]
+  
+
+find_theorems mop_list_init
+
+lemma hnr_array_new: 
   assumes PURE: "is_pure A"
   assumes INIT: "(init,init) \<in> the_pure A"
   shows "hn_refine 
@@ -905,25 +989,6 @@ proof -
     done
 qed
 
-(* TODO: Move *)
-lemma FREE_hrcompI:
-  assumes "MK_FREE (A) f"  
-  shows "MK_FREE (hr_comp A R) f"  
-  supply [vcg_rules] = MK_FREED[OF assms]
-  apply (rule)
-  unfolding hr_comp_def
-  by vcg
-
-
-lemma FREE_array_assn[sepref_frame_free_rules]:
-  assumes PURE: "is_pure A"
-  shows "MK_FREE (array_assn A) narray_free"  
-  apply (rewrite pure_array_assn_alt[OF PURE])
-  apply (rule FREE_hrcompI)
-  apply (rule FREE_raw_array_assn)
-  done
-
-
   
   
 lemma "(xs,xsi)\<in>\<langle>A\<rangle>list_rel \<Longrightarrow> i<length xs \<Longrightarrow> mop_array_nth xs i \<le>\<Down>A (mop_array_nth xsi i)"  
@@ -933,6 +998,6 @@ lemma "(xs,xsi)\<in>\<langle>A\<rangle>list_rel \<Longrightarrow> i<length xs \<
 
   
 thm sepref_fr_rules
-
+*)
 
 end
