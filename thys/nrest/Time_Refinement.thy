@@ -90,6 +90,16 @@ definition timerefineF ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoi
   where "timerefineF R M = (\<lambda>r. case M r of None \<Rightarrow> None |
                   Some cm \<Rightarrow> Some (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
 
+
+
+definition timerefineA ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoid_add,times,mult_zero}) acost)
+                             \<Rightarrow> ( ('b,'d) acost) \<Rightarrow> ( ('c,'d) acost)"
+  where "timerefineA R cm =  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))"
+
+lemma timerefine_consume: "timerefine E (consume M t) = consume (timerefine E M) (timerefineA E t)"
+  apply(auto simp: timerefine_def consume_def timerefineA_def split: nrest.splits option.splits intro!: ext)
+  sorry
+
 lemma timerefine_alt: "timerefine R m = case_nrest FAILi (\<lambda>M. SPECT (timerefineF R M)) m"
   unfolding timerefine_def timerefineF_def ..
 
@@ -115,6 +125,47 @@ lemma wfR_sup:
 (* I think this is better. It captures "finitely branching" *)
 definition wfR' :: "('b \<Rightarrow> ('c, _::mult_zero) acost) \<Rightarrow> bool" where
   "wfR' R = (\<forall>s. finite {f. the_acost (R s) f \<noteq> 0})"
+
+definition wfR'' :: "('b \<Rightarrow> ('c, _::mult_zero) acost) \<Rightarrow> bool" where
+  "wfR'' R = (\<forall>f. finite {s. the_acost (R s) f \<noteq> 0})"
+
+
+lemma "wfR R \<Longrightarrow> wfR'' R"
+  unfolding wfR_def wfR''_def apply safe
+  subgoal for f
+    apply(rule finite_cartesian_productD1[where B="{f}"])
+     apply(rule finite_subset[rotated]) by auto
+  done
+
+lemma assumes "wfn m"
+  assumes "m = SPECT M" "M r = Some cm"
+  shows "finite {ac. the_acost cm ac * the_acost (R ac) cc \<noteq> 0}"
+proof -
+  from assms have "finite {x. the_acost cm x \<noteq> 0}" unfolding wfn_def by force
+  show ?thesis
+    apply(rule finite_subset[where B="{ac. the_acost cm ac \<noteq> 0}"])
+    subgoal by auto
+    subgoal apply fact done
+    done
+qed 
+
+
+lemma "wfR'' (\<lambda>x. acostC (\<lambda>y. if x = y then 1 else 0))"
+  unfolding wfR''_def 
+  by auto
+
+lemma wfR''_finite_mult_left:
+  assumes "wfR'' R"
+  shows "finite {ac. the_acost cm ac * the_acost (R ac) cc \<noteq> 0}"
+proof - 
+  from assms have "finite {s. the_acost (R s) cc \<noteq> 0}" unfolding wfR''_def by auto
+  show ?thesis
+    apply(rule finite_subset[where B="{ac. the_acost (R ac) cc \<noteq> 0}"])
+    subgoal by auto
+    subgoal apply fact done
+    done
+qed 
+
 
 
 definition wfR2 :: "(('c, _::mult_zero) acost) \<Rightarrow> bool" where
@@ -461,7 +512,31 @@ proof -
     using f by(rule finite_SUP_sum)
   qed 
 
+lemma pl2:
+  fixes R ::"_ \<Rightarrow> ('a, enat) acost"
+  assumes "Ra \<noteq> {}" and "wfR'' R"
+  shows  " Sup { Some (Sum_any (\<lambda>ac. the_acost x ac * the_acost  (R ac) b)) |x. x \<in> Ra}
+             \<le> Some (Sum_any (\<lambda>ac. (SUP f\<in>Ra. the_acost f ac) * the_acost  (R ac) b))"
+proof -
+  have *: "{ Some (Sum_any (\<lambda>ac. the_acost x ac * the_acost  (R ac) b)) |x. x \<in> Ra} =
+Some ` {  (Sum_any (\<lambda>ac. the_acost x ac * the_acost (R ac) b)) |x. x \<in> Ra}" by blast
+  have *: "Sup { Some (Sum_any (\<lambda>ac. the_acost x ac * the_acost (R ac) b)) |x. x \<in> Ra}
+          = SUPREMUM { (Sum_any (\<lambda>ac. the_acost x ac * the_acost (R ac) b)) |x. x \<in> Ra} Some " 
+    unfolding * by simp
+ 
+  have a: "\<And>ac. (SUP f\<in>Ra. the_acost f ac) * the_acost (R ac) b = (SUP f\<in>Ra. the_acost f ac * the_acost  (R ac) b)" 
+    apply(subst enat_mult_cont') by simp
 
+  have e: "finite {x.  the_acost (R x) b \<noteq> 0}" using assms(2) unfolding wfR''_def by simp
+
+  show ?thesis unfolding *
+    apply(subst Some_Sup[symmetric]) using assms apply simp
+    apply simp  
+    unfolding a apply(rule order.trans[OF _ enat_Sum_any_cont]) 
+    subgoal by (simp add: setcompr_eq_image)
+    subgoal apply(rule finite_subset[OF _ e]) by auto    
+    done
+qed
 lemma pl:
   fixes R ::"_ \<Rightarrow> ('a, enat) acost"
   assumes "Ra \<noteq> {}" and "wfR R"
@@ -492,6 +567,50 @@ lemma oo: "Option.these (Ra - {None}) = Option.these (Ra)"
   by (metis insert_Diff_single these_insert_None) 
 lemma Sup_wo_None: "Ra \<noteq> {} \<and> Ra \<noteq> {None} \<Longrightarrow> Sup Ra = Sup (Ra-{None})"
   unfolding Sup_option_def apply auto unfolding oo by simp
+
+term continuous
+
+thm continuous_option
+
+lemma kkk2:
+  fixes R ::"_ \<Rightarrow> ('a,enat) acost"
+  assumes "wfR'' R"
+shows 
+" (case SUP x\<in>Ra. x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (Sum_any (\<lambda>ac. the_acost cm ac * the_acost  (R ac) b)))
+   \<ge> Sup {case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (Sum_any (\<lambda>ac. the_acost cm ac * the_acost  (R ac) b)) |x. x \<in>  Ra}"
+  apply(cases "Ra={} \<or> Ra = {None}")
+  subgoal by (auto split: option.splits simp: bot_option_def)
+  subgoal apply(subst (2) Sup_option_def) apply simp unfolding Sup_acost_def apply simp
+    
+
+  proof -
+    assume r: "Ra \<noteq> {} \<and> Ra \<noteq> {None}"
+    then  obtain x where x: "Some x \<in> Ra"  
+      by (metis everywhereNone not_None_eq)  
+
+    have kl: "Sup {case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost  (R ac) b) |x. x \<in> Ra}
+      = Sup ({case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost (R ac) b) |x. x \<in> Ra}-{None})"
+      apply(subst Sup_wo_None) 
+      subgoal apply safe subgoal using x by auto subgoal using x by force
+      done by simp
+  also have "({case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost  (R ac) b) |x. x \<in> Ra}-{None})
+            = ({case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost  (R ac) b) |x. x \<in> Ra \<and> x\<noteq>None})"
+    by (auto split: option.splits)
+  also have "\<dots> = ({  Some (\<Sum>ac. the_acost x ac * the_acost (R ac) b) |x. x\<in>Option.these Ra})"
+    by (force split: option.splits simp: Option.these_def) 
+  finally have rrr: "Sup {case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost (R ac) b) |x. x \<in> Ra}
+      = Sup ({  Some (\<Sum>ac. the_acost x ac * the_acost (R ac) b) |x. x\<in>Option.these Ra})" .
+
+
+  show "Sup {case x of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost  (R ac) b) |x. x \<in> Ra}
+         \<le> Some (\<Sum>ac. (SUP f\<in>Option.these Ra. the_acost f ac) * the_acost  (R ac) b)"
+      unfolding rrr apply(subst pl2)
+      subgoal using x unfolding Option.these_def by auto
+      subgoal by fact
+      apply simp done
+  qed
+  done
+
 lemma kkk:
   fixes R ::"_ \<Rightarrow> ('a,enat) acost"
   assumes "wfR R"
@@ -532,6 +651,23 @@ shows
   done
 
 lemma 
+  aaa: fixes R ::"_ \<Rightarrow> ('a,enat) acost"
+assumes "wfR'' R"
+shows 
+"(case SUP x\<in>Ra. x r of None \<Rightarrow> None | Some cm \<Rightarrow> Some (Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) b)))
+    \<ge> Sup {case x r of None \<Rightarrow> None | Some cm \<Rightarrow> Some (Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) b)) |x. x\<in>Ra}"
+proof -
+  have *: "{case x r of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost (R ac) b) |x. x \<in> Ra}
+      = {case x  of None \<Rightarrow> None | Some cm \<Rightarrow> Some (\<Sum>ac. the_acost cm ac * the_acost (R ac) b) |x. x \<in> (\<lambda>f. f r) ` Ra}"
+    by auto
+  have **: "\<And>f. (case SUP x\<in>Ra. x r of None \<Rightarrow> None | Some cm \<Rightarrow> f cm)
+      = (case SUP x\<in>(\<lambda>f. f r) ` Ra. x of None \<Rightarrow> None | Some cm \<Rightarrow> f cm)"    
+    by auto       
+
+  show ?thesis unfolding * ** apply(rule kkk2) by fact
+qed
+
+lemma 
   ***: fixes R ::"_ \<Rightarrow> ('a,enat) acost"
 assumes "wfR R"
 shows 
@@ -553,6 +689,29 @@ qed
 lemma nofail'': "x \<noteq> FAILT  \<longleftrightarrow> (\<exists>m. x=SPECT m)"
   unfolding nofailT_def  
   using nrest_noREST_FAILT by blast  
+
+lemma limRef_bindT_le2:
+fixes R ::"_ \<Rightarrow> ('a,enat) acost" assumes "wfR'' R"
+shows "limRef b R (bindT m f) \<ge> (case m of FAILi \<Rightarrow> FAILT | REST X \<Rightarrow> Sup {case f x of FAILi \<Rightarrow> FAILT | REST m2 \<Rightarrow> SPECT (\<lambda>r. case (map_option ((+) t1) \<circ> m2) r of None \<Rightarrow> None | Some cm \<Rightarrow> Some (Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) b))) |x t1. X x = Some t1})"
+    unfolding limRef_def bindT_def apply(cases m) apply auto
+  unfolding Sup_nrest_def apply (auto split: nrest.splits)
+  apply(rule le_funI)   apply simp unfolding Sup_fun_def     
+  subgoal 
+    apply(rule order.trans) defer 
+    apply(subst aaa[OF assms]) apply simp   
+    apply(rule Sup_least)
+    apply auto
+      apply(subst (asm) nofail'') apply (auto split: option.splits)
+    apply(rule Sup_upper)
+    apply auto
+    subgoal for xa t1 ma x2
+    apply(rule exI[where x="map_option ((+) t1) \<circ> ma"])
+      apply safe subgoal apply simp done
+      subgoal by auto   
+      apply(rule exI[where x=xa])
+      by simp 
+    done
+  done
 
 lemma limRef_bindT_le:
 fixes R ::"_ \<Rightarrow> ('a,enat) acost" assumes "wfR R"
@@ -629,6 +788,45 @@ lemma timerefine_bindT_ge:
   done
 
 
+lemma timerefine_bindT_ge2:
+  fixes R :: "_ \<Rightarrow> ('a,enat) acost"
+  assumes wfR'': "wfR'' R"
+  shows "bindT (timerefine R m) (\<lambda>x. timerefine R (f x)) \<le> timerefine R (bindT m f)"    
+  unfolding  pw_acost_le_iff'
+  apply safe
+  subgoal apply (simp add: nofailT_timerefine nofailT_project_acost pw_bindT_nofailTf')
+          apply auto apply(frule inresTf'_timerefine) by simp 
+  subgoal for b x t
+    unfolding limit_bindT 
+    unfolding pw_inresT_bindT
+    unfolding limRef_limit_timerefine
+    apply(rule ff[OF limRef_bindT_le2])
+    using assms
+     apply simp
+  apply(simp add: nofailT_limRef)
+      apply(cases m) subgoal by auto
+      apply simp 
+      unfolding pw_inresT_Sup apply auto
+      apply(drule inresT_limRef_D) apply auto
+      subgoal for x2 r' t' t'' x2a
+      apply(rule exI[where x="(case f r' of FAILi \<Rightarrow> FAILT | REST m2 \<Rightarrow> SPECT (\<lambda>r. case (map_option ((+) x2a) \<circ> m2) r of None \<Rightarrow> None | Some cm \<Rightarrow> Some (Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) b))))"])
+      apply safe
+       apply(rule exI[where x=r'])
+       apply(rule exI[where x=x2a])
+         apply simp
+        apply (cases "f r'") subgoal by auto
+        apply simp
+        apply(drule inresT_limRef_D) apply auto
+        apply(rule exI[where x="t' + t''"]) apply (simp add: zzz comm_semiring_class.distrib plus_acost_alt ) 
+        apply(subst Sum_any.distrib)
+        subgoal apply(rule wfR''_finite_mult_left) using wfR'' by simp
+        subgoal apply(rule wfR''_finite_mult_left) using wfR'' by simp
+        subgoal  
+          using add_mono by fastforce  
+        done
+    done
+  done
+
 
 lemma timerefine_R_mono: 
   fixes R :: "_ \<Rightarrow> ('a, enat) acost"
@@ -645,6 +843,24 @@ lemma timerefine_R_mono:
     apply -
     apply(rule finite_subset[where B="{x. the_acost (R' x) xa \<noteq> 0}"]) apply auto
     apply(rule wfR_fst) apply (rule assms) done
+  done
+
+
+lemma timerefine_R_mono_wfR'': 
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR'' R'"
+  shows "R\<le>R' \<Longrightarrow> timerefine R c \<le> timerefine R' c"
+  unfolding timerefine_def apply(cases c)
+   apply (auto intro!: le_funI simp: less_eq_acost_def split: option.splits)
+  apply(rule Sum_any_mono)
+   apply(rule mult_left_mono) apply(auto simp: le_fun_def)
+  subgoal premises prems for x2 x x2a xa xb 
+    using prems(1)[rule_format, of xb] apply(cases "R xb"; cases "R' xb") apply auto 
+    unfolding less_eq_acost_def by auto
+  subgoal for x2 x x2a xa using assms(1) unfolding wfR_def
+    apply -
+    apply(rule finite_subset[where B="{x. the_acost (R' x) xa \<noteq> 0}"]) apply auto
+    using assms[unfolded wfR''_def] apply simp done
   done
 
 
