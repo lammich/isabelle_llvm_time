@@ -238,6 +238,18 @@ lemma minus_p_m_alt: "minus_p_m Q M x = (case M of FAILi \<Rightarrow> None | RE
 lemma minus_p_m_Failt: "minus_p_m Q FAILT x = None" unfolding minus_p_m_def by auto
 
 
+lemma minus_p_m_flip:
+  fixes P :: "_ \<Rightarrow> ((_,enat) acost) option"
+  shows "Some (T + t) \<le> minus_p_m Q (SPECT P) x \<Longrightarrow> Some t \<le> minus_p_m Q (SPECT (map_option ((+) T) \<circ> P)) x"
+  unfolding minus_p_m_def
+  apply (auto simp: minus_potential_def split: option.splits)
+  subgoal
+    by (smt add.commute less_eq_option_Some less_eq_option_Some_None minus_plus_assoc2 needname_adjoint)
+  subgoal
+    apply(auto simp: if_splits)
+    by (metis add.commute add_le_if_le_diff needname_adjoint needname_cancle)
+  done
+
 
 lemma minus_p_m_antimono: 
   fixes x y :: "('a,'b::{complete_lattice,minus,ord,top,drm,monoid_add}) nrest"
@@ -356,6 +368,10 @@ lemma gwp_specifies_I:
   done
 
 
+lemma gwp_specifies_time_I: 
+  shows "gwp m (timerefineF E Q) \<ge> Some 0 \<Longrightarrow> (m \<le> timerefine E (SPECT Q))"
+  unfolding timerefine_SPECT
+  apply(rule gwp_specifies_I) .
 
 subsection "pointwise reasoning about gwp via nres3"
 
@@ -674,6 +690,13 @@ lemma gwp_SPECT_emb_I[vcg_rules']:
   subgoal for x tx using assms[of x] by (simp add: needname_cancle)    
   done
 
+
+lemma gwp_consume[vcg_rules']:
+  fixes m :: "(_,(_,enat) acost) nrest"
+  shows "Some (T+t) \<le> gwp m Q \<Longrightarrow> Some t \<le> gwp (consume m T) Q"
+  unfolding consume_def
+  apply(cases m) by (auto simp: gwp_pw minus_p_m_Failt intro: minus_p_m_flip)  
+
 lemma gwp_RETURNT_I[vcg_rules']:
   fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
   shows "t \<le> Q x \<Longrightarrow> t  \<le> gwp (RETURNT x) Q" 
@@ -770,6 +793,7 @@ proof -
     unfolding gwp_pw ..
 qed
 
+
 lemma gwp_conseq:
   assumes 
     "gwp f Q' \<ge> Some t"
@@ -800,6 +824,42 @@ proof -
     unfolding gwp_pw ..
 qed
 
+
+lemma gwp_conseq4_aux2: "t - t' + b \<le> c \<Longrightarrow> t' + a \<le> b \<Longrightarrow> t + a \<le> (c::enat)"
+  apply(cases t; cases t'; cases b; cases c; cases a) by auto
+
+lemma gwp_conseq4_aux3: "t - t' + b \<le> c \<Longrightarrow> t' + a \<le> b \<Longrightarrow> t + a \<le> (c::('a,enat)acost)"  
+  apply(cases t; cases t'; cases b; cases c; cases a)
+  unfolding less_eq_acost_def le_fun_def apply simp
+  apply safe apply(rule gwp_conseq4_aux2) by auto
+
+
+
+lemma gwp_conseq4:
+  fixes f :: "('b, ('a,enat) acost) nrest"
+  assumes 
+    "gwp f Q' \<ge> Some t'"
+    "\<And>x t'' M. Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ((t - t') + t'')" 
+  shows "gwp f Q  \<ge> Some t"
+proof -
+  {
+    fix x
+    from assms(1)[unfolded gwp_pw] have i: "Some t' \<le> minus_p_m Q' f x" by auto
+    from assms(2) have ii: "\<And>t''. Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ((t - t') + t'')" by auto
+    from i ii have "Some t \<le> minus_p_m Q f x"
+      unfolding minus_p_m_alt apply(auto split: nrest.splits)
+      subgoal for x2 apply(cases "x2 x") apply (simp add: minus_cost_None)
+        apply(simp add: aux1)  
+        apply(cases "Q' x") apply simp
+        apply auto 
+        apply(cases "Q x") apply auto 
+        subgoal for a aa ab apply(rule gwp_conseq4_aux3[where t'=t' and b=aa]) by auto 
+        done
+      done
+  } 
+  thus ?thesis
+    unfolding gwp_pw ..
+qed
 
 subsubsection \<open>Rules for While\<close>
 
@@ -838,45 +898,220 @@ next
 
 qed
 
+ 
+
+lemma flat_ge_consume[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "flat_ge f f' \<Longrightarrow> flat_ge (consume f T) (consume f' T)"
+  by (auto simp: refine_pw_simps pw_acost_flat_ge_iff) 
+
+lemma flat_ge_MIf[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "\<lbrakk>flat_ge f f'; flat_ge g g'\<rbrakk> \<Longrightarrow> flat_ge (MIf xb f g) (MIf xb f' g')"
+  unfolding MIf_def 
+  by refine_mono
+
+thm consume_mono
+
+lemma consume_mono'[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "f \<le> f' \<Longrightarrow> (consume f T) \<le> (consume f' T)"
+  by (auto simp: refine_pw_simps pw_acost_le_iff) 
+
+lemma MIf_mono[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "\<lbrakk>f \<le> f'; g \<le> g'\<rbrakk> \<Longrightarrow> (MIf xb f g) \<le> (MIf xb f' g')"
+  unfolding MIf_def 
+  by refine_mono
+
+lemma gwp_ASSERT_bind_I[vcg_rules']:
+  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
+  shows "(\<Phi> \<Longrightarrow> Some t \<le> gwp M Q) \<Longrightarrow> \<Phi> \<Longrightarrow> Some t \<le> gwp (do { ASSERT \<Phi>; M}) Q"
+  apply(cases \<Phi>)
+  by (auto intro: vcg_rules' )
+
+
+
+lemma grr: "Inf {uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa \<noteq> x \<longrightarrow> uu = Some top)} = Some (a-T)"
+proof -
+  consider "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa \<noteq> x \<longrightarrow> uu = Some top)}
+        = { Some (a-T) }" | "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa \<noteq> x \<longrightarrow> uu = Some top)}
+        = { Some (a-T) , Some top }" by auto
+  then show ?thesis
+    apply(cases) apply simp apply simp done
+qed
+
+lemma grr2: "Inf {uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)} = Some (a-T)"
+proof -
+  consider "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)}
+        = { Some (a-T) }" | "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)}
+        = { Some (a-T) , Some top }" by auto
+  then show ?thesis
+    apply(cases) apply simp apply simp done
+qed
+
+ 
+lemma kala:
+  fixes T :: "(_,enat) acost"
+  shows "gwp (SPECT [x\<mapsto>T]) Q = Some t \<Longrightarrow> Q x = Some (T+t)"
+  unfolding gwp_def minus_p_m_def minus_potential_def apply simp
+  apply(auto split: if_splits)
+  apply(cases "Q x") apply simp apply auto 
+  apply(auto split: if_splits)
+  subgoal for a
+  unfolding grr2  apply simp apply(cases T; cases t; cases a)
+    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp
+      apply(rule ext)  
+    by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat) 
+  done
+
+
+lemma 
+  fixes T :: "(_,enat) acost"
+  shows "gwp (SPECT [x\<mapsto>T]) Q = Some t \<longleftrightarrow> Q x = Some (T+t)"
+  unfolding gwp_def minus_p_m_def minus_potential_def apply simp
+  apply(cases "Q x") apply simp apply simp apply auto
+  subgoal for a unfolding grr apply simp apply(cases T; cases t; cases a)
+    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp
+      apply(rule ext)  
+    by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat)   
+  subgoal unfolding grr apply(cases T; cases t) apply auto  
+    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp apply(rule ext)
+     sorry
+  subgoal by (simp add: add_increasing2 needname_nonneg)  
+  oops
+
+  term "map_option ((+) (t1+T))"
+  term "(map_option ((+) t1) \<circ>\<circ>\<circ> (\<circ>)) (map_option ((+) T))"
+
+lemma ps: fixes T :: "('d, enat) acost"
+  shows "(map_option ((+) T) (if xa = x then Some a else None))  = (if xa = x then Some (T+a) else None)"
+  by simp
+  
+lemma pau: 
+  fixes T :: "('d, enat) acost"
+  shows "(map_option ((+) t1) \<circ>\<circ>\<circ> (\<circ>)) (map_option ((+) T)) (\<lambda>e. if e = x then Some 0 else None)
+      = (\<lambda>xa. if xa = x then Some (t1 + T) else None)"
+  unfolding comp_def apply(subst ps) apply(subst ps) apply (rule ext) by simp
+
+
+lemma ka: "{\<lambda>xa. if xa = x then Some (t1 + T) else None |x t1. x2 x = Some t1}
+      = (\<lambda>(x,t1) xa. if xa = x then Some (t1 + T) else None) ` {(x,t1) |x t1. x2 x = Some t1}"
+  by auto
+
+lemma sd: "(\<lambda>f. f y) ` {g x t1 |x t1. x2 x = Some t1}
+      = {g x t1 y |x t1. x2 x = Some t1}" by blast
+
+
+lemma consume_alt:
+  fixes M :: "(_,(_,enat) acost) nrest" 
+  shows "consume M T = do { r \<leftarrow> M; _ \<leftarrow> SPECT [()\<mapsto>T]; RETURNT r}"
+  unfolding bindT_def consume_def
+  apply(cases M) apply simp apply simp unfolding RETURNT_def apply simp
+  apply(subst pau) unfolding Sup_nrest_def apply simp
+  apply(rule ext) apply simp 
+proof (goal_cases)
+  case (1 x2 y)
+  have *: "(SUP f\<in>{\<lambda>xa. if xa = x then Some (t1 + T) else None |x t1. x2 x = Some t1}. f y)
+        = Sup ({   if y = x then Some (t1 + T) else None  |x t1. x2 x = Some t1})"
+    apply(rule arg_cong[where f=Sup])
+    apply(subst sd) by simp 
+
+  { assume "x2 y = None"
+    then     consider "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
+          = {}" | "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
+          = {None}" by force
+  } note pf=this
+  { fix a 
+    assume "x2 y = Some a"
+    then     consider "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
+          = {Some(a+T)}" | "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
+          = {Some(a+T),None}" by force
+  } note pf2=this
+  
+  show ?case unfolding *  apply(cases "x2 y")
+     apply simp_all
+    subgoal
+      apply(cases rule: pf) apply simp
+      subgoal premises p apply(subst p(2)) by (simp add: Sup_option_def)
+      subgoal premises p apply(subst p(2)) by (simp add: Sup_option_def)
+      done
+    subgoal 
+      apply(cases rule: pf2) apply simp
+      subgoal premises p apply(subst p(2)) by (simp add: add.commute Sup_option_def)
+      subgoal premises p apply(subst p(2)) by (simp add: add.commute Sup_option_def)
+      done
+    done
+qed
+
+lemma
+  fixes r :: "('a, (char list, enat) acost) nrest"
+  assumes "monadic_WHILEIT Inv bm c s = r" 
+  assumes IS: "\<And>s t'. I s = Some t' 
+           \<Longrightarrow>  gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)]) (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })  (\<lambda>s'. if (s',s)\<in>R then I s' else None) else Q s)) \<ge> Some t'"
+  assumes "I s = Some t"
+  assumes z: "\<And>t s. I s = Some t \<Longrightarrow> Inv s"
+  assumes wf: "wf R"
+  shows monadic_WHILE_rule'': "gwp r Q \<ge> Some t"
+  using assms(1,3)
+  unfolding monadic_WHILEIT_def
+proof (induction arbitrary: t rule: RECT_wf_induct[where R="R"])
+  case 1  
+  show ?case by fact
+next
+  case 2
+  then show ?case by refine_mono
+next
+  case step: (3 x D r t') 
+  note IH[vcg_rules'] = step.IH[OF _ refl] 
+  note step.hyps[symmetric, simp]   
+
+  from step.prems
+  show ?case 
+    apply clarsimp  
+    apply(rule gwp_ASSERT_bind_I)
+    apply (rule gwp_bindT_I)
+    apply(rule gwp_conseq)
+      apply (rule IS) apply simp  
+    unfolding MIf_def
+     apply(auto split: if_splits)
+      defer 
+    subgoal 
+      apply(rule gwp_consume)
+      apply(rule vcg_rules')
+      apply(drule kala) by simp
+    subgoal
+      apply(rule z) apply simp
+      done
+    subgoal
+      apply(drule kala)
+      apply(rule gwp_consume)
+      unfolding consume_alt
+      apply(subst (asm) gwp_bindT)
+      apply (rule gwp_bindT_I)
+      subgoal premises pr
+        apply(rule gwp_conseq) 
+         apply(subst pr(6)) apply simp
+        apply(subst (asm) gwp_bindT)
+      apply(drule kala)
+        unfolding RETURNT_alt
+        apply(drule kala) apply (auto split: if_splits)
+        apply(rule gwp_bindT_I)
+        apply(rule gwp_SPECT_I) 
+      apply(rule IH) apply simp by (simp add: add.commute)
+      done
+    done
+qed
+
+
+
+
+
+
 abbreviation "lift_acost_option I \<equiv> case_option None (\<lambda>m. Some (lift_acost m)) I"
-
-lemma aux2: "t - t' + b \<le> c \<Longrightarrow> t' + a \<le> b \<Longrightarrow> t + a \<le> (c::enat)"
-  apply(cases t; cases t'; cases b; cases c; cases a) by auto
-
-lemma aux3: "t - t' + b \<le> c \<Longrightarrow> t' + a \<le> b \<Longrightarrow> t + a \<le> (c::('a,enat)acost)"  
-  apply(cases t; cases t'; cases b; cases c; cases a)
-  unfolding less_eq_acost_def le_fun_def apply simp
-  apply safe apply(rule aux2) by auto
-
 
 
 thm gwp_conseq
-lemma gwp_conseq4:
-  fixes f :: "('b, ('a,enat) acost) nrest"
-  assumes 
-    "gwp f Q' \<ge> Some t'"
-    "\<And>x t'' M. Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ((t - t') + t'')" 
-  shows "gwp f Q  \<ge> Some t"
-proof -
-  {
-    fix x
-    from assms(1)[unfolded gwp_pw] have i: "Some t' \<le> minus_p_m Q' f x" by auto
-    from assms(2) have ii: "\<And>t''. Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ((t - t') + t'')" by auto
-    from i ii have "Some t \<le> minus_p_m Q f x"
-      unfolding minus_p_m_alt apply(auto split: nrest.splits)
-      subgoal for x2 apply(cases "x2 x") apply (simp add: minus_cost_None)
-        apply(simp add: aux1)  
-        apply(cases "Q' x") apply simp
-        apply auto 
-        apply(cases "Q x") apply auto 
-        subgoal for a aa ab apply(rule aux3[where t'=t' and b=aa]) by auto 
-        done
-      done
-  } 
-  thus ?thesis
-    unfolding gwp_pw ..
-qed
-
 lemma mm3_None[simp]: "mm3 t None = None"
   unfolding mm3_def by auto
 term wfR

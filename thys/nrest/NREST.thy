@@ -241,7 +241,8 @@ lemma continuous_option: (* or generally, adding a bottom element *)
   shows "continuous (case_option None (Some o f))"
   apply(rule continuousI)
   unfolding Sup_option_def[unfolded my_these_def] 
-  apply (simp add: option_Some_image continuousD[OF *])
+  apply (simp add: option_Some_image)
+  apply (simp add:  continuousD[OF *])
   apply rule+
   apply(rule arg_cong[where f=Sup]) 
     by  (auto split: option.splits  intro: rev_image_eqI)   
@@ -1304,6 +1305,7 @@ lemma trimonoD_mono: "mono2 B \<Longrightarrow> mono B"
 definition "RECT B x = 
   (if mono2 B then (gfp B x) else (top::'a::complete_lattice))"
 
+definition "RECT' F x = RECT (\<lambda>D x. F (\<lambda>x. consume (D x) (cost ''call'' 1)) x) x"
 
 thm gfp_eq_flatf_gfp
 
@@ -1353,6 +1355,16 @@ lemma RECT_mono[refine_mono]:
   unfolding RECT_def
   apply clarsimp  
   by (meson LE gfp_mono le_fun_def)  
+
+
+lemma RECT'_mono[refine_mono]:
+  assumes [simp]: "mono2 B'"
+  assumes LE: "\<And>F x. (B' F x) \<le> (B F x) "
+  shows " (RECT' B' x) \<le> (RECT' B x)"
+  unfolding RECT'_def
+  apply(rule RECT_mono)
+  subgoal sorry
+  by(rule LE)
 
 lemma whileT_mono: 
   assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
@@ -1409,17 +1421,22 @@ theorem RECT_wf_induct[consumes 1]:
   using RECT_wf_induct_aux[where P = "\<lambda>x fx.  P x fx"] assms by metis
 
 
+definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
 
 definition "monadic_WHILEIT I b f s \<equiv> do {
   RECT (\<lambda>D s. do {
     ASSERT (I s);
     bv \<leftarrow> b s;
-    if bv then do {
+    MIf bv (do {
       s \<leftarrow> f s;
+      SPECT [()\<mapsto> (cost ''call'' 1)];
       D s
-    } else do {RETURNT s}
+    }) (do {RETURNT s})
   }) s
 }"
+
+
+
 
 
 definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> _) \<Rightarrow> ('a \<Rightarrow> bool)
@@ -1427,6 +1444,8 @@ definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow>
                            \<Rightarrow> 'a \<Rightarrow> ('a,'c) nrest" where
   "\<And>E c. whileIET I E b c = whileT b c"
 
+
+definition "monadic_WHILEIET I E b f s \<equiv> monadic_WHILEIT I b f s"
 
 
 
