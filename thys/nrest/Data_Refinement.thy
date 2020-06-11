@@ -296,7 +296,107 @@ lemma
 end *)
 
 
+subsubsection \<open>Interaction with monadic operators\<close>
 
+thm continuous_option'[folded map_option_case]
+thm map_option_case
+lemma map_option_case_option_conv: "map_option f = case_option None (\<lambda>x. Some (f x))"
+  apply (rule ext) 
+  unfolding map_option_case by simp
+
+lemma continuous_map_option: "NREST.continuous f \<Longrightarrow> NREST.continuous (map_option f)"
+  unfolding map_option_case_option_conv apply(intro continuous_option') .
+
+lemma "NREST.continuous ((+) (t::enat))"
+  apply(rule continuousI)
+  oops
+
+lemma enat_plus_Sup_distrib:
+  "A\<noteq>{} \<Longrightarrow> (a::enat) + Sup A = Sup ((+) a ` A)"
+  apply(cases a)
+  subgoal 
+  unfolding Sup_enat_def apply auto
+   apply (metis Max.hom_commute empty_iff enat_add_left_cancel_le max_def plus_enat_simps(2))
+  apply(subst (asm) finite_image_iff)
+  subgoal unfolding inj_on_def by auto
+  subgoal apply simp done
+  done
+  subgoal by simp
+  done
+
+lemma ecost_plus_Sup_distrib:
+  "A\<noteq>{} \<Longrightarrow> (a::(_,enat) acost) + Sup A = Sup ((+) a ` A)"
+  unfolding Sup_acost_def apply(cases a)
+  unfolding plus_acost_alt apply simp
+  apply(rule ext)
+proof (goal_cases)
+  case (1 x xa)
+  have "x xa + (SUP f\<in>A. the_acost f xa) = x xa + (SUP f\<in>the_acost `A. f xa)"
+    apply simp  by (metis SUP_apply Sup_apply)  
+  also have "\<dots> = x xa + (SUP v\<in>{f xa|f. f \<in> the_acost `A}. v)"
+    by (simp add: setcompr_eq_image)  
+  also have "\<dots> = Sup ((+) (x xa) ` {f xa|f. f \<in> the_acost `A})"
+    apply(subst enat_plus_Sup_distrib) using 1(1) by auto
+  also have "\<dots> = (SUP x\<in>case_acost (\<lambda>b. acostC (\<lambda>xa. x xa + b xa)) ` A. the_acost x xa) "
+    apply(rule arg_cong[where f=Sup])
+    apply auto
+    subgoal for xb apply(cases xb) apply (auto simp: )
+      apply(rule image_eqI) by auto 
+    subgoal for xb apply(cases xb) apply (auto simp: )
+      apply(rule image_eqI) apply(rule refl) apply auto  
+      by force
+    done
+  finally show ?case .
+qed
+   
+lemma map_option_plus_ecost_continuous:
+  fixes t :: "(_,enat) acost"
+  shows "(\<lambda>a. map_option ((+) t) a) (Sup A) = Sup ((\<lambda>a. map_option ((+) (t)) a) ` A)"
+  unfolding map_option_case_option_conv
+  unfolding Sup_option_def[unfolded my_these_def] 
+  apply (simp add: option_Some_image  )
+  apply rule+
+  subgoal  
+    by (metis empty_is_image ffF these_empty_eq)  
+  subgoal apply(subst ecost_plus_Sup_distrib)
+    subgoal
+        using everywhereNone by fastforce  
+  apply(rule arg_cong[where f=Sup]) 
+    by  (auto split: option.splits  intro: rev_image_eqI)  
+  done
+
+lemma map_option_plus_enat_continuous:
+  fixes t :: enat
+  shows "(\<lambda>a. map_option ((+) t) a) (Sup A) = Sup ((\<lambda>a. map_option ((+) (t)) a) ` A)"
+  unfolding map_option_case_option_conv
+  unfolding Sup_option_def[unfolded my_these_def] 
+  apply (simp add: option_Some_image  )
+  apply rule+
+  subgoal  
+    by (metis empty_is_image ffF these_empty_eq)  
+  subgoal apply(subst enat_plus_Sup_distrib)
+    subgoal
+        using everywhereNone by fastforce  
+  apply(rule arg_cong[where f=Sup]) 
+    by  (auto split: option.splits  intro: rev_image_eqI)  
+  done
+
+lemma conc_fun_consume_aux:
+  fixes x2 :: "_ \<Rightarrow> (_,enat) acost option"
+  shows "Sup ((\<lambda>a. map_option ((+) t) a) ` {x2 a| a. (c, a) \<in> R})
+         = (\<lambda>a. map_option ((+) t) a) (Sup {x2 a |a. (c, a) \<in> R})"
+  apply(subst map_option_plus_ecost_continuous)
+  apply simp done
+
+
+lemma conc_fun_consume: 
+  fixes M :: "('c, (_,enat) acost ) nrest"
+  shows "\<Down>R (consume M t) = consume (\<Down>R M) t"
+  apply(clarsimp simp add: consume_def conc_fun_def comp_def split: nrest.splits)
+  apply(rule ext)  
+  apply(subst conc_fun_consume_aux[symmetric, simplified])
+  apply(rule arg_cong[where f=Sup]) 
+  by auto 
 
 
 subsubsection \<open>Examples\<close>
@@ -708,5 +808,21 @@ lemma pw_acost_nrest_rel_iff: "(a,b)\<in>\<langle>A\<rangle>nrest_rel \<longleft
 lemma param_RETURNT[param]: 
   "(RETURNT,RETURNT) \<in> R \<rightarrow> \<langle>R\<rangle>nrest_rel"
   by (auto simp: nrest_rel_def RETURNT_refine)
+
+lemma param_RETURN[param]: 
+  "(RETURNT,RETURNT) \<in> R \<rightarrow> \<langle>R\<rangle>nrest_rel"
+  by (auto simp: nrest_rel_def RETURNT_refine)
+
+lemma param_bind[param]:
+  "(bind,bind) \<in> \<langle>Ra\<rangle>nrest_rel \<rightarrow> (Ra\<rightarrow>\<langle>Rb\<rangle>nrest_rel) \<rightarrow> (\<langle>Rb\<rangle>nrest_rel:: (('a, (_,enat)acost) nrest \<times> ('c, _) nrest) set)"
+  by (auto simp: nrest_rel_def intro: bindT_conc_acost_refine' dest: fun_relD)
+
+lemma param_ASSERT_bind[param]: "\<lbrakk> 
+    (\<Phi>,\<Psi>) \<in> bool_rel; 
+    \<lbrakk> \<Phi>; \<Psi> \<rbrakk> \<Longrightarrow> (f,g)\<in>\<langle>R\<rangle>nrest_rel
+  \<rbrakk> \<Longrightarrow> (ASSERT \<Phi> \<then> f, ASSERT \<Psi> \<then> g) \<in> \<langle>R\<rangle>nrest_rel"
+  by (auto intro: nrest_relI)
+
+
 
 end
