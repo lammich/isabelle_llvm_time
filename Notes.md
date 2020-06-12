@@ -1,3 +1,35 @@
+
+
+# Fr 12.6.
+
+
+
+## TODO
+
+### Peter
+- HNR für While
+- 
+
+### Max
+- in Sorting_Insertion_Sort weiter
+- solver für Summen mit simplifier
+
+
+
+## Besprochen
+- solver für "SUM (cost ni mi) <= SUM (cost nj mj)"
+- solver für "SUM (cost ni mi) <= SUM (cost nj mj) - SUM (cost nk mk)"
+- idee:
+    -> runterbrechen auf constraints von enats
+    -> könnte allein mit simplifier funktionieren.
+
+lemma "a + c ≤ b ⟹ (a::nat) ≤ b - c" 
+  by simp
+
+- next steps:
+    - kosten solver
+
+
 # Mo 8.6.2020
 
 ## Fragestellung
