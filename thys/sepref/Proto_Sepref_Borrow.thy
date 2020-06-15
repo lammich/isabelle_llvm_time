@@ -16,23 +16,22 @@ begin
   definition "unborrow src dst \<equiv> doN {ASSERT (src=dst); RETURN ()}"
   sepref_register unborrow
 
-  lemma unborrow_correct[refine_vcg]: "s=d \<Longrightarrow> unborrow s d \<le> SPEC (\<lambda>r. r=())"
-    unfolding unborrow_def by auto
-  
+  lemma unborrow_correct[refine_vcg]: "s=d \<Longrightarrow> unborrow s d \<le> SPEC (\<lambda>r. r=()) (\<lambda>_. 0)"
+    unfolding unborrow_def SPEC_def ASSERT_def iASSERT_def apply simp by (auto simp: RETURNT_def)
   
   lemma unborrow_rule[sepref_comb_rules]:
     assumes FRAME: "\<Gamma> \<turnstile> hn_ctxt R src srci ** hn_invalid R dst dsti ** F"
     assumes [simp]: "vassn_tag \<Gamma> \<Longrightarrow> srci = dsti"
-    shows "hn_refine \<Gamma> (return ()) (hn_invalid R src srci ** hn_ctxt R dst dsti ** F) unit_assn (unborrow$src$dst)"
+    shows "hn_refine \<Gamma> (return ()::unit llM) (hn_invalid R src srci ** hn_ctxt R dst dsti ** F) unit_assn (unborrow$src$dst)"
     apply (rule hn_refine_vassn_tagI)
-    apply (rule hn_refine_cons_pre[OF FRAME])
-    apply (rule hn_refineI)
-    unfolding unborrow_def
+    apply (rule hn_refine_cons_pre[OF _ FRAME])
+    unfolding unborrow_def apply (simp only: APP_def)
+    apply (rule hn_refineI'')
     apply (simp add: refine_pw_simps)
     unfolding hn_ctxt_def invalid_assn_def pure_def
     by vcg'
   
-  lemma unborrow_nofail[refine_pw_simps]: "nofail (unborrow a b) \<longleftrightarrow> a=b" by (auto simp: unborrow_def refine_pw_simps)  
+  lemma unborrow_nofail[refine_pw_simps]: "nofailT (unborrow a b) \<longleftrightarrow> a=b" by (auto simp: unborrow_def refine_pw_simps)  
   
   
   text \<open>Assertion that adds constraint on concrete value. Used to carry through concrete equalities.\<close>
@@ -47,7 +46,9 @@ begin
     unfolding cnc_assn_def
     by (auto simp: sep_algebra_simps fun_eq_iff)
     
-    
+  (* BEWARE: This only only holds without time, would need to have
+     to add (infinite?) time credits to premise HT  
+
   text \<open>Rule to prove a-posteriori constraint (Only useful for simple programs.
     TODO: More partial Hoare-triples would make this more useful, e.g., 
       we could assume assertions, preconditions, and even termination!
@@ -57,7 +58,7 @@ begin
     assumes HT: "llvm_htriple \<Gamma> c (\<lambda>x'. \<up>(\<phi> x') ** sep_true)"
     shows "hn_refine \<Gamma> c \<Gamma>' (cnc_assn \<phi> R) a"
   proof (rule hn_refine_nofailI)
-    assume NF: "nofail a"
+    assume NF: "nofailT a"
   
     show ?thesis
       apply (rule hn_refineI)
@@ -67,6 +68,6 @@ begin
       done
       
   qed    
-  
+  *)
 
 end

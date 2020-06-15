@@ -1709,7 +1709,6 @@ proof (rule, cases a, goal_cases)
   }
 qed    
 
-definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
 
 lemma hn_if[sepref_comb_rules]:
   assumes P: "\<Gamma> \<turnstile> hn_val bool1_rel a a' ** \<Gamma>1"
