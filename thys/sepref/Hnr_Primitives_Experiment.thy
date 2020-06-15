@@ -136,9 +136,8 @@ lemma lift_acost_plus_distrib[named_ss fri_prepare_simps]:
   done
 
 (* BEWARE, conflicting abbreviation snat_assn *)
-abbreviation "snat_assn2 \<equiv> \<upharpoonleft>snat.assn"
-lemma "snat_assn2 = snat_assn" 
-  by (simp add: snat.assn_is_rel snat_rel_def)  
+lemma snat_assn_to_basic_layer: "snat_assn = \<upharpoonleft>snat.assn" 
+  by (simp add: snat.assn_is_rel snat_rel_def)   
                                      
 lemma DECOMP_HNR[vcg_decomp_rules]: "DECOMP_HTRIPLE (hn_refine \<Gamma> c \<Gamma>' R a) \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R a" by (simp add: vcg_tag_defs)
 
@@ -169,10 +168,10 @@ section \<open>List Operations\<close>
 subsection \<open>Monadic List Operations\<close>
 
 context
-  fixes  T :: "(nat \<times> unit) \<Rightarrow> (char list, enat) acost"
+  fixes  T :: "(nat \<times> nat) \<Rightarrow> (char list, enat) acost"
 begin
   definition mop_list_get  :: "'a list \<Rightarrow> nat \<Rightarrow> ('a, _) nrest"
-    where [simp]: "mop_list_get xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (T (length xs,())) }"
+    where [simp]: "mop_list_get xs i \<equiv> do { ASSERT (i<length xs); consume (RETURNT (xs!i)) (T (length xs,i)) }"
   sepref_register "mop_list_get"
 end
 
@@ -298,7 +297,7 @@ subsection \<open>Option Array\<close>
 text \<open>Assertion that adds constraint on concrete value. Used to carry through concrete equalities.\<close>
 definition "cnc_assn \<phi> A a c \<equiv> \<up>(\<phi> c) ** A a c"
   
-lemma norm_ceq_assn(*[named_ss sepref_frame_normrel]*): "hn_ctxt (cnc_assn \<phi> A) a c = (\<up>(\<phi> c) ** hn_ctxt A a c)"
+lemma norm_ceq_assn[named_ss sepref_frame_normrel]: "hn_ctxt (cnc_assn \<phi> A) a c = (\<up>(\<phi> c) ** hn_ctxt A a c)"
   unfolding hn_ctxt_def cnc_assn_def by simp
   
 
@@ -322,12 +321,13 @@ definition "eoarray_nth_impl xsi ii \<equiv> doM {
 }"  
   
 lemma hnr_eoarray_nth: "hn_refine 
-  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
   (eoarray_nth_impl xsi ii)
-  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii)
   (cnc_assn (\<lambda>(_,xsi'). xsi'=xsi) (A \<times>\<^sub>a eoarray_assn A))
   (mop_oarray_extract $ xs $ i)"  
-  unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_extract_def eoarray_nth_impl_def
+  unfolding snat_assn_to_basic_layer
+  unfolding  hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_extract_def eoarray_nth_impl_def
   by vcg 
 \<comment> \<open>thm hnr_eoarray_nth[sepref_fr_rules] (* BEWARE: needs $ for APP *) \<close>
 
@@ -341,24 +341,27 @@ lemma hnr_eoarray_nth: "hn_refine
 term eoarray_assn
 
 lemma hnr_eoarray_nth'[sepref_fr_rules]: "(uncurry eoarray_nth_impl, uncurry mop_oarray_extract)
-       \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn2\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x (ai, _). A \<times>\<^sub>a cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
+       \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x (ai, _). A \<times>\<^sub>a cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
+  unfolding snat_assn_to_basic_layer
   apply(rule hfrefI)
   unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst mop_oarray_extract_def hn_ctxt_def
             pure_def invalid_assn_def cnc_assn_def eoarray_assn_def eoarray_nth_impl_def
   by vcg
 
 lemma hnr_eoarray_upd: "hn_refine 
-  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
+  (hn_ctxt (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
   (array_upd xsi ii xi)
-  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_invalid A x xi)
+  (hn_invalid (eoarray_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_invalid A x xi)
   (cnc_assn (\<lambda>ri. ri=xsi) (eoarray_assn A))
   (mop_oarray_upd $ xs $ i $ x)"  
+  unfolding snat_assn_to_basic_layer
   unfolding hn_ctxt_def pure_def invalid_assn_def cnc_assn_def eoarray_assn_def mop_oarray_upd_def
   by vcg
 
 (* write in higher order form *)
 lemma hnr_eoarray_upd'[sepref_fr_rules]: "(uncurry2 array_upd, uncurry2 mop_oarray_upd)
-       \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn2\<^sup>k *\<^sub>a A\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x ((ai, _), _). cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
+       \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a A\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x ((ai, _), _). cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
+  unfolding snat_assn_to_basic_layer
   apply(rule hfrefI)
   unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst mop_oarray_upd_def hn_ctxt_def pure_def
             invalid_assn_def cnc_assn_def eoarray_assn_def eoarray_nth_impl_def
@@ -368,16 +371,18 @@ lemma hnr_eoarray_upd'[sepref_fr_rules]: "(uncurry2 array_upd, uncurry2 mop_oarr
 (* thm hnr_eoarray_upd[to_hfref] TODO: BUG, to_hfref loops here*)
    
 lemma hnr_eoarray_new: "hn_refine 
-  (hn_ctxt snat_assn2 i ii)
+  (hn_ctxt snat_assn i ii)
   (narrayo_new TYPE('a::llvm_rep) ii)
-  (hn_ctxt snat_assn2 i ii)
+  (hn_ctxt snat_assn i ii)
   (eoarray_assn A)
   (mop_oarray_new i)" 
+  unfolding snat_assn_to_basic_layer
   unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_oarray_new_def
   by vcg
 
 lemma hnr_eoarray_new'[sepref_fr_rules]: "( (narrayo_new TYPE('a::llvm_rep)), mop_oarray_new )
-       \<in> snat_assn2\<^sup>k \<rightarrow>\<^sub>a (eoarray_assn A)"
+       \<in> snat_assn\<^sup>k \<rightarrow>\<^sub>a (eoarray_assn A)"
+  unfolding snat_assn_to_basic_layer
   apply(rule hfrefI)
   unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def mop_oarray_new_def cnc_assn_def eoarray_assn_def eoarray_nth_impl_def
   by vcg
@@ -533,20 +538,21 @@ subsubsection \<open>Raw hnr rules\<close>
 
 thm vcg_rules
 lemma hnr_raw_array_nth: "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   (array_nth xsi ii)
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   id_assn
   (mop_array_nth xs i)" 
+  unfolding snat_assn_to_basic_layer
   unfolding hn_ctxt_def pure_def mop_array_nth_def
   apply vcg_step
   apply vcg_step
   by vcg
 
 (*lemma hnr_raw_array_upd: "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt id_assn x xi)
   (array_upd xsi ii xi)
-  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
+  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt id_assn x xi)
   raw_array_assn
   (mop_array_upd $ xs $ i $ x)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
@@ -554,23 +560,25 @@ lemma hnr_raw_array_nth: "hn_refine
 *)  
 
 lemma hnr_raw_array_upd: "((uncurry2 array_upd, uncurry2 mop_array_upd)
-       \<in> [\<lambda>((a, b), x). True]\<^sub>a raw_array_assn\<^sup>d *\<^sub>a snat_assn2\<^sup>k *\<^sub>a id_assn\<^sup>k \<rightarrow> raw_array_assn)"
+       \<in> [\<lambda>((a, b), x). True]\<^sub>a raw_array_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a id_assn\<^sup>k \<rightarrow> raw_array_assn)"
+  unfolding snat_assn_to_basic_layer
   apply(intro hfrefI)
   unfolding to_hnr_prod_fst_snd keep_drop_sels hf_pres_fst hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
   by vcg
 
 
 lemma hnr_raw_array_new: 
-  "(narray_new TYPE('a::llvm_rep), mop_list_init_raw (\<lambda>n. lift_acost (cost'_narray_new n))) : snat_assn2\<^sup>k \<rightarrow>\<^sub>a raw_array_assn"
+  "(narray_new TYPE('a::llvm_rep), mop_list_init_raw (\<lambda>n. lift_acost (cost'_narray_new n))) : snat_assn\<^sup>k \<rightarrow>\<^sub>a raw_array_assn"
+  unfolding snat_assn_to_basic_layer
   apply (rule hfrefI)
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def mop_list_init_raw_def
   by vcg
   
 (*
 lemma hnr_raw_array_new: "hn_refine 
-  (hn_ctxt snat_assn2 i ii)
+  (hn_ctxt snat_assn i ii)
   (narray_new TYPE('a::llvm_rep) ii)
-  (hn_ctxt snat_assn2 i ii)
+  (hn_ctxt snat_assn i ii)
   raw_array_assn
   (mop_li $ i)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_new_def
@@ -685,9 +693,9 @@ lemma deprecated_hnr_array_nth:
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
     (array_nth xsi ii)
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
     A
     (mop_array_nth xs i)" 
 proof -
@@ -721,9 +729,9 @@ qed
               
 thm hnr_raw_array_upd
 lemma hnr_raw_array_upd': "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt id_assn x xi)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt id_assn x xi)
   (array_upd xsi ii xi)
-  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt id_assn x xi)
+  (hn_invalid raw_array_assn xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt id_assn x xi)
   raw_array_assn
   (mop_array_upd $ xs $  i $  x)" 
   unfolding hn_ctxt_def pure_def invalid_assn_def mop_array_upd_def
@@ -749,9 +757,9 @@ end
 
 
 lemma hnr_raw_array_nth': "hn_refine 
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   (array_nth xsi ii)
-  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn2 i ii)
+  (hn_ctxt raw_array_assn xs xsi ** hn_ctxt snat_assn i ii)
   id_assn
   (mop_array_nth xs i)" 
   unfolding hn_ctxt_def pure_def mop_array_nth_def
@@ -786,9 +794,9 @@ thm hnr_array_nth
 lemma hnr_array_nth': 
   assumes PURE: "is_pure A"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
     (array_nth xsi ii)
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
     A
     (mop_array_nth $ xs $ i)" 
 proof -
@@ -828,9 +836,9 @@ qed
 lemma deprecated_hnr_array_nth': 
   assumes PURE: "is_pure A"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
     (array_nth xsi ii)
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii)
     A
     (mop_array_nth xs i)" 
 proof -
@@ -856,9 +864,9 @@ lemma deprecated_hnr_array_upd_SV:
   assumes PURE: "is_pure A"
   assumes SV: "single_valued (the_pure A)"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
     (array_upd xsi ii xi)
-    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt A x xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
     (array_assn A)
     (mop_array_upd xs i x)" 
 proof -
@@ -901,9 +909,9 @@ qed
 lemma deprecated_hnr_array_upd: 
   assumes PURE: "is_pure A"
   shows "hn_refine 
-    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii ** hn_ctxt A x xi)
+    (hn_ctxt (array_assn A) xs xsi ** hn_ctxt snat_assn i ii ** hn_ctxt A x xi)
     (array_upd xsi ii xi)
-    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn2 i ii  ** hn_ctxt A x xi)
+    (hn_invalid (array_assn A) xs xsi ** hn_ctxt snat_assn i ii  ** hn_ctxt A x xi)
     (array_assn A)
     (mop_array_upd xs i x)" 
 proof -
@@ -961,9 +969,9 @@ lemma hnr_array_new:
   assumes PURE: "is_pure A"
   assumes INIT: "(init,init) \<in> the_pure A"
   shows "hn_refine 
-    (hn_ctxt snat_assn2 i ii)
+    (hn_ctxt snat_assn i ii)
     (narray_new TYPE('a::llvm_rep) ii)
-    (hn_ctxt snat_assn2 i ii)
+    (hn_ctxt snat_assn i ii)
     (array_assn A)
     (mop_array_new $ i)" 
 proof -
