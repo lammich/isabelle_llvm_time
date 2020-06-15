@@ -354,6 +354,7 @@ definition consume where "consume M t \<equiv> case M of
 
 definition "SPEC P t = REST (\<lambda>v. if P v then Some (t v) else None)"
 
+ 
 
 lemma consume_mono:
   fixes  t :: "'a::{ordered_ab_semigroup_add,complete_lattice,monoid_add}"
@@ -364,6 +365,19 @@ lemma consume_mono:
      apply (metis less_eq_option_Some_None)        
     by (metis add_mono less_eq_option_Some)  
   done
+
+lemma consume_mono_ecost:
+  fixes  t :: "(string,enat) acost"
+  shows "t\<le>t' \<Longrightarrow> M \<le> M' \<Longrightarrow> consume M t \<le> consume M' t'"
+  unfolding consume_def apply (auto split: nrest.splits )
+  unfolding le_fun_def apply auto
+  subgoal for m m' x apply(cases "m' x";cases "m x" ) apply auto
+     apply (metis less_eq_option_Some_None)       
+    apply(cases t; cases t')
+      apply(auto intro!: add_mono simp: less_eq_acost_def plus_acost_alt split: acost.splits)  
+    by (metis acost.sel less_eq_acost_def less_eq_option_Some)
+  done
+
 
 instantiation unit :: plus
 begin
@@ -1305,7 +1319,7 @@ lemma trimonoD_mono: "mono2 B \<Longrightarrow> mono B"
 definition "RECT B x = 
   (if mono2 B then (gfp B x) else (top::'a::complete_lattice))"
 
-definition "RECT' F x = RECT (\<lambda>D x. F (\<lambda>x. consume (D x) (cost ''call'' 1)) x) x"
+definition "RECT' F x = consume (RECT (\<lambda>D x. F (\<lambda>x. consume (D x) (cost ''call'' 1)) x) x) (cost ''call'' 1)"
 
 thm gfp_eq_flatf_gfp
 
@@ -1356,15 +1370,52 @@ lemma RECT_mono[refine_mono]:
   apply clarsimp  
   by (meson LE gfp_mono le_fun_def)  
 
+lemma flat_ge_RECT_aux:
+ fixes f :: "'a \<Rightarrow> ('b, (char list, 'c::{complete_lattice,monoid_add,comm_monoid_add,one}) acost) nrest"
+  assumes "mono2 B'"
+    and "\<And>x. flat_ge (f x) (g x)"
+  shows "flat_ge (B' (\<lambda>x. consume (f x) c) x) (B' (\<lambda>x. consume (g x) c) x)"
+ 
+  using assms(1)[THEN trimonoD_flatf_ge]
+  apply -
+  apply(drule monotoneD[of _ _ _ "(\<lambda>x. consume (f x) c)" "(\<lambda>x. consume (g x) c)"])
+  subgoal using assms(2)
+    by (smt consume_FAIL(2) flat_ord_def fun_ord_def) 
+  subgoal
+    unfolding fun_ord_def
+    unfolding img_ord_def  flat_ord_def by simp
+  done
+
+lemma flat_ge_RECT_aux2:
+  fixes f :: "('a \<Rightarrow> ('b, (string, enat) acost) nrest)"
+   assumes "mono2 B'"
+    and "\<And>x. f x \<le> g x"
+  shows "(B' (\<lambda>x. consume (f x) c) x) \<le> (B' (\<lambda>x. consume (g x) c) x)" 
+  using assms(1)[THEN trimonoD_mono]
+  apply -
+  apply(drule monoD[of _ "(\<lambda>x. consume (f x) c)" "(\<lambda>x. consume (g x) c)"])
+  subgoal 
+    apply(rule le_funI)
+    apply(rule consume_mono_ecost)
+    using assms(2) by simp_all
+  subgoal
+    by(simp add: le_fun_def)
+  done
 
 lemma RECT'_mono[refine_mono]:
-  assumes [simp]: "mono2 B'"
+  fixes B :: "('a \<Rightarrow> ('b, (string, enat) acost) nrest)
+   \<Rightarrow> 'a \<Rightarrow> ('b, (string, enat) acost) nrest"
+  assumes m2[simp]: "mono2 B'"
   assumes LE: "\<And>F x. (B' F x) \<le> (B F x) "
   shows " (RECT' B' x) \<le> (RECT' B x)"
   unfolding RECT'_def
+  apply(rule consume_mono_ecost) apply simp
   apply(rule RECT_mono)
-  subgoal sorry
-  by(rule LE)
+  subgoal using m2 apply refine_mono
+    subgoal apply(rule flat_ge_RECT_aux) by auto
+    subgoal apply(rule flat_ge_RECT_aux2) by auto
+    done
+  by (rule LE)
 
 lemma whileT_mono: 
   assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
@@ -1424,6 +1475,34 @@ theorem RECT_wf_induct[consumes 1]:
 definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
 
 definition "monadic_WHILEIT I b f s \<equiv> do {
+  SPECT [()\<mapsto> (cost ''call'' 1)];
+  RECT (\<lambda>D s. do {
+    ASSERT (I s);
+    bv \<leftarrow> b s;
+    MIf bv (do {
+      s \<leftarrow> f s;
+      SPECT [()\<mapsto> (cost ''call'' 1)];
+      D s
+    }) (do {RETURNT s})
+  }) s
+}"
+
+
+lemma monadic_WHILEIT_RECT'_conv: "monadic_WHILEIT I b f s \<equiv> do {
+  RECT' (\<lambda>D s. do {
+    ASSERT (I s);
+    bv \<leftarrow> b s;
+    MIf bv (do {
+      s \<leftarrow> f s;
+      D s
+    }) (do {RETURNT s})
+  }) s
+}"
+  unfolding RECT'_def monadic_WHILEIT_def
+  sorry
+
+
+definition "monadic_WHILEIT' I b f s \<equiv> do {
   RECT (\<lambda>D s. do {
     ASSERT (I s);
     bv \<leftarrow> b s;
@@ -1439,6 +1518,8 @@ definition "monadic_WHILEIT I b f s \<equiv> do {
 
 
 
+
+
 definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> _) \<Rightarrow> ('a \<Rightarrow> bool)
                            \<Rightarrow> ('a \<Rightarrow> ('a,'c::{complete_lattice,plus,zero,monoid_add}) nrest)
                            \<Rightarrow> 'a \<Rightarrow> ('a,'c) nrest" where
@@ -1446,7 +1527,8 @@ definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow>
 
 
 definition "monadic_WHILEIET I E b f s \<equiv> monadic_WHILEIT I b f s"
-
+definition "monadic_WHILEIET' I E b f s \<equiv> monadic_WHILEIT' I b f s"
+                                                    
 
 
 subsection \<open>More Pw reasoning setup\<close>

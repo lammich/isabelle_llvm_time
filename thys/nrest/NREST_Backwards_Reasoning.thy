@@ -721,6 +721,16 @@ lemma gwp_If_I[vcg_rules']: "(b \<Longrightarrow> t \<le> gwp Ma Q) \<Longrighta
    by (simp add: split_def)
 
 
+lemma gwp_MIf_I[vcg_rules']:
+  fixes c1 :: "(_,(_,enat) acost) nrest"
+  assumes "(b \<Longrightarrow> Some (cost ''if'' 1 + t) \<le> gwp c1 Q)"
+    "(\<not>b \<Longrightarrow> Some (cost ''if'' 1 + t) \<le> gwp c2 Q)"
+  shows "Some t \<le> gwp (MIf b c1 c2) Q"
+  unfolding MIf_def
+  apply(rule gwp_consume)
+  apply(rule gwp_If_I[OF assms]) by simp_all
+
+
 lemma gwp_ASSERT_I[vcg_rules']:
   fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
   shows "(\<Phi> \<Longrightarrow> Some t \<le> Q ()) \<Longrightarrow> \<Phi> \<Longrightarrow> Some t \<le> gwp (ASSERT \<Phi>) Q"
@@ -966,20 +976,6 @@ lemma kala:
   done
 
 
-lemma 
-  fixes T :: "(_,enat) acost"
-  shows "gwp (SPECT [x\<mapsto>T]) Q = Some t \<longleftrightarrow> Q x = Some (T+t)"
-  unfolding gwp_def minus_p_m_def minus_potential_def apply simp
-  apply(cases "Q x") apply simp apply simp apply auto
-  subgoal for a unfolding grr apply simp apply(cases T; cases t; cases a)
-    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp
-      apply(rule ext)  
-    by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat)   
-  subgoal unfolding grr apply(cases T; cases t) apply auto  
-    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp apply(rule ext)
-     sorry
-  subgoal by (simp add: add_increasing2 needname_nonneg)  
-  oops
 
   term "map_option ((+) (t1+T))"
   term "(map_option ((+) t1) \<circ>\<circ>\<circ> (\<circ>)) (map_option ((+) T))"
@@ -1046,7 +1042,7 @@ qed
 
 lemma
   fixes r :: "('a, (char list, enat) acost) nrest"
-  assumes "monadic_WHILEIT Inv bm c s = r" 
+  assumes "monadic_WHILEIT' Inv bm c s = r" 
   assumes IS: "\<And>s t'. I s = Some t' 
            \<Longrightarrow>  gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)]) (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })  (\<lambda>s'. if (s',s)\<in>R then I s' else None) else Q s)) \<ge> Some t'"
   assumes "I s = Some t"
@@ -1054,7 +1050,7 @@ lemma
   assumes wf: "wf R"
   shows monadic_WHILE_rule'': "gwp r Q \<ge> Some t"
   using assms(1,3)
-  unfolding monadic_WHILEIT_def
+  unfolding monadic_WHILEIT'_def
 proof (induction arbitrary: t rule: RECT_wf_induct[where R="R"])
   case 1  
   show ?case by fact
@@ -1103,6 +1099,37 @@ next
     done
 qed
 
+lemma
+  fixes r :: "('a, (char list, enat) acost) nrest"
+  assumes pi: "monadic_WHILEIT Inv bm c s = r" 
+  assumes IS: "\<And>s t'. I s = Some t' 
+           \<Longrightarrow>  gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)]) (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })  (\<lambda>s'. if (s',s)\<in>R then I s' else None) else Q s)) \<ge> Some t'"
+  assumes "I s = Some (t + cost ''call'' 1)"
+  assumes z: "\<And>t s. I s = Some t \<Longrightarrow> Inv s"
+  assumes wf: "wf R"
+  shows monadic_WHILE_rule_real: "gwp r Q \<ge> Some t"
+  apply(subst pi[symmetric])
+  unfolding monadic_WHILEIT_def
+  apply(rule gwp_bindT_I)
+  apply(rule gwp_SPECT_I)
+  unfolding monadic_WHILEIT'_def[symmetric]
+  apply(rule monadic_WHILE_rule''[OF refl])
+     apply (rule IS)
+     apply simp apply(fact)
+   apply(fact z) apply fact 
+  done
+
+
+
+fun Someplus where
+  "Someplus None _ = None"
+| "Someplus _ None = None"
+| "Someplus (Some a) (Some b) = Some (a+b)"
+
+definition mm22 :: "( ('c,enat) acost option) \<Rightarrow> (   ('c,enat) acost option) \<Rightarrow> (   ('c,enat) acost option)" where
+  "mm22 r m = (case m  of None \<Rightarrow> Some (acostC (\<lambda>_. \<infinity>))
+                                | Some mt \<Rightarrow>
+                                  (case r of None \<Rightarrow> None | Some rt \<Rightarrow> (if mt \<le> rt then Some (rt - mt) else None)))"
 
 
 
@@ -1228,6 +1255,306 @@ lemma
   "0 < D \<Longrightarrow> D \<le> lift_acost ti - lift_acost y \<Longrightarrow> lift_acost y \<le> lift_acost ti  \<Longrightarrow> the_acost y < the_acost ti"
   apply(cases D; cases y; cases ti) apply (auto simp: lift_acost_def less_eq_acost_def less_fun_def le_fun_def)
   by (metis acost.sel diff_is_0_eq' leD less_acost_def zero_acost_def zero_enat_def) 
+
+
+definition "G b d = (if b then Some d else None)"
+definition "H Qs t Es0 Es = mm22 Qs (Someplus (Some t) (mm3 (Es0) (Some (Es))))"
+
+lemma lift_acost_cancel: "lift_acost x - lift_acost x = 0"
+  by(auto simp: lift_acost_def zero_acost_def zero_enat_def)
+
+
+lemma neueWhile_aux1: "Someplus (Some t) (mm3 (lift_acost (E s0)) (if I s then Some (lift_acost (E s)) else None)) = Some t'
+  \<Longrightarrow> I s \<and> t' = t + (lift_acost (E s0) - lift_acost (E s)) \<and> lift_acost (E s) \<le> lift_acost (E s0)"
+  unfolding mm3_def by (auto split: if_splits) 
+
+lemma pff: "Someplus (Some t) R \<le> Q \<Longrightarrow> Some t \<le> mm22 Q R"
+  unfolding mm22_def apply(auto split: option.splits)
+  subgoal unfolding less_eq_acost_def by simp
+  subgoal using needname_adjoint by blast
+  subgoal using needname_cancle by blast
+  done
+lemma pff2: "Some t \<le> mm22 Q R \<Longrightarrow> Someplus (Some t) R \<le> Q"
+  unfolding mm22_def apply(auto split: option.splits if_splits)
+  using add_le_if_le_diff by blast
+
+
+
+lemma Someplus_None: "Someplus Q None = None"
+  by (cases Q; auto)
+
+lemma minus_p_m_Map_empty: "minus_p_m Map.empty a b = 
+     (case a of FAILi \<Rightarrow> None | REST Mf \<Rightarrow> case Mf b of None \<Rightarrow> Some top | Some mt \<Rightarrow> None)" 
+  unfolding minus_p_m_def minus_potential_def by (auto split: nrest.splits option.splits )
+
+lemma "mm22 (gwp c Q) (Some T) = gwp c (\<lambda>x. Someplus (Q x) (Some T))"
+  unfolding mm22_def gwp_def 
+  apply (simp add: Someplus_None minus_p_m_Map_empty)
+  unfolding minus_p_m_def minus_potential_def
+  apply(cases c) apply auto oops
+
+
+lemma mm22_minus_cost: "mm22 c r = minus_cost c r"
+  unfolding mm22_def unfolding minus_cost_def top_acost_def top_enat_def by simp
+
+lemma "Inf {u. \<exists>x. u = minus_potential (\<lambda>x. case Q x of None \<Rightarrow> None | Some rt \<Rightarrow> minus_option rt T) x2 x}
+          \<le> (case Inf {u. \<exists>x. u = minus_potential Q x2 x} of None \<Rightarrow> None | Some rt \<Rightarrow> minus_option rt T)"
+  oops
+
+lemma minus_cost_minus_p_m_commute:
+  fixes T :: "(_,enat) acost"
+  shows "minus_cost (minus_p_m Q c x) (Some T) = minus_p_m (\<lambda>x. minus_cost (Q x) (Some T)) c x"
+  unfolding minus_cost_def minus_p_m_def minus_potential_def  apply(cases T)
+  apply (auto split: nrest.splits option.splits) apply(auto simp: top_acost_def minus_acost_alt top_enat_def split: option.splits acost.splits intro!: ext)
+  subgoal 
+    by (metis add.commute minus_plus_assoc2) 
+  subgoal 
+    by (smt acost.sel add_diff_cancel_enat enat_add_left_cancel_le less_eqE less_eq_acost_def needname_adjoint)
+  subgoal    
+    by (metis (full_types) drm_class.diff_left_mono minus_acost.simps needname_minus_absorb needname_nonneg order_trans)
+  subgoal 
+    by (smt acost.sel add_diff_cancel_enat enat_add_left_cancel_le less_eqE less_eq_acost_def needname_adjoint) 
+  subgoal 
+    by (metis (full_types) drm_class.diff_left_mono minus_acost.simps needname_minus_absorb needname_nonneg order_trans) 
+  done
+
+lemma aaa1: "gwp c (\<lambda>x. mm22 (Q x) (Some T)) = mm22 (gwp c Q) (Some T)"
+  unfolding  gwp_def           unfolding  mm22_minus_cost   
+  apply(subst mm_continousInf')
+  subgoal apply auto done
+proof -
+  have "(INF r\<in>{minus_p_m Q c x |x. True}. minus_cost r (Some T))
+         = Inf  {minus_cost (minus_p_m Q c x) (Some T) |x. True}"
+    apply(rule arg_cong[where f=Inf]) by auto
+  also have "\<dots> = Inf {minus_p_m (\<lambda>x. minus_cost (Q x) (Some T)) c x |x. True}"
+    apply(subst minus_cost_minus_p_m_commute) by simp
+  finally show "Inf {minus_p_m (\<lambda>x. minus_cost (Q x) (Some T)) c x |x. True}
+                = (INF r\<in>{minus_p_m Q c x |x. True}. minus_cost r (Some T))" by simp
+qed
+  
+lemma aaa: "gwp c (\<lambda>x. mm22 (Q x) (Some T)) \<le> mm22 (gwp c Q) (Some T)"
+  unfolding aaa1 by simp
+
+thm mm_continousInf'
+
+lemma lift_acost_mono: "A \<le> B \<Longrightarrow> lift_acost A \<le> lift_acost B"
+  by (auto simp: less_eq_acost_def lift_acost_def)
+lemma lift_acost_mono': "lift_acost A \<le> lift_acost B \<Longrightarrow> A \<le> B"
+  by (auto simp: less_eq_acost_def lift_acost_def)
+
+lemma blah:
+  fixes T :: "(_,enat) acost"
+    shows "consume (c s) T = SPECT x2
+      \<Longrightarrow> \<exists>x3. c s = SPECT x3 \<and> (\<forall>x. x2 x = Someplus (x3 x) (Some T))"
+  unfolding consume_def apply(auto split: nrest.splits)
+  subgoal for x2a x apply(cases "x2a x") by (auto simp: add.commute)
+  done
+
+lemma argh: "b\<le>d \<Longrightarrow> c\<le>d \<Longrightarrow> a + d - (b + (a + d - (c::nat))) = c - b"
+  by simp 
+
+lemma 
+  fixes s0 :: 'a and I :: "'a \<Rightarrow> bool" and E :: "'a \<Rightarrow> (string, nat) acost" and t :: "(string, enat) acost"
+    and Q :: "'a \<Rightarrow>  (string, enat) acost option"
+  assumes wf: "\<And>s. wfR2 (if I s then E s else 0)"
+  assumes
+  step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)])
+       (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })
+                             (\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
+                 else H (Q s) t (lift_acost (E s0)) (lift_acost (E s)))))"
+(* and  progress: "\<And>s. progress (c s)" \<comment> \<open>This is actually not really needed, because ''call'' needs to decrease!
+                                         As an improvement one could not look at ''call'' and ''if'' costs, by setting them to \<infinity>, then progress is needed again.\<close> *)
+ and  i: "I s0"                                       
+shows neueWhile_rule'': "Some t \<le> gwp (monadic_WHILEIET' I E bm c s0) Q"
+proof  -
+
+
+  show ?thesis unfolding monadic_WHILEIET'_def
+    apply (rule monadic_WHILE_rule''[OF refl,
+              where I="\<lambda>s. Someplus (Some t) (mm3 (lift_acost (E s0)) ((\<lambda>e. if I e
+                then Some (lift_acost (E e)) else None) s))" 
+                and R="ffSacost (\<lambda>s. if I s then E s else 0)", simplified])
+    subgoal for s t' (* step *)
+      apply(drule neueWhile_aux1)
+      apply(rule gwp_conseq_0)
+      apply(rule step)
+       apply simp
+      apply(rule gwp_SPECT_I)
+      apply(drule kala) apply safe
+    proof (goal_cases)
+      case (1 x t'' M)
+      have A1: "(\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
+          = (\<lambda>s'. if I s' \<and> E s' \<le> E s then Some (lift_acost (E s - E s')) else None)"
+        unfolding G_def by simp
+      have A2:  "H (Q s) t (lift_acost (E s0)) (lift_acost (E s)) 
+            = mm22 (Q s) (Some (t + (lift_acost (E s0) - lift_acost (E s))))"
+        unfolding H_def unfolding mm3_def using 1(5) by simp
+
+      (* thm progress[THEN progressD] 1 gwp_pw *)
+      { fix tt Q
+        from pff2[where R="Some (t + (lift_acost (E s0) - lift_acost (E s)))", of tt Q]
+        have faaa: "Some tt \<le> mm22 Q (Some (t + (lift_acost (E s0) - lift_acost (E s))))
+                 \<Longrightarrow> (Some (t + (lift_acost (E s0) - lift_acost (E s)) +tt)) \<le> Q"
+          apply simp apply(subst (2) add.commute) .
+      } note faaa = this
+
+        from 1(2)[symmetric]
+        show ?case apply(simp only: A1 A2)
+          apply(subst (2)add.assoc)
+          apply(rule faaa)
+          apply(subst (asm) add.commute)
+          subgoal premises prems apply(subst prems)
+            apply(cases x)
+            subgoal apply simp
+              apply(rule order.trans[OF _ aaa])
+              unfolding ffSacost_def using 1(4) apply auto
+              unfolding gwp_def
+              apply(rule Inf_mono) apply auto
+              subgoal for xa
+                apply(rule exI[where x="minus_p_m (\<lambda>s'. if I s' \<and> E s' \<le> E s then Some (lift_acost (E s - E s')) else None) (consume (c s) (cost ''call'' 1)) xa"])
+                apply safe  apply(rule exI[where x=xa])
+                 apply simp
+                unfolding minus_p_m_def apply(auto split: nrest.splits)
+                unfolding minus_potential_def apply(split option.splits) apply simp
+                apply auto
+                subgoal for x2 x3
+                  subgoal unfolding mm3_def using 1(5) apply simp    apply auto unfolding mm22_def apply auto
+                  proof -
+                    assume I: "x" "I s" "consume (c s) (cost ''call'' 1) = SPECT x2" "the_acost (E xa) < the_acost (E s)" 
+                            "I xa" "E xa \<le> E s" "x3 \<le> lift_acost (E s - E xa)" "x2 xa = Some x3"
+                            "lift_acost (E s) \<le> lift_acost (E s0)" 
+                    have A: "lift_acost (E xa) \<le> lift_acost (E s0)"
+                      using I(6)[THEN lift_acost_mono] I(9) by simp
+
+                    show "x3 \<le> t + (lift_acost (E s0) - lift_acost (E xa)) - (t + (lift_acost (E s0) - lift_acost (E s)))"
+                      apply(cases t; cases "E s0"; cases "E xa"; cases "E s"; cases x3) apply simp
+                      
+                      using I(7) I(9) A
+                      unfolding less_eq_acost_def lift_acost_def plus_acost_alt minus_acost_alt
+                      apply auto
+                      subgoal for x xaa xb xc xd xe apply(cases "x xe") apply simp_all apply(subst argh) by auto
+                      done
+
+                    show "t + (lift_acost (E s0) - lift_acost (E s)) \<le> t + (lift_acost (E s0) - lift_acost (E xa))"
+                      apply(cases t; cases "E s0"; cases "E xa"; cases "E s"; cases x3) apply simp
+                      
+                      using I(7) I(9) A
+                      unfolding less_eq_acost_def lift_acost_def plus_acost_alt minus_acost_alt
+                      apply auto
+                      subgoal for x xaa xb xc xd xe apply(cases "x xe") apply simp_all
+                        by (metis I(6) acost.sel diff_le_mono2 less_eq_acost_def)
+                      done
+                    show "lift_acost (E s - E xa) - x3 \<le> t + (lift_acost (E s0) - lift_acost (E xa)) - (t + (lift_acost (E s0) - lift_acost (E s))) - x3"
+                      apply(cases t; cases "E s0"; cases "E xa"; cases "E s"; cases x3) apply simp
+                      
+                      using I(7) I(9) A
+                      unfolding less_eq_acost_def lift_acost_def plus_acost_alt minus_acost_alt
+                      apply auto
+                      subgoal for x xaa xb xc xd xe apply(cases "x xe") apply simp_all  
+                        by (simp add: argh)
+                      done         
+                    { assume "\<not> lift_acost (E xa) \<le> lift_acost (E s0)"
+                      with A show False by simp
+                      }
+                  qed
+                done
+              subgoal for x2 t
+                
+                apply(drule blah) apply auto 
+               (*  apply(drule progress[THEN progressD, where s'=xa])
+                subgoal for x3 apply(cases "x3 xa") by auto *)
+                unfolding mm22_def apply auto
+                subgoal for x4 proof (goal_cases)
+                  case 1 
+                  (* from 1(9) obtain tt where "x4 xa = Some tt"  apply(cases "x4 xa") by auto *)
+                  with 1(7) have "t>0" apply(cases "x4 xa") apply auto unfolding less_acost_def  zero_acost_def apply auto 
+                    subgoal for x apply(rule exI[where x="''call''"]) unfolding plus_acost_alt cost_def apply simp
+                      apply(cases x) by simp
+                    done
+                  with 1(3,6) show ?case unfolding less_acost_def zero_acost_def lift_acost_def minus_acost_alt
+                    apply(cases "E xa"; cases "E s"; cases t) unfolding less_eq_acost_def le_fun_def less_fun_def apply auto
+                      subgoal 
+                        by (metis "1"(5) acost.sel less_eq_acost_def) 
+                      subgoal 
+                        using zero_enat_def by auto 
+                      done
+                qed  
+                done
+              done
+            done
+            subgoal by simp
+            done
+          done
+      qed
+    subgoal (* init *) apply(simp add: i) unfolding mm3_def by (simp add: lift_acost_cancel)
+    subgoal for ta s apply(cases "I s") by auto 
+    subgoal apply(rule wf_ffSacost) using wf[unfolded wfR2_def] .
+    done
+qed
+
+
+
+lemma 
+  fixes s0 :: 'a and I :: "'a \<Rightarrow> bool" and E :: "'a \<Rightarrow> (string, nat) acost" and t :: "(string, enat) acost"
+    and Q :: "'a \<Rightarrow>  (string, enat) acost option"
+  assumes wf: "\<And>s. wfR2 (if I s then E s else 0)"
+  assumes
+  step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)])
+       (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })
+                             (\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
+                 else H (Q s) (t + cost ''call'' 1) (lift_acost (E s0)) (lift_acost (E s)))))"
+(* and  progress: "\<And>s. progress (c s)" \<comment> \<open>This is actually not really needed, because ''call'' needs to decrease!
+                                         As an improvement one could not look at ''call'' and ''if'' costs, by setting them to \<infinity>, then progress is needed again.\<close> *)
+ and  i: "I s0"                                       
+shows neueWhile_rule''_real: "Some t \<le> gwp (monadic_WHILEIET I E bm c s0) Q"
+  unfolding monadic_WHILEIET_def monadic_WHILEIT_def
+  apply(rule gwp_bindT_I)
+  apply(rule gwp_SPECT_I)
+  unfolding monadic_WHILEIT'_def[symmetric] monadic_WHILEIET'_def[symmetric, where E=E]
+  apply(rule neueWhile_rule'')
+     apply fact
+    apply(rule step) using assms by auto
+lemma lift_acost_leq_conv: "lift_acost (E s) \<le> lift_acost (E s0) \<longleftrightarrow> E s \<le> E s0"
+  by(auto simp: less_eq_acost_def lift_acost_def)
+lemma lift_acost_minus: " lift_acost A - lift_acost B =  lift_acost (A - B)"
+  by(cases A; cases B; auto simp: lift_acost_def minus_acost_alt)
+
+lemma neueWhile_rewrite: "mm22 (Q s) (Someplus (Some (t + cost ''call'' 1)) (mm3 (lift_acost (E s0)) (Some (lift_acost (E s)))))
+    = (if E s \<le> E s0 then minus_cost (Q s) (Some (t + cost ''call'' 1 + (lift_acost (E s0 - E s)))) else Some top)"
+  apply(auto simp: mm22_minus_cost[symmetric] top_acost_def lift_acost_minus top_enat_def lift_acost_leq_conv mm3_def mm22_def split: option.splits if_splits)
+  done
+
+
+definition "loop_body_condition Is' Es' Es = (if Is' \<and> Es' \<le> Es then Some (lift_acost (Es - Es')) else None)"
+definition "loop_exit_condition Qs t Es Es0 = (if Es \<le> Es0 then minus_cost Qs (Some (t + cost ''call'' 1 + (lift_acost (Es0 - Es)))) else Some top)"
+
+lemma 
+  fixes s0 :: 'a and I :: "'a \<Rightarrow> bool" and E :: "'a \<Rightarrow> (string, nat) acost" and t :: "(string, enat) acost"
+    and Q :: "'a \<Rightarrow>  (string, enat) acost option"
+  assumes wf: "\<And>s. wfR2 (if I s then E s else 0)"
+  assumes
+  step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)])
+       (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })
+                             (\<lambda>s'. loop_body_condition (I s') (E s') (E s) )
+                 else loop_exit_condition (Q s) t (E s) (E s0))))"
+(* and  progress: "\<And>s. progress (c s)" \<comment> \<open>This is actually not really needed, because ''call'' needs to decrease!
+                                         As an improvement one could not look at ''call'' and ''if'' costs, by setting them to \<infinity>, then progress is needed again.\<close>
+*)
+ and  i: "I s0"                                       
+shows gwp_monadic_WHILEIET: "Some t \<le> gwp (monadic_WHILEIET I E bm c s0) Q"
+  apply(rule neueWhile_rule''_real)
+     apply (fact wf)
+    unfolding G_def H_def neueWhile_rewrite
+    apply(rule step[unfolded loop_body_condition_def loop_exit_condition_def])
+    apply simp
+  apply (fact i)
+  done
+  
+
+
+thm neueWhile_rule''_real[unfolded G_def H_def]
+
+
 
 lemma
   fixes I :: "_ \<Rightarrow> ('a,nat) acost option"
