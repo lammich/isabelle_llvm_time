@@ -824,5 +824,7 @@ lemma param_ASSERT_bind[param]: "\<lbrakk>
   by (auto intro: nrest_relI)
 
 
+definition nrest_trel where 
+  nrest_trel_def_internal: "nrest_trel R E \<equiv> {(c,a).  c \<le> \<Down>R (timerefine E a)}"
 
 end
