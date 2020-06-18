@@ -1,3 +1,64 @@
+# Montag 15.6.
+
+insert_impl (hnr) insert3
+
+insert3 l <= \Down(R l) ... sort_one_more_spec
+
+insort1 = [ ... sort_one_more_spec ...]
+** >= by refine_vcg **   B
+insort2 = [ ... insert3 ...]
+(hnr) by sepref       A
+insort_impl
+
+A[FCOMP B] geht nicht
+-> zufuss selbst hinschreiben.
+
+und dann:
+    Hoaretriple extrahieren.
+       
+    
+## TODO:
+
+### Max:
+- Sorting_Insertion_Sort fertig machen
+    - code extract
+    - hoare triple extract
+    - clean up
+    
+## nächster schritt
+- gemeinsam Heap Sort
+
+
+# Fr 12.6.
+
+
+
+## TODO
+
+### Peter
+- HNR für While
+- 
+
+### Max
+- in Sorting_Insertion_Sort weiter
+- solver für Summen mit simplifier
+
+
+
+## Besprochen
+- solver für "SUM (cost ni mi) <= SUM (cost nj mj)"
+- solver für "SUM (cost ni mi) <= SUM (cost nj mj) - SUM (cost nk mk)"
+- idee:
+    -> runterbrechen auf constraints von enats
+    -> könnte allein mit simplifier funktionieren.
+
+lemma "a + c ≤ b ⟹ (a::nat) ≤ b - c" 
+  by simp
+
+- next steps:
+    - kosten solver
+
+
 # Mo 8.6.2020
 
 ## Fragestellung
