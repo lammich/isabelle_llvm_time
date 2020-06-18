@@ -1746,13 +1746,15 @@ lemma WHILEIT_comb[sepref_monadify_comb]:
       SP (PR_CONST (monadic_WHILEIT I))$(\<lambda>\<^sub>2x. (EVAL$(b x)))$f$s
     )"
   by (simp_all add: WHILEIT_to_monadic)
-  
+  \<close>
+
+
 lemma monadic_WHILEIT_pat[def_pat_rules]:
   "monadic_WHILEIT$I \<equiv> UNPROTECT (monadic_WHILEIT I)"
   by auto  
     
 lemma id_monadic_WHILEIT[id_rules]: 
-  "PR_CONST (monadic_WHILEIT I) ::\<^sub>i TYPE(('a \<Rightarrow> bool nres) \<Rightarrow> ('a \<Rightarrow> 'a nres) \<Rightarrow> 'a \<Rightarrow> 'a nres)"
+  "PR_CONST (monadic_WHILEIT I) ::\<^sub>i TYPE(('a \<Rightarrow> (bool,_) nrest) \<Rightarrow> ('a \<Rightarrow> ('a,_) nrest) \<Rightarrow> 'a \<Rightarrow> ('a,_) nrest)"
   by simp
     
 lemma monadic_WHILEIT_arities[sepref_monadify_arity]:
@@ -1761,27 +1763,81 @@ lemma monadic_WHILEIT_arities[sepref_monadify_arity]:
 
 lemma monadic_WHILEIT_comb[sepref_monadify_comb]:
   "PR_CONST (monadic_WHILEIT I)$b$f$s \<equiv> 
-    Refine_Basic.bind$(EVAL$s)$(\<lambda>\<^sub>2s. 
+    NREST.bindT$(EVAL$s)$(\<lambda>\<^sub>2s. 
       SP (PR_CONST (monadic_WHILEIT I))$b$f$s
     )"
   by (simp)
-  \<close>
-  
+
+
+(* TODO: Move *)
+lemma addcost_NTERM_iff: "addcost c m = NTERM \<longleftrightarrow> m = NTERM"
+  apply(cases m) by auto
+
+
+(* TODO: clean up this mess and MOVE! *)
+lemma mono_body_consume:
+  assumes "M.mono_body (\<lambda>f. cB f x)"
+  shows "M.mono_body (\<lambda>f. cB (\<lambda>x. ll_call (f x)) x)"
+  apply(rule)
+  subgoal for a b
+    using assms
+    apply -
+    apply(erule monotoneD[of _ _ _ "(\<lambda>x. ll_call (a x))" "(\<lambda>x. ll_call (b x))"])
+    unfolding fun_ord_def
+    unfolding img_ord_def  flat_ord_def
+    unfolding ll_call_def
+    apply (force simp: run_simps addcost_NTERM_iff) 
+    done
+  done
+
+lemma hnr_RECT_aux:
+  assumes S: "\<And>cf af ax px. \<lbrakk>
+    \<And>ax px. hn_refine (hn_ctxt Rx ax px ** F) (cf px) (F' ax px) Ry (af ax)\<rbrakk> 
+    \<Longrightarrow> hn_refine (hn_ctxt Rx ax px ** F) (cB cf px) (F' ax px) Ry (aB af ax)"
+  assumes M: "(\<And>x. M.mono_body (\<lambda>f. cB f x))"
+  shows "hn_refine 
+    (hn_ctxt Rx ax px ** F) (ll_call (REC' cB px)) (F' ax px) Ry (RECT' aB ax)"
+  unfolding REC'_def RECT'_def
+  apply(subst ll_call_def)
+  apply(rule hnr_consume)
+  apply(rule hnr_RECT)
+   apply(rule S)
+  apply(subst ll_call_def)
+  apply(rule hnr_consume) 
+   apply assumption
+  subgoal unfolding one_enat_def lift_acost_cost by simp
+  subgoal apply(rule mono_body_consume) by(fact M)
+  subgoal unfolding one_enat_def lift_acost_cost by simp
+  done
+
+lemma hn_RECT_wiewirshabenwollen[sepref_comb_rules]:
+  assumes "INDEP Ry" "INDEP Rx" "INDEP Rx'"
+  assumes FR: "P \<turnstile> hn_ctxt Rx ax px ** F"
+  assumes S: "\<And>cf af ax px. \<lbrakk>
+    \<And>ax px. hn_refine (hn_ctxt Rx ax px ** F) (cf px) (hn_ctxt Rx' ax px ** F) Ry 
+      (RCALL$af$ax)\<rbrakk> 
+    \<Longrightarrow> hn_refine (hn_ctxt Rx ax px ** F) (cB cf px) (F' ax px) Ry 
+          (aB af ax)"
+  assumes FR': "\<And>ax px. F' ax px \<turnstile> hn_ctxt Rx' ax px ** F"
+  assumes M: "(\<And>x. M.mono_body (\<lambda>f. cB f x))"
+  (*assumes PREC[unfolded CONSTRAINT_def]: "CONSTRAINT precise Ry"*)
+  shows "hn_refine 
+    (P) (ll_call (REC' cB px)) (hn_ctxt Rx' ax px ** F) Ry 
+        (RECT'$(\<lambda>\<^sub>2D x. aB D x)$ax)"
+  unfolding APP_def PROTECT2_def
+  apply (rule hn_refine_cons_pre[OF _ FR])
+  apply (rule hnr_RECT_aux)
+
+  apply (rule hn_refine_cons_post[OF _ FR'])
+  apply (rule S[unfolded RCALL_def APP_def])
+  apply assumption
+  apply fact+
+  done
+
+
 lemma hn_refine_add_invalid: (* Very customized rule for manual derivation of while *)
   "hn_refine (hn_ctxt Rs a b ** \<Gamma>) c \<Gamma>' R m \<Longrightarrow> hn_refine (hn_ctxt Rs a b ** \<Gamma>) c (hn_invalid Rs a b ** \<Gamma>') R m"
   by (smt hn_refine_frame' invalidate_clone' sep_conj_commute sep_conj_left_commute)
-
-
-definition "monadic_WHILEITc I b f s \<equiv> do {
-  consume (RECT (\<lambda>D s. do {
-    ASSERT (I s);
-    bv \<leftarrow> b s;
-    MIf bv (do {
-      s \<leftarrow> f s;
-      consume (D s) (cost ''call'' 1)
-    }) (do {RETURNT s})
-  }) s) (cost ''call'' 1)
-}"
 
 lemma hn_monadic_WHILE_aux:
   assumes FR: "P \<turnstile> hn_ctxt Rs s' s ** \<Gamma>"
@@ -1802,20 +1858,18 @@ lemma hn_monadic_WHILE_aux:
   assumes f_fr: "\<And>s' s. \<Gamma>f s' s \<turnstile> hn_ctxt Rsf s' s ** \<Gamma>"
   assumes free: "MK_FREE Rsf fr"
   (*assumes PREC: "precise Rs"*)
-  shows "hn_refine (P) (llc_while b (\<lambda>s. doM {r \<leftarrow> f s; fr s; return r}) s) (hn_invalid Rs s' s ** \<Gamma>) Rs (monadic_WHILEITc I b' f' s')"
-  apply1 (rule hn_refine_cons_pre[OF _ FR])                                                                        
+  shows "hn_refine (P) (llc_while b (\<lambda>s. doM {r \<leftarrow> f s; fr s; return r}) s) (hn_invalid Rs s' s ** \<Gamma>) Rs (monadic_WHILEIT I b' f' s')"
+  apply1 (rule hn_refine_cons_pre[rotated, OF FR])
   apply (rule hn_refine_add_invalid)
   
   apply (rule hn_refine_synthI)
-  unfolding monadic_WHILEITc_def
-  apply (rule hnr_consume[rotated])
-  apply(subst lift_acost_cost) unfolding one_enat_def apply simp
-  focus (rule hnr_RECT[where F'="\<lambda>s' s. \<Gamma>" and Ry=Rs])
+  unfolding monadic_WHILEIT_RECT'_conv
+  focus (rule hnr_RECT_aux[where F'="\<lambda>s' s. \<Gamma>" and Ry=Rs])
     apply1 (rule hnr_ASSERT)
     focus (rule hnr_bind_manual_free)
       applyS (rule b_ref; simp)
-      apply1 (rule hn_refine_cons_pre[rotated], sep_drule b_fr, rule entails_refl)
-      unfolding MIf_def
+  apply1 (rule hn_refine_cons_pre[rotated], sep_drule b_fr, rule entails_refl)
+  unfolding MIf_def
       focus (rule hn_if_aux[OF _ _ _ MERGE_triv])
         apply (fri_rotate entails_pre_cong :-1) apply (rule conj_entails_mono[OF entails_refl]) apply (rule entails_refl)
         focus (* Then-Part *)
@@ -1824,8 +1878,6 @@ lemma hn_monadic_WHILE_aux:
           applyS (rule f_ref, simp)
           apply1 (rule hn_refine_cons_pre[rotated], sep_drule f_fr, simp, rule entails_refl)
           apply (rule hnr_freeI[OF free])
-          apply (rule hnr_consume[rotated])
-          focus (subst lift_acost_cost) unfolding one_enat_def apply simp solved          
           apply (rule hn_refine_cons_pre, assumption)
           applyS (simp add: sep_conj_ac; rule entails_refl)
           solved
@@ -1841,7 +1893,7 @@ lemma hn_monadic_WHILE_aux:
       solved
     focus apply pf_mono_prover solved
     solved
-      subgoal by (simp add: ll_call_def REC'_def llc_while_def mwhile_def llc_if_def cong: if_cong)      
+  subgoal by (simp add: llc_while_def mwhile_def llc_if_def cong: if_cong)
   subgoal ..
   subgoal ..
   done
@@ -1855,7 +1907,8 @@ lemma hn_monadic_WHILE_lin[sepref_comb_rules]:
     (\<Gamma>b s' s)
     (pure bool1_rel)
     (b' s')"
-  assumes b_fr: "\<And>s' s. TERM (monadic_WHILEITc,''cond'') \<Longrightarrow> \<Gamma>b s' s \<turnstile> hn_ctxt Rs s' s ** \<Gamma>"
+  assumes b_fr: "\<And>s' s. TERM (monadic_WHILEIT,''cond'')
+       \<Longrightarrow> \<Gamma>b s' s \<turnstile> hn_ctxt Rs s' s ** \<Gamma>"
 
   assumes f_ref: "\<And>s' s. I s' \<Longrightarrow> hn_refine
     (hn_ctxt Rs s' s ** \<Gamma>)
@@ -1863,14 +1916,16 @@ lemma hn_monadic_WHILE_lin[sepref_comb_rules]:
     (\<Gamma>f s' s)
     Rs
     (f' s')"
-  assumes f_fr: "\<And>s' s. TERM (monadic_WHILEITc,''body'') \<Longrightarrow> \<Gamma>f s' s \<turnstile> hn_ctxt Rsf s' s ** \<Gamma>"
-  assumes free: "TERM (monadic_WHILEITc,''free-old-state'') \<Longrightarrow> MK_FREE Rsf fr"
+  assumes f_fr: "\<And>s' s. TERM (monadic_WHILEIT,''body'')
+                   \<Longrightarrow> \<Gamma>f s' s \<turnstile> hn_ctxt Rsf s' s ** \<Gamma>"
+  assumes free: "TERM (monadic_WHILEIT,''free-old-state'')
+                   \<Longrightarrow> MK_FREE Rsf fr"
   shows "hn_refine 
     P 
     (llc_while b (\<lambda>s. doM {r \<leftarrow> f s; fr s; return r}) s) 
     (hn_invalid Rs s' s ** \<Gamma>)
     Rs 
-    (PR_CONST (monadic_WHILEITc I)$(\<lambda>\<^sub>2s'. b' s')$(\<lambda>\<^sub>2s'. f' s')$(s'))"
+    (PR_CONST (monadic_WHILEIT I)$(\<lambda>\<^sub>2s'. b' s')$(\<lambda>\<^sub>2s'. f' s')$(s'))"
   using assms(2-)
   unfolding APP_def PROTECT2_def CONSTRAINT_def PR_CONST_def
   by (rule hn_monadic_WHILE_aux)

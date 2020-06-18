@@ -296,7 +296,15 @@ subsection \<open>Option Array\<close>
   
 text \<open>Assertion that adds constraint on concrete value. Used to carry through concrete equalities.\<close>
 definition "cnc_assn \<phi> A a c \<equiv> \<up>(\<phi> c) ** A a c"
-  
+
+
+lemma cnc_assn_prod_conv[named_ss sepref_frame_normrel]:
+  shows "\<And>A B \<phi>. A \<times>\<^sub>a cnc_assn \<phi> B = cnc_assn (\<phi> o snd) (A\<times>\<^sub>aB)"
+    and "\<And>A B \<phi>. cnc_assn \<phi> A \<times>\<^sub>a B = cnc_assn (\<phi> o fst) (A\<times>\<^sub>aB)"
+  unfolding cnc_assn_def
+  by (auto simp: sep_algebra_simps fun_eq_iff)
+
+
 lemma norm_ceq_assn[named_ss sepref_frame_normrel]: "hn_ctxt (cnc_assn \<phi> A) a c = (\<up>(\<phi> c) ** hn_ctxt A a c)"
   unfolding hn_ctxt_def cnc_assn_def by simp
   
@@ -521,6 +529,17 @@ qed
   definition "unborrow src dst \<equiv> doN {ASSERT (src=dst); RETURN ()}"
   sepref_register unborrow
 
+  lemma unborrow_rule[sepref_comb_rules]:
+    assumes FRAME: "\<Gamma> \<turnstile> hn_ctxt R src srci ** hn_invalid R dst dsti ** F"
+    assumes [simp]: "vassn_tag \<Gamma> \<Longrightarrow> srci = dsti"
+    shows "hn_refine \<Gamma> (return ():: _ llM) (hn_invalid R src srci ** hn_ctxt R dst dsti ** F) unit_assn (unborrow$src$dst)"
+    apply (rule hn_refine_vassn_tagI)
+    apply (rule hn_refine_cons_pre[rotated,OF FRAME])
+    unfolding unborrow_def APP_def
+    apply (rule hn_refineI'')
+    apply (simp add: refine_pw_simps)
+    unfolding hn_ctxt_def invalid_assn_def pure_def
+    by vcg'
 
 subsection \<open>Array\<close>
 
