@@ -1,9 +1,9 @@
 theory Sorting_Misc
-imports "../../sepref/IICF/IICF" "HOL-Library.Discrete"
+imports "../../sepref/Sepref" "../../sepref/Hnr_Primitives_Experiment" "HOL-Library.Discrete"
 begin
   hide_const (open) pi Word.slice
 
-
+\<^cancel>\<open>
 lemma WHILEIT_unfold': "WHILEIT I b c s = doN { ASSERT (I s); if b s then doN { s\<leftarrow>c s; WHILEIT I b c s } else RETURN s }"
   apply (rewrite in "\<hole>=_" WHILEIT_unfold)
   by (auto)
@@ -25,7 +25,7 @@ lemma WHILEIT_rule_amend_invar:
   
 
 (* TODO: Move *)
-abbreviation monadic_If :: "bool nres \<Rightarrow> 'a nres \<Rightarrow> 'a nres \<Rightarrow> 'a nres" ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
+abbreviation monadic_If :: "(bool,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> ('a,_) nrest" ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
   where "monadic_If b x y \<equiv> doN { t \<leftarrow> b; if t then x else y }"
   
 (* TODO: Move *)
@@ -48,7 +48,7 @@ lemma monadic_WHILEIT_rule:
   subgoal
     by auto  
   done
-
+\<close>
 (* Required as VCG-rule when using monadic_WHILEIT_rule *)    
 lemma split_ifI: "\<lbrakk> b\<Longrightarrow>P; \<not>b\<Longrightarrow>Q \<rbrakk> \<Longrightarrow> If b P Q" by simp 
   
@@ -77,13 +77,13 @@ lemma split_ifI: "\<lbrakk> b\<Longrightarrow>P; \<not>b\<Longrightarrow>Q \<rbr
     done
     
   lemma RECT_dep_refine:
-    assumes M: "trimono body"
+    assumes M: "mono2 body"
     assumes R0: "(x,x')\<in>R arb\<^sub>0"
     assumes S0: "SS = S arb\<^sub>0 x"
     assumes RS: "\<And>f f' x x' arb. \<lbrakk> \<And>x x' arb. (x,x')\<in>R arb \<Longrightarrow> f x \<le>\<Down>(S arb x) (f' x'); (x,x')\<in>R arb \<rbrakk> 
       \<Longrightarrow> body f x \<le>\<Down>(S arb x) (body' f' x')"
     shows "RECT (\<lambda>f x. body f x) x \<le>\<Down>SS (RECT (\<lambda>f' x'. body' f' x') x')"
-    unfolding RECT_def S0
+    unfolding RECT_flat_gfp_def S0
     apply (clarsimp simp add: M)
   
     apply (rule flatf_fixp_dep_transfer[where 
@@ -92,11 +92,10 @@ lemma split_ifI: "\<lbrakk> b\<Longrightarrow>P; \<not>b\<Longrightarrow>Q \<rbr
       and P="\<lambda>arb x x'. (x',x)\<in>R arb"
       and arb\<^sub>0=arb\<^sub>0, 
       OF _ _ flatf_ord.fixp_unfold[OF M[THEN trimonoD_flatf_ge]] R0])
-    apply simp
-    apply (simp add: trimonoD)
-    by (rule RS)
-  
-  
+    subgoal by simp
+    subgoal apply (drule trimonoD_flatf_ge) by simp
+    subgoal by (rule RS) simp_all 
+    done
   
 lemma sorted_lelI:
   assumes "transp R"
@@ -110,10 +109,11 @@ lemma sorted_lelI:
   apply (auto simp: sorted_wrt_append dest: transpD)
   done
   
-(* TODO: Move *) thm specify_left
-lemma specify_left_pw: "\<lbrakk> nofail m; \<And>v. inres m v \<Longrightarrow> f v \<le> m' \<rbrakk> \<Longrightarrow> doN { v\<leftarrow>m; f v} \<le> m'"
-  by (auto simp: pw_le_iff refine_pw_simps)
-
+(* WRONG with time! m may consume time!
+lemma specify_left_pw: "\<lbrakk> nofailT m; \<And>v b. (\<exists>b. inresT (project_acost b m) v t) \<Longrightarrow> f v \<le> m' \<rbrakk> \<Longrightarrow> doN { v\<leftarrow>m; f v} \<le> m'"
+  apply (auto simp: pw_acost_le_iff refine_pw_simps)
+ 
+*)
 
 (* TODO: Move, replace Misc.slice_Len lemma *)
 declare Misc.slice_len[simp del]
@@ -297,20 +297,33 @@ lemma idx_shift_rel_alt: "l\<le>ii \<Longrightarrow> (ii,i)\<in>idx_shift_rel l 
 lemma slice_nth_refine: "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l; i<h \<rbrakk> \<Longrightarrow> xs!i = xs'!i'"  
   by (auto simp: slice_rel_def in_br_conv slice_nth idx_shift_rel_def algebra_simps)
 
-lemma slice_nth_refine': "\<lbrakk>(xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l\<rbrakk>  
-  \<Longrightarrow> mop_list_get xs i \<le>\<Down>Id (mop_list_get xs' i')"  
-  apply (auto simp: pw_le_iff refine_pw_simps idx_shift_rel_def)
-  by (auto simp: slice_rel_def in_br_conv slice_nth algebra_simps)
-  
+lemma satminus_zero_if_less_zero: "satminus t x = 0 \<Longrightarrow> x\<le>x' \<Longrightarrow> satminus t x' = 0"
+  by(auto simp: satminus_def split: if_splits)
+
+lemma helpe: "x \<le> y \<Longrightarrow> (the_acost (x) b::enat) \<le> the_acost (y) b"
+  by(cases x; cases y; auto simp: less_eq_acost_def)
+
+lemma slice_nth_refine':
+  \<comment> \<open>only if running time of mop_list_get does not depend on its length, this theorem is true\<close>
+  assumes T_indep: "\<And>x y. T x = T y" 
+  shows "\<lbrakk>(xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l\<rbrakk>  
+  \<Longrightarrow> mop_list_get T xs i \<le>\<Down>Id (mop_list_get T xs' i')"  
+  apply (auto simp: pw_acost_le_iff refine_pw_simps idx_shift_rel_def)
+      apply (auto simp:  slice_rel_def in_br_conv slice_nth algebra_simps)   
+  by (metis assms)   
   
 lemma slice_upd_refine: "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l; i<h; (x,x')\<in>Id \<rbrakk> 
   \<Longrightarrow> (xs[i:=x], xs'[i':=x'])\<in>slice_rel xs\<^sub>0 l h"  
   by (auto simp: slice_rel_def in_br_conv slice_upd idx_shift_rel_def algebra_simps)
 
-lemma slice_upd_refine': "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l; (x,x')\<in>Id \<rbrakk> 
-  \<Longrightarrow> mop_list_set xs i x \<le>\<Down>(slice_rel xs\<^sub>0 l h) (mop_list_set xs' i' x')"  
-  apply (auto simp: pw_le_iff refine_pw_simps)
-  by (auto simp: slice_rel_def in_br_conv slice_upd idx_shift_rel_def algebra_simps)
+lemma slice_upd_refine':
+  \<comment> \<open>only if running time of mop_list_get does not depend on its length, this theorem is true\<close>
+  assumes T_indep: "\<And>x y. T x = T y" 
+  shows "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l; (x,x')\<in>Id \<rbrakk> 
+  \<Longrightarrow> mop_list_set T xs i x \<le>\<Down>(slice_rel xs\<^sub>0 l h) (mop_list_set T xs' i' x')"  
+  apply (auto simp: pw_acost_le_iff refine_pw_simps)
+  apply (auto simp: slice_rel_def in_br_conv slice_upd idx_shift_rel_def algebra_simps)   
+  by (metis assms)   
     
 lemma slice_in_slice_rel[simp]: "\<lbrakk>l\<le>h; h\<le>length xs\<rbrakk> \<Longrightarrow> (xs, Misc.slice l h xs) \<in> slice_rel xs l h"  
   unfolding slice_rel_def in_br_conv by auto
@@ -514,15 +527,39 @@ lemma size_refine[sepref_fr_rules]: "LENGTH('a)>2 \<Longrightarrow> (return o (\
 (* Assertion-guarded operations on nats, which are going to be refined to bounded numbers *)
     named_theorems mop_nat_defs
 
-  definition mop_nat_sub :: "nat \<Rightarrow> nat \<Rightarrow> nat nres" where [mop_nat_defs]: "mop_nat_sub a b \<equiv> doN { ASSERT (a\<ge>b); RETURN (a-b) }"
-  definition mop_nat_add_bnd :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat nres" where [mop_nat_defs]: "mop_nat_add_bnd h a b \<equiv> doN { ASSERT (a+b\<le>h); RETURN (a+b) }"
-  definition mop_nat_div :: "nat \<Rightarrow> nat \<Rightarrow> nat nres" where [mop_nat_defs]: "mop_nat_div a b \<equiv> doN { ASSERT (b\<noteq>0); RETURN (a div b) }"
-  
+context
+  fixes T :: "(unit * unit) \<Rightarrow> (string, enat) acost"
+begin
+
+  definition mop_sub :: "nat \<Rightarrow> nat \<Rightarrow> (nat,_) nrest" where [simp]: "mop_sub a b \<equiv> doN { ASSERT (a\<ge>b); consume (RETURN (a-b)) (T ((),())) }"
+  definition mop_add_bnd :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> (nat,_) nrest" where [simp]: "mop_add_bnd h a b \<equiv> doN { ASSERT (a+b\<le>h); consume (RETURN (a+b)) (T ((),()))   }"
+  definition mop_div :: "nat \<Rightarrow> nat \<Rightarrow> (nat,_) nrest" where [simp]: "mop_div a b \<equiv> doN { ASSERT (b\<noteq>0); consume (RETURN (a div b)) (T ((),()))  }"
+
+end
+
+(* TODO: move *)
+lemma satminus_0_iff: "satminus t x = 0 \<longleftrightarrow> enat t \<le> x"
+  by(auto simp: satminus_def)
+
+definition "mop_nat_sub \<equiv> mop_sub (\<lambda>_. cost ''sub'' 1)"
+lemma mop_nat_sub_alt[mop_nat_defs]: "mop_nat_sub a b = doN { ASSERT (a\<ge>b); SPECc2 ''sub'' (-) a b}"
+  by(auto simp: mop_nat_sub_def SPECc2_def pw_acost_eq_iff refine_pw_simps satminus_0_iff)
+
+definition "mop_nat_add_bnd \<equiv> mop_add_bnd (\<lambda>_. cost ''add'' 1)"
+lemma mop_nat_add_bnd_alt[mop_nat_defs]: "mop_nat_add_bnd h a b = doN { ASSERT (a+b\<le>h); SPECc2 ''add'' (+) a b}"
+  by(auto simp: mop_nat_add_bnd_def SPECc2_def pw_acost_eq_iff refine_pw_simps satminus_0_iff)
+
+definition "mop_nat_div \<equiv> mop_div (\<lambda>_. cost ''udiv'' 1)"
+lemma mop_nat_div_alt[mop_nat_defs]: "mop_nat_div a b = doN { ASSERT (b\<noteq>0); SPECc2 ''udiv'' (div) a b}"
+  by(auto simp: mop_nat_div_def SPECc2_def pw_acost_eq_iff refine_pw_simps satminus_0_iff)
+
   sepref_register mop_nat_sub mop_nat_add_bnd mop_nat_div
   
-  context fixes dummy :: "'l::len2" begin
+  context fixes dummy :: "'l::len2" begin     
     private abbreviation (input) "N \<equiv> snat_assn' TYPE('l)"
-  
+
+  thm sepref_fr_rules
+
     sepref_def snat_sub_impl [llvm_inline] is "uncurry mop_nat_sub" :: "N\<^sup>k*\<^sub>aN\<^sup>k\<rightarrow>\<^sub>aN"
       unfolding mop_nat_defs by sepref
   
