@@ -1,9 +1,16 @@
 theory Sorting_Setup
-imports "../../sepref/IICF/IICF" "../../sepref/IICF/Impl/Proto_IICF_EOArray" Sorting_Misc 
+imports "../../sepref/Hnr_Primitives_Experiment" Sorting_Misc "../../nrest/Refine_Heuristics"
 begin
-  hide_const (open) Word.slice array_assn
+  hide_const (open) Word.slice
 
-  
+(* TODO: move *)
+lemma [simp]: "RETURNTecost v \<le> SPECc2 n f a b
+      \<longleftrightarrow> (f a b = v)"
+  unfolding SPECc2_def apply (auto simp: pw_acost_le_iff refine_pw_simps)
+  using zero_enat_def by(auto simp: )  
+
+lemma [simp]: "RETURNTecost x \<le> RETURNTecost y \<longleftrightarrow> x=y"
+  by (auto simp: pw_acost_le_iff refine_pw_simps) 
 
 definition "le_by_lt lt a b \<equiv> \<not>lt b a"  
 definition "lt_by_le le a b \<equiv> le a b \<and> \<not>le b a"
@@ -146,29 +153,28 @@ qed
 lemma sorted_sorted_wrt_lt: "sorted = sorted_wrt_lt ((<)::_::linorder \<Rightarrow>_)"
   apply (intro ext) unfolding sorted_sorted_wrt by simp
 
-
-
 definition "sort_spec lt xs xs' \<equiv> mset xs'=mset xs \<and> sorted_wrt_lt lt xs'" 
   
 definition "slice_sort_spec lt xs\<^sub>0 l h \<equiv> doN {
     ASSERT (l\<le>h \<and> h\<le>length xs\<^sub>0);
     SPEC (\<lambda>xs. length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0 \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec lt (Misc.slice l h xs\<^sub>0) (Misc.slice l h xs))
+         (\<lambda>_. cost ''slice_sort'' 1)
   }"
-  
-lemma slice_sort_spec_refine_sort: "\<lbrakk>(xsi,xs) \<in> slice_rel xs\<^sub>0 l h; l'=l; h'=h\<rbrakk> \<Longrightarrow> slice_sort_spec lt xsi l h \<le>\<Down>(slice_rel xs\<^sub>0 l' h') (SPEC (sort_spec lt xs))"
+
+lemma slice_sort_spec_refine_sort: "\<lbrakk>(xsi,xs) \<in> slice_rel xs\<^sub>0 l h; l'=l; h'=h\<rbrakk> \<Longrightarrow> slice_sort_spec lt xsi l h \<le>\<Down>(slice_rel xs\<^sub>0 l' h') (SPEC (sort_spec lt xs)  (\<lambda>_. cost ''slice_sort'' (1::enat)))"
   unfolding slice_sort_spec_def sort_spec_def
-  apply (refine_vcg RES_refine)
+  apply (refine_rcg)
   by (auto simp: slice_rel_def in_br_conv)
 
-lemma slice_sort_spec_eq_sort': "\<lbrakk>(xsi,xs) \<in> slicep_rel l h; xsi'=xsi; l'=l; h'=h\<rbrakk> \<Longrightarrow> \<Down>(slice_rel xsi' l' h') (SPEC (sort_spec lt xs)) = slice_sort_spec lt xsi l h"
+lemma slice_sort_spec_eq_sort': "\<lbrakk>(xsi,xs) \<in> slicep_rel l h; xsi'=xsi; l'=l; h'=h\<rbrakk> \<Longrightarrow> \<Down>(slice_rel xsi' l' h') (SPEC (sort_spec lt xs) (\<lambda>_. cost ''slice_sort'' (1::enat))) = slice_sort_spec lt xsi l h"
   unfolding slice_sort_spec_def sort_spec_def
-  apply (auto simp: slice_rel_def slicep_rel_def in_br_conv build_rel_SPEC_conv)
+  apply (auto simp: slice_rel_def slicep_rel_def in_br_conv build_rel_SPEC_conv intro!: SPEC_cong)
   done
   
-corollary slice_sort_spec_refine_sort': "\<lbrakk>(xsi,xs) \<in> slicep_rel l h; xsi'=xsi; l'=l; h'=h\<rbrakk> \<Longrightarrow> slice_sort_spec lt xsi l h \<le>\<Down>(slice_rel xsi' l' h') (SPEC (sort_spec lt xs))"
+corollary slice_sort_spec_refine_sort': "\<lbrakk>(xsi,xs) \<in> slicep_rel l h; xsi'=xsi; l'=l; h'=h\<rbrakk> \<Longrightarrow> slice_sort_spec lt xsi l h \<le>\<Down>(slice_rel xsi' l' h') (SPEC (sort_spec lt xs) (\<lambda>_. cost ''slice_sort'' (1::enat)))"
   by (simp add: slice_sort_spec_eq_sort')
   
-corollary slice_sort_spec_refine_sort'_sym: "\<lbrakk>(xsi,xs) \<in> slicep_rel l h; xsi'=xsi; l'=l; h'=h\<rbrakk> \<Longrightarrow> \<Down>(slice_rel xsi' l' h') (SPEC (sort_spec lt xs)) \<le> slice_sort_spec lt xsi l h"
+corollary slice_sort_spec_refine_sort'_sym: "\<lbrakk>(xsi,xs) \<in> slicep_rel l h; xsi'=xsi; l'=l; h'=h\<rbrakk> \<Longrightarrow> \<Down>(slice_rel xsi' l' h') (SPEC (sort_spec lt xs) (\<lambda>_. cost ''slice_sort'' (1::enat))) \<le> slice_sort_spec lt xsi l h"
   by (simp add: slice_sort_spec_eq_sort')
   
 lemma slice_sort_spec_alt: "slice_sort_spec lt xs l h = doN {
@@ -176,18 +182,18 @@ lemma slice_sort_spec_alt: "slice_sort_spec lt xs l h = doN {
     SPEC (\<lambda>xs'. eq_outside_range xs' xs l h
       \<and> mset (slice l h xs') = mset (slice l h xs)
       \<and> sorted_wrt_lt lt (slice l h xs')
-    )
+    ) (\<lambda>_. cost ''slice_sort'' (1::enat))
   }"
   unfolding slice_sort_spec_def sort_spec_def eq_outside_range_def
-  by (auto simp: pw_eq_iff refine_pw_simps)
+  by (auto simp: pw_acost_eq_iff refine_pw_simps)
       
   
   lemma slice_sort_spec_sem_alt: "slice_sort_spec lt xs l h = doN {
       ASSERT (l \<le> h \<and> h \<le> length xs);
-      SPEC (\<lambda>xs'. slice_eq_mset l h xs xs' \<and> sorted_wrt_lt lt (slice l h xs'))
+      SPEC (\<lambda>xs'. slice_eq_mset l h xs xs' \<and> sorted_wrt_lt lt (slice l h xs')) (\<lambda>_. cost ''slice_sort'' (1::enat))
     }"
     unfolding slice_sort_spec_alt
-    by (auto simp: pw_eq_iff refine_pw_simps slice_eq_mset_alt slice_eq_mset_eq_length eq_outside_rane_lenD dest: eq_outside_range_sym)
+    by (auto simp: pw_acost_eq_iff SPEC_def refine_pw_simps slice_eq_mset_alt slice_eq_mset_eq_length eq_outside_rane_lenD dest: eq_outside_range_sym)
   
   
   
@@ -197,21 +203,108 @@ lemma sort_spec_permute: "\<lbrakk>mset xs' = mset xs; sort_spec lt xs' ys\<rbra
 
 
 context weak_ordering begin  
-  sepref_decl_op cmpo_idxs: "\<lambda>xs i j. the (xs!i) \<^bold>< the (xs!j)" 
-    :: "[\<lambda>((xs,i),j). i<length xs \<and> j<length xs \<and> xs!i\<noteq>None \<and> xs!j\<noteq>None]\<^sub>f 
-      (\<langle>\<langle>Id::'a rel\<rangle>option_rel\<rangle>list_rel \<times>\<^sub>r nat_rel) \<times>\<^sub>r nat_rel \<rightarrow> bool_rel"
-    by simp
-    
-  sepref_decl_op cmp_idxs: "\<lambda>xs i j. xs!i \<^bold>< xs!j" 
-    :: "[\<lambda>((xs,i),j). i<length xs \<and> j<length xs]\<^sub>f 
-      (\<langle>Id::'a rel\<rangle>list_rel \<times>\<^sub>r nat_rel) \<times>\<^sub>r nat_rel \<rightarrow> bool_rel"
-    by simp
 
-  sepref_decl_op cmpo_v_idx: "\<lambda>xs v j. v \<^bold>< the (xs!j)" :: "[\<lambda>((xs,v),j). j<length xs \<and> xs!j \<noteq> None]\<^sub>f (\<langle>\<langle>Id::'a rel\<rangle>option_rel\<rangle>list_rel \<times>\<^sub>r (Id::'a rel)) \<times>\<^sub>r nat_rel \<rightarrow> bool_rel"
+context
+  fixes T :: "(string, enat) acost"
+begin
+  
+  definition "mop_cmpo_idxs xs i j = doN {
+      ASSERT (i<length xs \<and> j<length xs \<and> xs!i\<noteq>None \<and> xs!j\<noteq>None);
+      consume (RETURNT (the (xs!i) \<^bold>< the (xs!j))) T
+    }"
+  
+  sepref_register mop_cmpo_idxs
+  
+  lemma mop_cmpo_idxs_param: "(mop_cmpo_idxs,mop_cmpo_idxs) \<in> \<langle>\<langle>Id::'a rel\<rangle>option_rel\<rangle>list_rel \<rightarrow> nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+    unfolding mop_cmpo_idxs_def
+    apply(intro fun_relI)
+    apply (parametricity)
+    unfolding  list_rel_id_simp option_rel_id_simp apply (simp add: Id_def)
+    apply (simp add: Id_def)
+    apply(rule nrest_relI)
     by simp
+  
+end
 
-  sepref_decl_op cmpo_idx_v: "\<lambda>xs i v. the (xs!i) \<^bold>< v" :: "[\<lambda>((xs,i),v). i<length xs \<and> xs!i\<noteq>None]\<^sub>f (\<langle>\<langle>Id::'a rel\<rangle>option_rel\<rangle>list_rel \<times>\<^sub>r nat_rel) \<times>\<^sub>r (Id::'a rel) \<rightarrow> bool_rel"
+context
+  fixes T :: "(string, enat) acost"
+begin  
+  definition "mop_cmp_idxs xs i j = doN {
+      ASSERT (i<length xs \<and> j<length xs);
+      consume (RETURNT ( (xs!i) \<^bold><  (xs!j))) T
+    }"
+  
+  sepref_register mop_cmp_idxs
+  
+  lemma mop_cmp_idxs_param: "(mop_cmp_idxs,mop_cmp_idxs) \<in> \<langle>Id::'a rel\<rangle>list_rel \<rightarrow> nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+    unfolding mop_cmp_idxs_def
+    apply(intro fun_relI)
+    apply (parametricity)
+    unfolding  list_rel_id_simp option_rel_id_simp 
+    apply(rule nrest_relI)
     by simp
+end
+
+
+context
+  fixes T :: "(string, enat) acost"
+begin  
+  definition [simp]: "mop_cmp_v_idx xs v j = doN {
+      ASSERT (j<length xs);
+      consume (RETURNT ( v \<^bold><  (xs!j))) T
+    }"
+  
+  sepref_register mop_cmp_v_idx
+  
+  lemma mop_cmp_v_idx_param: "(mop_cmp_v_idx,mop_cmp_v_idx) \<in> \<langle>Id::'a rel\<rangle>list_rel \<rightarrow> (Id::'a rel) \<rightarrow> nat_rel \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+    unfolding mop_cmp_v_idx_def
+    apply(intro fun_relI)
+    apply (parametricity)
+    unfolding  list_rel_id_simp
+    apply(rule nrest_relI)
+    by simp
+end
+
+context
+  fixes T :: "(string, enat) acost"
+begin  
+  definition [simp]: "mop_cmpo_v_idx xs v j = doN {
+      ASSERT (j<length xs \<and> xs!j \<noteq> None);
+      consume (RETURNT ( v \<^bold><  the (xs!j))) T
+    }"
+  
+  sepref_register mop_cmpo_v_idx
+  
+  lemma mop_cmpo_v_idx_param: "(mop_cmpo_v_idx,mop_cmpo_v_idx) \<in> \<langle>\<langle>Id::'a rel\<rangle>option_rel\<rangle>list_rel \<rightarrow> (Id::'a rel) \<rightarrow> nat_rel \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+    unfolding mop_cmpo_v_idx_def
+    apply(intro fun_relI)
+    apply (parametricity)
+    unfolding  list_rel_id_simp option_rel_id_simp
+    apply(simp add: Id_def)
+    apply(rule nrest_relI)
+    by simp
+end
+
+
+context
+  fixes T :: "(string, enat) acost"
+begin  
+  definition "mop_cmpo_idx_v xs i v = doN {
+      ASSERT (i<length xs \<and> xs!i \<noteq> None);
+      consume (RETURNT ( the (xs!i) \<^bold>< v)) T
+    }"
+  
+  sepref_register mop_cmpo_idx_v
+  
+  lemma mop_cmpo_idx_v_param: "(mop_cmpo_idx_v,mop_cmpo_idx_v) \<in> \<langle>\<langle>Id::'a rel\<rangle>option_rel\<rangle>list_rel \<rightarrow> nat_rel \<rightarrow> (Id::'a rel) \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+    unfolding mop_cmpo_idx_v_def
+    apply(intro fun_relI)
+    apply (parametricity)
+    unfolding  list_rel_id_simp option_rel_id_simp
+    apply(simp add: Id_def)
+    apply(rule nrest_relI)
+    by simp
+end
         
 (*
   definition refines_cmp_idxs :: "('a list \<Rightarrow> _ \<Rightarrow> assn) \<Rightarrow> (_ \<Rightarrow> 'l::len2 word \<Rightarrow> 'l word \<Rightarrow> 1 word llM) \<Rightarrow> bool" 
@@ -229,14 +322,14 @@ context weak_ordering begin
 end  
   
      
-definition "refines_relp A R Rimpl \<equiv> (uncurry Rimpl,uncurry (RETURN oo R)) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
+definition "refines_relp A name op Rimpl \<equiv> (uncurry Rimpl,uncurry (PR_CONST (SPECc2 name op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
 
 term "GEN_ALGO Rimpl (refines_relp A R)"
 
-lemma gen_refines_relpD: "GEN_ALGO Rimpl (refines_relp A R) \<Longrightarrow> (uncurry Rimpl,uncurry (RETURN oo R)) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
+lemma gen_refines_relpD: "GEN_ALGO Rimpl (refines_relp A name op) \<Longrightarrow> (uncurry Rimpl,uncurry (PR_CONST (SPECc2 name op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
   by (simp add: GEN_ALGO_def refines_relp_def)
 
-lemma gen_refines_relpI[intro?]: "(uncurry Rimpl,uncurry (RETURN oo R)) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn \<Longrightarrow> GEN_ALGO Rimpl (refines_relp A R)"
+lemma gen_refines_relpI[intro?]: "(uncurry Rimpl,uncurry (SPECc2 name op)) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn \<Longrightarrow> GEN_ALGO Rimpl (refines_relp A name op)"
   by (simp add: GEN_ALGO_def refines_relp_def)
   
 (*  
@@ -256,42 +349,43 @@ end
 *)  
 
 (* TODO: Move *)
-
+term array_assn
 locale sort_impl_context = weak_ordering +  
   fixes lt_impl :: "'ai::llvm_rep \<Rightarrow> 'ai \<Rightarrow> 1 word llM"
+    and lt_curr_name :: string
     and elem_assn :: "'a \<Rightarrow> 'ai \<Rightarrow> assn"
-  assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn (\<^bold><))"
+  assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn lt_curr_name (\<^bold><))"
+  assumes lt_curr_name_no_clash: "lt_curr_name \<noteq> ''eo_extract''"
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
 begin
 
-  abbreviation "arr_assn \<equiv> woarray_assn elem_assn"
-  
-  
+  abbreviation "arr_assn \<equiv> array_assn elem_assn"
+
   definition "cmpo_idxs2 xs\<^sub>0 i j \<equiv> doN {
     ASSERT (i \<noteq> j);
-    (vi,xs) \<leftarrow> mop_eo_extract xs\<^sub>0 i;
-    (vj,xs) \<leftarrow> mop_eo_extract xs j;
-    let r = vi \<^bold>< vj;
-    xs \<leftarrow> mop_eo_set xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
-    xs \<leftarrow> mop_eo_set xs j vj;
+    (vi,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 i;
+    (vj,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs j;
+    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi vj;
+    xs \<leftarrow> mop_eo_set 0 xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
+    xs \<leftarrow> mop_eo_set 0 xs j vj;
     unborrow xs xs\<^sub>0;
     RETURN r
   }"
   
   definition "cmpo_v_idx2 xs\<^sub>0 v j \<equiv> doN {
-    (vj,xs) \<leftarrow> mop_eo_extract xs\<^sub>0 j;
-    let r = v \<^bold>< vj;
-    xs \<leftarrow> mop_eo_set xs j vj;
+    (vj,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 j;
+    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) v vj;
+    xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs j vj;
     unborrow xs xs\<^sub>0;
     RETURN r
   }"
   
   definition "cmpo_idx_v2 xs\<^sub>0 i v \<equiv> doN {
-    (vi,xs) \<leftarrow> mop_eo_extract xs\<^sub>0 i;
-    let r = vi \<^bold>< v;
-    xs \<leftarrow> mop_eo_set xs i vi;
+    (vi,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 i;
+    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi v;
+    xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs i vi;
     unborrow xs xs\<^sub>0;
     RETURN r
   }"
@@ -303,77 +397,214 @@ begin
     unborrow xs xs\<^sub>0;
     RETURN b
   }"  
-  
-  lemma cmpo_idxs2_refine: "(uncurry2 cmpo_idxs2, uncurry2 (PR_CONST mop_cmpo_idxs)) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    unfolding cmpo_idxs2_def
-    apply (intro frefI nres_relI)
+
+
+
+
+  lemma cmpo_idxs2_refine: "(uncurry2 cmpo_idxs2, uncurry2 (PR_CONST (mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+    unfolding cmpo_idxs2_def  mop_cmpo_idxs_def unborrow_def SPECc2_def
+    apply (intro frefI nrest_relI)
     apply clarsimp
     subgoal for xs i j
-      apply refine_vcg
-      apply (simp_all add: list_update_swap[of i j] map_update[symmetric])
+      apply(rule gwp_specifies_acr_I)
+      apply (refine_vcg \<open>-\<close>)
+           apply (simp_all add: list_update_swap[of i j] map_update[symmetric])
+      subgoal by force 
+      subgoal by (metis list_update_id list_update_overwrite option.sel)
+      subgoal by auto
+      subgoal by auto
+      subgoal by auto
       done
     done
 
-  lemma cmpo_v_idx2_refine: "(cmpo_v_idx2, PR_CONST mop_cmpo_v_idx) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    unfolding cmpo_v_idx2_def
+
+  definition "E_cmpo_idxs \<equiv> \<lambda>x. acostC (\<lambda>y. (if x=''cmpo_idxs'' then (if  y=''eo_extract'' then 2 else if y=lt_curr_name then 1 else 0) else 0))"
+
+  lemma "mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1  + cost lt_curr_name 1) xs i j \<le> \<Down>Id (timerefine E_cmpo_idxs (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) xs i j))"
+    unfolding mop_cmpo_idxs_def
+    apply(refine_rcg)
+     apply (auto simp: E_cmpo_idxs_def timerefineA_def)  
+    apply(simp add: if_distrib[where x="If _ 2 _" ] )
+    apply(subst mult_zero_right)
+    apply(subst Sum_any.delta)
+    by(auto simp: less_eq_acost_def zero_acost_def cost_def lt_curr_name_no_clash) 
+
+  lemma cmpo_v_idx2_refine: "(cmpo_v_idx2, PR_CONST (mop_cmpo_v_idx (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+     unfolding cmpo_v_idx2_def  mop_cmpo_v_idx_def unborrow_def SPECc2_def
+    apply (intro frefI nrest_relI fun_relI)
     apply clarsimp
-    apply refine_vcg
-    apply auto
+    subgoal for xs i j
+      apply(rule gwp_specifies_acr_I)
+      apply (refine_vcg \<open>-\<close>)
+      subgoal by force
+      subgoal by (metis Pair_inject list_update_id list_update_overwrite option.sel)
+      subgoal by auto
+      subgoal by auto
+      done
     done
 
-    
-  lemma cmpo_idx_v2_refine: "(cmpo_idx_v2, PR_CONST mop_cmpo_idx_v) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    unfolding cmpo_idx_v2_def
+
+  lemma cmpo_idx_v2_refine: "(cmpo_idx_v2, PR_CONST (mop_cmpo_idx_v (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+    unfolding cmpo_idx_v2_def mop_cmpo_idx_v_def unborrow_def SPECc2_def
+    apply (intro frefI nrest_relI fun_relI)
     apply clarsimp
-    apply refine_vcg
-    apply auto
+    subgoal for xs i j
+      apply(rule gwp_specifies_acr_I)
+      apply (refine_vcg \<open>-\<close>)
+      subgoal by force
+      subgoal by (metis Pair_inject list_update_id list_update_overwrite option.sel)
+      subgoal by auto
+      subgoal by auto
+      done
     done
 
-  lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST mop_cmp_idxs))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nres_rel"
-    unfolding cmp_idxs2_def mop_cmp_idxs_def PR_CONST_def
-    apply (intro frefI nres_relI)
-    apply clarsimp
-    apply refine_vcg
-    apply (rule order_trans)
-    apply (rule cmpo_idxs2_refine[param_fo, THEN nres_relD], assumption, (rule IdI)+)
-    by (auto simp: pw_le_iff refine_pw_simps)
+  definition "cmpo_idxs2' xs\<^sub>0 i j \<equiv> doN {
+    ASSERT (i \<noteq> j);
+    (vi,xs) \<leftarrow> mop_oarray_extract xs\<^sub>0 i;
+    (vj,xs) \<leftarrow> mop_oarray_extract xs j;
+    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi vj;
+    xs \<leftarrow> mop_oarray_upd xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
+    xs \<leftarrow> mop_oarray_upd xs j vj;
+    unborrow xs xs\<^sub>0;
+    RETURN r
+  }"
+  
+  definition "cmpo_v_idx2' xs\<^sub>0 v i \<equiv> doN {
+    (vi,xs) \<leftarrow> mop_oarray_extract xs\<^sub>0 i;
+    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) v vi;
+    xs \<leftarrow> mop_oarray_upd xs i vi;
+    unborrow xs xs\<^sub>0;
+    RETURN r
+  }"
+  
+  definition "cmpo_idx_v2' xs\<^sub>0 i v \<equiv> doN {
+    (vi,xs) \<leftarrow> mop_oarray_extract xs\<^sub>0 i;
+    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi v;
+    xs \<leftarrow> mop_oarray_upd xs i vi;
+    unborrow xs xs\<^sub>0;
+    RETURN r
+  }"
+
+  definition "cmp_idxs2' xs\<^sub>0 i j \<equiv> doN {
+    xs \<leftarrow> mop_to_eo_conv xs\<^sub>0;
+    b \<leftarrow> cmpo_idxs2' xs i j;
+    xs \<leftarrow> mop_to_wo_conv xs;
+    unborrow xs xs\<^sub>0;
+    RETURN b
+  }"  
+  sepref_register cmpo_idx_v2' cmpo_v_idx2' 
+
+  definition "E_mop_oarray_extract \<equiv> \<lambda>x. acostC (\<lambda>y. (if x=''eo_extract'' then the_acost (lift_acost mop_array_nth_cost) y else (if x=y then 1 else 0)))"
+
+  lemma E_mop_oarray_extract_alt: "E_mop_oarray_extract = TId(''eo_extract'':=(lift_acost mop_array_nth_cost))"
+    unfolding TId_def E_mop_oarray_extract_def
+    apply(rule ext) apply auto done
+
+  lemma mop_oarray_extract_refine: 
+    "mop_oarray_extract a b \<le> \<Down> Id (timerefine E_mop_oarray_extract (mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) a b))"
+    unfolding mop_oarray_extract_def E_mop_oarray_extract_alt             
     
-        
-  sepref_definition cmp_idxs_impl [llvm_inline] is "uncurry2 cmp_idxs2" :: "(woarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-    unfolding cmp_idxs2_def cmpo_idxs2_def PR_CONST_def
-    supply [sepref_fr_rules] = eo_hnr_dep
-    by sepref
-    
-  sepref_definition cmpo_idxs_impl [llvm_inline] is "uncurry2 cmpo_idxs2" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-    unfolding cmpo_idxs2_def PR_CONST_def
-    supply [sepref_fr_rules] = eo_hnr_dep
+    sorry
+  
+  lemma mop_eo_set_ghost[refine]:
+    "(x,x') \<in> A \<Longrightarrow> (xs,xs') \<in> \<langle>\<langle>A\<rangle>option_rel\<rangle>list_rel \<Longrightarrow> (i,i')\<in>nat_rel \<Longrightarrow> mop_oarray_upd xs i x \<le> \<Down> (\<langle>\<langle>A\<rangle>option_rel\<rangle>list_rel) (timerefine R (mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs' i' x'))"
+    sorry
+  
+  lemma unborrow_refine[refine]: "(a, a') \<in> Id \<Longrightarrow> (b, b') \<in> Id \<Longrightarrow> unborrow a b \<le> \<Down>R (timerefine E (unborrow a' b'))"
+    (* maybe some restriction on E needed? *)
+    sorry
+  
+  lemma SPECc2_refine[refine]:
+    "(a,a')\<in>A \<Longrightarrow> (b,b')\<in>A \<Longrightarrow> SPECc2 lt_curr_name (\<^bold><) a b \<le> \<Down> bool_rel (timerefine E_mop_oarray_extract (SPECc2 lt_curr_name (\<^bold><) a' b'))"
+    sorry
+  
+  lemma wfR_E: "wfR E_mop_oarray_extract" sorry
+  
+  
+  lemma cmpo_v_idx2'_refine: "(cmpo_v_idx2', cmpo_v_idx2) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> nrest_trel Id E_mop_oarray_extract"
+    sorry
+
+  lemma cmpo_idx_v2'_refine: "(cmpo_idx_v2', cmpo_idx_v2) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> nrest_trel Id E_mop_oarray_extract"
+    unfolding cmpo_idx_v2'_def cmpo_idx_v2_def
+    unfolding nrest_trel_def_internal
+    apply (intro frefI nrest_relI fun_relI) 
+    apply safe
+    supply bindT_refine_conc_time[refine] 
+    supply mop_oarray_extract_refine[refine]
+    apply (refine_rcg) 
+    apply refine_dref_type
+    by (simp_all add: wfR_E)
+  
+  
+  
+    lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST (mop_cmp_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1))))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+      unfolding cmp_idxs2_def mop_cmp_idxs_def PR_CONST_def cmpo_idxs2_def unborrow_def SPECc2_def
+      unfolding mop_to_eo_conv_def mop_to_wo_conv_def 
+      apply (intro frefI nrest_relI)
+      apply clarsimp
+      subgoal for xs i j
+        apply(rule gwp_specifies_acr_I)
+        apply (refine_vcg \<open>-\<close>)
+        subgoal apply (simp add: lift_acost_zero) by force
+        subgoal by auto 
+        subgoal by auto
+        subgoal by (metis Pair_inject list_update_id list_update_overwrite list_update_swap option.sel)
+        subgoal by auto
+        subgoal by auto 
+        subgoal by auto 
+        subgoal by auto 
+        done
+      done
+
+
+
+  sepref_def cmpo_idxs_impl [llvm_inline] is "uncurry2 (PR_CONST cmpo_idxs2')" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+    unfolding cmpo_idxs2'_def PR_CONST_def
     by sepref
 
-  sepref_definition cmpo_v_idx_impl [llvm_inline] is "uncurry2 cmpo_v_idx2" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a elem_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-    unfolding cmpo_v_idx2_def PR_CONST_def
-    supply [sepref_fr_rules] = eo_hnr_dep
+  sepref_def cmpo_v_idx_impl [llvm_inline] is "uncurry2 (PR_CONST cmpo_v_idx2')" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a elem_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+    unfolding cmpo_v_idx2'_def PR_CONST_def
+   (* supply [sepref_fr_rules] = eo_hnr_dep *)
     by sepref
-  
-  
-  sepref_definition cmpo_idx_v_impl [llvm_inline] is "uncurry2 cmpo_idx_v2" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
-    unfolding cmpo_idx_v2_def PR_CONST_def
-    supply [sepref_fr_rules] = eo_hnr_dep
+
+
+(* TODO: HNR rules for mop_to_eo_conv and mop_to_wo_conv
+
+  sepref_def cmp_idxs_impl [llvm_inline] is "uncurry2 (PR_CONST cmp_idxs2')" :: "(array_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+    unfolding cmp_idxs2'_def cmpo_idxs2'_def PR_CONST_def
+  apply sepref_dbg_preproc
+  apply sepref_dbg_cons_init
+  apply sepref_dbg_id
+  apply sepref_dbg_monadify
+  apply sepref_dbg_opt_init
+  apply sepref_dbg_trans_keep
+  apply sepref_dbg_trans_step_keep
+  apply sepref_dbg_opt
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_constraints
     by sepref
-    
+    *)
+  
+  sepref_definition cmpo_idx_v_impl [llvm_inline] is "uncurry2 cmpo_idx_v2'" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+    unfolding cmpo_idx_v2'_def PR_CONST_def
+    by sepref
+
+      \<^cancel>\<open>
   context notes [fcomp_norm_unfold] = list_rel_id_simp option_rel_id_simp begin
     sepref_decl_impl (ismop) cmp_idxs_impl.refine[FCOMP cmp_idxs2_refine] .
     sepref_decl_impl (ismop) cmpo_idxs_impl.refine[FCOMP cmpo_idxs2_refine] .
     sepref_decl_impl (ismop) cmpo_v_idx_impl.refine[FCOMP cmpo_v_idx2_refine] .
     sepref_decl_impl (ismop) cmpo_idx_v_impl.refine[FCOMP cmpo_idx_v2_refine] .
   end  
-    
+     \<close>
 end
 
 locale pure_sort_impl_context = sort_impl_context +
   assumes pureA[safe_constraint_rules]: "CONSTRAINT is_pure elem_assn"
   notes [sepref_frame_free_rules] = mk_free_is_pure[OF CONSTRAINT_D[OF pureA]]
 begin
-
+\<^cancel>\<open>
 
   definition "cmp_idxs2' xs i j \<equiv> doN {
     ASSERT (i<length xs \<and> j<length xs);
@@ -421,9 +652,8 @@ begin
     apply rule
     by (rule cmp_idxs_impl.refine)  
   *)  
-    
+    \<close>
 end  
-
 
 (*
   TODO: Explicit ownership collection data structures!
@@ -464,16 +694,19 @@ end
 type_synonym size_t = "64"
 abbreviation "size_assn \<equiv> snat_assn' TYPE(size_t)"
   
-lemma unat_sort_impl_context: "pure_sort_impl_context (\<le>) (<) ll_icmp_ult unat_assn"
+
+thm hn_unat_ops(13)
+lemma unat_sort_impl_context: "pure_sort_impl_context (\<le>) (<) ll_icmp_ult ''icmp_ult'' unat_assn"
   apply intro_locales
   apply (rule linwo)
   apply unfold_locales
-  apply rule
-  apply (rule hn_unat_ops)
+    apply rule 
+    apply (rule hn_unat_ops[unfolded PR_CONST_def]) 
+  apply simp
   apply (solve_constraint)
   done
   
-  
+  \<^cancel>\<open>
 subsection \<open>Parameterized Sorting\<close>  
 
 text \<open>Extension of a weak ordering with explicit carrier set is always possible, 
@@ -503,10 +736,11 @@ definition "pslice_sort_spec cdom pless cparam xs l h \<equiv> doN {
 locale parameterized_weak_ordering =
   fixes cdom :: "'cparam \<Rightarrow> 'a set"
     and pless :: "'cparam \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool"
-    and pcmp :: "'cparam \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool nres"
+    and pcmp :: "'cparam \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> (bool,_) nrest"
+    and pcmp_time :: "ecost"
   assumes weak_ordering_on_lt: "weak_ordering_on_lt (cdom cparam) (pless cparam)"
   assumes pcmp_correct[refine_vcg]: "\<lbrakk> a\<in>cdom cparam; b\<in>cdom cparam\<rbrakk> 
-    \<Longrightarrow> pcmp cparam a b \<le> SPEC (\<lambda>r. r \<longleftrightarrow> pless cparam a b)"
+    \<Longrightarrow> pcmp cparam a b \<le> SPEC (\<lambda>r. r \<longleftrightarrow> pless cparam a b) (\<lambda>_. pcmp_time)"
 begin    
 
   definition "cdom_rel cparam \<equiv> br id (\<lambda>x. x\<in>cdom cparam)"
@@ -701,8 +935,9 @@ begin
     
     
 end
+\<close>
 
-(*
+\<^cancel>\<open>
 locale parameterized_weak_ordering = weak_ordering +
   fixes (*cparam :: 'cparam*)
         cdom :: "'cparam \<Rightarrow> 'a set"
@@ -836,7 +1071,7 @@ begin
     
     
 end
-*)
+\<close>
 
 text \<open>The compare function takes an external parameter.\<close>  
 
@@ -849,12 +1084,14 @@ locale random_access_iterator =
     and to_eo_impl :: "'oi \<Rightarrow> 'oi llM"
     and to_wo_impl :: "'oi \<Rightarrow> 'oi llM"
     and extract_impl :: "'oi \<Rightarrow> 'size::len2 word \<Rightarrow> ('ai \<times> 'oi) llM"
+    and extract_impl_cost :: "ecost" 
     and set_impl :: "'oi \<Rightarrow> 'size word \<Rightarrow> 'ai \<Rightarrow> 'oi llM"
+    and set_impl_cost :: "ecost" 
   assumes
           to_eo_hnr: "(to_eo_impl, mop_to_eo_conv) \<in> wo_assn\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ ai. cnc_assn (\<lambda>x. x=ai) eo_assn)" 
       and to_wo_hnr: "(to_wo_impl, mop_to_wo_conv) \<in> eo_assn\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ ai. cnc_assn (\<lambda>x. x=ai) wo_assn)"
-      and eo_extract_hnr_aux: "(uncurry extract_impl, uncurry mop_eo_extract) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ (ai,_). elem_assn \<times>\<^sub>a cnc_assn (\<lambda>x. x = ai) eo_assn)"
-      and eo_set_hnr_aux: "(uncurry2 set_impl, uncurry2 mop_eo_set) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ ((ai,_),_). cnc_assn (\<lambda>x. x=ai) eo_assn)"
+      and eo_extract_hnr_aux: "(uncurry extract_impl, uncurry (mop_eo_extract (\<lambda>_. extract_impl_cost))) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ (ai,_). elem_assn \<times>\<^sub>a cnc_assn (\<lambda>x. x = ai) eo_assn)"
+      and eo_set_hnr_aux: "(uncurry2 set_impl, uncurry2 (mop_eo_set (\<lambda>_. set_impl_cost))) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ ((ai,_),_). cnc_assn (\<lambda>x. x=ai) eo_assn)"
       
   notes [[sepref_register_adhoc to_eo_impl to_wo_impl extract_impl set_impl]]
 begin
@@ -869,12 +1106,12 @@ begin
       clarsimp_all simp: cnc_assn_def sep_algebra_simps entails_lift_extract_simps)
 
   lemma eo_extract_nodep_hnr_aux: 
-    "(uncurry extract_impl, uncurry mop_eo_extract) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eo_assn"
+    "(uncurry extract_impl, uncurry (mop_eo_extract (\<lambda>_. extract_impl_cost))) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eo_assn"
     using eo_extract_hnr_aux 
     by rl_mono
 
   lemma eo_set_nodep_hnr_aux: 
-    "(uncurry2 set_impl, uncurry2 mop_eo_set) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a eo_assn"
+    "(uncurry2 set_impl, uncurry2 (mop_eo_set (\<lambda>_. set_impl_cost))) \<in> eo_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a eo_assn"
     using eo_set_hnr_aux
     by rl_mono
     
@@ -886,7 +1123,7 @@ begin
     using to_wo_hnr
     by rl_mono
   
-        
+        \<^cancel>\<open>
     
   sepref_decl_impl (ismop,no_register) eo_extract: eo_extract_hnr_aux .
   sepref_decl_impl (ismop) eo_extract_nodep: eo_extract_nodep_hnr_aux .
@@ -904,9 +1141,10 @@ begin
   sepref_definition swap_eo_impl_aux is "uncurry2 swap_eo" :: "wo_assn\<^sup>d *\<^sub>a (snat_assn' TYPE('size))\<^sup>k *\<^sub>a (snat_assn' TYPE('size))\<^sup>k \<rightarrow>\<^sub>a wo_assn"
     unfolding swap_eo_def
     by sepref
-    
+    \<close>
 end    
-    
+
+\<^cancel>\<open>
 concrete_definition (in -) swap_eo_impl[llvm_inline] is random_access_iterator.swap_eo_impl_aux_def
   
 context
@@ -918,7 +1156,7 @@ begin
 end     
        
 (*  sepref_decl_impl (ismop) swap_eo_impl.refine[FCOMP swap_eo_refine] uses mop_list_swap.fref[where A=Id] .*)
-    
+  \<close>  
     
 end
 
@@ -929,7 +1167,7 @@ lemma gen_refines_param_relpD: "GEN_ALGO Rimpl (refines_param_relp P A R)
   \<Longrightarrow> (uncurry2 Rimpl,uncurry2 R) \<in> P\<^sup>k*\<^sub>aA\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
   by (simp add: GEN_ALGO_def refines_param_relp_def)
 
-
+\<^cancel>\<open>
 locale parameterized_sort_impl_context = random_access_iterator + parameterized_weak_ordering + 
   constrains "cdom" :: "'cparam \<Rightarrow> _" and pless :: _ and pcmp :: "'cparam \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool nres"
     and elem_assn :: "'a \<Rightarrow> 'ai::llvm_rep \<Rightarrow> assn"
@@ -985,6 +1223,6 @@ begin
 
 end  
 
-
+\<close>
 
 end
