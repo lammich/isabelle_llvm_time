@@ -1,3 +1,29 @@
+# Donnerstag 18.6.
+
+## Erkenntnisse
+
+- Währungen haben abhängigkeiten
+- unser Ansatz erlaubt es nicht die Abhängigkeiten in den Währungen zu modellieren
+- wie lösen? 3 schritte für das Interface
+    1. alle währungen können noch versteckte abhängigkeiten haben (z.b. "slice_sort_spec")
+    2. alle währungen ohne versteckte Abhaengigkeiten (z.b. "slice_insertionsort_spec")
+    3. llvm implementierung, per hn_refine prädikat und nur konstanter umrechnungen.
+  
+- Inspektion von Heapsort und sift_down
+- Trennung von Korrektheit und Laufzeit (per leof)
+
+## TODOS
+
+### Max
+- leof theorie aufbauen
+- Insertion Sort aufräumen
+- algo <= SPEC X (\infinity) beweise streamlinen.
+  - sollten die gleichen proof obligations rauskommen wie im alten framework
+  - alle zusätzlichen proof obligation involving time gehen per simp weg (weil x <= \infinity <--> True)
+  - Test with sift_down_btu_correct
+  
+  
+
 # Montag 15.6.
 
 insert_impl (hnr) insert3
