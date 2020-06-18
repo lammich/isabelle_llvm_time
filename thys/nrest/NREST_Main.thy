@@ -208,6 +208,17 @@ lemma RETURNT_refine_t[refine]:
   apply(rule RETURNT_refine) by (fact assms)
 
 
+declare RETURNT_refine_t[refine0]
+
+
+lemma timerefineA_TId[refine0]:
+  fixes T :: "(_,enat) acost"
+  shows "T \<le> T' \<Longrightarrow> T \<le> timerefineA TId T'"
+  unfolding timerefineA_def TId_def
+    apply(simp add: if_distrib)
+    apply(subst mult_zero_right)
+    apply(subst Sum_any.delta) by(cases T; cases T'; auto)
+
 
 (* TODO: move *)
 

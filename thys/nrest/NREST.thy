@@ -552,6 +552,8 @@ lemma pw_Sup_nofail[refine_pw_simps]: "nofailT (Sup X) \<longleftrightarrow> (\<
 lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
   unfolding SPEC_def by auto
 
+lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
+  by(auto simp: consume_def split: nrest.splits)
 
 subsection "pw reasoning for enat"
 
@@ -1487,8 +1489,72 @@ definition "monadic_WHILEIT I b f s \<equiv> do {
   }) s
 }"
 
+(* TODO: Move *)
+definition "satminus a b \<equiv> (if b=\<infinity> then 0 else a - the_enat b)"
 
-lemma monadic_WHILEIT_RECT'_conv: "monadic_WHILEIT I b f s \<equiv> do {
+lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow> the_acost t b = \<infinity> \<or> ta \<le> the_enat (the_acost t b)"
+  unfolding satminus_def
+  by auto
+
+lemma inresT_consume[refine_pw_simps]:
+ "inresT (consume M t) x t' \<longleftrightarrow> (inresT M x (satminus t' t))"
+  unfolding satminus_def
+  apply(cases t)
+  apply(auto simp: consume_def  split: nrest.splits )
+  subgoal for n x2 z apply(cases z) by auto  
+  subgoal for n x2 z apply(cases z) by auto  
+  subgoal for x2 z apply(cases z) by auto   
+  done
+definition "consumea T = SPECT [()\<mapsto>T]"
+
+lemma consume_alt_aux:
+  fixes T :: "'a::{comm_monoid_add}"
+  shows "map_option ((+) T) (if xa = x then Some t else None)
+  = (if xa = x then Some (t+T) else None)"
+  by (auto simp: add.commute)
+
+lemma consume_alt:
+  fixes T :: "(_,enat) acost"
+  shows
+   "consume M T = do { r \<leftarrow> M; consumea T; RETURNT r}"
+  term "consume M T"
+  apply(auto simp: pw_acost_eq_iff consumea_def refine_pw_simps project_acost_SPECT')
+  subgoal for b x t
+    apply(rule exI[where x=x])
+    apply(rule exI[where x="(satminus t (the_acost T b))"])
+    apply auto  
+    apply (simp add: satminus_def project_acost_SPECT') apply auto
+    by presburger 
+  subgoal unfolding satminus_def 
+    using inresT_mono by fastforce
+  done
+
+
+lemma 
+  fixes T1 :: "(_,enat) acost"
+  shows
+  consumea_shrink_1:
+    "do { consumea T1; consumea T2 } = consumea (T1 + T2)"
+  unfolding consumea_def  by(auto simp: bindT_def)
+
+lemma 
+  fixes T1 :: "(_,enat) acost"
+  shows
+  consumea_shrink:
+    "do { consumea T1; consumea T2 } = consumea (T1 + T2)"
+    "do { consumea T1; consumea T2; M } = do { consumea (T1 + T2); M }" 
+  by (auto simp add: consumea_shrink_1 simp flip: nres_acost_bind_assoc)
+
+lemma consume_alt2:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "consume M T = do { consumea T; M}"
+  unfolding consumea_def consume_def
+  apply(cases M) by (auto simp: bindT_def) 
+
+
+lemma monadic_WHILEIT_RECT'_conv:
+  fixes f :: "'b \<Rightarrow> ('b, (char list, enat) acost) nrest"
+  shows "monadic_WHILEIT I b f s \<equiv> do {
   RECT' (\<lambda>D s. do {
     ASSERT (I s);
     bv \<leftarrow> b s;
@@ -1499,8 +1565,7 @@ lemma monadic_WHILEIT_RECT'_conv: "monadic_WHILEIT I b f s \<equiv> do {
   }) s
 }"
   unfolding RECT'_def monadic_WHILEIT_def
-  sorry
-
+  unfolding consume_alt2 consumea_def .
 
 definition "monadic_WHILEIT' I b f s \<equiv> do {
   RECT (\<lambda>D s. do {
@@ -1544,24 +1609,7 @@ lemma pac_ASSERT[refine_pw_simps]:
   by (auto simp: zero_acost_def project_acost_def iASSERT_def ASSERT_def RETURNT_def
           split: nrest.splits) 
  
-lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
-  by(auto simp: consume_def split: nrest.splits)
  
-definition "satminus a b \<equiv> (if b=\<infinity> then 0 else a - the_enat b)"
-
-lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow> the_acost t b = \<infinity> \<or> ta \<le> the_enat (the_acost t b)"
-  unfolding satminus_def
-  by auto
-
-lemma inresT_consume[refine_pw_simps]:
- "inresT (consume M t) x t' \<longleftrightarrow> (inresT M x (satminus t' t))"
-  unfolding satminus_def
-  apply(cases t)
-  apply(auto simp: consume_def  split: nrest.splits )
-  subgoal for n x2 z apply(cases z) by auto  
-  subgoal for n x2 z apply(cases z) by auto  
-  subgoal for x2 z apply(cases z) by auto   
-  done
 
 lemma project_acost_SPECT[refine_pw_simps]: 
   "project_acost b (SPECT \<Phi>) = SPECT (\<lambda>x. map_option (\<lambda>m. the_acost m b) (\<Phi> x))"

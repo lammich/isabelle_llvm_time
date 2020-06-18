@@ -961,7 +961,7 @@ proof -
 qed
 
  
-lemma kala:
+lemma monadic_WHILE_rule''_aux1:
   fixes T :: "(_,enat) acost"
   shows "gwp (SPECT [x\<mapsto>T]) Q = Some t \<Longrightarrow> Q x = Some (T+t)"
   unfolding gwp_def minus_p_m_def minus_potential_def apply simp
@@ -975,70 +975,11 @@ lemma kala:
     by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat) 
   done
 
-
-
-  term "map_option ((+) (t1+T))"
-  term "(map_option ((+) t1) \<circ>\<circ>\<circ> (\<circ>)) (map_option ((+) T))"
-
-lemma ps: fixes T :: "('d, enat) acost"
-  shows "(map_option ((+) T) (if xa = x then Some a else None))  = (if xa = x then Some (T+a) else None)"
-  by simp
-  
-lemma pau: 
-  fixes T :: "('d, enat) acost"
-  shows "(map_option ((+) t1) \<circ>\<circ>\<circ> (\<circ>)) (map_option ((+) T)) (\<lambda>e. if e = x then Some 0 else None)
-      = (\<lambda>xa. if xa = x then Some (t1 + T) else None)"
-  unfolding comp_def apply(subst ps) apply(subst ps) apply (rule ext) by simp
-
-
-lemma ka: "{\<lambda>xa. if xa = x then Some (t1 + T) else None |x t1. x2 x = Some t1}
-      = (\<lambda>(x,t1) xa. if xa = x then Some (t1 + T) else None) ` {(x,t1) |x t1. x2 x = Some t1}"
-  by auto
-
-lemma sd: "(\<lambda>f. f y) ` {g x t1 |x t1. x2 x = Some t1}
-      = {g x t1 y |x t1. x2 x = Some t1}" by blast
-
-
-lemma consume_alt:
+lemma consume_alt3:
   fixes M :: "(_,(_,enat) acost) nrest" 
   shows "consume M T = do { r \<leftarrow> M; _ \<leftarrow> SPECT [()\<mapsto>T]; RETURNT r}"
-  unfolding bindT_def consume_def
-  apply(cases M) apply simp apply simp unfolding RETURNT_def apply simp
-  apply(subst pau) unfolding Sup_nrest_def apply simp
-  apply(rule ext) apply simp 
-proof (goal_cases)
-  case (1 x2 y)
-  have *: "(SUP f\<in>{\<lambda>xa. if xa = x then Some (t1 + T) else None |x t1. x2 x = Some t1}. f y)
-        = Sup ({   if y = x then Some (t1 + T) else None  |x t1. x2 x = Some t1})"
-    apply(rule arg_cong[where f=Sup])
-    apply(subst sd) by simp 
-
-  { assume "x2 y = None"
-    then     consider "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
-          = {}" | "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
-          = {None}" by force
-  } note pf=this
-  { fix a 
-    assume "x2 y = Some a"
-    then     consider "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
-          = {Some(a+T)}" | "{f. \<exists>x t1. (y = x \<longrightarrow> f = Some (t1 + T) \<and> x2 x = Some t1) \<and> (y \<noteq> x \<longrightarrow> f = None \<and> x2 x = Some t1)}
-          = {Some(a+T),None}" by force
-  } note pf2=this
-  
-  show ?case unfolding *  apply(cases "x2 y")
-     apply simp_all
-    subgoal
-      apply(cases rule: pf) apply simp
-      subgoal premises p apply(subst p(2)) by (simp add: Sup_option_def)
-      subgoal premises p apply(subst p(2)) by (simp add: Sup_option_def)
-      done
-    subgoal 
-      apply(cases rule: pf2) apply simp
-      subgoal premises p apply(subst p(2)) by (simp add: add.commute Sup_option_def)
-      subgoal premises p apply(subst p(2)) by (simp add: add.commute Sup_option_def)
-      done
-    done
-qed
+  using consume_alt  apply (simp add: consumea_def)
+  by blast
 
 lemma
   fixes r :: "('a, (char list, enat) acost) nrest"
@@ -1075,23 +1016,23 @@ next
     subgoal 
       apply(rule gwp_consume)
       apply(rule vcg_rules')
-      apply(drule kala) by simp
+      apply(drule monadic_WHILE_rule''_aux1) by simp
     subgoal
       apply(rule z) apply simp
       done
     subgoal
-      apply(drule kala)
+      apply(drule monadic_WHILE_rule''_aux1)
       apply(rule gwp_consume)
-      unfolding consume_alt
+      unfolding consume_alt3
       apply(subst (asm) gwp_bindT)
       apply (rule gwp_bindT_I)
       subgoal premises pr
         apply(rule gwp_conseq) 
          apply(subst pr(6)) apply simp
         apply(subst (asm) gwp_bindT)
-      apply(drule kala)
+      apply(drule monadic_WHILE_rule''_aux1)
         unfolding RETURNT_alt
-        apply(drule kala) apply (auto split: if_splits)
+        apply(drule monadic_WHILE_rule''_aux1) apply (auto split: if_splits)
         apply(rule gwp_bindT_I)
         apply(rule gwp_SPECT_I) 
       apply(rule IH) apply simp by (simp add: add.commute)
@@ -1380,7 +1321,7 @@ proof  -
       apply(rule step)
        apply simp
       apply(rule gwp_SPECT_I)
-      apply(drule kala) apply safe
+      apply(drule monadic_WHILE_rule''_aux1) apply safe
     proof (goal_cases)
       case (1 x t'' M)
       have A1: "(\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
@@ -1527,6 +1468,45 @@ lemma neueWhile_rewrite: "mm22 (Q s) (Someplus (Some (t + cost ''call'' 1)) (mm3
 
 definition "loop_body_condition Is' Es' Es = (if Is' \<and> Es' \<le> Es then Some (lift_acost (Es - Es')) else None)"
 definition "loop_exit_condition Qs t Es Es0 = (if Es \<le> Es0 then minus_cost Qs (Some (t + cost ''call'' 1 + (lift_acost (Es0 - Es)))) else Some top)"
+
+
+lemma plus_minus_adjoint_ecost: "A \<le> B \<Longrightarrow> t \<le> B - A \<longleftrightarrow> t + A \<le> (B::(_,enat) acost)"
+  apply(cases t; cases B, cases A)
+  apply(auto simp: less_eq_acost_def minus_acost_alt plus_acost_alt)
+  subgoal by (smt ab_semigroup_add_class.add_ac(1) add.commute add_diff_cancel_enat le_iff_add plus_eq_infty_iff_enat)
+  subgoal by (simp add: needname_adjoint)
+  done
+
+lemma loop_body_conditionI:
+  assumes "lift_acost Es' \<le> lift_acost Es"
+  assumes "t + lift_acost Es' \<le> lift_acost Es"
+  assumes "Is'"
+  shows  "Some t \<le> loop_body_condition Is' Es' Es"
+  unfolding loop_body_condition_def
+  using assms
+  apply (auto simp: lift_acost_minus[symmetric] intro: lift_acost_mono') 
+  apply(subst plus_minus_adjoint_ecost)
+  by simp_all 
+
+lemma le_minus_cost_if_gt_Someplus: 
+  fixes Q :: "('b, enat) acost option"
+  shows "Someplus (Some t) R \<le> Q \<Longrightarrow> Some t \<le> minus_cost Q R"
+  by(rule pff[unfolded mm22_minus_cost]) 
+                    
+lemma le_minus_cost_Some_if_gt_Some: 
+  fixes Q :: "('b, enat) acost option"
+  shows "Some (t + R) \<le> Q \<Longrightarrow> Some t \<le> minus_cost Q (Some R)"
+  apply(rule le_minus_cost_if_gt_Someplus) by simp
+
+thm loop_exit_condition_def
+lemma loop_exit_conditionI:
+  assumes  "Es \<le> Es0 \<Longrightarrow>  Some ((lift_acost (Es0 - Es)) + (t' + (t + cost ''call'' 1 ))) \<le> Qs"
+  shows "Some t' \<le> loop_exit_condition Qs t Es Es0"
+  using assms unfolding loop_exit_condition_def
+  apply simp apply safe
+  apply(rule le_minus_cost_Some_if_gt_Some) by (simp add: add_ac)
+
+
 
 lemma 
   fixes s0 :: 'a and I :: "'a \<Rightarrow> bool" and E :: "'a \<Rightarrow> (string, nat) acost" and t :: "(string, enat) acost"
