@@ -1,3 +1,29 @@
+# Montag 22.6.
+
+## TODOs
+### Max
+- gwp leof regeln
+- refinement and vcg proofs bis functional goals
+- issues erstellen
+
+### Peter
+- beweise retten
+
+## Beobachtungen
+- monadische operationen wie "lchild", "has_lchild" mit abstrakten währungen lassen
+- TODO: Feingliederung in Sepref automatisieren, wenn die ausdrücke monadifiziert werden.
+- ODER: händisch (weit im konkreten, ein schritt vor dem sepref Schritt) mit kosten_funktionen (first iteration)
+
+## interessant
+- Sorting_Heapsort.sift_down_param
+  - parametrische compare funktion
+  - "bis zum Schluss eine parametrische compare funktion vorhalten (auch durch Sepref)"
+  - count "foreign function calls"
+  - sort kostet "O (n * log n) cmp_funs"
+  - daraus folgern,  falls cmp_fun kostet O(m) -> gesamt kostet O (n * log n * m)
+  - CMP_ASSN cmp mycmp_impl 
+  - "higher order separation logic" -> check for related work;
+
 # Donnerstag 18.6.
 
 ## Erkenntnisse
