@@ -222,7 +222,80 @@ lemma timerefineA_TId[refine0]:
 
 (* TODO: move *)
 
+lemma timerefine_SPECT_map: "timerefine E (SPECT [x'\<mapsto>t]) = SPECT [x'\<mapsto>timerefineA E t]"
+  by (auto simp: timerefine_def timerefineA_def intro!: ext)
+
+lemma SPECT_refine_t[refine]:
+  fixes t :: "(_,enat) acost"
+  assumes "(x,x')\<in>R"
+    and "t\<le> timerefineA E t'"
+  shows "SPECT [x\<mapsto>t] \<le> \<Down>R (timerefine E (SPECT [x'\<mapsto>t']))"
+  apply(subst timerefine_SPECT_map)
+  using assms apply(auto simp: pw_acost_le_iff refine_pw_simps)
+  apply(cases t) apply (auto simp: less_eq_acost_def)
+  subgoal for b ta xa apply(rule order.trans[where b="xa b"]) by auto
+  done
+lemma consume_refine_easy:
+  fixes M :: "('e, ('b, enat) acost) nrest"
+  shows "\<lbrakk>t \<le> t'; M \<le> \<Down> R (   M')\<rbrakk> \<Longrightarrow> NREST.consume M t \<le> \<Down>R (  (NREST.consume M' t'))" 
+  apply(subst conc_fun_consume)
+  apply(rule consume_mono) by auto
+
+(* TODO: move *)
+definition "struct_preserving E \<equiv> (\<forall>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t))
+                                   \<and> (\<forall>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t))"
+
+lemma struct_preservingI:
+  assumes "\<And>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t)"
+     "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
+  shows "struct_preserving E"
+  using assms unfolding struct_preserving_def by auto
+
+lemma struct_preservingD:
+  assumes "struct_preserving E"
+  shows "\<And>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t)"
+     "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
+  using assms unfolding struct_preserving_def by auto
+
+lemma "(a,a)\<in>Id" unfolding Id_def by simp
 
 
+lemma RECT_refine_t:
+  assumes M: "mono2 body"
+  assumes R0: "(x,x')\<in>R"
+  assumes RS: "\<And>f f' x x'. \<lbrakk> \<And>x x'. (x,x')\<in>R \<Longrightarrow> f x \<le>\<Down>S (timerefine E (f' x')); (x,x')\<in>R \<rbrakk> 
+    \<Longrightarrow> body f x \<le>\<Down>S (timerefine E (body' f' x'))"
+  shows "RECT (\<lambda>f x. body f x) x \<le>\<Down>S (timerefine E (RECT (\<lambda>f' x'. body' f' x') x'))"
+  unfolding RECT_flat_gfp_def
+  apply (clarsimp simp add: M) 
+  apply (rule flatf_fixp_transfer[where 
+        fp'="flatf_gfp body" 
+    and B'=body 
+    and P="\<lambda>x x'. (x',x)\<in>R", 
+    OF _ _ flatf_ord.fixp_unfold[OF M[THEN trimonoD_flatf_ge]] R0])
+  apply simp
+  apply (simp add: trimonoD_flatf_ge)
+  by (rule RS)
+
+
+lemma monadic_WHILEIT_refine_t[refine]:  
+  fixes b :: "'c \<Rightarrow> (bool, (char list, enat) acost) nrest"
+  assumes wfR[simp]:  "wfR E"
+  assumes sp_E: "struct_preserving E"
+  assumes [refine]: "(s',s) \<in> R"
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s \<rbrakk> \<Longrightarrow> I' s'"  
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s' \<rbrakk> \<Longrightarrow> b' s' \<le>\<Down>bool_rel (timerefine E (b s))"
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s'; nofailT (b s);  \<exists>t e. inresT (project_acost  e (b s)) True t \<rbrakk> \<Longrightarrow> f' s' \<le>\<Down>R (timerefine E (f s))"
+  shows "monadic_WHILEIT I' b' f' s' \<le> \<Down>R (timerefine E (monadic_WHILEIT I b f s))"
+  unfolding monadic_WHILEIT_def unfolding MIf_def 
+  apply (refine_rcg bindT_refine_conc_time RECT_refine_t IdI wfR struct_preservingD[OF sp_E]) 
+  apply simp  
+  subgoal by refine_mono
+  apply (assumption?; auto)+
+  apply (refine_rcg consume_refine_easy bindT_refine_conc_time wfR struct_preservingD[OF sp_E] RETURNT_refine_t )
+       apply (assumption?; auto)+
+  apply(rule RETURNT_refine_t) 
+  apply (assumption?; auto)+ 
+  done
 
 end
