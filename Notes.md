@@ -1,3 +1,55 @@
+# Montag 22.6.
+
+## TODOs
+### Max
+- gwp leof regeln
+- refinement and vcg proofs bis functional goals
+- issues erstellen
+
+### Peter
+- beweise retten
+
+## Beobachtungen
+- monadische operationen wie "lchild", "has_lchild" mit abstrakten währungen lassen
+- TODO: Feingliederung in Sepref automatisieren, wenn die ausdrücke monadifiziert werden.
+- ODER: händisch (weit im konkreten, ein schritt vor dem sepref Schritt) mit kosten_funktionen (first iteration)
+
+## interessant
+- Sorting_Heapsort.sift_down_param
+  - parametrische compare funktion
+  - "bis zum Schluss eine parametrische compare funktion vorhalten (auch durch Sepref)"
+  - count "foreign function calls"
+  - sort kostet "O (n * log n) cmp_funs"
+  - daraus folgern,  falls cmp_fun kostet O(m) -> gesamt kostet O (n * log n * m)
+  - CMP_ASSN cmp mycmp_impl 
+  - "higher order separation logic" -> check for related work;
+
+# Donnerstag 18.6.
+
+## Erkenntnisse
+
+- Währungen haben abhängigkeiten
+- unser Ansatz erlaubt es nicht die Abhängigkeiten in den Währungen zu modellieren
+- wie lösen? 3 schritte für das Interface
+    1. alle währungen können noch versteckte abhängigkeiten haben (z.b. "slice_sort_spec")
+    2. alle währungen ohne versteckte Abhaengigkeiten (z.b. "slice_insertionsort_spec")
+    3. llvm implementierung, per hn_refine prädikat und nur konstanter umrechnungen.
+  
+- Inspektion von Heapsort und sift_down
+- Trennung von Korrektheit und Laufzeit (per leof)
+
+## TODOS
+
+### Max
+- leof theorie aufbauen
+- Insertion Sort aufräumen
+- algo <= SPEC X (\infinity) beweise streamlinen.
+  - sollten die gleichen proof obligations rauskommen wie im alten framework
+  - alle zusätzlichen proof obligation involving time gehen per simp weg (weil x <= \infinity <--> True)
+  - Test with sift_down_btu_correct
+  
+  
+
 # Montag 15.6.
 
 insert_impl (hnr) insert3
