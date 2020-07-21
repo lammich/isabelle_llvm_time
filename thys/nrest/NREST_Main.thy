@@ -280,7 +280,7 @@ lemma RECT_refine_t:
 
 lemma monadic_WHILEIT_refine_t[refine]:  
   fixes b :: "'c \<Rightarrow> (bool, (char list, enat) acost) nrest"
-  assumes wfR[simp]:  "wfR E"
+  assumes wfR[simp]:  "wfR'' E"
   assumes sp_E: "struct_preserving E"
   assumes [refine]: "(s',s) \<in> R"
   assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s \<rbrakk> \<Longrightarrow> I' s'"  
@@ -288,14 +288,51 @@ lemma monadic_WHILEIT_refine_t[refine]:
   assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s'; nofailT (b s);  \<exists>t e. inresT (project_acost  e (b s)) True t \<rbrakk> \<Longrightarrow> f' s' \<le>\<Down>R (timerefine E (f s))"
   shows "monadic_WHILEIT I' b' f' s' \<le> \<Down>R (timerefine E (monadic_WHILEIT I b f s))"
   unfolding monadic_WHILEIT_def unfolding MIf_def 
-  apply (refine_rcg bindT_refine_conc_time RECT_refine_t IdI wfR struct_preservingD[OF sp_E]) 
+  apply (refine_rcg bindT_refine_conc_time2 RECT_refine_t IdI wfR struct_preservingD[OF sp_E]) 
   apply simp  
   subgoal by refine_mono
   apply (assumption?; auto)+
-  apply (refine_rcg consume_refine_easy bindT_refine_conc_time wfR struct_preservingD[OF sp_E] RETURNT_refine_t )
+  apply (refine_rcg consume_refine_easy bindT_refine_conc_time2 wfR struct_preservingD[OF sp_E] RETURNT_refine_t )
        apply (assumption?; auto)+
   apply(rule RETURNT_refine_t) 
   apply (assumption?; auto)+ 
   done
+
+
+
+
+
+lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
+  by auto
+
+lemma timerefineA_upd:
+  fixes R :: "'b \<Rightarrow> ('c, enat) acost"
+  shows "timerefineA (R(n:=y)) (cost m x) = (if n=m then acostC (\<lambda>z. x * the_acost y z) else timerefineA R (cost m x))"
+  unfolding timerefineA_def
+  by (auto simp: cost_def zero_acost_def timerefineA_upd_aux)
+
+lemma timerefineA_TId_aux: "the_acost x a * (if b then (1::enat) else 0)
+    = (if b then the_acost x a  else 0)"
+  apply(cases b) by auto
+
+lemma timerefineA_TId_eq:
+  shows "timerefineA TId x = (x:: ('b, enat) acost)"
+  unfolding timerefineA_def TId_def 
+  by (simp add: timerefineA_TId_aux)
+
+lemma wfR_TId: "wfR TId"
+  unfolding TId_def wfR_def apply simp
+  sorry
+
+lemma "wfR' TId"
+  unfolding TId_def wfR'_def by simp
+lemma wfR''_TId: "wfR'' TId"
+  unfolding TId_def wfR''_def by simp
+
+
+lemma sp_TId: "struct_preserving (TId::_\<Rightarrow>(string, enat) acost)" 
+  by (auto intro!: struct_preservingI simp: timerefineA_upd timerefineA_TId)
+
+
 
 end

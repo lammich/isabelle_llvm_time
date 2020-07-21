@@ -1,6 +1,6 @@
 theory Sorting_Heapsort
-imports Sorting_Setup
-begin
+imports Sorting_Setup "../../nrest/NREST_Automation"
+begin                                       
 
 (*
   TODO: Fix section structure
@@ -541,73 +541,252 @@ context weak_ordering begin
     by auto
 
 end  
+
+(* TODO: Move *)               
+context
+  fixes  T :: "(nat \<times> nat \<times> nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_list_swap  :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list, _) nrest"
+    where [simp]: "mop_list_swap xs i j \<equiv> do { ASSERT (i<length xs \<and> j<length xs); consume (RETURNT (swap xs i j)) (T (length xs,i,j)) }"
+  sepref_register "mop_list_swap"
+end
+
+lemma param_mop_list_get:
+  "(mop_list_swap T, mop_list_swap T) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_list_swap_def swap_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by auto              
+
     
 context heap_context begin  
-  
-  definition sift_down :: "nat \<Rightarrow> 'a list \<Rightarrow> 'a list nres" where "sift_down i\<^sub>0 xs \<equiv> doN {
+
+context
+  fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_has_lchild  :: "nat \<Rightarrow> (bool, _) nrest"
+    where [simp]: "mop_has_lchild i \<equiv> do { consume (RETURNT (has_lchild i)) (T (i)) }"
+  sepref_register "mop_has_lchild"
+end
+
+lemma mop_has_lchild:
+  "(mop_has_lchild T, mop_has_lchild T) \<in> nat_rel \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_has_lchild_def 
+  by (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+
+context
+  fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_has_rchild  :: "nat \<Rightarrow> (bool, _) nrest"
+    where [simp]: "mop_has_rchild i \<equiv> do { consume (RETURNT (has_rchild i)) (T (i)) }"
+  sepref_register "mop_has_rchild"
+end
+
+lemma mop_has_rchild:
+  "(mop_has_rchild T, mop_has_rchild T) \<in> nat_rel \<rightarrow> \<langle>bool_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_has_rchild_def 
+  by (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+
+context
+  fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_lchild  :: "nat \<Rightarrow> (nat, _) nrest"
+    where [simp]: "mop_lchild i \<equiv> do { consume (RETURNT (lchild i)) (T (i)) }"
+  sepref_register "mop_lchild"
+end
+
+lemma mop_lchild:
+  "(mop_lchild T, mop_lchild T) \<in> nat_rel \<rightarrow> \<langle>nat_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_lchild_def 
+  by (auto simp: pw_acost_le_iff refine_pw_simps)
+
+context
+  fixes  T :: "(nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_rchild  :: "nat \<Rightarrow> (nat, _) nrest"
+    where [simp]: "mop_rchild i \<equiv> do { consume (RETURNT (rchild i)) (T (i)) }"
+  sepref_register "mop_rchild"
+end
+
+lemma mop_rchild:
+  "(mop_rchild T, mop_rchild T) \<in> nat_rel \<rightarrow> \<langle>nat_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI) 
+  by (auto simp: pw_acost_le_iff refine_pw_simps)
+ 
+
+(* TODO: *)
+
+(* OPTION A: verfeinerung mit zusatz information*)
+lemma "a2 \<le> timerefine_NONSTANDARD a"
+  (* refinement in lockstep *)
+  oops
+
+(* OPTION B: verfeinerung mit zusatz information*)
+term "(\<le>\<^sub>n)"
+
+term "m \<le> SPECT Q"
+term "Some 0 \<le> gwp m Q"
+
+term "m \<le>\<^sub>n SPECT Q"
+term " Some 0 \<le> (if nofailT m then gwp m Q else Some \<infinity>)"
+term "gwp\<^sub>n m Q \<equiv> (if nofailT m then gwp m Q else Some \<infinity>)"
+
+
+lemma le_if_leof: "nofailT a \<Longrightarrow> a \<le>\<^sub>n b \<Longrightarrow> a \<le> b"
+  unfolding le_or_fail_def by simp
+
+(* trennen von  korrektheit und  laufzeit*)
+lemma assumes correctness: "a \<le> SPEC a_spec (\<lambda>_. top)"
+  and time: " a \<le>\<^sub>n SPEC (\<lambda>_. True) T"
+shows separate_correct_and_time: "a \<le> SPEC a_spec T"
+proof -
+  from correctness have [simp]: "nofailT a"
+    unfolding nofailT_def by(cases a; simp add: SPEC_def)
+  have "a \<le> inf (SPEC a_spec (\<lambda>_. top)) (SPEC (\<lambda>_. True) T)"
+    using time correctness by (auto intro: inf_greatest  le_if_leof)
+  also have "\<dots> = SPEC a_spec T"
+    by(auto simp add: SPEC_def)
+  finally show "a \<le> SPEC a_spec T" .
+qed
+
+
+abbreviation "mop_has_lchildF \<equiv> mop_has_lchild (\<lambda>_. top)"
+abbreviation "mop_has_rchildF \<equiv> mop_has_rchild (\<lambda>_. top)"
+abbreviation "mop_lchildF \<equiv> mop_lchild (\<lambda>_. top)"
+abbreviation "mop_rchildF \<equiv> mop_rchild (\<lambda>_. top)"
+abbreviation "mop_list_getF \<equiv> mop_list_get (\<lambda>_. top)"
+abbreviation "mop_list_setF \<equiv> mop_list_set (\<lambda>_. top)"
+abbreviation "mop_list_swapF \<equiv> mop_list_swap (\<lambda>_. top)"
+abbreviation "mop_cmp_idxsF \<equiv> mop_cmp_idxs top"
+abbreviation "SPECc2F aop \<equiv> ( (\<lambda>a b. consume (RETURNT (aop a b)) top))"
+
+abbreviation "mop_has_lchildN \<equiv> mop_has_lchild (\<lambda>_. cost ''has_lchild'' 1)"
+abbreviation "mop_has_rchildN \<equiv> mop_has_rchild (\<lambda>_. cost ''has_rchild'' 1)"
+abbreviation "mop_lchildN \<equiv> mop_lchild (\<lambda>_. cost ''lchild'' 1)"
+abbreviation "mop_rchildN \<equiv> mop_rchild (\<lambda>_. cost ''rchild'' 1)"
+abbreviation "mop_list_getN \<equiv> mop_list_get (\<lambda>_. cost ''list_get'' 1)"
+abbreviation "mop_list_setN \<equiv> mop_list_set (\<lambda>_. cost ''list_set'' 1)"
+
+
+  definition sift_down :: "nat \<Rightarrow> 'a list \<Rightarrow> ('a list,_) nrest" where "sift_down i\<^sub>0 xs \<equiv> doN {
     ASSERT (in_heap i\<^sub>0 \<and> i\<^sub>0<length xs);
-    (xs,i,_) \<leftarrow> WHILEIT (\<lambda>(xs,i,ctd). in_heap i \<and> i\<ge>i\<^sub>0) 
-      (\<lambda>(xs,i,ctd). has_rchild i \<and> ctd) 
+    _ \<leftarrow> consumea top;
+    (xs,i,_) \<leftarrow> monadic_WHILEIT (\<lambda>(xs,i,ctd). in_heap i \<and> i\<ge>i\<^sub>0) 
+      (\<lambda>(xs,i,ctd). doN {                
+                          hrc \<leftarrow> mop_has_rchildF i;
+                          SPECc2F  (\<and>)  hrc ctd
+                        }) 
       (\<lambda>(xs,i,ctd). doN {
-        lc \<leftarrow> mop_list_get xs (lchild i);
-        rc \<leftarrow> mop_list_get xs (rchild i);
-        v \<leftarrow> mop_list_get xs i;
+        lci \<leftarrow> mop_lchildF i;
+        lc \<leftarrow> mop_list_getF xs lci;
+        rci \<leftarrow> mop_rchildF i;
+        rc \<leftarrow> mop_list_getF xs rci;
+        v \<leftarrow> mop_list_getF xs i;
       
-        if lc \<^bold>< rc then
-          if v \<^bold>< rc then doN {
-            xs \<leftarrow> mop_list_swap xs i (rchild i);
-            RETURN (xs,rchild i,True)
-          } else RETURN (xs,i,False)
-        else if v \<^bold>< lc then doN {
-          xs \<leftarrow> mop_list_swap xs i (lchild i);
-          RETURN (xs,lchild i,True)
-        } else RETURN (xs,i,False)
-      }) 
+        b1 \<leftarrow> SPECc2F (\<^bold><)  lc rc;
+        MIf b1 (doN {
+          b2 \<leftarrow> SPECc2F  (\<^bold><)  v rc;
+          MIf b2 (doN {
+                xs \<leftarrow> mop_list_swapF xs i rci;
+                RETURN (xs,rci,True)
+              })
+             (RETURN (xs,i,False))
+          })
+        ( 
+          doN {
+          b3 \<leftarrow> SPECc2F  (\<^bold><)  v lc;
+          MIf b3 (doN {
+                  xs \<leftarrow> mop_list_swapF xs i lci;
+                  RETURN (xs,lci,True)
+               })
+             ( RETURN (xs,i,False))
+          }
+      ) }) 
     (xs,i\<^sub>0,True);
   
     ASSERT (in_heap i \<and> i\<ge>i\<^sub>0);
     ASSERT (has_lchild i \<longrightarrow> lchild i < length xs);
     
-    if has_lchild i \<and> xs!i \<^bold>< xs!lchild i then
-      mop_list_swap xs i (lchild i)
-    else 
-      RETURN xs
+    hlc \<leftarrow> mop_has_lchildF i;
+    MIf hlc (doN {
+          lci \<leftarrow> mop_lchildF i;
+          b \<leftarrow> mop_cmp_idxs top xs i lci;
+          MIf b (mop_list_swapF xs i lci)
+              (doN { _ \<leftarrow> consumea top; RETURN xs })
+          })
+      ( doN {_ \<leftarrow> consumea top; RETURN xs })
       
   }"
 
   lemma in_heap_len_bound: "in_heap i \<Longrightarrow> h\<le>length xs \<Longrightarrow> i<length xs"
     using in_heap_bounds(2) less_le_trans by blast
-  
-    
-    
+
+  thm monadic_WHILE_rule_real
+  thm gwp_monadic_WHILEIET
+
+
+
+lemma prod3: "m\<le> f x y z \<Longrightarrow> m \<le> (case (x,y,z) of (a,b,c) \<Rightarrow> f a b c)"
+  by auto
+
+term emb
+
+definition "BREAK I T = (if I then Some (T::(_,enat)acost) else None)"
+
+lemma BREAK_I: "I \<Longrightarrow> Some t \<le> BREAK I top"
+  unfolding BREAK_def by auto
+
+thm vcg_rules'
+
+
+lemma if_rule2: "(c \<Longrightarrow> Some x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then a else None)"
+  by auto
+lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
+  by auto
+
+
+ 
+
+thm refine_pw_simps
+lemma top_acost_absorbs: "top + (x::(_,enat)acost) = top"
+  apply(cases x) by (auto simp: top_acost_def plus_acost_alt top_enat_def)
+
+declare less_eq_option_Some_None[simp]
+lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> T=T' \<and> b"
+  by (auto split: if_splits)
+
   lemma sift_down_btu_correct:
     assumes "heapify_btu_invar xs\<^sub>0 l' xs" "l<l'"
-    shows "sift_down (l'-Suc 0) xs \<le> SPEC (\<lambda>xs'. heapify_btu_invar xs\<^sub>0 (l'-Suc 0) xs')"
+    shows "sift_down (l'-Suc 0) xs \<le> SPEC (\<lambda>xs'. heapify_btu_invar xs\<^sub>0 (l'-Suc 0) xs') (\<lambda>_. top)"
     unfolding sift_down_def 
-    apply (refine_vcg WHILEIT_rule_amend_invar[where 
-      I="\<lambda>(xs,i,ctd). 
+    unfolding SPEC_def
+    apply(rule gwp_specifies_I)
+
+    supply wr = monadic_WHILE_rule_real[OF refl, where 
+      I="\<lambda>(xs,i,ctd). if (in_heap i \<and> i\<ge>(l'-Suc 0) \<and>
           sift_down_btu_invar xs\<^sub>0 (l'-Suc 0) i xs 
           \<and> h\<le>length xs
-          \<and> (\<not>ctd \<longrightarrow> has_rchild i \<and> xs!i\<^bold>\<ge>xs!lchild i \<and> xs!i\<^bold>\<ge>xs!rchild i)"
+          \<and> (\<not>ctd \<longrightarrow> has_rchild i \<and> xs!i\<^bold>\<ge>xs!lchild i \<and> xs!i\<^bold>\<ge>xs!rchild i)) then Some top else None"
       and
       R = "measure (\<lambda>(xs,i,ctd). (if ctd then 1 else 0) + h - i)"    
-    ]) 
-    using assms
+    ]
+    unfolding mop_has_rchild_def mop_has_lchild_def mop_lchild_def mop_rchild_def
+          mop_cmp_idxs_def SPECc2_def mop_list_get_def mop_list_swap_def consumea_def
+    apply (refine_vcg \<open>-\<close> rules: wr if_rule2 if_rule prod3 BREAK_I) 
+    using assms    
     unfolding heapify_btu_invar_def sift_down_btu_invar_def
-    apply (simp_all del: in_heap_simps)
+    apply (simp_all add: ifSome_iff del: in_heap_simps)
     apply (all \<open>(auto simp: in_heap_len_bound diff_less_mono2 wo_leI; fail)?\<close>)
-    subgoal unfolding is_heap_btu_def by (auto intro!: in_heapI)
-    subgoal unfolding is_heap_btu_def by auto
-    subgoal using btu_sift_down_init by auto
-    subgoal unfolding is_heap_btu_def by auto
-    subgoal by (force simp: asym wo_leI simp: btu_heapify_down_right)   
-    subgoal using children_greater(2) le_trans less_imp_le_nat by blast
-    
+    subgoal by (force simp:  asym wo_leI simp: btu_heapify_down_right)  
+
     subgoal by (simp add: diff_less_mono2 less_Suc_eq)
     subgoal by simp (metis wo_leI wo_less_trans)
     subgoal by (simp add: diff_less_mono less_imp_le)
     subgoal by (force simp add: btu_heapify_down_left asym wo_leI)
-    subgoal using children_greater(1) dual_order.strict_trans2 less_imp_le by blast
     subgoal by (simp add: diff_less_mono2 less_Suc_eq)
     subgoal apply simp using local.trans wo_leI by blast
     subgoal by (simp add: diff_less_mono less_imp_le)
@@ -617,25 +796,34 @@ context heap_context begin
     subgoal 
       apply clarsimp
       using btu_sift_down_term1 btu_sift_down_term2 btu_sift_down_term3 wo_leI by blast
-    done    
-  
+    subgoal 
+      apply clarsimp
+      using btu_sift_down_term1 btu_sift_down_term2 btu_sift_down_term3 wo_leI by blast
+
+    subgoal using btu_sift_down_init apply (auto simp: top_acost_absorbs)  
+      using is_heap_btu_def by blast
+    subgoal by (auto split: prod.splits simp: ifSome_iff)
+    subgoal unfolding is_heap_btu_def by (auto intro!: in_heapI)
+    done
 
   lemma sift_down_restore_correct: 
     assumes A: "l<h" "sift_down_invar xs\<^sub>0 l xs"
-    shows "sift_down l xs \<le> SPEC (\<lambda>xs'. slice_eq_mset l h xs' xs\<^sub>0 \<and> is_heap xs')"  
+    shows "sift_down l xs \<le> SPEC (\<lambda>xs'. slice_eq_mset l h xs' xs\<^sub>0 \<and> is_heap xs') (\<lambda>_. top)"  
     unfolding sift_down_def
-    apply (refine_vcg WHILEIT_rule_amend_invar[where 
-      I="\<lambda>(xs,i,ctd). 
+    unfolding SPEC_def
+    apply(rule gwp_specifies_I)
+    unfolding mop_has_rchild_def mop_has_lchild_def mop_lchild_def mop_rchild_def
+          mop_cmp_idxs_def SPECc2_def mop_list_get_def mop_list_swap_def consumea_def
+    apply (refine_vcg \<open>-\<close> rules: monadic_WHILE_rule_real[OF refl, where 
+      I="\<lambda>(xs,i,ctd). if (in_heap i \<and> i\<ge>l \<and>
           sift_down_invar xs\<^sub>0 i xs 
           \<and> h\<le>length xs
-          \<and> (\<not>ctd \<longrightarrow> has_rchild i \<and> xs!i\<^bold>\<ge>xs!lchild i \<and> xs!i\<^bold>\<ge>xs!rchild i)"
+          \<and> (\<not>ctd \<longrightarrow> has_rchild i \<and> xs!i\<^bold>\<ge>xs!lchild i \<and> xs!i\<^bold>\<ge>xs!rchild i)) then Some top else None"
       and
       R = "measure (\<lambda>(xs,i,ctd). (if ctd then 1 else 0) + h - i)"    
-    ]) 
-    apply clarsimp_all
+    ] if_rule2 if_rule prod3 BREAK_I)
+    apply (clarsimp_all simp add: ifSome_iff)
     apply (all \<open>(auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap; fail)?\<close>)
-    subgoal using A unfolding sift_down_invar_def is_heap_except_down_def by auto
-    subgoal using A unfolding sift_down_invar_def is_heap_except_down_def by auto
     subgoal using asym sift_down_invar_step(2) wo_leI by blast
     subgoal by (simp add: diff_less_mono2 less_SucI)
     subgoal using wo_less_trans wo_not_le_imp_less by blast
@@ -644,87 +832,247 @@ context heap_context begin
     subgoal by (simp add: diff_less_mono2 less_Suc_eq)
     subgoal using itrans wo_leI by blast 
     subgoal by (simp add: Suc_diff_le less_imp_le)
-    subgoal unfolding sift_down_invar_def by simp
-    subgoal by (meson lchild_of_no_rchild_term sift_down_invar_def sift_down_invar_step(3) sift_down_term1 wo_leD wo_leI wo_less_not_sym)
-    subgoal by (meson lchild_of_no_rchild_term less_imp_le not_le sift_down_invar_def sift_down_lemma_left_no_right_child sift_down_term1)
-    (*subgoal unfolding sift_down_invar_def by simp*)
-    subgoal unfolding sift_down_invar_def by (meson wo_leI sift_down_term1 sift_down_term2 sift_down_term3)
-    done
-    
-      
-    
+    subgoal apply rule
+      subgoal unfolding sift_down_invar_def by simp    
+      subgoal by (meson lchild_of_no_rchild_term sift_down_invar_def sift_down_invar_step(3) sift_down_term1 wo_leD wo_leI wo_less_not_sym)
+      done
+    subgoal apply rule   
+      subgoal unfolding sift_down_invar_def by simp     
+      subgoal unfolding sift_down_invar_def by (meson wo_leI sift_down_term1 sift_down_term2 sift_down_term3)
+      done
+    subgoal apply rule
+      subgoal unfolding sift_down_invar_def by simp    
+      subgoal by (meson lchild_of_no_rchild_term less_imp_le not_le sift_down_invar_def sift_down_lemma_left_no_right_child sift_down_term1)
+      done
+    subgoal using A unfolding sift_down_invar_def is_heap_except_down_def by (auto simp: top_acost_absorbs)
+    subgoal using A unfolding sift_down_invar_def is_heap_except_down_def root_in_heap by auto
+    done       
     
     
     
   text \<open>Deferred swap optimization\<close>
-  definition sift_down1 :: "nat \<Rightarrow> 'a list \<Rightarrow> 'a list nres" where "sift_down1 i\<^sub>0 xs \<equiv> doN {
+  definition sift_down1 :: "nat \<Rightarrow> 'a list \<Rightarrow> ('a list,_) nrest" where "sift_down1 i\<^sub>0 xs \<equiv> doN {
     ASSERT (in_heap i\<^sub>0);
-    v \<leftarrow> mop_list_get xs i\<^sub>0;
-    (xs,i,_) \<leftarrow> WHILEIT (\<lambda>(xs,i,ctd). in_heap i \<and> i\<ge>i\<^sub>0) (\<lambda>(xs,i,ctd). has_rchild i \<and> ctd) (\<lambda>(xs,i,ctd). doN {
-      lc \<leftarrow> mop_list_get xs (lchild i);
-      rc \<leftarrow> mop_list_get xs (rchild i);
+    v \<leftarrow> mop_list_getN xs i\<^sub>0;
+    (xs,i,_) \<leftarrow> monadic_WHILEIT (\<lambda>(xs,i,ctd). in_heap i \<and> i\<ge>i\<^sub>0) 
+      (\<lambda>(xs,i,ctd). doN {                
+                          hrc \<leftarrow> mop_has_rchildN i;
+                          SPECc2 ''land''  (\<and>)  hrc ctd
+                        })
+    (\<lambda>(xs,i,ctd). doN {
+        lci \<leftarrow> mop_lchildN i;
+        lc \<leftarrow> mop_list_getN xs lci;
+        rci \<leftarrow> mop_rchildN i;
+        rc \<leftarrow> mop_list_getN xs rci;
+        _ \<leftarrow> consumea 0;
     
-      if lc \<^bold>< rc then
-        if v \<^bold>< rc then doN {
-          t \<leftarrow> mop_list_get xs (rchild i);
-          xs \<leftarrow> mop_list_set xs i t;
-          RETURN (xs,rchild i,True)
-        } else RETURN (xs,i,False)
-      else if v \<^bold>< lc then doN {
-        t \<leftarrow> mop_list_get xs (lchild i);
-        xs \<leftarrow> mop_list_set xs i t;
-        RETURN (xs,lchild i,True)
-      } else RETURN (xs,i,False)
+      b1 \<leftarrow> SPECc2 ''less''  (\<^bold><)  lc rc;
+      MIf b1 (doN {
+          b2 \<leftarrow> SPECc2 ''less''  (\<^bold><)  v rc;
+          MIf b2 (doN {
+              t \<leftarrow> mop_list_getN xs rci;
+              xs \<leftarrow> mop_list_setN xs i t;
+              RETURN (xs,rchild i,True)
+              })
+             (RETURN (xs,i,False))
+            })
+            (doN {
+              b3 \<leftarrow> SPECc2 ''less''  (\<^bold><)  v lc;
+              MIf b3 (doN {
+                  t \<leftarrow> mop_list_getN xs lci;
+                  xs \<leftarrow> mop_list_setN xs i t;
+                  RETURN (xs,lchild i,True)
+              }) 
+              (RETURN (xs,i,False))} )
     }) (xs,i\<^sub>0,True);
 
     ASSERT (in_heap i \<and> i\<ge>i\<^sub>0);
     ASSERT (has_lchild i \<longrightarrow> lchild i < length xs);
     
-    xs \<leftarrow> (if has_lchild i \<and> v \<^bold>< xs!lchild i then doN {
-      t \<leftarrow> mop_list_get xs (lchild i);
-      xs \<leftarrow> mop_list_set xs i t;
-      xs \<leftarrow> mop_list_set xs (lchild i) v;
-      RETURN xs
-    } else doN {
-      xs \<leftarrow> mop_list_set xs i v;
-      RETURN xs
-    });
-
-  
-    RETURN xs
-  }"
+    hlc \<leftarrow> mop_has_lchildN i;
+    MIf hlc (doN {
+              lci \<leftarrow> mop_lchildN i;
+              b \<leftarrow> mop_cmp_v_idx (cost ''cmp_v_idx'' 1) xs v lci;
+              MIf b (doN {
+                  t \<leftarrow> mop_list_getN xs lci;
+                  xs \<leftarrow> mop_list_setN xs i t;
+                  xs \<leftarrow> mop_list_setN xs lci v;
+                  RETURN xs })
+                (doN {
+                  xs \<leftarrow> mop_list_setN xs i v;
+                  RETURN xs}
+                )
+              })
+              (doN {
+                xs \<leftarrow> mop_list_setN xs i v;
+                RETURN xs})
+  }" 
 
 
   definition "swap_opt_rel v \<equiv> {((xs,i,ctd),(xs',i',ctd')). xs' = xs[i:=v] \<and> i<length xs \<and> i'=i \<and> ctd'=ctd }"
-  
-  
-  lemma sift_down1_refine: "sift_down1 i\<^sub>0 xs \<le>\<Down>Id (sift_down i\<^sub>0 xs)"
-    unfolding sift_down1_def sift_down_def
-    apply (intro refine0)
-    subgoal by simp
-    apply (rule specify_left_pw, simp)
-    subgoal for v
-      apply (rule refine)
-      apply (rule WHILEIT_refine[where R="swap_opt_rel v"])
-      subgoal by (auto simp: swap_opt_rel_def)
-      subgoal by (auto simp: swap_opt_rel_def)
-      subgoal by (auto simp: swap_opt_rel_def)
-      subgoal for s s'
-        apply (clarsimp simp: swap_opt_rel_def split del: if_split)
-        apply (intro refine0 if_refine)
-        apply (all \<open>(auto; auto simp: swap_def;fail)?\<close>)
-        done
-      subgoal for s s'
-        supply [simp del] = conc_Id  
-        apply (clarsimp simp: swap_opt_rel_def split del: if_split)
-        apply (intro refine0 if_refine)
-        apply (all \<open>(auto; auto simp: swap_def;fail)?\<close>)
-        (*apply simp apply refine_rcg
-        apply (auto simp: swap_def)*)
-        done
-      done
+
+  thm swap_opt_rel_def
+
+lemma shift_consumea_back: "doN { consumea T; M } = doN { x \<leftarrow> M; consumea T; RETURNT x}"
+  oops
+
+lemma EX_inresT_consume: "\<exists>t b. inresT (project_acost b (NREST.consume M tt)) x' t
+  \<Longrightarrow> \<exists>t b. inresT (project_acost b M) x' t"
+  apply auto subgoal for t b   
+    subgoal apply(rule exI[where x="0"]) apply(rule exI[where x=b])
+      unfolding inresT_def consume_def apply(cases M) apply simp apply simp
+      unfolding project_acost_def by (auto simp: zero_enat_def[symmetric] le_fun_def split: option.splits)  
     done
-  
+  done
+
+lemma EX_inresT_RETURNT: "\<exists>t b. inresT (project_acost b (RETURNTecost a)) x' t
+    \<Longrightarrow> x' = a"
+  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
+
+lemma EX_inresT_RETURNT_D: "inresT (project_acost b (RETURNTecost a)) x' t
+    \<Longrightarrow> x' = a"
+  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
+lemma EX_inresT_SPECTONE_D: "inresT (project_acost b (SPECT [a \<mapsto> tt])) x' t
+    \<Longrightarrow> x' = a"
+  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
+
+lemma EX_inresT_consume_RETURNT: "\<exists>t b. inresT (project_acost b (NREST.consume (RETURNTecost a) tt)) x' t
+    \<Longrightarrow> x' = a"
+  apply(drule EX_inresT_consume)
+  apply(drule EX_inresT_RETURNT) by simp
+
+lemma consumea_refine:
+  fixes t :: "(_,enat) acost"
+  shows "((), ()) \<in> R \<Longrightarrow> t \<le> timerefineA F t' \<Longrightarrow> consumea t \<le> \<Down> R (timerefine F (consumea t'))"
+  unfolding consumea_def
+  apply(rule SPECT_refine_t) by auto
+
+lemma consumea_Id_refine:
+  fixes t :: "(_,enat) acost"
+  shows "t \<le> timerefineA F t' \<Longrightarrow> consumea t \<le> \<Down> Id (timerefine F (consumea t'))"
+  unfolding consumea_def
+  apply(rule SPECT_refine_t) by auto
+    
+
+lemma sp_TId: "struct_preserving TId"
+  sorry
+
+lemma swap_consumea_ASSERT: "do { consumea t; ASSERT P; M:: ('c, ('d, enat) acost) nrest} = do {ASSERT P; consumea t; M}"
+  apply(auto simp: pw_acost_eq_iff refine_pw_simps consumea_def)
+  apply (metis zero_enat_def zero_le)
+  using le_Suc_ex zero_enat_def by force
+
+
+lemma consumea_0_noop:
+  fixes m :: "('b,'c::{complete_lattice,zero,monoid_add}) nrest"
+  shows "do { consumea 0; m } = m"
+  apply(auto simp: consumea_def bindT_def split: nrest.splits intro!: ext) 
+  subgoal for x2 x apply(cases "x2 x") by auto
+  done
+
+definition "bindT_flag = bindT"
+definition "MIf_flag = MIf"
+definition "monadic_WHILEIT_flag = monadic_WHILEIT"
+lemma add_consumeas_to_bindT:
+  fixes f :: "'a \<Rightarrow> ('b,'c::{complete_lattice,zero,monoid_add}) nrest"
+  shows "bindT m f = do { consumea 0; bindT_flag m f }"
+  unfolding bindT_flag_def by (simp add: consumea_0_noop)
+
+lemma add_consumeas_to_MIf: 
+  shows "MIf b f1 f2 = do { consumea 0; MIf_flag b (do { consumea 0; f1}) (do { consumea 0; f2})}"
+  unfolding MIf_flag_def by (simp add: consumea_0_noop)
+
+lemma add_consumeas_to_monadic_WHILEIT:
+  shows "monadic_WHILEIT I b c s = doN { consumea 0; monadic_WHILEIT_flag I (\<lambda>a. doN { consumea 0;b a}) (\<lambda>a. doN { consumea 0;c a}) s }"
+  unfolding monadic_WHILEIT_flag_def by (simp add: consumea_0_noop)
+
+lemmas add_consumeas_every_where = add_consumeas_to_bindT add_consumeas_to_MIf add_consumeas_to_monadic_WHILEIT
+lemmas unflag_every_where = bindT_flag_def MIf_flag_def monadic_WHILEIT_flag_def
+
+thm refine0
+thm SPECc2_def
+lemma SPECc2_alt: 
+  shows "SPECc2 name aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) (cost name (1::enat))))"
+  unfolding SPECc2_def consume_def RETURNT_alt by auto
+
+lemma inresT_consumea_D: "inresT (project_acost e (do {_ \<leftarrow> consumea tt; M })) x t 
+        \<Longrightarrow> \<exists>t e. inresT (project_acost e M) x t "
+  apply(rule exI[where x=0])
+  apply(rule exI[where x=e])
+  by(auto simp: zero_enat_def[symmetric] consumea_def bindT_def inresT_def project_acost_def le_fun_def
+          split: if_splits nrest.splits option.splits)
+thm mop_cmp_v_idx_def
+thm refine0              
+
+lemma forget_inresT_project_acos: "\<exists>t b. inresT (project_acost b (consumea tt)) x' t \<Longrightarrow> True"
+  by simp
+
+lemma forget_nofailT_consumea: "nofailT (consumea tt) \<Longrightarrow> True"
+  by simp
+
+lemmas normalize_inres_precond = forget_nofailT_consumea forget_inresT_project_acos
+                                  inresT_consumea_D EX_inresT_SPECTONE_D
+
+
+lemma bindT_refine_conc_time_my:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'; \<exists>t b. inresT (project_acost b m') x' t\<rbrakk>
+         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  apply(rule bindT_refine_conc_time2) using assms by auto
+
+text \<open>The idea of the following tactic is to normalize all straight line blocks,
+      such that they have the form (doN { [ASSUMEs]; consumea T; [RETURNs]; FURTHER }.      
+      To that end, it assumes that most operations are unfolded and only contain consumea, RETURN
+      or consume (RETURN _) _. The RETURNs will be propagated with @{thm nres_bind_left_identity},
+      ASSERTIONs will be pulled to the front, consumeas will be shrinked and assoc rule is applied.
+
+      It then is assumed, that FURTHER statements in the concrete and abstract are in lock step.
+
+      [ Then refine_block will split products, collect and discharge ASSUME statements, 
+      pay for the consumea; and then stop at a FURTHER statement.
+      One can then give "rules" that process the FURTHER statements. ]
+      This process is way better done by refine_rcg!
+      
+      This allows that not only lockstep refinement is possible, but that by unfolding certain
+      operations, their effects get 
+        \<close>
+
+method normalize_blocks = (simp only: swap_consumea_ASSERT nres_acost_bind_assoc consume_alt consumea_shrink nres_bind_left_identity)
+method refine_block uses rules = (drule normalize_inres_precond |split prod.splits | intro allI impI
+                                    | rule refine0 consumea_Id_refine SPECT_refine_t bindT_refine_conc_time_my rules)
+method refine_blocks uses rules = repeat_all_new \<open>refine_block rules: rules\<close>
+
+  lemma sift_down1_refine_functional_aux: "sift_down1 i\<^sub>0 xs \<le> \<Down> Id (timerefine TId (sift_down i\<^sub>0 xs))" 
+    unfolding sift_down1_def sift_down_def
+    unfolding mop_list_get_def mop_list_swap_def mop_list_set_def 
+              mop_lchild_def mop_rchild_def mop_has_rchild_def mop_has_lchild_def
+              SPECc2_alt mop_cmp_idxs_def mop_cmp_v_idx_def
+    apply normalize_blocks
+    apply (refine_rcg consumea_Id_refine bindT_refine_conc_time_my
+            monadic_WHILEIT_refine_t[where R="swap_opt_rel (xs ! i\<^sub>0)"]
+            MIf_refine
+          )
+    supply [simp del] = conc_Id  
+    apply(auto simp: wfR''_TId sp_TId swap_opt_rel_def top_acost_absorbs swap_def)
+    done
+
+  lemma sift_down1_refine_functional: "sift_down1 i\<^sub>0 xs \<le>  (sift_down i\<^sub>0 xs)"
+    sorry
+
+  definition  "sift_down1_time i\<^sub>0 xs = undefined (enat (length xs - i\<^sub>0))" (* actually logarithmic *)
+
+  lemma sift_down1_refine_Time: "sift_down1 i\<^sub>0 xs \<le>\<^sub>n (SPEC (\<lambda>_. True) (\<lambda>_. sift_down1_time i\<^sub>0  xs))"
+    sorry
+
+  lemmas sift_down1_btu_functional = order.trans[OF sift_down1_refine_functional sift_down_btu_correct]
+  thm separate_correct_and_time[OF sift_down1_btu_functional sift_down1_refine_Time]
+
+  lemmas sift_down1_restore_functional = order.trans[OF sift_down1_refine_functional sift_down_restore_correct] 
+  thm separate_correct_and_time[OF sift_down1_restore_functional sift_down1_refine_Time]
+
 
     
   text \<open>Index shift optimization\<close>
@@ -881,13 +1229,13 @@ lemmas h_aux_refines2 = mop_geth3.refine mop_seth3.refine
 
 context heap_context begin  
   
-  definition sift_down3 :: "nat \<Rightarrow> 'a list \<Rightarrow> 'a list nres" where "sift_down3 i\<^sub>0 xs \<equiv> doN {
+  definition sift_down3 :: "nat \<Rightarrow> 'a list \<Rightarrow> ('a list, _) nrest" where "sift_down3 i\<^sub>0 xs \<equiv> doN {
     ASSERT (l\<le>i\<^sub>0 \<and> i\<^sub>0<h);
     let i\<^sub>1 = i\<^sub>0 - l;
     xs \<leftarrow> mop_to_eo_conv xs;
     (v,xs) \<leftarrow> mop_geth3 l h xs i\<^sub>1;
     
-    (xs,i,_) \<leftarrow> WHILEIT (\<lambda>(xs,i,ctd). i<h-l \<and> i\<ge>i\<^sub>1) (\<lambda>(xs,i,ctd). has_rchild3 l h i \<and> ctd) (\<lambda>(xs,i,ctd). doN {
+    (xs,i,_) \<leftarrow> monadic_WHILEIT (\<lambda>(xs,i,ctd). i<h-l \<and> i\<ge>i\<^sub>1) (\<lambda>(xs,i,ctd). has_rchild3 l h i \<and> ctd) (\<lambda>(xs,i,ctd). doN {
       lci \<leftarrow> mop_lchild3 h i;
       rci \<leftarrow> mop_rchild3 h i;
     
@@ -1061,7 +1409,7 @@ context weak_ordering begin
     Otherwise, getting rid of the \<le> ghost parameter is difficult!
   *)
 
-  definition heapsort :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list nres" where "heapsort xs\<^sub>0 l h\<^sub>0 \<equiv> doN {
+  definition heapsort :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "heapsort xs\<^sub>0 l h\<^sub>0 \<equiv> doN {
     ASSERT (l\<le>h\<^sub>0);
     if h\<^sub>0-l > 1 then doN {
       xs \<leftarrow> heapify_btu1 (\<^bold><) l h\<^sub>0 xs\<^sub>0;

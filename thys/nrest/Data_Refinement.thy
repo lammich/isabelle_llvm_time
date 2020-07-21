@@ -218,6 +218,27 @@ proof -
     apply(rule timerefine_bindT_ge) by(fact assms(1))
   finally show ?thesis .
 qed
+lemma bindT_refine_conc_time2:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R';  \<exists>t b. inresT (project_acost b m) x t;  \<exists>t b. inresT (project_acost b m') x' t;
+    nofailT m; nofailT m'\<rbrakk> \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  using assms
+proof -
+  term "(timerefine E m')"
+  term timerefine
+  have "bindT m (\<lambda>x.  (f x)) \<le>  \<Down> R (bindT (timerefine E m') (\<lambda>x. timerefine E (f' x)))"
+    apply(rule bindT_conc_acost_refine') apply(rule assms(2)) 
+    apply(rule assms(3))  
+    by (auto simp: refine_pw_simps dest: inresT_project_acost_timerefine) 
+  also have "\<dots> \<le> \<Down> R (timerefine E (bindT m' f'))"
+    apply(rule nrest_Rel_mono)
+    apply(rule timerefine_bindT_ge2) by(fact assms(1))
+  finally show ?thesis .
+qed
+
 
 
 lemma "(x,x')\<in>R \<Longrightarrow> (RETURNT x ::(_,'a::{nonneg,order,complete_lattice,monoid_add}) nrest ) \<le> \<Down>R (RETURNT x')"

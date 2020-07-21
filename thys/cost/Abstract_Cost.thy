@@ -12,6 +12,9 @@ begin
         maybe hide @{type cost} behind a new type and define + for it? \<close>
 
 
+  lemma acost_eq_I: "(\<And>x. the_acost P x = the_acost Q x) \<Longrightarrow> P=Q"
+    by (cases P; cases Q; auto)
+
   instantiation acost :: (type, zero) zero
   begin
     definition "zero_acost = acostC (\<lambda>_. 0)"

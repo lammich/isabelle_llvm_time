@@ -137,6 +137,14 @@ lemma "wfR R \<Longrightarrow> wfR'' R"
      apply(rule finite_subset[rotated]) by auto
   done
 
+lemma "wfR R \<Longrightarrow> wfR' R"
+  unfolding wfR_def wfR'_def apply safe
+  subgoal for s
+    apply(rule finite_cartesian_productD2[where A="{s}"])
+     apply(rule finite_subset) by auto
+  done
+
+
 lemma assumes "wfn m"
   assumes "m = SPECT M" "M r = Some cm"
   shows "finite {ac. the_acost cm ac * the_acost (R ac) cc \<noteq> 0}"
@@ -210,6 +218,21 @@ proof -
     apply(rule wfR_fst) by fact
 qed
 
+lemma wfR_finite_mult_left2:
+  fixes R2 :: "('b \<Rightarrow> ('c, 'd::mult_zero) acost)"
+  assumes "wfR'' R2"
+  shows "finite {a. the_acost Mc a * the_acost (R2 a) ac \<noteq> 0}"
+proof -
+
+  have "{a. the_acost Mc a * the_acost (R2 a) ac \<noteq> 0} \<subseteq> {a. the_acost (R2 a) ac \<noteq> 0}"
+    apply(cases Mc) by (auto simp: zero_acost_def)
+  then
+  show ?thesis
+    apply(rule finite_subset)
+    using assms unfolding wfR''_def by simp
+qed
+
+
 lemma wfR_finite_mult_left:
   fixes R2 :: "('b \<Rightarrow> ('c, 'd::mult_zero) acost)"
   assumes "wfR R2"
@@ -223,8 +246,6 @@ proof -
     apply(rule finite_subset)
     apply(rule wfR_fst) by fact
 qed
-
-
 
 
 lemma 
@@ -248,7 +269,6 @@ proof -
       apply(rule finite_Int)   using assms wfR_def by auto
     done    
 qed
-
 
 
 lemma wfR_finite_Sum_any: 
@@ -360,6 +380,155 @@ lemma timerefine_mono:
       subgoal using l apply(rule ordered_semiring_class.mult_right_mono) by (simp add: needname_nonneg)
       apply(rule wfR_finite_mult_left) by fact
   qed 
+
+lemma timerefine_mono2: 
+  fixes R :: "_ \<Rightarrow> ('a, 'b::{complete_lattice,nonneg,mult_zero,ordered_semiring}) acost"
+  assumes "wfR'' R"
+  shows "c\<le>c' \<Longrightarrow> timerefine R c \<le> timerefine R c'"
+  apply(cases c) apply simp
+  apply(cases c') apply (auto simp: less_eq_acost_def timerefine_def split: nrest.splits option.splits simp: le_fun_def)
+  subgoal  by (metis le_some_optE) 
+  proof (goal_cases)
+    case (1 x2 x2a x x2b x2c xa)
+    then have l: "\<And>ac. the_acost x2b ac \<le>  the_acost x2c ac"
+      apply(cases x2b; cases x2c) unfolding less_eq_acost_def  
+      apply auto
+      by (metis acost.sel less_eq_acost_def less_eq_option_Some)
+    show ?case
+      apply(rule Sum_any_mono)
+      subgoal using l apply(rule ordered_semiring_class.mult_right_mono) by (simp add: needname_nonneg)
+      apply(rule wfR_finite_mult_left2) by fact
+  qed 
+  thm wfR''_def
+
+lemma "finite A \<Longrightarrow> (\<And>x. x\<in>A \<Longrightarrow> f x \<ge> 0) \<Longrightarrow> x\<in>A \<Longrightarrow> f x > 0 \<Longrightarrow> sum f A > (0::enat)"
+  using sum_pos2 sorry
+
+lemma yeah: "(\<And>s. finite {b. f s b \<noteq> 0}) \<Longrightarrow> {s. Sum_any (f s) \<noteq> (0::enat)} = {s. (\<exists>b. f s b \<noteq> 0)}"
+  apply auto  
+  subgoal using Sum_any.not_neutral_obtains_not_neutral by blast
+  subgoal  
+    by (simp add: Sum_any.expand_set) 
+  done
+
+thm Sum_any.not_neutral_obtains_not_neutral
+
+lemma z: "(a::enat) * b \<noteq> 0 \<longleftrightarrow> a \<noteq> 0 \<and> b \<noteq> 0"
+  by auto
+
+  
+
+lemma wfR''D: "wfR'' R \<Longrightarrow> finite {s. the_acost (R s) f \<noteq> 0}"
+  by (auto simp: wfR''_def)
+
+lemma 
+  wfR_finite_crossprod2:
+  fixes Mc :: "('a, enat) acost"
+  assumes "wfR'' R1"  "wfR'' R2"
+  shows "finite ({a. \<exists>b. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0} \<times> {b. \<exists>a. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0})"
+proof -
+
+  have **: "{a. \<exists>b. the_acost Mc a \<noteq> 0 \<and> the_acost (R2 a) b \<noteq> 0 \<and> the_acost (R1 b) cc \<noteq> 0}
+      \<subseteq> (\<Union>b\<in>{b. the_acost (R1 b) cc \<noteq> 0}. {a. the_acost Mc a \<noteq> 0 \<and> the_acost (R2 a) b \<noteq> 0 })"
+    by auto 
+  show ?thesis 
+    apply(rule finite_cartesian_product)
+    subgoal 
+      apply(subst z)
+      apply(subst z)
+      apply(rule finite_subset[OF **])
+      apply(rule finite_Union)
+      subgoal apply(rule finite_imageI) using assms(1)[THEN wfR''D] by simp
+      subgoal apply auto subgoal for b apply(rule finite_subset[where B="{s. the_acost (R2 s) b \<noteq> 0}"])
+        using assms(2)[THEN wfR''D] by auto
+      done
+    done
+    subgoal 
+      apply(subst z)
+      apply(subst z)   
+      apply(rule finite_subset[where B="{b. the_acost (R1 b) cc \<noteq> 0}"])
+      subgoal by auto
+      subgoal using  assms(1)[THEN wfR''D] by simp 
+      done
+    done
+  qed 
+
+lemma pf: "(x, z) \<in> (R O S) \<longleftrightarrow> (\<exists>y. (x, y) \<in> R \<and> (y,z) \<in> S)"
+  by auto
+
+lemma assumes "finite ({y. (x, y) \<in> R })"
+        and "\<And>y. finite ({z. (y, z) \<in> S })"
+      shows "finite ({z. (x, z) \<in> (R O S) })"
+proof -
+  have *: "{z. (x, z) \<in> (R O S) } = (\<Union>y. {z. (x, y) \<in> R \<and> (y,z) \<in> S})"
+    unfolding pf by auto
+  have **: "{z. (x, z) \<in> (R O S) } \<subseteq> (\<Union>y\<in>{y. (x, y) \<in> R }. {z. (y,z) \<in> S})"
+    unfolding pf by auto
+
+  show "finite ({z. (x, z) \<in> (R O S) })"
+    apply(rule finite_subset[OF **]) 
+    apply(rule finite_Union)
+    subgoal
+      apply(rule finite_imageI) apply fact done
+    subgoal for A apply auto
+      subgoal for y
+        apply(rule finite_subset[where B="{z. (y, z) \<in> S }"])
+         apply blast 
+        apply(rule assms(2)) done
+      done
+    done
+qed
+
+
+lemma 
+  fixes R1 :: "'a \<Rightarrow> ('b, enat) acost"
+  assumes R1: "wfR'' R1" and R2: "wfR'' R2"
+  shows "wfR'' (pp R1 R2)"
+  unfolding pp_def wfR''_def
+  apply simp apply safe
+proof -
+  fix f  
+  have "\<And>s. finite {b. the_acost (R2 s) b * the_acost (R1 b) f \<noteq> 0}"
+    apply(rule wfR_finite_mult_left2) by fact
+
+  have l: "{s. \<exists>b. the_acost (R2 s) b \<noteq> 0 \<and> the_acost (R1 b) f \<noteq> 0}
+      = (\<Union>b\<in>{b. the_acost (R1 b) f \<noteq> 0}. {s. the_acost (R2 s) b \<noteq> 0 })"
+    by auto
+
+  show "finite {s. (\<Sum>b. the_acost (R2 s) b * the_acost (R1 b) f) \<noteq> 0}"
+    apply(subst yeah) apply fact
+    apply(subst z)
+    apply(subst l)
+    apply(rule finite_Union) 
+    subgoal  apply(rule finite_imageI) by (rule R1[THEN wfR''D])
+    subgoal       
+      using R2
+      by (auto simp: wfR''_def)
+    done
+qed
+
+lemma
+  fixes R1 :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR'' R1" "wfR'' R2"
+  shows timerefine_iter2: "timerefine R1 (timerefine R2 c) =  timerefine (pp R1 R2) c"
+  unfolding timerefine_def 
+  apply(cases c)
+  subgoal by simp 
+  apply (auto simp: le_fun_def pp_def split: option.splits) apply (rule ext)
+  apply (auto simp: le_fun_def pp_def split: option.splits)
+  apply(subst Sum_any_right_distrib)
+  subgoal apply(rule wfR''_finite_mult_left[of R1]) using assms by simp_all
+  apply (rule ext)
+  subgoal for mc r Mc cc
+    apply (subst Sum_any.swap[where C="{a. \<exists>b. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0} \<times> {b. \<exists>a. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0}"])
+    subgoal      
+      apply(rule wfR_finite_crossprod2) using assms by auto
+    subgoal by simp 
+    apply(subst Sum_any_left_distrib)
+    subgoal apply(rule wfR_finite_mult_left2) using assms by simp 
+    apply(rule Sum_any.cong)
+    by (meson mult.assoc)
+  done 
 
 
 lemma
