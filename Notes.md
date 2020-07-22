@@ -1,3 +1,41 @@
+
+
+
+# Treffen Mittwoch 22.7.2020
+
+## IJCAR post-discussions
+- Chargueraud 2016 Paper: https://hal.inria.fr/hal-01408670/document
+- Fiat to Facade (chlipala)
+
+
+## Max Kirchmeier
+- Heute zu dritt treffen, oder morgen?
+- was gibts zu besprechen?
+- eher, compiler approach
+
+## Aktueller Stand
+
+- Insertion Sort: milestone, korrektheit und synthese per Sepref (still: einige Sorries)
+- Heap Sort: 
+    - sift_down_btu_correct
+    - sift_down_restore_correct
+    - sift_down1_refine_functional_aux
+    - arbeite an sift_down1_refine_Time
+      - einführung von leof, gwp_n und die zugehörigen Regeln. 
+      
+      
+## TODO
+
+### Max
+- leof nach hinten schieben
+- refinement beweise aufsetzten (paralellisierung ermöglichen)      -> "Trail of sorries"
+
+### Peter
+- "trail of sorries" reparieren
+
+
+
+
 # Montag 22.6.
 
 ## TODOs
