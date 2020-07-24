@@ -480,7 +480,7 @@ proof -
 qed
 
 
-lemma 
+lemma wfR''_ppI:
   fixes R1 :: "'a \<Rightarrow> ('b, enat) acost"
   assumes R1: "wfR'' R1" and R2: "wfR'' R2"
   shows "wfR'' (pp R1 R2)"
