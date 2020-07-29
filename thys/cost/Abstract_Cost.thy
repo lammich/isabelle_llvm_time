@@ -134,14 +134,35 @@ end
     definition "bot_acost = acostC (\<lambda>x. bot)"             
     definition "top_acost = acostC (\<lambda>x. top)"
     definition "sup_acost c c' = acostC (\<lambda>x. sup (the_acost c x) (the_acost c' x))"
+    definition "inf_acost c c' = acostC (\<lambda>x. inf (the_acost c x) (the_acost c' x))"
 
     instance 
       apply standard
      apply(auto simp add: le_fun_def less_eq_acost_def less_acost_def split: acost.split)
       subgoal for x y apply(cases x; cases y) apply (auto simp: le_less less_fun_def le_fun_def)  
         using less_not_sym by fastforce
-      sorry (* TODO *)
-  end
+      subgoal for x y apply(cases x; cases y) apply (auto simp: le_less less_fun_def le_fun_def)  
+        by metis
+      subgoal for x y z apply(cases x; cases y; cases z) apply (auto simp: less_fun_def le_fun_def)
+        using order_trans by blast
+      subgoal for x y  apply(cases x; cases y) apply (auto simp: less_fun_def le_fun_def)
+        using antisym_conv by fastforce  
+      subgoal for x y  apply(cases x; cases y) by (auto simp: inf.strict_order_iff inf_acost_def inf_commute) 
+      subgoal for x y  apply(cases x; cases y) by (auto simp: inf.strict_order_iff inf_acost_def)  
+      subgoal for x y z apply(cases x; cases y; cases z) by (auto simp: inf_acost_def)
+      subgoal for x y  apply(cases x; cases y) by (simp add: sup.strict_order_iff sup_acost_def sup_commute)  
+      subgoal for x y  apply(cases x; cases y) by (simp add: sup.strict_order_iff sup_acost_def)  
+      subgoal for x y z  apply(cases x; cases y; cases z) apply (auto simp: le_less less_fun_def le_fun_def)  
+        by (smt acost.sel dual_order.strict_implies_order le_sup_iff order.not_eq_order_implies_strict order_refl sup_acost_def)
+      subgoal for x  apply(cases x) apply (auto simp: Inf_acost_def)  
+        by (metis acost.sel le_INF_iff order_refl)  
+      subgoal for A z x apply(cases z) by (auto simp add: Inf_acost_def le_INF_iff)
+      subgoal for x A y apply(cases x) apply (simp add: Sup_acost_def) by (metis Sup_upper acost.sel image_iff)
+      subgoal for A z x apply(cases z) apply (simp add: Sup_acost_def) by (simp add: SUP_least)
+      subgoal unfolding Inf_acost_def top_acost_def by simp 
+      subgoal unfolding Sup_acost_def bot_acost_def by simp 
+      done
+end
 
 
 end
