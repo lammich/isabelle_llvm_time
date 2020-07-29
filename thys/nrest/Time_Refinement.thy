@@ -1032,6 +1032,276 @@ lemma timerefine_R_mono_wfR'':
     using assms[unfolded wfR''_def] apply simp done
   done
 
+subsection \<open>TId\<close>
+
+
+definition "TId = (\<lambda>x. acostC (\<lambda>y. (if x=y then 1 else 0)))"
+
+lemma timerefine_id:
+  fixes M :: "(_,(_,enat)acost) nrest"
+  shows "timerefine TId M = M"
+  apply(cases M; auto simp: timerefine_def TId_def)
+  apply(rule ext) apply(auto split: option.splits)
+  subgoal for x2 r x2a apply(cases x2a) apply simp
+    apply(rule ext) apply(simp add: if_distrib)
+    apply(subst mult_zero_right)
+    apply(subst Sum_any.delta) by simp
+  done
+
+
+lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
+  by auto
+
+lemma timerefineA_upd:
+  fixes R :: "'b \<Rightarrow> ('c, enat) acost"
+  shows "timerefineA (R(n:=y)) (cost m x) = (if n=m then acostC (\<lambda>z. x * the_acost y z) else timerefineA R (cost m x))"
+  unfolding timerefineA_def
+  by (auto simp: cost_def zero_acost_def timerefineA_upd_aux)
+
+lemma timerefineA_TId_aux: "the_acost x a * (if b then (1::enat) else 0)
+    = (if b then the_acost x a  else 0)"
+  apply(cases b) by auto
+
+lemma timerefineA_TId_eq:
+  shows "timerefineA TId x = (x:: ('b, enat) acost)"
+  unfolding timerefineA_def TId_def 
+  by (simp add: timerefineA_TId_aux)
+
+lemma wfR_TId: "wfR TId"
+  unfolding TId_def wfR_def apply simp
+  sorry
+
+lemma "wfR' TId"
+  unfolding TId_def wfR'_def by simp
+lemma wfR''_TId: "wfR'' TId"
+  unfolding TId_def wfR''_def by simp
+
+
+
+
+
+subsection \<open>Stuff about integrating functional Specification (with top time)\<close>
+
+
+lemma getDiff: assumes "A \<subseteq> C"
+  shows "\<exists>B. C = A \<union> B \<and> A \<inter> B = {}"
+  using assms 
+  by (metis Diff_disjoint Diff_partition)  
+
+lemma assumes "finite B" "{x. f x\<noteq>0} \<subseteq> B"
+  shows sum_extend_zeros: "sum f B = sum f {x. f x\<noteq>0}"
+proof -
+  from assms(2) obtain A where B: "B = A \<union> {x. f x\<noteq>0}" and disj[simp]: "A \<inter> {x. f x\<noteq>0} = {}"    
+    by (metis Int_commute getDiff sup_commute)  
+  from assms(1) B have [simp]: "finite A" "finite {x. f x\<noteq>0}" by auto
+
+  have *: "sum f A = 0"
+    apply(rule sum.neutral)
+    using disj by blast    
+
+  show ?thesis
+    unfolding B
+    by(simp add: * sum.union_disjoint)
+qed
+
+
+
+lemma inf_acost: "inf (acostC a) (acostC b) = acostC (inf a b)"
+  unfolding inf_acost_def by auto
+  
+lemma z1: "\<And>a. a \<noteq> 0 \<Longrightarrow> a * top = (top::enat)" 
+    unfolding top_enat_def  
+    by (simp add: imult_is_infinity)
+
+lemma z2: "\<And>a. a \<noteq> 0 \<Longrightarrow> top * a = (top::enat)" 
+    unfolding top_enat_def  
+    by (simp add: imult_is_infinity) 
+
+lemma fixes a b :: enat
+  shows inf_absorbs_top2: "inf (b * a) (top * a) = b * a"
+    apply(cases "a=0"; cases "b=0") by (auto simp: z2)
+lemma fixes a b :: enat
+  shows inf_absorbs_top: "inf (a * b) (a * top) = a * b"
+    apply(cases "a=0"; cases "b=0") by (auto simp: z1)
+                                 
+
+lemma blatop:
+  fixes f :: "_ \<Rightarrow> enat"
+  assumes F: "finite {x. f x \<noteq> 0}"
+  shows " Sum_any (inf (\<lambda>x. f x * g x) (\<lambda>x. f x * top))
+     = inf (Sum_any (\<lambda>x. f x * g x)) (Sum_any (\<lambda>x. f x * top))"
+proof (cases "{x. f x \<noteq> 0} = {}")
+  case True
+  then show ?thesis
+    unfolding Sum_any.expand_set by simp
+next
+  case False 
+  with F have cn0: "card {x. f x \<noteq> 0} \<noteq> 0" by simp
+  
+  have 1: "{a. inf (\<lambda>x.   (f x * g x)) (\<lambda>x.   (f x) * top) a \<noteq> 0}
+      \<subseteq> {x. f x \<noteq> 0}" by auto
+  have 2: "{a. f a * g a \<noteq> 0} \<subseteq> {x. f x \<noteq> 0}" by auto
+  have 3: "{a. f a * top \<noteq> 0} \<subseteq> {x. f x \<noteq> 0}" by auto
+ 
+
+  { fix a b :: enat
+  have "inf (a * b) (a * top) = a * b"
+    apply(cases "a=0"; cases "b=0") by (auto simp: z1)
+  } note * = this
+
+  have "(\<Sum>a\<in>{x. f x \<noteq> 0}. f a * top) = (\<Sum>a\<in>{x. f x \<noteq> 0}. top)"
+    apply(rule sum.cong) apply simp by (auto simp: top_enat_def imult_is_infinity)
+  also have "\<dots> = top" 
+    using False cn0 by (simp add: top_enat_def imult_is_infinity)
+  finally have i: "(\<Sum>a\<in>{x. f x \<noteq> 0}. f a * top) = top" .
+    
+
+  show ?thesis
+    unfolding Sum_any.expand_set
+    apply(subst sum_extend_zeros[symmetric, OF _ 1]) apply fact
+    apply(subst sum_extend_zeros[symmetric, OF _ 2]) apply fact
+    apply(subst sum_extend_zeros[symmetric, OF _ 3]) apply fact
+    by (simp add: * i)
+qed
+
+lemma blatop2:
+  fixes f :: "_ \<Rightarrow> enat"
+  assumes F: "finite {x. f x \<noteq> 0}"
+  shows "inf (Sum_any (\<lambda>x. g x * f x)) (Sum_any (\<lambda>x. top * f x))
+    = Sum_any (inf (\<lambda>x. g x * f x) (\<lambda>x. top * f x))"
+  apply(subst (1) mult.commute) 
+  apply(subst (2) mult.commute)  
+  apply(subst blatop[symmetric]) apply fact
+  by(simp add: mult.commute)
+
+lemma timerefine_inf_top_distrib:
+  fixes m :: "('a, ('d, enat) acost) nrest"
+  assumes a: "\<And>cc. finite {x. the_acost (R x) cc \<noteq> 0}"
+  shows "timerefine R (inf m (SPEC P (\<lambda>_. top)))
+        = inf (timerefine R m) (timerefine R (SPEC P (\<lambda>_. top)))"
+  unfolding timerefine_def SPEC_def 
+  apply(cases m) apply simp apply simp apply(rule ext)
+  apply auto
+  subgoal for x2 r
+    apply(cases "x2 r") apply simp
+    apply simp
+    unfolding inf_acost apply simp apply(rule ext)
+    apply (simp add: top_acost_def) 
+    apply(subst blatop2) apply (rule a)
+    apply(subst inf_fun_def)
+    using inf_absorbs_top2
+    apply(subst inf_absorbs_top2) by simp
+  done
+
+definition sift_down :: "('a, (char list, enat) acost) nrest"
+  where "sift_down = undefined"
+definition sift_down1  :: "('a, (char list, enat) acost) nrest"
+  where "sift_down1 = undefined"
+definition sift_down_spec ::  "'a \<Rightarrow> bool" 
+  where "sift_down_spec = undefined"
+definition sift_down_cost :: "(_,enat) acost"
+    where "sift_down_cost = undefined"
+
+lemma "sift_down \<le> SPEC sift_down_spec (\<lambda>_. top)" 
+  sorry
+
+lemma "sift_down1 \<le> sift_down"
+  sorry
+
+lemma F: "sift_down1 \<le> SPEC (sift_down_spec) top"
+  sorry
+
+lemma T: "sift_down1 \<le>\<^sub>n SPEC (\<lambda>_. True) (\<lambda>_. sift_down_cost)"
+  sorry
+
+lemma FT: "sift_down1 \<le> SPEC sift_down_spec (\<lambda>_. sift_down_cost)"
+  sorry
+ 
+definition "sift_down_spec_sd = SPEC sift_down_spec (\<lambda>_. cost ''sift_down'' (1::enat))"
+
+definition "RR = TId(''sift_down'' :=sift_down_cost)"
+
+lemma 
+  SPEC_timerefine:
+  "A \<le> A' \<Longrightarrow> (\<And>x. B x \<le> timerefineA R (B' x)) \<Longrightarrow> SPEC A B \<le> timerefine R (SPEC A' B')"
+  apply(auto simp: SPEC_def)
+  unfolding timerefine_SPECT
+  apply (simp add: le_fun_def) apply auto
+  unfolding timerefineF_def timerefineA_def
+  by auto
+
+lemma 
+  SPEC_timerefine_eq:
+  "(\<And>x. B x = timerefineA R (B' x)) \<Longrightarrow> SPEC A B = timerefine R (SPEC A B')"
+  apply(auto simp: SPEC_def)
+  unfolding timerefine_SPECT 
+  apply auto
+  unfolding timerefineF_def timerefineA_def
+  by auto
+
+
+ 
+lemma tAtop: "wfR'' R \<Longrightarrow> timerefineA R top = top"
+  sorry
+
+lemma *: "SPEC sift_down_spec (\<lambda>_. sift_down_cost)
+      = timerefine RR (SPEC sift_down_spec (\<lambda>_. cost ''sift_down'' 1))"
+  unfolding RR_def 
+  apply(rule SPEC_timerefine_eq)
+  by (simp add: timerefineA_upd)
+  
+lemma "sift_down1 \<le> timerefine RR sift_down_spec_sd"
+  apply(rule order.trans[OF FT])
+  by (simp add: * sift_down_spec_sd_def)
+
+term "timerefine RR sift_down_spec_sd"
+lemma "sift_down1 \<le> timerefine RR sift_down_spec_sd"
+proof -
+  have "sift_down1 <= SPEC sift_down_spec (\<lambda>_. sift_down_cost)"
+    by (rule FT)
+  also have "\<dots> = inf (SPEC sift_down_spec (\<lambda>_. top)) (SPEC (\<lambda>_. True)  (\<lambda>_. sift_down_cost))"
+    by (auto simp add: SPEC_def)
+  also have "\<dots> \<le> inf (timerefine RR (SPEC sift_down_spec top)) (timerefine RR (SPEC (\<lambda>_. True) (\<lambda>_. cost ''sift_down'' 1)))"
+    apply(rule inf_mono)
+    subgoal
+      apply(rule SPEC_timerefine)
+       apply simp
+      unfolding RR_def
+      apply(simp add: top_fun_def)
+      apply(subst tAtop) subgoal sorry
+      apply simp
+      done
+    subgoal 
+      apply(rule SPEC_timerefine)
+      apply simp term "sift_down_cost"
+      unfolding RR_def using timerefineA_upd
+      apply(subst timerefineA_upd)
+      by(simp add: )
+    done
+  also have "\<dots> = timerefine RR (SPEC sift_down_spec (\<lambda>_. cost ''sift_down'' 1))"
+    unfolding top_fun_def
+    apply(subst inf.commute)
+    apply(subst timerefine_inf_top_distrib[symmetric])
+    subgoal sorry
+    unfolding SPEC_def apply simp
+    apply(rule arg_cong[where f="timerefine RR"])
+    by auto
+  also have "\<dots> = timerefine RR sift_down_spec_sd" 
+    unfolding sift_down_spec_sd_def by simp
+  finally show ?thesis .
+qed
+
+(*
+
+in heap_sort
+use
+sift_down_spec_sd
+
+
+
+in heap_sort'
+use
+ *) 
 
 
 end

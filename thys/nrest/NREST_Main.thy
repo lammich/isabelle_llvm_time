@@ -120,20 +120,6 @@ lemma refine_Id[refine0]: "S \<le> \<Down> Id S"
   by auto
 
 
-definition "TId = (\<lambda>x. acostC (\<lambda>y. (if x=y then 1 else 0)))"
-
-lemma timerefine_id:
-  fixes M :: "(_,(_,enat)acost) nrest"
-  shows "timerefine TId M = M"
-  apply(cases M; auto simp: timerefine_def TId_def)
-  apply(rule ext) apply(auto split: option.splits)
-  subgoal for x2 r x2a apply(cases x2a) apply simp
-    apply(rule ext) apply(simp add: if_distrib)
-    apply(subst mult_zero_right)
-    apply(subst Sum_any.delta) by simp
-  done
-
-
 lemma refine_TId[refine0]:
   fixes S :: "(_,(_,enat)acost) nrest"
   shows  "S \<le> \<Down> Id (timerefine TId S)"
@@ -257,6 +243,9 @@ lemma struct_preservingD:
      "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
   using assms unfolding struct_preserving_def by auto
 
+lemma sp_TId: "struct_preserving (TId::_\<Rightarrow>(string, enat) acost)" 
+  by (auto intro!: struct_preservingI simp: timerefineA_upd timerefineA_TId)
+
 lemma "(a,a)\<in>Id" unfolding Id_def by simp
 
 
@@ -300,38 +289,6 @@ lemma monadic_WHILEIT_refine_t[refine]:
 
 
 
-
-
-lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
-  by auto
-
-lemma timerefineA_upd:
-  fixes R :: "'b \<Rightarrow> ('c, enat) acost"
-  shows "timerefineA (R(n:=y)) (cost m x) = (if n=m then acostC (\<lambda>z. x * the_acost y z) else timerefineA R (cost m x))"
-  unfolding timerefineA_def
-  by (auto simp: cost_def zero_acost_def timerefineA_upd_aux)
-
-lemma timerefineA_TId_aux: "the_acost x a * (if b then (1::enat) else 0)
-    = (if b then the_acost x a  else 0)"
-  apply(cases b) by auto
-
-lemma timerefineA_TId_eq:
-  shows "timerefineA TId x = (x:: ('b, enat) acost)"
-  unfolding timerefineA_def TId_def 
-  by (simp add: timerefineA_TId_aux)
-
-lemma wfR_TId: "wfR TId"
-  unfolding TId_def wfR_def apply simp
-  sorry
-
-lemma "wfR' TId"
-  unfolding TId_def wfR'_def by simp
-lemma wfR''_TId: "wfR'' TId"
-  unfolding TId_def wfR''_def by simp
-
-
-lemma sp_TId: "struct_preserving (TId::_\<Rightarrow>(string, enat) acost)" 
-  by (auto intro!: struct_preservingI simp: timerefineA_upd timerefineA_TId)
 
 
 
