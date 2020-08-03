@@ -65,6 +65,17 @@ lemma leq_sc_r_DONE1:
   unfolding leq_sidecon_def by (auto intro: add_mono cost_mono ecost_nneg)
 
 
+definition "sc_solve_debug n x = x"
+
+lemma leq_sc_r_DONE_ALL_debug:
+  "(P \<and> sc_solve_debug n (x\<le>y)) \<Longrightarrow> leq_sidecon (cost n x) 0 0 (cost n y) r 0 P"
+  unfolding leq_sidecon_def by (auto simp: sc_solve_debug_def intro: add_increasing2 cost_mono ecost_nneg )
+
+lemma leq_sc_r_DONE1_debug:
+  "leq_sidecon l 0 ls 0 0 r (P \<and> sc_solve_debug n (x\<le>y)) \<Longrightarrow> leq_sidecon (cost n x) (l + ls) 0 (cost n y) r 0 P"
+  unfolding leq_sidecon_def by (auto simp: sc_solve_debug_def intro: add_mono cost_mono ecost_nneg)
+
+
 lemma "cost ''a'' 1 + cost ''b'' (1::enat) + cost ''b'' 1 + cost ''b'' 1 + cost ''a'' 2 \<le> cost ''a'' 3 + cost ''b'' 3"
   apply(simp only: add.assoc)
   apply(rule leq_sc_init)
@@ -79,6 +90,11 @@ method sc_solve' =  ( (simp only: add.assoc)?; rule leq_sc_init, (simp only: add
          ( (rule leq_sc_l_SUCC leq_sc_l_FAIL leq_sc_l_DONE)+,
            (rule leq_sc_r_SUCC leq_sc_r_FAIL leq_sc_r_DONE_ALL leq_sc_r_DONE1)+ )+ )
 method sc_solve =  ( (simp add: lift_acost_propagate lift_acost_cost)?; sc_solve' )
+
+method sc_solve'_debug =  ( (simp only: add.assoc)?; rule leq_sc_init, (simp only: add.assoc)?,
+         ( (rule leq_sc_l_SUCC leq_sc_l_FAIL leq_sc_l_DONE)+,
+           (rule leq_sc_r_SUCC leq_sc_r_FAIL leq_sc_r_DONE_ALL_debug leq_sc_r_DONE1_debug)+ )+ )
+method sc_solve_debug =  ( (simp add: lift_acost_propagate lift_acost_cost)?; sc_solve'_debug )
 
 lemma
   lift_acost_diff_to_the_front:
