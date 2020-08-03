@@ -9,6 +9,42 @@ begin
 
 section "stuff to move"
 
+(* move *)
+lemma bindT_refine_easy:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'\<rbrakk>
+         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  apply(rule bindT_refine_conc_time2) using assms
+  by (auto dest: inres_if_inresT_acost)
+
+
+
+lemma monadic_WHILEIT_refine':  
+  fixes b :: "'c \<Rightarrow> (bool, (char list, enat) acost) nrest"
+  assumes wfR[simp]:  "wfR'' E"
+  assumes sp_E: "struct_preserving E"
+  assumes [refine]: "(s',s) \<in> R"
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s \<rbrakk> \<Longrightarrow> I' s'"  
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s' \<rbrakk> \<Longrightarrow> b' s' \<le>\<Down>bool_rel (timerefine E (b s))"
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s'; inres (b s) True \<rbrakk> \<Longrightarrow> f' s' \<le>\<Down>R (timerefine E (f s))"
+  shows "monadic_WHILEIT I' b' f' s' \<le> \<Down>R (timerefine E (monadic_WHILEIT I b f s))"
+  apply(rule monadic_WHILEIT_refine_t[OF assms(1-5)])
+  by(auto intro: assms(6) inres_if_inresT_acost)
+
+lemma inres_consumea[simp]: "inres (do {_ \<leftarrow> consumea t; M}) r \<longleftrightarrow> inres M r"
+  by (cases M) (auto simp: bindT_def inres_def consumea_def)
+
+lemma inres_RETURNT[simp]: "inres (RETURNT x) y \<longleftrightarrow> (x=y)"
+  by(auto simp: inres_def )
+
+lemma inres_bind_ASSERT[simp]: "inres (doN { ASSERT \<phi>; N }) r \<longleftrightarrow> (\<phi> \<and> inres N r)"
+  by(auto simp: inres_def ASSERT_def iASSERT_def)
+
+
+
 lemma if_rule2: "(c \<Longrightarrow> Some x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then a else None)"
   by auto
 
@@ -870,12 +906,12 @@ text \<open>The idea of the following tactic is to normalize all straight line b
               mop_lchild_def mop_rchild_def mop_has_rchild_def mop_has_lchild_def
               SPECc2_alt mop_cmp_idxs_def mop_cmp_v_idx_def
     apply normalize_blocks
-    apply (refine_rcg consumea_Id_refine bindT_refine_conc_time_my
+    apply (refine_rcg consumea_Id_refine bindT_refine_easy
             monadic_WHILEIT_refine_t[where R="swap_opt_rel (xs ! i\<^sub>0)"]
             MIf_refine
           )
     supply [simp del] = conc_Id  
-    apply(auto simp: wfR''_TId sp_TId swap_opt_rel_def top_acost_absorbs swap_def)
+    apply(auto simp: swap_opt_rel_def top_acost_absorbs swap_def)
     done
 
 
@@ -1002,6 +1038,7 @@ context heap_context begin
     by auto
 
 
+
  lemma sift_down2_refine: "sift_down2 i xs \<le> \<Down>Id (timerefine TId (sift_down1 i xs))"
     unfolding sift_down1_def sift_down2_def 
     unfolding h_aux_refines[OF heap_context_axioms, symmetric]
@@ -1013,22 +1050,22 @@ context heap_context begin
 
     apply (intro refine0)
       apply (all \<open>unfold in_heap_def; simp_all; fail \<close>) [2]
-    apply(rule bindT_refine_conc_time_my_inres)
+    apply(rule bindT_refine_easy)
     subgoal by simp
      apply(rule consumea_Id_refine)
     subgoal by simp
-    apply(rule bindT_refine_conc_time_my_inres)
+    apply(rule bindT_refine_easy)
     subgoal by simp
     focus
-      apply (refine_rcg bindT_refine_conc_time_my MIf_refine consumea_Id_refine)
+      apply (refine_rcg bindT_refine_easy monadic_WHILEIT_refine' MIf_refine consumea_Id_refine)
       supply [refine_dref_RELATES] = RELATESI[of ihs_opt_rel]  
       apply refine_dref_type
-      apply(simp_all only: wfR''_TId sp_TId top_acost_absorbs)
+      apply(simp_all only: wfR''_TId sp_TId top_acost_absorbs )
       apply (simp_all add: ihs_opt_rel_alt ) (** Takes loooong *)
       apply (all \<open>(determ \<open>elim conjE\<close>)?; simp?\<close>)
       apply (clarsimp_all simp: idx_shift_adjust ihs_opt_rel_alt simp del: in_heap_simps) (** Takes loooong *)
       unfolding in_heap_def idx_shift_rel_def ihs_opt_rel_alt
-      apply (auto simp: algebra_simps dest!: recover_from_inresT)  
+      apply (auto simp: algebra_simps)  
       solved
     subgoal for _ _ s s'
       supply [split del] = if_split
@@ -1037,12 +1074,12 @@ context heap_context begin
       apply (intro refine0 )
       subgoal by (clarsimp simp: idx_shift_adjust ihs_opt_rel_alt)
 
-      apply(rule bindT_refine_conc_time_my)
+      apply(rule bindT_refine_easy)
       subgoal by simp
        apply(rule consumea_Id_refine)
       subgoal by simp
     
-      apply (refine_rcg bindT_refine_conc_time_my MIf_refine consumea_Id_refine)
+      apply (refine_rcg bindT_refine_easy MIf_refine consumea_Id_refine)
       apply(simp_all only: wfR''_TId sp_TId top_acost_absorbs)  
         apply (simp_all add: ihs_opt_rel_alt)
         apply (all \<open>determ \<open>elim conjE\<close>; simp?\<close>)
@@ -1163,40 +1200,31 @@ context heap_context begin
 (* TODO: Move *)
   lemma introR: "(a,a')\<in>R \<Longrightarrow> (a,a')\<in>R" .
 
-lemma mop_has_lchild3_refine: "(aaa,aa)\<in>Id \<Longrightarrow> (mop_has_lchild3 l h aaa :: (_, (_, enat) acost) nrest) \<le> \<Down> bool_rel (timerefine TId (mop_has_lchild3F l h aa))"
-  apply(auto simp: mop_has_lchild3_def mop_has_lchild3F_def simp del: conc_Id) 
-  apply(intro RETURNT_refine_t consume_refine) by auto 
-
-lemma mop_lchild3_refine: "(a,a')\<in>Id \<Longrightarrow> (mop_lchild3 h a:: (_, (_, enat) acost) nrest) \<le> \<Down> Id (timerefine TId (mop_lchild3F h a'))"
-  apply(auto simp: mop_lchild3_def mop_lchild3F_def simp del: conc_Id) 
-  apply(intro refine0  RETURNT_refine_t consume_refine) by auto 
-
-(* move *)
-lemma bindT_refine_conc_time_my_inres_forget:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'\<rbrakk>
-         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  apply(rule bindT_refine_conc_time2) using assms
-  by (auto dest: inres_if_inresT_acost)
+  lemma mop_has_lchild3_refine: "(a,a')\<in>Id \<Longrightarrow> (mop_has_lchild3 l h a :: (_, (_, enat) acost) nrest) \<le> \<Down> bool_rel (timerefine TId (mop_has_lchild3F l h a'))"
+    apply(auto simp: mop_has_lchild3_def mop_has_lchild3F_def simp del: conc_Id) 
+    apply(intro RETURNT_refine_t consume_refine) by auto 
+  
+  lemma mop_lchild3_refine: "(a,a')\<in>Id \<Longrightarrow> (mop_lchild3 h a:: (_, (_, enat) acost) nrest) \<le> \<Down> Id (timerefine TId (mop_lchild3F h a'))"
+    apply(auto simp: mop_lchild3_def mop_lchild3F_def simp del: conc_Id) 
+    apply(intro refine0  RETURNT_refine_t consume_refine) by auto 
 
 
-lemma inres_RETURNT: "inres (RETURNT x) y = (x=y)"
-  by(auto simp: inres_def )
-
-lemma inres_bind_ASSERT: "inres (doN { ASSERT \<phi>; N }) r \<longleftrightarrow> (\<phi> \<and> inres N r)"
-  by(auto simp: inres_def ASSERT_def iASSERT_def)
 
 
-lemma inres_mop_has_lchild3F: "inres (mop_has_lchild3F l h a) t \<longleftrightarrow> (has_lchild2 a \<longleftrightarrow> t)"
-  unfolding mop_has_lchild3F_def by(simp add: inres_RETURNT inres_consume_conv)
+  lemma inres_mop_has_lchild3F: "inres (mop_has_lchild3F l h a) t \<longleftrightarrow> (has_lchild2 a \<longleftrightarrow> t)"
+    unfolding mop_has_lchild3F_def by(simp add: inres_consume_conv)
+  
+  lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc (2 * a) < h \<and> Suc (2 * a) = a'"
+    unfolding mop_lchild3F_def by (simp add: inres_consume_conv)
 
-lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc (2 * a) < h \<and> Suc (2 * a) = a'"
-  unfolding mop_lchild3F_def by (simp add: inres_bind_ASSERT inres_RETURNT inres_consume_conv)
 
+  (* TODO: Move *)
+declare inres_consume_conv[simp]
 
+lemma inres_bindT_consume_conv[simp]:
+  fixes t :: "(_,enat) acost"
+  shows "inres (doN { x  \<leftarrow> NREST.consume m t; M x}) r = inres (doN { x \<leftarrow> m; M x }) r"
+  unfolding consume_alt2 by simp
 
   lemma sift_down3_refine_funct: "sift_down3 i xs \<le>\<Down>Id (timerefine TId (sift_down2 i xs))"
     unfolding sift_down3_def sift_down2_def
@@ -1206,7 +1234,7 @@ lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc
     
     apply (intro refine0)
     apply clarsimp_all [3]
-    apply (rule bindT_refine_conc_time_my_inres)
+    apply (rule bindT_refine_easy)
     subgoal by simp
     focus
       apply (auto intro!: consume_refine timerefineA_TId RETURNT_refine_t)
@@ -1214,16 +1242,17 @@ lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc
     subgoal
       for s s'
       apply(cases s; simp)
-    apply (rule bindT_refine_conc_time_my_inres_forget)
+    apply (rule bindT_refine_easy)
     subgoal by simp
-    apply (rule monadic_WHILEIT_refine_t)
+     apply (rule monadic_WHILEIT_refine')
+    unfolding  mop_has_rchild3F_def
     subgoal by simp
     subgoal by simp
     apply (rule introR[where R=sd23_rel])
     apply (auto simp: sd23_rel_def woe_eq_except_init) []
     apply (auto simp: sd23_rel_def) []
     subgoal 
-      unfolding mop_has_rchild3F_def mop_has_rchild3_def SPECc2_alt
+      unfolding mop_has_rchild3_def SPECc2_alt
       apply (refine_rcg bindT_refine_conc_time_my_inres)
       apply refine_dref_type
       by (auto simp: sd23_rel_def ) 
@@ -1231,7 +1260,7 @@ lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc
       apply clarsimp
       unfolding mop_lchild3_def mop_rchild3_def mop_cmpo_idxs_def mop_lchild3F_def mop_rchild3F_def
       apply normalize_blocks
-      apply (intro refine0 bindT_refine_conc_time_my_inres )
+      apply (intro refine0 bindT_refine_easy)
       apply refine_dref_type
       apply (use [[put_named_ss Main_ss]] in \<open>auto simp: conc_Id in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth\<close>) [5]
         apply simp
@@ -1240,7 +1269,7 @@ lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc
       unfolding mop_seth3_def
       apply simp
       apply normalize_blocks
-      apply(refine_rcg MIf_refine bindT_refine_conc_time_my_inres)
+      apply(refine_rcg MIf_refine bindT_refine_easy)
                          apply refine_dref_type
       apply (auto simp only: sp_TId wfR''_TId timerefineA_TId_eq top_greatest intro!: consumea_refine)
       
@@ -1253,7 +1282,7 @@ lemma inres_mop_lchild3F: "inres (mop_lchild3F h a) a' \<longleftrightarrow> Suc
       apply normalize_blocks
       apply (clarsimp split: prod.split)
       apply normalize_blocks 
-      apply (refine_rcg MIf_refine bindT_refine_conc_time_my_inres mop_has_lchild3_refine mop_lchild3_refine consume_refine)
+      apply (refine_rcg MIf_refine bindT_refine_easy mop_has_lchild3_refine mop_lchild3_refine consume_refine)
       apply refine_dref_type
       apply (auto simp only: inres_mop_has_lchild3F inres_mop_lchild3F sp_TId wfR''_TId
                         timerefineA_TId_eq top_acost_absorbs top_greatest intro!: consumea_refine)
@@ -1283,14 +1312,14 @@ definition sift_down3_cost :: "_ \<Rightarrow> ecost" where
       cost ''mop_eo_set'' 1 + cost ''mop_eo_set'' 1 + cost ''mop_eo_extract'' 1 
       + cost ''if'' 1 + cost ''cmop_idxs'' 1 + cost ''lchild'' 1 + cost ''if'' 1 
       + cost ''has_lchild'' 1 +
-      lift_acost (E_sd3_l ((h-l)-(i -l)) True) 
+      lift_acost (E_sd3_l i True) 
       + cost ''has_rchild'' 1 + cost ''land'' 1 + cost ''if'' 1 + cost ''mop_eo_extract'' 1 
       + cost ''mop_eo_set'' 1 + cost ''mop_eo_extract'' 1 
       + cost ''call'' 1"
  
 
 
-lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (\<lambda>_. True) (%_. sift_down3_cost i))"
+lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (\<lambda>_. True) (%_. sift_down3_cost (h-i)))"
   unfolding sift_down3_def SPEC_def
     apply(rule gwpn_specifies_I)
 
@@ -1397,7 +1426,7 @@ thm separate_correct_and_time
 
 lemma sift_down_btu_correct':
   assumes "heapify_btu_invar xs\<^sub>0 l' xs" "l<l'"
-  shows "sift_down3 (l'-Suc 0) xs \<le> SPEC (\<lambda>xs'. heapify_btu_invar xs\<^sub>0 (l'-Suc 0) xs') (%_. sift_down3_cost (l' - Suc 0))"
+  shows "sift_down3 (l'-Suc 0) xs \<le> SPEC (\<lambda>xs'. heapify_btu_invar xs\<^sub>0 (l'-Suc 0) xs') (%_. sift_down3_cost (h-(l' - Suc 0)))"
   apply(rule separate_correct_and_time)
   subgoal 
     apply(rule order.trans) 
@@ -1427,7 +1456,7 @@ definition sift_down_restore
 definition Rsd where "Rsd i = TId(''sift_down'':=sift_down3_cost i)"
 
 lemma sift_down3_refines_heapify_btu_step:
-    shows "sift_down3  l' xs \<le> \<Down>Id( timerefine (Rsd l') (heapify_btu_step l' xs\<^sub>0 xs))"
+    shows "sift_down3  l' xs \<le> \<Down>Id( timerefine (Rsd (h-l')) (heapify_btu_step l' xs\<^sub>0 xs))"
   unfolding heapify_btu_step_def
   apply(rule ASSERT_D3_leI)
   apply simp  
@@ -1445,7 +1474,7 @@ thm sift_down_restore_correct
 
 lemma sift_down_restore_correct':
   assumes "l < h" "sift_down_invar xs\<^sub>0 l xs"
-  shows "sift_down3 l xs \<le> SPEC (\<lambda>xs'. slice_eq_mset l h xs' xs\<^sub>0 \<and> is_heap xs') (%_. sift_down3_cost l)"
+  shows "sift_down3 l xs \<le> SPEC (\<lambda>xs'. slice_eq_mset l h xs' xs\<^sub>0 \<and> is_heap xs') (%_. sift_down3_cost (h-l))"
   apply(rule separate_correct_and_time)
   subgoal 
     apply(rule order.trans) 
@@ -1458,7 +1487,7 @@ lemma sift_down_restore_correct':
   by (rule sift_down3_refine_time)
 
 lemma sift_down3_refines_sift_down_restore:
-  shows "sift_down3 l xs \<le>  \<Down>Id( timerefine (Rsd l) ( sift_down_restore xs\<^sub>0 xs))"
+  shows "sift_down3 l xs \<le>  \<Down>Id( timerefine (Rsd (h-l)) ( sift_down_restore xs\<^sub>0 xs))"
   unfolding sift_down_restore_def
   apply(rule ASSERT_D3_leI)
   apply simp  
@@ -1492,14 +1521,14 @@ context heap_context begin
   qed *)
 
   lemmas bla = sift_down_ab.refine[OF heap_context_axioms, symmetric, unfolded heapify_btu_step_def]
-  lemma sift_down4_refine: "sift_down4 (\<^bold><) l h l' xs \<le> \<Down>Id( timerefine (Rsd l') (sift_down_ab (\<^bold>\<le>) l h l' xs\<^sub>0 xs))"
+  lemma sift_down4_refine: "sift_down4 (\<^bold><) l h l' xs \<le> \<Down>Id( timerefine (Rsd (h-l')) (sift_down_ab (\<^bold>\<le>) l h l' xs\<^sub>0 xs))"
   proof -
     note sift_down4.refine[OF heap_context_axioms, symmetric, THEN meta_eq_to_obj_eq]
     also note sift_down3_refines_heapify_btu_step
     finally show ?thesis unfolding sift_down_ab.refine[OF heap_context_axioms] .
   qed
 
-  lemma sift_down4_refine_restore: "sift_down4 (\<^bold><) l h l xs \<le> \<Down>Id( timerefine (Rsd l) (sift_down_restore_a (\<^bold>\<le>) l h xs\<^sub>0 xs))"
+  lemma sift_down4_refine_restore: "sift_down4 (\<^bold><) l h l xs \<le> \<Down>Id( timerefine (Rsd (h-l)) (sift_down_restore_a (\<^bold>\<le>) l h xs\<^sub>0 xs))"
   proof -
     note sift_down4.refine[OF heap_context_axioms, symmetric, THEN meta_eq_to_obj_eq]
     also note sift_down3_refines_sift_down_restore
@@ -1507,16 +1536,13 @@ context heap_context begin
   qed
 
 
-  definition Rsdu where "Rsdu = TId(''sift_down'':=sift_down3_cost h)"
+  lemma sift_down3_cost_mono:
+    "x\<le>y \<Longrightarrow> sift_down3_cost x \<le> sift_down3_cost y"
+    unfolding sift_down3_cost_def E_sd3_l_def Let_def
+    apply sc_solve by auto
 
 
-lemma sift_down3_cost_antimono:
-  "y\<ge>l \<Longrightarrow> x \<ge> y \<Longrightarrow> sift_down3_cost x \<le> sift_down3_cost y"
-  unfolding sift_down3_cost_def
-  unfolding E_sd3_l_def Let_def apply sc_solve by (auto)
-
-
-  lemma sift_down4_refine_u: "(la,la')\<in>nat_rel \<Longrightarrow> (xs,xs')\<in> (\<langle>Id\<rangle>list_rel) \<Longrightarrow> sift_down4 (\<^bold><) l h la xs \<le> \<Down>(\<langle>Id\<rangle>list_rel) ( timerefine (Rsd l) (sift_down_ab (\<^bold>\<le>) l h la' xs\<^sub>0 xs'))"
+  lemma sift_down4_refine_u: "(la,la')\<in>nat_rel \<Longrightarrow> (xs,xs')\<in> (\<langle>Id\<rangle>list_rel) \<Longrightarrow> sift_down4 (\<^bold><) l h la xs \<le> \<Down>(\<langle>Id\<rangle>list_rel) ( timerefine (Rsd (h-l)) (sift_down_ab (\<^bold>\<le>) l h la' xs\<^sub>0 xs'))"
     apply (simp del: conc_Id)
     apply(rule order.trans[OF sift_down4_refine, of _  xs\<^sub>0])
     unfolding sift_down_ab_def
@@ -1526,7 +1552,8 @@ lemma sift_down3_cost_antimono:
     subgoal by(auto simp: Rsd_def wfR''_TId intro: wfR''_upd)
     unfolding Rsd_def
     apply(simp add: le_fun_def) 
-    apply(rule sift_down3_cost_antimono) by auto
+    apply(rule sift_down3_cost_mono)
+    by auto
 
   definition "heapify_btu xs\<^sub>0 \<equiv> doN {
     ASSERT(h>0);
@@ -1553,8 +1580,6 @@ definition heapify_btu_cost :: "_ \<Rightarrow> ecost"
 definition EEE :: "_ \<Rightarrow> (char list, nat) acost" where
   "EEE = (\<lambda>(xs,l'). (cost ''call'' (l'-l) + (cost ''lt'' (l'-l) + cost ''if'' (l'-l)) + cost ''minus'' (l'-l) + cost ''sift_down'' (l'-l)))"
 
-thm gwp_monadic_WHILEIET
-
   lemma heapify_btu_correct: "\<lbrakk> l<h; h\<le>length xs\<^sub>0 \<rbrakk> \<Longrightarrow> heapify_btu xs\<^sub>0 \<le> SPEC (\<lambda>xs. slice_eq_mset l h xs xs\<^sub>0 \<and> is_heap xs) (\<lambda>_. heapify_btu_cost xs\<^sub>0)"
     unfolding heapify_btu_def
     apply simp
@@ -1568,7 +1593,8 @@ thm gwp_monadic_WHILEIET
     subgoal for s
       apply clarsimp
       apply (refine_vcg \<open>-\<close>)
-      apply simp_all apply safe
+      apply simp_all
+      apply safe
       subgoal
         apply (refine_vcg \<open>-\<close>) (* loop body *)
         subgoal apply(rule loop_body_conditionI) 
@@ -1582,7 +1608,8 @@ thm gwp_monadic_WHILEIET
     subgoal (* exiting loop because of wrong guard *)
       apply(rule loop_exit_conditionI)
       apply (refine_vcg \<open>-\<close>)
-      unfolding heapify_btu_invar_def unfolding EEE_def heapify_btu_cost_def
+      unfolding heapify_btu_invar_def
+      unfolding EEE_def heapify_btu_cost_def
       apply auto
       subgoal using btu_heapify_term by blast
       subgoal 
@@ -1614,7 +1641,7 @@ thm gwp_monadic_WHILEIET
 
 
 
-lemma heapify_btu2_refine: "heapify_btu2 xs\<^sub>0 \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine (Rsd l) (heapify_btu xs\<^sub>0))"
+lemma heapify_btu2_refine: "heapify_btu2 xs\<^sub>0 \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine (Rsd (h-l)) (heapify_btu xs\<^sub>0))"
   unfolding heapify_btu2_def heapify_btu_def 
   supply monadic_WHILEIT_refine_t[refine]                         
   supply bindT_refine_conc_time_my_inres[refine]
@@ -1629,12 +1656,12 @@ lemma heapify_btu2_refine: "heapify_btu2 xs\<^sub>0 \<le> \<Down> (\<langle>Id\<
 thm heapify_btu2_refine[no_vars] heapify_btu_correct[no_vars]
 lemma heapify_btu2_correct:
   "\<lbrakk>l < h; h \<le> length xs\<^sub>0\<rbrakk>
-  \<Longrightarrow> heapify_btu2 xs\<^sub>0 \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine (Rsd l) (SPEC (\<lambda>xs. slice_eq_mset l h xs xs\<^sub>0 \<and> is_heap xs) (\<lambda>_. heapify_btu_cost xs\<^sub>0)))"
+  \<Longrightarrow> heapify_btu2 xs\<^sub>0 \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine (Rsd (h-l)) (SPEC (\<lambda>xs. slice_eq_mset l h xs xs\<^sub>0 \<and> is_heap xs) (\<lambda>_. heapify_btu_cost xs\<^sub>0)))"
   apply(rule order.trans)
    apply(rule heapify_btu2_refine)
   apply simp
   apply(rule timerefine_mono2)
-  by(auto simp: Rsd_def wfR''_TId intro: wfR''_upd heapify_btu_correct)
+  by(auto simp: Rsd_def intro: heapify_btu_correct)
   
 
 thm heap_context.heapify_btu2_def
@@ -1642,9 +1669,8 @@ thm heap_context.heapify_btu2_def
 end
 
 concrete_definition heapify_btu1 for less_eq  l h xs\<^sub>0 is heap_context.heapify_btu_def
-print_theorems
 concrete_definition heapify_btu2 for less l h xs\<^sub>0 is heap_context.heapify_btu2_def
-concrete_definition Rsd_a for l h i is heap_context.Rsd_def
+concrete_definition Rsd_a for i is heap_context.Rsd_def
 
 
 context heap_context begin  
@@ -1830,8 +1856,7 @@ lemma heapsort_correct:
           apply(simp only: add.assoc)
           apply(rule add_left_mono) 
           apply(rule add_increasing) apply(rule ecost_nneg)
-          apply sc_solve (* TODO: add labels, such that one knows which currency is the problem if solving fails *)
-          by auto
+          apply sc_solve_debug by (auto simp: sc_solve_debug_def)
         subgoal 
           
       
@@ -1895,12 +1920,16 @@ qed
   thm heap_context.sift_down4_refine_restore
   thm heap_context.heapify_btu2_refine
 
+(* TODO: move *)
+lemma inres_bindT_SPECT_one[simp]: "inres (do {l' \<leftarrow> SPECT [x \<mapsto> t]; M l'}) r \<longleftrightarrow> inres (M x) r"
+  by(auto simp: bindT_def inres_def split: nrest.splits)
 
+declare inres_SPECT[simp]
 
 lemma heapsort2_refine:
   fixes xs\<^sub>0 :: "'a list"
   assumes "l\<le>h\<^sub>0" "h\<^sub>0\<le>length xs\<^sub>0"
-  shows "heapsort2  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine (Rsd_a l h\<^sub>0 l) (heapsort  xs\<^sub>0 l h\<^sub>0))"
+  shows "heapsort2  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine (Rsd_a (h\<^sub>0-l)) (heapsort xs\<^sub>0 l h\<^sub>0))"
 proof -
     interpret initial: heap_context "(\<^bold>\<le>)" "(\<^bold><)" l h\<^sub>0 by unfold_locales fact
 
@@ -1909,9 +1938,9 @@ proof -
     show ?thesis
       unfolding heapsort_def heapsort2_def 
       supply bindT_refine_conc_time_my_inres[refine]
-      apply(refine_rcg SPECc2_refine MIf_refine )
-                          apply refine_dref_type
-      prefer 10 thm Rsd_a.refine[OF initial.heap_context_axioms] heapify_btu1.refine[OF initial.heap_context_axioms]
+      apply(refine_rcg SPECc2_refine MIf_refine monadic_WHILEIT_refine' )
+      apply refine_dref_type
+      prefer 10
       subgoal
         apply(rule  initial.heapify_btu2_refine[unfolded heapify_btu1.refine[OF initial.heap_context_axioms]
                                                 Rsd_a.refine[OF initial.heap_context_axioms]
@@ -1922,17 +1951,16 @@ proof -
                 intro!: wfR''_upd cost_n_leq_TId_n struct_preserving_upd_I )
       subgoal 
         apply(refine_rcg)
-        by (auto simp: timerefineA_upd timerefineA_TId_eq)
-      unfolding SPECc2_def inres_SPECT apply (simp del: conc_Id)
-      subgoal premises prems for x' xa x'a x'b x1 h h' xs\<^sub>1 t e proof -
+        by (auto simp: timerefineA_upd)
+      unfolding SPECc2_def apply (simp del: conc_Id)
+      subgoal premises prems for d _ _ _ xs\<^sub>1 h h' proof -
         interpret N: heap_context "(\<^bold>\<le>)" "(\<^bold><)" l "h-Suc 0" using prems by (unfold_locales) auto
-
 
         from prems have *: "h' \<le> h\<^sub>0" by simp
 
         show ?thesis
           unfolding Rsd_a_def[symmetric]
-          using N.sift_down4_refine_restore[of xs\<^sub>1 xs\<^sub>1]
+          using N.sift_down4_refine_restore[of "swap xs\<^sub>1 l h'" "swap xs\<^sub>1 l h'"]
           unfolding Rsd_a.refine[OF N.heap_context_axioms]
           unfolding Rsd_a_def  N.sift_down3_cost_def initial.sift_down3_cost_def
           unfolding prems(8)
@@ -1941,16 +1969,16 @@ proof -
           apply(rule timerefine_R_mono_wfR'')
           subgoal by(auto simp: wfR''_TId intro: wfR''_upd)
           subgoal apply(auto simp: le_fun_def)
-            unfolding N.E_sd3_l_def Let_def 
+            unfolding N.E_sd3_l_def Let_def prems(1)[symmetric]
             apply simp
-            apply sc_solve using \<open>h' \<le> h\<^sub>0\<close> apply(auto simp: one_enat_def) done
+            apply sc_solve using \<open>h' \<le> h\<^sub>0\<close> apply(auto simp add: zero_enat_def one_enat_def) done
           done
       qed
       done        
 qed 
 
 definition heapsort_TR
-  where "heapsort_TR l h = pp (Rsd_a l h l) (TId(''slice_sort'':=heapsort_time l h))"
+  where "heapsort_TR l h = pp (Rsd_a (h-l)) (TId(''slice_sort'':=heapsort_time l h))"
 
 lemma heapsort_correct': 
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> \<Longrightarrow> heapsort2 xs l h \<le>
