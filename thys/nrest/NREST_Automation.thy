@@ -75,10 +75,10 @@ lemma "cost ''a'' 1 + cost ''b'' (1::enat) + cost ''b'' 1 + cost ''b'' 1 + cost 
   apply(rule leq_sc_r_DONE_ALL leq_sc_r_DONE1) 
   oops
 
-method sc_solve' =  ( simp only: add.assoc, rule leq_sc_init, simp only: add.assoc,
+method sc_solve' =  ( (simp only: add.assoc)?; rule leq_sc_init, (simp only: add.assoc)?,
          ( (rule leq_sc_l_SUCC leq_sc_l_FAIL leq_sc_l_DONE)+,
            (rule leq_sc_r_SUCC leq_sc_r_FAIL leq_sc_r_DONE_ALL leq_sc_r_DONE1)+ )+ )
-method sc_solve =  ( (simp add: lift_acost_propagate lift_acost_cost)?, sc_solve' )
+method sc_solve =  ( (simp add: lift_acost_propagate lift_acost_cost)?; sc_solve' )
 
 lemma
   lift_acost_diff_to_the_front:

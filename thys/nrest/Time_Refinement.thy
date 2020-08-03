@@ -1193,6 +1193,28 @@ lemma timerefine_inf_top_distrib:
     apply(subst inf_absorbs_top2) by simp
   done
 
+
+lemma 
+  SPEC_timerefine:
+  "A \<le> A' \<Longrightarrow> (\<And>x. B x \<le> timerefineA R (B' x)) \<Longrightarrow> SPEC A B \<le> timerefine R (SPEC A' B')"
+  apply(auto simp: SPEC_def)
+  unfolding timerefine_SPECT
+  apply (simp add: le_fun_def) apply auto
+  unfolding timerefineF_def timerefineA_def
+  by auto
+
+lemma 
+  SPEC_timerefine_eq:
+  "(\<And>x. B x = timerefineA R (B' x)) \<Longrightarrow> SPEC A B = timerefine R (SPEC A B')"
+  apply(auto simp: SPEC_def)
+  unfolding timerefine_SPECT 
+  apply auto
+  unfolding timerefineF_def timerefineA_def
+  by auto
+
+
+experiment
+begin
 definition sift_down :: "('a, (char list, enat) acost) nrest"
   where "sift_down = undefined"
 definition sift_down1  :: "('a, (char list, enat) acost) nrest"
@@ -1221,23 +1243,6 @@ definition "sift_down_spec_sd = SPEC sift_down_spec (\<lambda>_. cost ''sift_dow
 
 definition "RR = TId(''sift_down'' :=sift_down_cost)"
 
-lemma 
-  SPEC_timerefine:
-  "A \<le> A' \<Longrightarrow> (\<And>x. B x \<le> timerefineA R (B' x)) \<Longrightarrow> SPEC A B \<le> timerefine R (SPEC A' B')"
-  apply(auto simp: SPEC_def)
-  unfolding timerefine_SPECT
-  apply (simp add: le_fun_def) apply auto
-  unfolding timerefineF_def timerefineA_def
-  by auto
-
-lemma 
-  SPEC_timerefine_eq:
-  "(\<And>x. B x = timerefineA R (B' x)) \<Longrightarrow> SPEC A B = timerefine R (SPEC A B')"
-  apply(auto simp: SPEC_def)
-  unfolding timerefine_SPECT 
-  apply auto
-  unfolding timerefineF_def timerefineA_def
-  by auto
 
 
  
@@ -1290,6 +1295,8 @@ proof -
     unfolding sift_down_spec_sd_def by simp
   finally show ?thesis .
 qed
+end
+
 
 (*
 
