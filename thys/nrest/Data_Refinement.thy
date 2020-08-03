@@ -241,6 +241,16 @@ qed
 
 
 
+lemma bindT_refine_conc_time_my:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'; \<exists>t b. inresT (project_acost b m') x' t\<rbrakk>
+         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  apply(rule bindT_refine_conc_time2) using assms by auto
+
+
 lemma "(x,x')\<in>R \<Longrightarrow> (RETURNT x ::(_,'a::{nonneg,order,complete_lattice,monoid_add}) nrest ) \<le> \<Down>R (RETURNT x')"
   unfolding conc_fun_def RETURNT_def apply (auto simp: le_fun_def) 
 proof -
@@ -847,5 +857,56 @@ lemma param_ASSERT_bind[param]: "\<lbrakk>
 
 definition nrest_trel where 
   nrest_trel_def_internal: "nrest_trel R E \<equiv> {(c,a).  c \<le> \<Down>R (timerefine E a)}"
+
+
+lemma nrest_trelD: "(c,a)\<in>nrest_trel R E \<Longrightarrow> c \<le> \<Down>R (timerefine E a)" by (simp add: nrest_trel_def_internal)
+
+  
+lemma nrest_trelI: "c \<le> \<Down>R (timerefine E a) \<Longrightarrow> (c,a)\<in>nrest_trel R E" by (simp add: nrest_trel_def_internal)
+
+(* TODO: move *)
+
+
+lemma timerefine_conc_fun_ge2:
+  fixes C :: "('f, ('b, enat) acost) nrest"
+  assumes "wfR'' E"
+  shows "timerefine E (\<Down> R C) \<ge> \<Down>R (timerefine E C)"
+
+  unfolding conc_fun_def timerefine_def
+  apply(cases C) apply auto apply(rule le_funI)
+  apply(rule Sup_least)
+  apply (auto split: option.splits)
+  subgoal 
+    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some_None mem_Collect_eq)
+  unfolding less_eq_acost_def apply auto
+  apply(rule Sum_any_mono)
+  apply(rule mult_right_mono)
+  subgoal     
+    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some mem_Collect_eq the_acost_mono)
+    apply simp
+  apply(rule wfR_finite_mult_left2 )
+  using assms by simp
+
+lemma timerefine_conc_fun_ge:
+  fixes C :: "('f, ('b, enat) acost) nrest"
+  assumes "wfR E"
+  shows "timerefine E (\<Down> R C) \<ge> \<Down>R (timerefine E C)"
+
+  unfolding conc_fun_def timerefine_def
+  apply(cases C) apply auto apply(rule le_funI)
+  apply(rule Sup_least)
+  apply (auto split: option.splits)
+  subgoal 
+    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some_None mem_Collect_eq)
+  unfolding less_eq_acost_def apply auto
+  apply(rule Sum_any_mono)
+  apply(rule mult_right_mono)
+  subgoal     
+    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some mem_Collect_eq the_acost_mono)
+    apply simp
+  apply(rule wfR_finite_mult_left )
+  using assms by simp
+
+
 
 end

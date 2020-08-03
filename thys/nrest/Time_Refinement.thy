@@ -96,15 +96,38 @@ definition timerefineA ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoi
                              \<Rightarrow> ( ('b,'d) acost) \<Rightarrow> ( ('c,'d) acost)"
   where "timerefineA R cm =  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))"
 
-lemma timerefine_consume: "timerefine E (consume M t) = consume (timerefine E M) (timerefineA E t)"
-  apply(auto simp: timerefine_def consume_def timerefineA_def split: nrest.splits option.splits intro!: ext)
-  sorry
 
 lemma timerefine_alt: "timerefine R m = case_nrest FAILi (\<lambda>M. SPECT (timerefineF R M)) m"
   unfolding timerefine_def timerefineF_def ..
 
 lemma timerefine_SPECT: "timerefine R (SPECT Q) = SPECT (timerefineF R Q)" 
   unfolding timerefine_alt by simp
+
+lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
+  by auto
+
+lemma timerefineA_update_apply_same_cost: 
+  "timerefineA (F(n := y)) (cost n (t::enat)) = acostC (\<lambda>x. t * the_acost y x)"
+  by (auto simp: timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
+
+
+
+lemma timerefineA_cost: "timerefineA TR (cost n (1::enat)) = TR n"
+  unfolding timerefineA_def cost_def zero_acost_def
+  apply simp
+  apply(subst timerefineA_upd_aux)
+  apply(subst Sum_any.delta) by simp 
+
+
+lemma timerefineA_update_cost[simp]: 
+  "n\<noteq>m \<Longrightarrow> timerefineA (F(n := y)) (cost m (t::enat)) = timerefineA F (cost m t)"
+  by (auto simp: timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
+
+lemma timerefineA_upd:
+  fixes R :: "'b \<Rightarrow> ('c, enat) acost"
+  shows "timerefineA (R(n:=y)) (cost m x) = (if n=m then acostC (\<lambda>z. x * the_acost y z) else timerefineA R (cost m x))"
+  unfolding timerefineA_def
+  by (auto simp: cost_def zero_acost_def timerefineA_upd_aux)
 
 
 definition wfn :: "('a, ('c,'d::{complete_lattice,comm_monoid_add,times,mult_zero}) acost) nrest \<Rightarrow> bool" where
@@ -130,6 +153,16 @@ definition wfR'' :: "('b \<Rightarrow> ('c, _::mult_zero) acost) \<Rightarrow> b
   "wfR'' R = (\<forall>f. finite {s. the_acost (R s) f \<noteq> 0})"
 
 
+lemma wfR''_upd[intro]: "wfR'' F \<Longrightarrow> wfR'' (F(x:=y))"
+  unfolding wfR''_def
+  apply auto
+  subgoal for f
+    apply(rule finite_subset[where B="{s. the_acost (F s) f \<noteq> 0} \<union> {x}"])
+    by auto
+  done
+
+
+
 lemma "wfR R \<Longrightarrow> wfR'' R"
   unfolding wfR_def wfR''_def apply safe
   subgoal for f
@@ -144,6 +177,21 @@ lemma "wfR R \<Longrightarrow> wfR' R"
      apply(rule finite_subset) by auto
   done
 
+
+lemma timerefine_consume:
+  assumes "wfR'' E"
+  shows "timerefine E (consume M t) = consume (timerefine E (M:: (_, (_, enat) acost) nrest)) (timerefineA E t)"
+  apply(auto simp: timerefine_def consume_def timerefineA_def split: nrest.splits option.splits intro!: ext)
+  subgoal for x2 r x2a cc    
+  apply(cases t, cases x2a) 
+    unfolding plus_acost_alt apply simp
+    unfolding  ring_distribs(2)
+    apply(subst Sum_any.distrib)
+    subgoal apply(rule finite_subset[OF _ assms[unfolded wfR''_def, rule_format]]) by auto
+    subgoal apply(rule finite_subset[OF _ assms[unfolded wfR''_def, rule_format]]) by auto
+    apply simp
+    done
+  done
 
 lemma assumes "wfn m"
   assumes "m = SPECT M" "M r = Some cm"
@@ -178,6 +226,10 @@ qed
 
 definition wfR2 :: "(('c, _::mult_zero) acost) \<Rightarrow> bool" where
   "wfR2 R = (finite {f. the_acost R f \<noteq> 0})"
+
+
+lemma wfR2_If_if_wfR2: "(I \<Longrightarrow> wfR2 f) \<Longrightarrow> wfR2 (if I then f else 0)"
+  unfolding wfR2_def apply(cases I) by (auto simp: zero_acost_def)
 
 
 lemma wfR2_enum:
@@ -320,6 +372,14 @@ lemma [simp]: "timerefine R FAILT = FAILT" by(auto simp: timerefine_def)
 definition pp where
   "pp R2 R1 = (\<lambda>a. acostC (\<lambda>c. Sum_any (%b. the_acost (R1 a) b * the_acost (R2 b) c  ) ))"
 
+
+lemma timerefineA_pp: "\<And>E1 E2. timerefineA (pp E1 E2) R = timerefineA E1 (timerefineA E2 R)"  
+  sorry
+
+lemma pp_assoc: "pp A (pp B C) = pp (pp A B) C"
+  sorry
+
+
 lemma Sum_any_mono:
   fixes f :: "('a \<Rightarrow> 'b::{nonneg,comm_monoid_add,order,ordered_comm_monoid_add})"
   assumes fg: "\<And>x. f x \<le> g x" (* can one relax that and say the norm is mono, for integer domains ? *)
@@ -401,10 +461,7 @@ lemma timerefine_mono2:
   qed 
   thm wfR''_def
 
-lemma "finite A \<Longrightarrow> (\<And>x. x\<in>A \<Longrightarrow> f x \<ge> 0) \<Longrightarrow> x\<in>A \<Longrightarrow> f x > 0 \<Longrightarrow> sum f A > (0::enat)"
-  using sum_pos2 sorry
-
-lemma yeah: "(\<And>s. finite {b. f s b \<noteq> 0}) \<Longrightarrow> {s. Sum_any (f s) \<noteq> (0::enat)} = {s. (\<exists>b. f s b \<noteq> 0)}"
+lemma wfR''_ppI_aux: "(\<And>s. finite {b. f s b \<noteq> 0}) \<Longrightarrow> {s. Sum_any (f s) \<noteq> (0::enat)} = {s. (\<exists>b. f s b \<noteq> 0)}"
   apply auto  
   subgoal using Sum_any.not_neutral_obtains_not_neutral by blast
   subgoal  
@@ -413,7 +470,7 @@ lemma yeah: "(\<And>s. finite {b. f s b \<noteq> 0}) \<Longrightarrow> {s. Sum_a
 
 thm Sum_any.not_neutral_obtains_not_neutral
 
-lemma z: "(a::enat) * b \<noteq> 0 \<longleftrightarrow> a \<noteq> 0 \<and> b \<noteq> 0"
+lemma wfR''_ppI_aux2: "(a::enat) * b \<noteq> 0 \<longleftrightarrow> a \<noteq> 0 \<and> b \<noteq> 0"
   by auto
 
   
@@ -434,8 +491,8 @@ proof -
   show ?thesis 
     apply(rule finite_cartesian_product)
     subgoal 
-      apply(subst z)
-      apply(subst z)
+      apply(subst wfR''_ppI_aux2)
+      apply(subst wfR''_ppI_aux2)
       apply(rule finite_subset[OF **])
       apply(rule finite_Union)
       subgoal apply(rule finite_imageI) using assms(1)[THEN wfR''D] by simp
@@ -444,8 +501,8 @@ proof -
       done
     done
     subgoal 
-      apply(subst z)
-      apply(subst z)   
+      apply(subst wfR''_ppI_aux2)
+      apply(subst wfR''_ppI_aux2)   
       apply(rule finite_subset[where B="{b. the_acost (R1 b) cc \<noteq> 0}"])
       subgoal by auto
       subgoal using  assms(1)[THEN wfR''D] by simp 
@@ -496,8 +553,8 @@ proof -
     by auto
 
   show "finite {s. (\<Sum>b. the_acost (R2 s) b * the_acost (R1 b) f) \<noteq> 0}"
-    apply(subst yeah) apply fact
-    apply(subst z)
+    apply(subst wfR''_ppI_aux) apply fact
+    apply(subst wfR''_ppI_aux2)
     apply(subst l)
     apply(rule finite_Union) 
     subgoal  apply(rule finite_imageI) by (rule R1[THEN wfR''D])
@@ -1032,10 +1089,40 @@ lemma timerefine_R_mono_wfR'':
     using assms[unfolded wfR''_def] apply simp done
   done
 
+subsection \<open>Structure Preserving\<close>
+
+definition "struct_preserving E \<equiv> (\<forall>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t))
+                                   \<and> (\<forall>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t))"
+
+lemma struct_preservingI:
+  assumes "\<And>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t)"
+     "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
+  shows "struct_preserving E"
+  using assms unfolding struct_preserving_def by auto
+
+lemma struct_preservingD:
+  assumes "struct_preserving E"
+  shows "\<And>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t)"
+     "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
+  using assms unfolding struct_preserving_def by auto
+
+
+lemma struct_preserving_upd_I[intro]: 
+  fixes F:: "char list \<Rightarrow> (char list, enat) acost"
+  shows "struct_preserving F \<Longrightarrow>  x\<noteq>''if''\<Longrightarrow>  x\<noteq>''call'' \<Longrightarrow> struct_preserving (F(x:=y))"
+  by (auto simp: struct_preserving_def)
+
+
 subsection \<open>TId\<close>
 
 
 definition "TId = (\<lambda>x. acostC (\<lambda>y. (if x=y then 1 else 0)))"
+
+
+
+
+lemma cost_n_leq_TId_n: "cost n (1::enat) \<le> TId n"
+  by(auto simp:  TId_def cost_def zero_acost_def less_eq_acost_def)
 
 lemma timerefine_id:
   fixes M :: "(_,(_,enat)acost) nrest"
@@ -1048,32 +1135,35 @@ lemma timerefine_id:
     apply(subst Sum_any.delta) by simp
   done
 
+lemma timerefineA_TId:
+  fixes T :: "(_,enat) acost"
+  shows "T \<le> T' \<Longrightarrow> T \<le> timerefineA TId T'"
+  unfolding timerefineA_def TId_def
+    apply(simp add: if_distrib)
+    apply(subst mult_zero_right)
+    apply(subst Sum_any.delta) by(cases T; cases T'; auto)
 
-lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
-  by auto
 
-lemma timerefineA_upd:
-  fixes R :: "'b \<Rightarrow> ('c, enat) acost"
-  shows "timerefineA (R(n:=y)) (cost m x) = (if n=m then acostC (\<lambda>z. x * the_acost y z) else timerefineA R (cost m x))"
-  unfolding timerefineA_def
-  by (auto simp: cost_def zero_acost_def timerefineA_upd_aux)
+lemma sp_TId[simp]: "struct_preserving (TId::_\<Rightarrow>(string, enat) acost)" 
+  by (auto intro!: struct_preservingI simp: timerefineA_upd timerefineA_TId)
+
 
 lemma timerefineA_TId_aux: "the_acost x a * (if b then (1::enat) else 0)
     = (if b then the_acost x a  else 0)"
   apply(cases b) by auto
 
-lemma timerefineA_TId_eq:
+lemma timerefineA_TId_eq[simp]:
   shows "timerefineA TId x = (x:: ('b, enat) acost)"
   unfolding timerefineA_def TId_def 
   by (simp add: timerefineA_TId_aux)
 
 lemma wfR_TId: "wfR TId"
   unfolding TId_def wfR_def apply simp
-  sorry
+  oops
 
 lemma "wfR' TId"
   unfolding TId_def wfR'_def by simp
-lemma wfR''_TId: "wfR'' TId"
+lemma wfR''_TId[simp]: "wfR'' TId"
   unfolding TId_def wfR''_def by simp
 
 
@@ -1203,6 +1293,18 @@ lemma
   unfolding timerefineF_def timerefineA_def
   by auto
 
+
+lemma SPECT_emb'_timerefine:
+  "
+  (\<And>x. Q x \<Longrightarrow> Q' x)
+  \<Longrightarrow>
+  (\<And>x. T x \<le> timerefineA E (T' x))
+  \<Longrightarrow>
+  SPECT (emb' Q T) \<le> timerefine E (SPECT (emb' Q' T'))"
+  unfolding SPEC_REST_emb'_conv[symmetric]
+  apply(rule SPEC_timerefine) by (auto intro: le_funI)
+
+
 lemma 
   SPEC_timerefine_eq:
   "(\<And>x. B x = timerefineA R (B' x)) \<Longrightarrow> SPEC A B = timerefine R (SPEC A B')"
@@ -1213,102 +1315,17 @@ lemma
   by auto
 
 
-experiment
-begin
-definition sift_down :: "('a, (char list, enat) acost) nrest"
-  where "sift_down = undefined"
-definition sift_down1  :: "('a, (char list, enat) acost) nrest"
-  where "sift_down1 = undefined"
-definition sift_down_spec ::  "'a \<Rightarrow> bool" 
-  where "sift_down_spec = undefined"
-definition sift_down_cost :: "(_,enat) acost"
-    where "sift_down_cost = undefined"
-
-lemma "sift_down \<le> SPEC sift_down_spec (\<lambda>_. top)" 
-  sorry
-
-lemma "sift_down1 \<le> sift_down"
-  sorry
-
-lemma F: "sift_down1 \<le> SPEC (sift_down_spec) top"
-  sorry
-
-lemma T: "sift_down1 \<le>\<^sub>n SPEC (\<lambda>_. True) (\<lambda>_. sift_down_cost)"
-  sorry
-
-lemma FT: "sift_down1 \<le> SPEC sift_down_spec (\<lambda>_. sift_down_cost)"
-  sorry
- 
-definition "sift_down_spec_sd = SPEC sift_down_spec (\<lambda>_. cost ''sift_down'' (1::enat))"
-
-definition "RR = TId(''sift_down'' :=sift_down_cost)"
 
 
 
- 
-lemma tAtop: "wfR'' R \<Longrightarrow> timerefineA R top = top"
-  sorry
+lemma finite_sum_nonzero_cost:
+  "finite {a. the_acost (cost n m) a \<noteq> 0}"
+  unfolding cost_def by (auto simp: zero_acost_def)
 
-lemma *: "SPEC sift_down_spec (\<lambda>_. sift_down_cost)
-      = timerefine RR (SPEC sift_down_spec (\<lambda>_. cost ''sift_down'' 1))"
-  unfolding RR_def 
-  apply(rule SPEC_timerefine_eq)
-  by (simp add: timerefineA_upd)
-  
-lemma "sift_down1 \<le> timerefine RR sift_down_spec_sd"
-  apply(rule order.trans[OF FT])
-  by (simp add: * sift_down_spec_sd_def)
-
-term "timerefine RR sift_down_spec_sd"
-lemma "sift_down1 \<le> timerefine RR sift_down_spec_sd"
-proof -
-  have "sift_down1 <= SPEC sift_down_spec (\<lambda>_. sift_down_cost)"
-    by (rule FT)
-  also have "\<dots> = inf (SPEC sift_down_spec (\<lambda>_. top)) (SPEC (\<lambda>_. True)  (\<lambda>_. sift_down_cost))"
-    by (auto simp add: SPEC_def)
-  also have "\<dots> \<le> inf (timerefine RR (SPEC sift_down_spec top)) (timerefine RR (SPEC (\<lambda>_. True) (\<lambda>_. cost ''sift_down'' 1)))"
-    apply(rule inf_mono)
-    subgoal
-      apply(rule SPEC_timerefine)
-       apply simp
-      unfolding RR_def
-      apply(simp add: top_fun_def)
-      apply(subst tAtop) subgoal sorry
-      apply simp
-      done
-    subgoal 
-      apply(rule SPEC_timerefine)
-      apply simp term "sift_down_cost"
-      unfolding RR_def using timerefineA_upd
-      apply(subst timerefineA_upd)
-      by(simp add: )
-    done
-  also have "\<dots> = timerefine RR (SPEC sift_down_spec (\<lambda>_. cost ''sift_down'' 1))"
-    unfolding top_fun_def
-    apply(subst inf.commute)
-    apply(subst timerefine_inf_top_distrib[symmetric])
-    subgoal sorry
-    unfolding SPEC_def apply simp
-    apply(rule arg_cong[where f="timerefine RR"])
-    by auto
-  also have "\<dots> = timerefine RR sift_down_spec_sd" 
-    unfolding sift_down_spec_sd_def by simp
-  finally show ?thesis .
-qed
-end
-
-
-(*
-
-in heap_sort
-use
-sift_down_spec_sd
-
-
-
-in heap_sort'
-use
- *) 
+lemma finite_sum_nonzero_if_summands_finite_nonzero:
+  "finite {a. f a \<noteq> 0} \<Longrightarrow> finite {a. g a \<noteq> 0} \<Longrightarrow> finite {a. (f a ::nat) + g a \<noteq> 0}"
+  apply(rule finite_subset[where B="{a. f a \<noteq> 0} \<union> {a. g a \<noteq> 0}"])
+  by auto
 
 
 end

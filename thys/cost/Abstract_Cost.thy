@@ -165,4 +165,15 @@ end
 end
 
 
+
+
+lemma the_acost_mono: "T \<le> T' \<Longrightarrow> the_acost T b \<le> the_acost T' b"
+  apply(cases T; cases T') by (auto simp: le_fun_def less_eq_acost_def)
+
+lemma the_acost_propagate:  
+  shows "the_acost (a + b) = (\<lambda>x. the_acost a x + the_acost b x)"
+  apply(cases a; cases b) by auto
+
+
+
 end

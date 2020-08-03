@@ -81,6 +81,23 @@ subsection \<open>Setup for refinement condition generator\<close>
 
 
 
+lemma consume_refine:
+  fixes M :: "('e, ('b, enat) acost) nrest"
+  assumes "wfR'' E"
+  shows "\<lbrakk>t \<le> timerefineA E t'; M \<le> \<Down> R (timerefine E M')\<rbrakk> \<Longrightarrow> NREST.consume M t \<le> \<Down>R (timerefine E (NREST.consume M' t'))"
+  apply(subst timerefine_consume)
+  subgoal using assms .
+  apply(subst conc_fun_consume)
+  apply(rule consume_mono) by auto
+
+lemma MIf_refine:
+  fixes f :: "(_,(string, enat) acost) nrest"
+  shows "struct_preserving E \<Longrightarrow> wfR'' E \<Longrightarrow> (b,b')\<in>bool_rel \<Longrightarrow> (b \<Longrightarrow> f \<le> \<Down>R (timerefine E f'))
+           \<Longrightarrow> (\<not>b \<Longrightarrow> g \<le> \<Down>R (timerefine E g')) \<Longrightarrow>  MIf b f g  \<le> \<Down>R (timerefine E (MIf b' f' g' ))"
+  by(auto simp: MIf_def timerefineA_update_apply_same_cost dest: struct_preservingD intro!: consume_refine)
+
+
+
 thm refine
 
 thm ASSERT_leI_f
@@ -128,10 +145,6 @@ lemma refine_TId[refine0]:
 
 
 
-lemma the_acost_mono: "T \<le> T' \<Longrightarrow> the_acost T b \<le> the_acost T' b"
-  apply(cases T; cases T') by (auto simp: le_fun_def less_eq_acost_def)
-
-
 
 
 lemma SPEC_refine[refine]:
@@ -175,14 +188,21 @@ thm refine0
 thm consume_mono[refine0]
 
 
+
+lemma ASSERT_D5_leI[refine0]: 
+  fixes S' :: "(_,(_,enat)acost) nrest"
+  shows "(\<Phi> \<Longrightarrow> \<Down> R (timerefine F S) \<le> \<Down> R (timerefine E S')) \<Longrightarrow> \<Down> R (timerefine F ( do { _ \<leftarrow> ASSERT \<Phi>; S })) \<le> \<Down> R (timerefine E (do {
+                                     _ \<leftarrow> ASSERT \<Phi>;
+                                     S'
+                                   }))"
+  by (auto simp: pw_acost_le_iff refine_pw_simps)
+
+
+
 thm consume_mono[where M="M::(_,(_,enat)acost) nrest"]
 
-lemma consume_refine[refine0]:
-  fixes M :: "('e, ('b, enat) acost) nrest"
-  shows "\<lbrakk>t \<le> timerefineA E t'; M \<le> \<Down> R (timerefine E M')\<rbrakk> \<Longrightarrow> NREST.consume M t \<le> \<Down>R (timerefine E (NREST.consume M' t'))"
-  apply(subst timerefine_consume)
-  apply(subst conc_fun_consume)
-  apply(rule consume_mono) by auto
+declare consume_refine[refine0]
+
 
 lemma timerefine_RETURNT: "timerefine E (RETURNT x') = RETURNT x'"
   by (auto simp: timerefine_def RETURNT_def zero_acost_def)
@@ -195,15 +215,7 @@ lemma RETURNT_refine_t[refine]:
 
 
 declare RETURNT_refine_t[refine0]
-
-
-lemma timerefineA_TId[refine0]:
-  fixes T :: "(_,enat) acost"
-  shows "T \<le> T' \<Longrightarrow> T \<le> timerefineA TId T'"
-  unfolding timerefineA_def TId_def
-    apply(simp add: if_distrib)
-    apply(subst mult_zero_right)
-    apply(subst Sum_any.delta) by(cases T; cases T'; auto)
+declare timerefineA_TId[refine0]
 
 
 (* TODO: move *)
@@ -226,27 +238,6 @@ lemma consume_refine_easy:
   shows "\<lbrakk>t \<le> t'; M \<le> \<Down> R (   M')\<rbrakk> \<Longrightarrow> NREST.consume M t \<le> \<Down>R (  (NREST.consume M' t'))" 
   apply(subst conc_fun_consume)
   apply(rule consume_mono) by auto
-
-(* TODO: move *)
-definition "struct_preserving E \<equiv> (\<forall>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t))
-                                   \<and> (\<forall>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t))"
-
-lemma struct_preservingI:
-  assumes "\<And>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t)"
-     "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
-  shows "struct_preserving E"
-  using assms unfolding struct_preserving_def by auto
-
-lemma struct_preservingD:
-  assumes "struct_preserving E"
-  shows "\<And>t. cost ''call'' t \<le> timerefineA E (cost ''call'' t)"
-     "\<And>t. cost ''if'' t \<le> timerefineA E (cost ''if'' t)"
-  using assms unfolding struct_preserving_def by auto
-
-lemma sp_TId: "struct_preserving (TId::_\<Rightarrow>(string, enat) acost)" 
-  by (auto intro!: struct_preservingI simp: timerefineA_upd timerefineA_TId)
-
-lemma "(a,a)\<in>Id" unfolding Id_def by simp
 
 
 lemma RECT_refine_t:
@@ -288,8 +279,98 @@ lemma monadic_WHILEIT_refine_t[refine]:
   done
 
 
+subsection \<open>Shortcuts for specifications of operations\<close>
+
+  definition "SPECc1' c aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>c]))"
+  definition "SPECc1 name aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>(cost name 1)]))"
+  definition "SPECc2 name aop == ( (\<lambda>a b. SPECT ( [(aop a b)\<mapsto>(cost name 1)])))"
 
 
+
+
+lemma SPECc2_alt: "SPECc2 name aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) (cost name 1)))"
+  unfolding SPECc2_def consume_def by(auto simp: RETURNT_def intro!: ext)
+
+
+lemma SPECc2_refine:
+  "(op x y, op' x' y')\<in>R \<Longrightarrow> cost n (1::enat) \<le> TR n'  \<Longrightarrow> SPECc2 n op x y \<le> \<Down> R (timerefine TR (SPECc2 n' op' x' y'))"
+  unfolding SPECc2_def    
+  apply(subst SPECT_refine_t) apply auto
+  apply(rule order.trans) apply (simp add: )
+  apply(subst timerefineA_cost) by simp
+
+
+subsection "normalize blocks"
+
+
+lemma consumea_refine:
+  fixes t :: "(_,enat) acost"
+  shows "((), ()) \<in> R \<Longrightarrow> t \<le> timerefineA F t' \<Longrightarrow> consumea t \<le> \<Down> R (timerefine F (consumea t'))"
+  unfolding consumea_def
+  apply(rule SPECT_refine_t) by auto
+
+lemma consumea_Id_refine:
+  fixes t :: "(_,enat) acost"
+  shows "t \<le> timerefineA F t' \<Longrightarrow> consumea t \<le> \<Down> Id (timerefine F (consumea t'))"
+  unfolding consumea_def
+  apply(rule SPECT_refine_t) by auto
+    
+
+lemma swap_consumea_ASSERT: "do { consumea t; ASSERT P; M:: ('c, ('d, enat) acost) nrest} = do {ASSERT P; consumea t; M}"
+  apply(auto simp: pw_acost_eq_iff refine_pw_simps consumea_def)
+  apply (metis zero_enat_def zero_le)
+  using le_Suc_ex zero_enat_def by force
+
+
+lemma consumea_0_noop:
+  fixes m :: "('b,'c::{complete_lattice,zero,monoid_add}) nrest"
+  shows "do { consumea 0; m } = m"
+  apply(auto simp: consumea_def bindT_def split: nrest.splits intro!: ext) 
+  subgoal for x2 x apply(cases "x2 x") by auto
+  done
+
+thm refine0              
+
+lemma forget_inresT_project_acos: "\<exists>t b. inresT (project_acost b (consumea tt)) x' t \<Longrightarrow> True"
+  by simp
+
+lemma forget_nofailT_consumea: "nofailT (consumea tt) \<Longrightarrow> True"
+  by simp
+
+lemmas normalize_inres_precond = forget_nofailT_consumea forget_inresT_project_acos
+                                  inresT_consumea_D EX_inresT_SPECTONE_D
+
+method normalize_blocks = (simp only: swap_consumea_ASSERT nres_acost_bind_assoc consume_alt consumea_shrink nres_bind_left_identity)
+method refine_block uses rules = (drule normalize_inres_precond |split prod.splits | intro allI impI
+                                    | rule refine0 consumea_Id_refine SPECT_refine_t bindT_refine_conc_time_my rules)
+method refine_blocks uses rules = repeat_all_new \<open>refine_block rules: rules\<close>
+
+
+subsection \<open>Simple bind rule with inres\<close>
+
+
+lemma bindT_refine_conc_time_my_inres:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'; inres m' x'\<rbrakk>
+         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  apply(rule bindT_refine_conc_time2) using assms
+  by (auto dest: inres_if_inresT_acost)
+
+term consume
+lemma bindT_refine_conc_time_easy:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R' \<rbrakk> \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  apply(rule bindT_refine_conc_time)
+    apply fact
+   apply fact
+  apply(rule assms(3)) apply simp
+  done
 
 
 end

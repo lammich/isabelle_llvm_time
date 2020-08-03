@@ -2,7 +2,7 @@ theory Sorting_Misc
 imports "../../sepref/Sepref" "../../sepref/Hnr_Primitives_Experiment" "HOL-Library.Discrete"
 begin
   hide_const (open) pi Word.slice
-
+  term SPECc2
 \<^cancel>\<open>
 lemma WHILEIT_unfold': "WHILEIT I b c s = doN { ASSERT (I s); if b s then doN { s\<leftarrow>c s; WHILEIT I b c s } else RETURN s }"
   apply (rewrite in "\<hole>=_" WHILEIT_unfold)

@@ -410,6 +410,20 @@ lemma gwp_specifies_I:
     done
   done
 
+lemma gwp_specifies_rev_I: 
+  shows "(m \<le> SPECT Q) \<Longrightarrow> gwp m Q \<ge> Some 0 "
+  unfolding gwp_pw apply (cases m)
+   apply (auto simp: minus_p_m_Failt le_fun_def minus_p_m_def minus_potential_def split: option.splits)
+  subgoal for M x apply(cases "Q x"; cases "M x")
+    subgoal by (auto split: if_splits)[1]
+    subgoal by (metis less_eq_option_Some_None) 
+    subgoal by (auto split: if_splits)[1]
+    subgoal by (auto split: if_splits)
+    done
+  subgoal using needname_nonneg by blast
+  subgoal by (metis less_eq_option_Some) 
+  done
+
 
 lemma gwp_specifies_time_I: 
   shows "gwp m (timerefineF E Q) \<ge> Some 0 \<Longrightarrow> (m \<le> timerefine E (SPECT Q))"
@@ -1733,6 +1747,11 @@ lemma nofailT_bindT:
 
 lemma inres_SPECT: "inres (SPECT [x\<mapsto>t]) y \<longleftrightarrow> x = y"
   unfolding inres_def by auto 
+
+
+
+
+
 
 lemma
   nofailT_bindT_SPEC_iff:

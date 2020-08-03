@@ -352,7 +352,17 @@ definition consume where "consume M t \<equiv> case M of
           REST X \<Rightarrow> REST (map_option ((+) t) o (X))"
 
 
+
+
 definition "SPEC P t = REST (\<lambda>v. if P v then Some (t v) else None)"
+
+
+
+lemma 
+  SPEC_leq_SPEC_I:
+  "A \<le> A' \<Longrightarrow> (\<And>x. B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
+  apply(auto simp: SPEC_def)
+  by (simp add: le_fun_def)  
 
  
 
@@ -519,6 +529,11 @@ lemma consume_FAIL:
 lemma consume_Fails[simp]: "consume FAILT t = FAILT" by(auto simp: consume_def)
 
 
+lemma consume_0:
+  "consume M 0 = M"
+  apply(cases M) apply(auto simp: consume_def intro!: ext)
+  subgoal for x2 x apply(cases "x2 x") by auto
+  done
 
 
 section "pointwise reasoning"
@@ -892,6 +907,24 @@ end
 subsection \<open> le_or_fail \<close>
   definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
     "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
+
+lemma le_if_leof: "nofailT a \<Longrightarrow> a \<le>\<^sub>n b \<Longrightarrow> a \<le> b"
+  unfolding le_or_fail_def by simp
+
+text \<open>separate functional correctness from running time\<close>
+
+lemma assumes correctness: "a \<le> SPEC a_spec (\<lambda>_. top)"
+  and time: " a \<le>\<^sub>n SPEC (\<lambda>_. True) T"
+shows separate_correct_and_time: "a \<le> SPEC a_spec T"
+proof -
+  from correctness have [simp]: "nofailT a"
+    unfolding nofailT_def by(cases a; simp add: SPEC_def)
+  have "a \<le> inf (SPEC a_spec (\<lambda>_. top)) (SPEC (\<lambda>_. True) T)"
+    using time correctness by (auto intro: inf_greatest  le_if_leof)
+  also have "\<dots> = SPEC a_spec T"
+    by(auto simp add: SPEC_def)
+  finally show "a \<le> SPEC a_spec T" .
+qed
 
 section \<open> Monad Operators \<close>
 
@@ -1505,6 +1538,16 @@ lemma inresT_consume[refine_pw_simps]:
   subgoal for n x2 z apply(cases z) by auto  
   subgoal for x2 z apply(cases z) by auto   
   done
+
+
+
+lemma consume_zero:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "x=0 \<Longrightarrow> NREST.consume M x = M"
+  by(auto simp: pw_acost_eq_iff refine_pw_simps zero_acost_def satminus_def zero_enat_def)
+
+
+
 definition "consumea T = SPECT [()\<mapsto>T]"
 
 lemma consume_alt_aux:
@@ -1594,6 +1637,58 @@ definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow>
 definition "monadic_WHILEIET I E b f s \<equiv> monadic_WHILEIT I b f s"
 definition "monadic_WHILEIET' I E b f s \<equiv> monadic_WHILEIT' I b f s"
                                                     
+
+
+
+
+subsection \<open>inresT retrieval\<close>
+
+lemma EX_inresT_consume': " inresT (project_acost b (NREST.consume M tt)) x' t
+  \<Longrightarrow> \<exists>t b. inresT (project_acost b M) x' t"
+     
+    subgoal apply(rule exI[where x="0"]) apply(rule exI[where x=b])
+      unfolding inresT_def consume_def apply(cases M) apply simp apply simp
+      unfolding project_acost_def by (auto simp: zero_enat_def[symmetric] le_fun_def split: option.splits)  
+    done
+
+lemma inresT_consumea_D: "inresT (project_acost e (do {_ \<leftarrow> consumea tt; M })) x t 
+        \<Longrightarrow> \<exists>t e. inresT (project_acost e M) x t "
+  apply(rule exI[where x=0])
+  apply(rule exI[where x=e])
+  by(auto simp: zero_enat_def[symmetric] consumea_def bindT_def inresT_def project_acost_def le_fun_def
+          split: if_splits nrest.splits option.splits)
+
+lemma EX_inresT_RETURNT_D: "inresT (project_acost b (RETURNT a)) x' t
+    \<Longrightarrow> x' = a"
+  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
+
+lemma EX_inresT_RETURNT: "\<exists>t b. inresT (project_acost b (RETURNT a)) x' t
+    \<Longrightarrow> x' = a"
+  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
+
+lemmas recover_from_inresT = inresT_consumea_D EX_inresT_RETURNT_D EX_inresT_consume' EX_inresT_RETURNT
+
+
+
+lemma EX_inresT_consume: "\<exists>t b. inresT (project_acost b (NREST.consume M tt)) x' t
+  \<Longrightarrow> \<exists>t b. inresT (project_acost b M) x' t"
+  apply auto subgoal for t b   
+    subgoal apply(rule exI[where x="0"]) apply(rule exI[where x=b])
+      unfolding inresT_def consume_def apply(cases M) apply simp apply simp
+      unfolding project_acost_def by (auto simp: zero_enat_def[symmetric] le_fun_def split: option.splits)  
+    done
+  done
+
+
+
+lemma EX_inresT_SPECTONE_D: "inresT (project_acost b (SPECT [a \<mapsto> tt])) x' t
+    \<Longrightarrow> x' = a"
+  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
+
+lemma EX_inresT_consume_RETURNT: "\<exists>t b. inresT (project_acost b (NREST.consume (RETURNT a) tt)) x' t
+    \<Longrightarrow> x' = a"
+  apply(drule EX_inresT_consume)
+  apply(drule EX_inresT_RETURNT) by simp
 
 
 subsection \<open>More Pw reasoning setup\<close>

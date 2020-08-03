@@ -267,6 +267,7 @@ ML \<open>
 lemma dflt_arity[sepref_monadify_arity]:
   "RETURN \<equiv> \<lambda>\<^sub>2x. SP RETURN$x" 
   "RECT \<equiv> \<lambda>\<^sub>2B x. SP RECT$(\<lambda>\<^sub>2D x. B$(\<lambda>\<^sub>2x. RCALL$D$x)$x)$x" 
+  "RECT' \<equiv> \<lambda>\<^sub>2B x. SP RECT'$(\<lambda>\<^sub>2D x. B$(\<lambda>\<^sub>2x. RCALL$D$x)$x)$x" 
   "case_list \<equiv> \<lambda>\<^sub>2fn fc l. SP case_list$fn$(\<lambda>\<^sub>2x xs. fc$x$xs)$l" 
   "case_prod \<equiv> \<lambda>\<^sub>2fp p. SP case_prod$(\<lambda>\<^sub>2a b. fp$a$b)$p" 
   "case_option \<equiv> \<lambda>\<^sub>2fn fs ov. SP case_option$fn$(\<lambda>\<^sub>2x. fs$x)$ov" 
@@ -274,9 +275,9 @@ lemma dflt_arity[sepref_monadify_arity]:
   "Let \<equiv> \<lambda>\<^sub>2x f. SP Let$x$(\<lambda>\<^sub>2x. f$x)"
   by (simp_all only: SP_def APP_def PROTECT2_def RCALL_def)
 
-
 lemma dflt_comb[sepref_monadify_comb]:
   "\<And>B x. RECT$B$x \<equiv> NREST.bindT$(EVAL$x)$(\<lambda>\<^sub>2x. SP (RECT$B$x))"
+  "RECT' \<equiv> \<lambda>\<^sub>2B x. SP RECT'$(\<lambda>\<^sub>2D x. B$(\<lambda>\<^sub>2x. RCALL$D$x)$x)$x" 
   "\<And>D x. RCALL$D$x \<equiv> NREST.bindT$(EVAL$x)$(\<lambda>\<^sub>2x. SP (RCALL$D$x))"
   "\<And>fn fc l. case_list$fn$fc$l \<equiv> NREST.bindT$(EVAL$l)$(\<lambda>\<^sub>2l. (SP case_list$fn$fc$l))"
   "\<And>fp p. case_prod$fp$p \<equiv> NREST.bindT$(EVAL$p)$(\<lambda>\<^sub>2p. (SP case_prod$fp$p))"

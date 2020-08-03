@@ -547,9 +547,6 @@ subsection \<open>Arithmetics\<close>
 
 
 
-  definition "SPECc1' c aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>c]))"
-  definition "SPECc1 name aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>(cost name 1)]))"
-  definition "SPECc2 name aop == ( (\<lambda>a b. SPECT ( [(aop a b)\<mapsto>(cost name 1)])))"
 
 
 context 

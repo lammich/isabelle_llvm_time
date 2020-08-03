@@ -122,10 +122,4 @@ lemma "cost ''a'' 1 + cost ''b'' (1::enat) + cost ''b'' 1 + cost ''a'' 2  + cost
   oops
 
 
-(* TODO: Move *)
-lemma MIf_refine: "struct_preserving E \<Longrightarrow> (b,b')\<in>bool_rel \<Longrightarrow> (b \<Longrightarrow> f \<le> \<Down>R (timerefine E f'))
-           \<Longrightarrow> (\<not>b \<Longrightarrow> g \<le> \<Down>R (timerefine E g')) \<Longrightarrow>  MIf b f g  \<le> \<Down>R (timerefine E (MIf b' f' g' ))"
-  sorry
-
-
 end

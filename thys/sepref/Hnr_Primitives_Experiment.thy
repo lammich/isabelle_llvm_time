@@ -427,6 +427,11 @@ lemma FREE_eoarray_assn[sepref_frame_free_rules]:
 definition "mop_to_eo_conv xs \<equiv> do { consume (RETURNT (map Some xs)) (lift_acost 0) }"  
 definition "mop_to_wo_conv xs \<equiv> do { ASSERT (None\<notin>set xs); consume (RETURNT (map the xs)) (lift_acost 0) }"  
 
+
+  lemma mop_to_eo_conv_alt: "mop_to_eo_conv xs \<equiv> (RETURNT (map Some xs)) "
+    unfolding mop_to_eo_conv_def lift_acost_zero  consume_0 .
+
+
 (* XXX: Need "array_assn A" first for this to be meaningful! ra-comp! *)  
   
 definition "some_rel \<equiv> br the (Not o is_None)"

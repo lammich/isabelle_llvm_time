@@ -9,137 +9,14 @@ begin
 
 section "stuff to move"
 
-
-
-declare wfR''_TId[simp]
-declare timerefineA_TId_eq[simp]
-declare sp_TId[simp]
-
-
-lemma timerefineA_cost: "timerefineA TR (cost n (1::enat)) = TR n"
-  unfolding timerefineA_def cost_def zero_acost_def
-  apply simp
-  apply(subst timerefineA_upd_aux)
-  apply(subst Sum_any.delta) by simp 
-
-
-lemma SPECc2_refine:
-  "(op x y, op' x' y')\<in>R \<Longrightarrow> cost n (1::enat) \<le> TR n'  \<Longrightarrow> SPECc2 n op x y \<le> \<Down> R (timerefine TR (SPECc2 n' op' x' y'))"
-  unfolding SPECc2_def    
-  apply(subst SPECT_refine_t) apply auto
-  apply(rule order.trans) apply (simp add: )
-  apply(subst timerefineA_cost) by simp
-
-
-
-lemma bindT_refine_conc_time_my_inres:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'; inres m' x'\<rbrakk>
-         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  apply(rule bindT_refine_conc_time2) using assms
-  by (auto dest: inres_if_inresT_acost)
-
-
-(* DUPLICATES *)
-lemma wfR''_upd[intro]: "wfR'' F \<Longrightarrow> wfR'' (F(x:=y))"
-  unfolding wfR''_def
-  apply auto
-  subgoal for f
-    apply(rule finite_subset[where B="{s. the_acost (F s) f \<noteq> 0} \<union> {x}"])
-    by auto
-  done
-
-lemma cost_n_leq_TId_n: "cost n (1::enat) \<le> TId n"
-  by(auto simp:  TId_def cost_def zero_acost_def less_eq_acost_def)
- 
-lemma timerefineA_update_cost[simp]: 
-  "n\<noteq>m \<Longrightarrow> timerefineA (F(n := y)) (cost m (t::enat)) = timerefineA F (cost m t)"
-  by (auto simp: timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
-lemma struct_preserving_upd_I[intro]: 
-  fixes F:: "char list \<Rightarrow> (char list, enat) acost"
-  shows "struct_preserving F \<Longrightarrow>  x\<noteq>''if''\<Longrightarrow>  x\<noteq>''call'' \<Longrightarrow> struct_preserving (F(x:=y))"
-  by(auto simp: struct_preserving_def timerefineA_update_cost )
-
-
-
-
 lemma if_rule2: "(c \<Longrightarrow> Some x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then a else None)"
   by auto
+
 lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
   by auto
 
 lemma ifSome_None: "(if P then Some x else None) = Some y \<longleftrightarrow> P \<and> x=y"
   by (auto split: if_splits)
-
-
-
-
-term sift_down_ab
-
-thm gwp_specifies_I
-lemma gwp_specifies_rev_I: 
-  shows "(m \<le> SPECT Q) \<Longrightarrow> gwp m Q \<ge> Some 0 "
-  unfolding gwp_pw apply (cases m)
-   apply (auto simp: minus_p_m_Failt le_fun_def minus_p_m_def minus_potential_def split: option.splits)
-  subgoal for M x apply(cases "Q x"; cases "M x")
-    subgoal by (auto split: if_splits)[1]
-    subgoal by (metis less_eq_option_Some_None) 
-    subgoal by (auto split: if_splits)[1]
-    subgoal by (auto split: if_splits)
-    done
-  subgoal using needname_nonneg by blast
-  subgoal by (metis less_eq_option_Some) 
-  done
-
-
-lemma ASSERT_D5_leI[refine0]: 
-  fixes S' :: "(_,(_,enat)acost) nrest"
-  shows "(\<Phi> \<Longrightarrow> \<Down> R (timerefine F S) \<le> \<Down> R (timerefine E S')) \<Longrightarrow> \<Down> R (timerefine F ( do { _ \<leftarrow> ASSERT \<Phi>; S })) \<le> \<Down> R (timerefine E (do {
-                                     _ \<leftarrow> ASSERT \<Phi>;
-                                     S'
-                                   }))"
-  by (auto simp: pw_acost_le_iff refine_pw_simps)
-
-
-lemma 
-  SPEC_leq_SPEC_I:
-  "A \<le> A' \<Longrightarrow> (\<And>x. B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
-  apply(auto simp: SPEC_def)
-  unfolding timerefine_SPECT
-  by (simp add: le_fun_def)  
-
-
-
-lemma EX_inresT_consume': " inresT (project_acost b (NREST.consume M tt)) x' t
-  \<Longrightarrow> \<exists>t b. inresT (project_acost b M) x' t"
-     
-    subgoal apply(rule exI[where x="0"]) apply(rule exI[where x=b])
-      unfolding inresT_def consume_def apply(cases M) apply simp apply simp
-      unfolding project_acost_def by (auto simp: zero_enat_def[symmetric] le_fun_def split: option.splits)  
-    done
-
-lemma inresT_consumea_D: "inresT (project_acost e (do {_ \<leftarrow> consumea tt; M })) x t 
-        \<Longrightarrow> \<exists>t e. inresT (project_acost e M) x t "
-  apply(rule exI[where x=0])
-  apply(rule exI[where x=e])
-  by(auto simp: zero_enat_def[symmetric] consumea_def bindT_def inresT_def project_acost_def le_fun_def
-          split: if_splits nrest.splits option.splits)
-
-lemma EX_inresT_RETURNT_D: "inresT (project_acost b (RETURNTecost a)) x' t
-    \<Longrightarrow> x' = a"
-  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
-
-lemma EX_inresT_RETURNT: "\<exists>t b. inresT (project_acost b (RETURNTecost a)) x' t
-    \<Longrightarrow> x' = a"
-  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
-
-lemmas recover_from_inresT = inresT_consumea_D EX_inresT_RETURNT_D EX_inresT_consume' EX_inresT_RETURNT
-
-
-
 
 lemma prod3: "m\<le> f x y z \<Longrightarrow> m \<le> (case (x,y,z) of (a,b,c) \<Rightarrow> f a b c)"
   by auto
@@ -148,182 +25,7 @@ lemma top_acost_absorbs: "top + (x::(_,enat)acost) = top"
   apply(cases x) by (auto simp: top_acost_def plus_acost_alt top_enat_def)
 
 
-subsection "normalize blocks"
 
-
-
-
-lemma EX_inresT_consume: "\<exists>t b. inresT (project_acost b (NREST.consume M tt)) x' t
-  \<Longrightarrow> \<exists>t b. inresT (project_acost b M) x' t"
-  apply auto subgoal for t b   
-    subgoal apply(rule exI[where x="0"]) apply(rule exI[where x=b])
-      unfolding inresT_def consume_def apply(cases M) apply simp apply simp
-      unfolding project_acost_def by (auto simp: zero_enat_def[symmetric] le_fun_def split: option.splits)  
-    done
-  done
-
-
-lemma EX_inresT_SPECTONE_D: "inresT (project_acost b (SPECT [a \<mapsto> tt])) x' t
-    \<Longrightarrow> x' = a"
-  by(auto simp: inresT_def project_acost_def le_fun_def RETURNT_def split: if_splits ) 
-
-lemma EX_inresT_consume_RETURNT: "\<exists>t b. inresT (project_acost b (NREST.consume (RETURNTecost a) tt)) x' t
-    \<Longrightarrow> x' = a"
-  apply(drule EX_inresT_consume)
-  apply(drule EX_inresT_RETURNT) by simp
-
-lemma consumea_refine:
-  fixes t :: "(_,enat) acost"
-  shows "((), ()) \<in> R \<Longrightarrow> t \<le> timerefineA F t' \<Longrightarrow> consumea t \<le> \<Down> R (timerefine F (consumea t'))"
-  unfolding consumea_def
-  apply(rule SPECT_refine_t) by auto
-
-lemma consumea_Id_refine:
-  fixes t :: "(_,enat) acost"
-  shows "t \<le> timerefineA F t' \<Longrightarrow> consumea t \<le> \<Down> Id (timerefine F (consumea t'))"
-  unfolding consumea_def
-  apply(rule SPECT_refine_t) by auto
-    
-thm sp_TId
-
-lemma swap_consumea_ASSERT: "do { consumea t; ASSERT P; M:: ('c, ('d, enat) acost) nrest} = do {ASSERT P; consumea t; M}"
-  apply(auto simp: pw_acost_eq_iff refine_pw_simps consumea_def)
-  apply (metis zero_enat_def zero_le)
-  using le_Suc_ex zero_enat_def by force
-
-
-lemma consumea_0_noop:
-  fixes m :: "('b,'c::{complete_lattice,zero,monoid_add}) nrest"
-  shows "do { consumea 0; m } = m"
-  apply(auto simp: consumea_def bindT_def split: nrest.splits intro!: ext) 
-  subgoal for x2 x apply(cases "x2 x") by auto
-  done
-
-definition "bindT_flag = bindT"
-definition "MIf_flag = MIf"
-definition "monadic_WHILEIT_flag = monadic_WHILEIT"
-lemma add_consumeas_to_bindT:
-  fixes f :: "'a \<Rightarrow> ('b,'c::{complete_lattice,zero,monoid_add}) nrest"
-  shows "bindT m f = do { consumea 0; bindT_flag m f }"
-  unfolding bindT_flag_def by (simp add: consumea_0_noop)
-
-lemma add_consumeas_to_MIf: 
-  shows "MIf b f1 f2 = do { consumea 0; MIf_flag b (do { consumea 0; f1}) (do { consumea 0; f2})}"
-  unfolding MIf_flag_def by (simp add: consumea_0_noop)
-
-lemma add_consumeas_to_monadic_WHILEIT:
-  shows "monadic_WHILEIT I b c s = doN { consumea 0; monadic_WHILEIT_flag I (\<lambda>a. doN { consumea 0;b a}) (\<lambda>a. doN { consumea 0;c a}) s }"
-  unfolding monadic_WHILEIT_flag_def by (simp add: consumea_0_noop)
-
-lemmas add_consumeas_every_where = add_consumeas_to_bindT add_consumeas_to_MIf add_consumeas_to_monadic_WHILEIT
-lemmas unflag_every_where = bindT_flag_def MIf_flag_def monadic_WHILEIT_flag_def
-
-thm refine0
-thm SPECc2_def
-lemma SPECc2_alt: 
-  shows "SPECc2 name aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) (cost name (1::enat))))"
-  unfolding SPECc2_def consume_def RETURNT_alt by auto
-
-thm refine0              
-
-lemma forget_inresT_project_acos: "\<exists>t b. inresT (project_acost b (consumea tt)) x' t \<Longrightarrow> True"
-  by simp
-
-lemma forget_nofailT_consumea: "nofailT (consumea tt) \<Longrightarrow> True"
-  by simp
-
-lemmas normalize_inres_precond = forget_nofailT_consumea forget_inresT_project_acos
-                                  inresT_consumea_D EX_inresT_SPECTONE_D
-
-
-lemma bindT_refine_conc_time_my:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'; \<exists>t b. inresT (project_acost b m') x' t\<rbrakk>
-         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  apply(rule bindT_refine_conc_time2) using assms by auto
-
-term inres
-
-
-
-
-method normalize_blocks = (simp only: swap_consumea_ASSERT nres_acost_bind_assoc consume_alt consumea_shrink nres_bind_left_identity)
-method refine_block uses rules = (drule normalize_inres_precond |split prod.splits | intro allI impI
-                                    | rule refine0 consumea_Id_refine SPECT_refine_t bindT_refine_conc_time_my rules)
-method refine_blocks uses rules = repeat_all_new \<open>refine_block rules: rules\<close>
-
-subsection "commands"
-(* TODO: Move *)               
-context
-  fixes  T :: "(nat \<times> nat \<times> nat) \<Rightarrow> (char list, enat) acost"
-begin
-  definition mop_list_swap  :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list, _) nrest"
-    where [simp]: "mop_list_swap xs i j \<equiv> do { ASSERT (i<length xs \<and> j<length xs); consume (RETURNT (swap xs i j)) (T (length xs,i,j)) }"
-  sepref_register "mop_list_swap"
-end
-
-lemma param_mop_list_get:
-  "(mop_list_swap T, mop_list_swap T) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
-  apply(intro nrest_relI fun_relI)
-  unfolding mop_list_swap_def swap_def
-  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
-  apply parametricity
-  by auto              
-
-abbreviation "mop_list_swapN \<equiv> mop_list_swap (\<lambda>_. cost ''list_swap'' 1)"
-abbreviation "mop_list_getN \<equiv> mop_list_get (\<lambda>_. cost ''list_get'' 1)"
-abbreviation "mop_list_setN \<equiv> mop_list_set (\<lambda>_. cost ''list_set'' 1)"
-
-abbreviation "SPECc2F aop \<equiv> ( (\<lambda>a b. consume (RETURNT (aop a b)) top))"
-abbreviation "mop_list_getF \<equiv> mop_list_get (\<lambda>_. top)"
-abbreviation "mop_list_setF \<equiv> mop_list_set (\<lambda>_. top)"
-abbreviation "mop_list_swapF \<equiv> mop_list_swap (\<lambda>_. top)"        
-abbreviation (in weak_ordering) "mop_cmp_idxsF \<equiv> mop_cmp_idxs top"
-
-subsection \<open>separate time from functional correctness\<close>
-
-
-(* TODO: *)
-
-(* OPTION A: verfeinerung mit zusatz information*)
-lemma "a2 \<le> timerefine_NONSTANDARD a"
-  (* refinement in lockstep *)
-  oops
-
-(* OPTION B: verfeinerung mit zusatz information*)
-term "(\<le>\<^sub>n)"
-
-term "m \<le> SPECT Q"
-term "Some 0 \<le> gwp m Q"
-
-term "m \<le>\<^sub>n SPECT Q"
-term " Some 0 \<le> (if nofailT m then gwp m Q else Some \<infinity>)"
-term "gwp\<^sub>n m Q \<equiv> (if nofailT m then gwp m Q else Some \<infinity>)"
-
-
-lemma le_if_leof: "nofailT a \<Longrightarrow> a \<le>\<^sub>n b \<Longrightarrow> a \<le> b"
-  unfolding le_or_fail_def by simp
-
-(* trennen von  korrektheit und  laufzeit*)
-lemma assumes correctness: "a \<le> SPEC a_spec (\<lambda>_. top)"
-  and time: " a \<le>\<^sub>n SPEC (\<lambda>_. True) T"
-shows separate_correct_and_time: "a \<le> SPEC a_spec T"
-proof -
-  from correctness have [simp]: "nofailT a"
-    unfolding nofailT_def by(cases a; simp add: SPEC_def)
-  have "a \<le> inf (SPEC a_spec (\<lambda>_. top)) (SPEC (\<lambda>_. True) T)"
-    using time correctness by (auto intro: inf_greatest  le_if_leof)
-  also have "\<dots> = SPEC a_spec T"
-    by(auto simp add: SPEC_def)
-  finally show "a \<le> SPEC a_spec T" .
-qed
-
-
-
-section  "START"
 
 
 locale heap_range_context = 
@@ -1459,15 +1161,6 @@ context heap_context begin
     by (auto simp: sd23_rel_def)
 
 (* TODO: Move *)
-lemma consume_0:
-  "consume M 0 = M"
-  apply(cases M) apply(auto simp: consume_def intro!: ext)
-  subgoal for x2 x apply(cases "x2 x") by auto
-  done
-
-  lemma mop_to_eo_conv_alt: "mop_to_eo_conv xs \<equiv> (RETURNT (map Some xs)) "
-    unfolding mop_to_eo_conv_def lift_acost_zero  consume_0 .
-    
   lemma introR: "(a,a')\<in>R \<Longrightarrow> (a,a')\<in>R" .
 
 lemma mop_has_lchild3_refine: "(aaa,aa)\<in>Id \<Longrightarrow> (mop_has_lchild3 l h aaa :: (_, (_, enat) acost) nrest) \<le> \<Down> bool_rel (timerefine TId (mop_has_lchild3F l h aa))"
@@ -2218,7 +1911,7 @@ proof -
       supply bindT_refine_conc_time_my_inres[refine]
       apply(refine_rcg SPECc2_refine MIf_refine )
                           apply refine_dref_type
-      prefer 9 thm Rsd_a.refine[OF initial.heap_context_axioms] heapify_btu1.refine[OF initial.heap_context_axioms]
+      prefer 10 thm Rsd_a.refine[OF initial.heap_context_axioms] heapify_btu1.refine[OF initial.heap_context_axioms]
       subgoal
         apply(rule  initial.heapify_btu2_refine[unfolded heapify_btu1.refine[OF initial.heap_context_axioms]
                                                 Rsd_a.refine[OF initial.heap_context_axioms]
@@ -2259,10 +1952,6 @@ qed
 definition heapsort_TR
   where "heapsort_TR l h = pp (Rsd_a l h l) (TId(''slice_sort'':=heapsort_time l h))"
 
-lemma timerefineA_update_apply_same_cost: 
-  "timerefineA (F(n := y)) (cost n (t::enat)) = acostC (\<lambda>x. t * the_acost y x)"
-  by (auto simp: timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
-  
 lemma heapsort_correct': 
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> \<Longrightarrow> heapsort2 xs l h \<le>
       \<Down>Id (timerefine (heapsort_TR l h) (slice_sort_spec (\<^bold><) xs' l' h'))"

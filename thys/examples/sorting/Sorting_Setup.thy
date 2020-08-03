@@ -1,5 +1,6 @@
 theory Sorting_Setup
-imports "../../sepref/Hnr_Primitives_Experiment" Sorting_Misc "../../nrest/Refine_Heuristics"
+  imports "../../sepref/Hnr_Primitives_Experiment" Sorting_Misc "../../nrest/Refine_Heuristics"
+  "../../nrest/NREST_Automation"
 begin
   hide_const (open) Word.slice
 
@@ -418,16 +419,13 @@ begin
     done
 
 
-  definition "E_cmpo_idxs \<equiv> \<lambda>x. acostC (\<lambda>y. (if x=''cmpo_idxs'' then (if  y=''eo_extract'' then 2 else if y=lt_curr_name then 1 else 0) else 0))"
+  definition "E_cmpo_idxs \<equiv> TId(''cmpo_idxs'':=(cost ''eo_extract'' 2) + (cost lt_curr_name 1))"
 
   lemma "mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1  + cost lt_curr_name 1) xs i j \<le> \<Down>Id (timerefine E_cmpo_idxs (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) xs i j))"
     unfolding mop_cmpo_idxs_def
     apply(refine_rcg)
-     apply (auto simp: E_cmpo_idxs_def timerefineA_def)  
-    apply(simp add: if_distrib[where x="If _ 2 _" ] )
-    apply(subst mult_zero_right)
-    apply(subst Sum_any.delta)
-    by(auto simp: less_eq_acost_def zero_acost_def cost_def lt_curr_name_no_clash) 
+      apply (auto simp: E_cmpo_idxs_def timerefineA_update_apply_same_cost)
+    apply sc_solve by simp
 
   lemma cmpo_v_idx2_refine: "(cmpo_v_idx2, PR_CONST (mop_cmpo_v_idx (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
      unfolding cmpo_v_idx2_def  mop_cmpo_v_idx_def unborrow_def SPECc2_def
@@ -1224,5 +1222,36 @@ begin
 end  
 
 \<close>
+
+
+
+subsection "Some more commands"
+(* TODO: Move *)               
+context
+  fixes  T :: "(nat \<times> nat \<times> nat) \<Rightarrow> (char list, enat) acost"
+begin
+  definition mop_list_swap  :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list, _) nrest"
+    where [simp]: "mop_list_swap xs i j \<equiv> do { ASSERT (i<length xs \<and> j<length xs); consume (RETURNT (swap xs i j)) (T (length xs,i,j)) }"
+  sepref_register "mop_list_swap"
+end
+
+lemma param_mop_list_get:
+  "(mop_list_swap T, mop_list_swap T) \<in> \<langle>the_pure A\<rangle> list_rel \<rightarrow> nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>\<langle>the_pure A\<rangle> list_rel\<rangle> nrest_rel"
+  apply(intro nrest_relI fun_relI)
+  unfolding mop_list_swap_def swap_def
+  apply (auto simp: pw_acost_le_iff refine_pw_simps list_rel_imp_same_length)
+  apply parametricity
+  by auto              
+
+abbreviation "mop_list_swapN \<equiv> mop_list_swap (\<lambda>_. cost ''list_swap'' 1)"
+abbreviation "mop_list_getN \<equiv> mop_list_get (\<lambda>_. cost ''list_get'' 1)"
+abbreviation "mop_list_setN \<equiv> mop_list_set (\<lambda>_. cost ''list_set'' 1)"
+
+abbreviation "SPECc2F aop \<equiv> ( (\<lambda>a b. consume (RETURNT (aop a b)) top))"
+abbreviation "mop_list_getF \<equiv> mop_list_get (\<lambda>_. top)"
+abbreviation "mop_list_setF \<equiv> mop_list_set (\<lambda>_. top)"
+abbreviation "mop_list_swapF \<equiv> mop_list_swap (\<lambda>_. top)"        
+abbreviation (in weak_ordering) "mop_cmp_idxsF \<equiv> mop_cmp_idxs top"
+
 
 end

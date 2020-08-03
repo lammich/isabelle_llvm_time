@@ -569,6 +569,7 @@ lemma hn_ASSUME_bind[sepref_comb_rules]:
   apply (auto simp: vassn_tag_def)
   done
     
+declare hnr_ASSERT[sepref_comb_rules]
   
 term bindT
 term RETURNT  
