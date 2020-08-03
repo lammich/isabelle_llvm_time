@@ -356,7 +356,7 @@ locale sort_impl_context = weak_ordering +
     and lt_curr_name :: string
     and elem_assn :: "'a \<Rightarrow> 'ai \<Rightarrow> assn"
   assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn lt_curr_name (\<^bold><))"
-  assumes lt_curr_name_no_clash: "lt_curr_name \<noteq> ''eo_extract''"
+  assumes lt_curr_name_no_clash: "lt_curr_name \<noteq> ''eo_extract''" "lt_curr_name \<noteq> ''eo_set''" 
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
@@ -492,47 +492,70 @@ begin
   }"  
   sepref_register cmpo_idx_v2' cmpo_v_idx2' 
 
-  definition "E_mop_oarray_extract \<equiv> \<lambda>x. acostC (\<lambda>y. (if x=''eo_extract'' then the_acost (lift_acost mop_array_nth_cost) y else (if x=y then 1 else 0)))"
-
-  lemma E_mop_oarray_extract_alt: "E_mop_oarray_extract = TId(''eo_extract'':=(lift_acost mop_array_nth_cost))"
-    unfolding TId_def E_mop_oarray_extract_def
-    apply(rule ext) apply auto done
-
+  definition "E_mop_oarray_extract \<equiv> TId(''eo_extract'':=lift_acost mop_array_nth_cost, ''eo_set'':=lift_acost mop_array_upd_cost)"
+ 
   lemma mop_oarray_extract_refine: 
     "mop_oarray_extract a b \<le> \<Down> Id (timerefine E_mop_oarray_extract (mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) a b))"
-    unfolding mop_oarray_extract_def E_mop_oarray_extract_alt             
-    
-    sorry
+    unfolding mop_oarray_extract_def E_mop_oarray_extract_def mop_eo_extract_def       
+    apply(intro refine0)
+    by(auto simp: timerefineA_update_apply_same_cost intro!: wfR''_upd) 
   
   lemma mop_eo_set_ghost[refine]:
-    "(x,x') \<in> A \<Longrightarrow> (xs,xs') \<in> \<langle>\<langle>A\<rangle>option_rel\<rangle>list_rel \<Longrightarrow> (i,i')\<in>nat_rel \<Longrightarrow> mop_oarray_upd xs i x \<le> \<Down> (\<langle>\<langle>A\<rangle>option_rel\<rangle>list_rel) (timerefine R (mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs' i' x'))"
-    sorry
+    "(x,x') \<in> A \<Longrightarrow> (xs,xs') \<in> \<langle>\<langle>A\<rangle>option_rel\<rangle>list_rel \<Longrightarrow> (i,i')\<in>nat_rel \<Longrightarrow> wfR'' R \<Longrightarrow>
+      lift_acost mop_array_upd_cost \<le> R ''eo_set'' \<Longrightarrow>  mop_oarray_upd xs i x \<le> \<Down> (\<langle>\<langle>A\<rangle>option_rel\<rangle>list_rel) (timerefine R (mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs' i' x'))"
+    unfolding mop_oarray_upd_def     mop_eo_set_def
+    apply(intro refine0)
+       apply safe
+    subgoal  
+      by (simp add: list_rel_imp_same_length)  
+    subgoal  
+      using param_nth by fastforce   
+    subgoal by(simp add: timerefineA_cost)
+    subgoal  
+      by (smt length_list_update list_rel_eq_listrel listrel_iff_nth nth_list_update option_relI(2) relAPP_def)  
+    done 
+
+lemma unborrow_refine[refine]: 
+  fixes E :: "'e \<Rightarrow> ('c, enat) acost"
+  shows "((), ()) \<in> R \<Longrightarrow> (a, a') \<in> Id \<Longrightarrow> (b, b') \<in> Id \<Longrightarrow> unborrow a b \<le> \<Down>R (timerefine E (unborrow a' b'))"
+    unfolding unborrow_def
+    apply(intro refine0) 
+   apply simp_all
+    done
   
-  lemma unborrow_refine[refine]: "(a, a') \<in> Id \<Longrightarrow> (b, b') \<in> Id \<Longrightarrow> unborrow a b \<le> \<Down>R (timerefine E (unborrow a' b'))"
-    (* maybe some restriction on E needed? *)
-    sorry
+  lemma SPECc2_lt_refine[refine]:
+    "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc2 lt_curr_name (\<^bold><) a b \<le> \<Down> bool_rel (timerefine E_mop_oarray_extract (SPECc2 lt_curr_name (\<^bold><) a' b'))"
+    apply(rule SPECc2_refine) by (auto simp: cost_n_leq_TId_n lt_curr_name_no_clash E_mop_oarray_extract_def)
   
-  lemma SPECc2_refine[refine]:
-    "(a,a')\<in>A \<Longrightarrow> (b,b')\<in>A \<Longrightarrow> SPECc2 lt_curr_name (\<^bold><) a b \<le> \<Down> bool_rel (timerefine E_mop_oarray_extract (SPECc2 lt_curr_name (\<^bold><) a' b'))"
-    sorry
-  
-  lemma wfR_E: "wfR E_mop_oarray_extract" sorry
+lemma wfR_E: "wfR'' E_mop_oarray_extract"
+  by(auto simp: E_mop_oarray_extract_def intro!: wfR''_upd) 
   
   
   lemma cmpo_v_idx2'_refine: "(cmpo_v_idx2', cmpo_v_idx2) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> nrest_trel Id E_mop_oarray_extract"
-    sorry
+    unfolding cmpo_v_idx2'_def cmpo_v_idx2_def
+    unfolding nrest_trel_def_internal
+    apply (intro frefI nrest_relI fun_relI) 
+    apply safe
+    supply bindT_refine_conc_time2[refine] 
+    supply mop_oarray_extract_refine[refine]
+    apply (refine_rcg) 
+    apply refine_dref_type
+    apply (simp_all add: wfR_E)
+    apply (simp add: E_mop_oarray_extract_def )
+    done 
 
   lemma cmpo_idx_v2'_refine: "(cmpo_idx_v2', cmpo_idx_v2) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> nrest_trel Id E_mop_oarray_extract"
     unfolding cmpo_idx_v2'_def cmpo_idx_v2_def
     unfolding nrest_trel_def_internal
     apply (intro frefI nrest_relI fun_relI) 
     apply safe
-    supply bindT_refine_conc_time[refine] 
+    supply bindT_refine_conc_time2[refine] 
     supply mop_oarray_extract_refine[refine]
     apply (refine_rcg) 
     apply refine_dref_type
-    by (simp_all add: wfR_E)
-  
+    apply (simp_all add: wfR_E)
+    apply (simp add: E_mop_oarray_extract_def )
+    done
   
   
     lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST (mop_cmp_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1))))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
@@ -700,6 +723,7 @@ lemma unat_sort_impl_context: "pure_sort_impl_context (\<le>) (<) ll_icmp_ult ''
   apply unfold_locales
     apply rule 
     apply (rule hn_unat_ops[unfolded PR_CONST_def]) 
+    apply simp
   apply simp
   apply (solve_constraint)
   done

@@ -177,6 +177,23 @@ lemma "wfR R \<Longrightarrow> wfR' R"
      apply(rule finite_subset) by auto
   done
 
+(* TODO: refactor the next two lemmas, they essentially do the same *)
+lemma timerefineA_propagate:
+  assumes "wfR'' E"
+  fixes a b :: "('a, enat) acost"
+  shows "timerefineA E (a + b) = timerefineA E a + timerefineA E b"
+  unfolding timerefineA_def
+  apply(auto simp: timerefine_def consume_def timerefineA_def split: nrest.splits option.splits intro!: ext)
+  subgoal for  cc    
+  apply(cases a, cases b) 
+    unfolding plus_acost_alt apply simp
+    unfolding  ring_distribs(2)
+    apply(subst Sum_any.distrib)
+    subgoal apply(rule finite_subset[OF _ assms[unfolded wfR''_def, rule_format]]) by auto
+    subgoal apply(rule finite_subset[OF _ assms[unfolded wfR''_def, rule_format]]) by auto
+    apply simp
+    done
+  done
 
 lemma timerefine_consume:
   assumes "wfR'' E"

@@ -21,6 +21,29 @@ Akra_Bazzi.Landau_Real_Products \<rightarrow> HOL-Library.Function_Algebras
 
 *)
 
+(* TODO: Move *)
+
+lemma inres_SPECc2: "inres (SPECc2 n op a b) t \<longleftrightarrow> (op a b = t)"
+  by(auto simp: inres_def SPECc2_def)
+
+
+(* TODO: solve *)
+
+lemma ht_from_hnr: "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))
+    \<Longrightarrow> \<Phi> \<Longrightarrow> llvm_htriple ($(timerefineA E T) ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')"
+  sorry          
+
+lemma llvm_htriple_more_time: "a\<le>b \<Longrightarrow> llvm_htriple ($a ** F) c Q \<Longrightarrow> llvm_htriple ($b ** F) c Q"
+proof -
+  assume "a\<le>b"
+  then obtain c where "b=a+c" sorry
+  then have *: "$b = ($a ** $c)" sorry
+  show ?thesis
+    unfolding * sorry    
+qed
+
+
+
 
 
 section \<open>Insertion Sort\<close>  
@@ -276,13 +299,8 @@ definition "E2 = TId(''list_get'':=cost ''olist_extract'' (1::enat),
                     ''list_cmp_v'':=cost ''list_cmpo_v'' (1::enat),
                     ''list_set'':=cost ''olist_set'' (1::enat)) "
 
-find_theorems consumea timerefine
 
-lemma t1: "T \<le> timerefineA E2 T' \<Longrightarrow> consumea T \<le> \<Down> Id (timerefine E2 (consumea T'))"
-  sorry
-
-lemma t2: "SPECc2 ''i_gt'' (<) 0 x2a \<le> \<Down> Id (timerefine E2 (SPECc2 ''i_gt'' (<) 0 x2a))"
-  sorry
+find_theorems SPECc2 timerefine
 
 
 lemma wfR_E2[simp]: "wfR'' E2"
@@ -320,7 +338,9 @@ lemma is_insert2_refine: "is_insert2 xs i \<le>\<Down>(\<langle>Id\<rangle>list_
     apply (clarsimp split: prod.splits simp: ii2_loop_rel_def)
     apply(rule bindT_refine_conc_time2)
     subgoal apply(rule sp_E2 wfR_E2) done
-     apply (refine_rcg t1)
+     apply (refine_rcg consumea_refine)
+     apply refine_dref_type
+    apply simp
     subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
     apply(rule MIf_refine)
     subgoal  apply(rule sp_E2 wfR_E2) done
@@ -328,13 +348,17 @@ lemma is_insert2_refine: "is_insert2 xs i \<le>\<Down>(\<langle>Id\<rangle>list_
       apply simp
     apply(rule bindT_refine_conc_time2) 
     subgoal  apply(rule sp_E2 wfR_E2) done
-      apply(rule t1)
+      apply(rule consumea_refine)
+       apply refine_dref_type
+    apply simp
       subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
        apply simp
      apply (refine_rcg; simp)
     apply(rule bindT_refine_conc_time2) 
     subgoal apply(rule sp_E2 wfR_E2) done
-      apply(rule t1)
+      apply(rule consumea_refine) 
+       apply refine_dref_type
+       apply simp
       subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
      apply (refine_rcg; simp)
       apply (refine_rcg; simp)
@@ -347,17 +371,23 @@ lemma is_insert2_refine: "is_insert2 xs i \<le>\<Down>(\<langle>Id\<rangle>list_
     apply simp
     apply(rule bindT_refine_conc_time2) 
     subgoal apply(rule sp_E2 wfR_E2) done
-      apply(rule t1)
+      apply(rule consumea_refine) 
+       apply refine_dref_type
+       apply simp
       subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
       apply refine_rcg 
       apply simp
     apply(rule bindT_refine_conc_time2) 
     subgoal apply(rule sp_E2 wfR_E2) done
-      apply(rule t1)
+      apply(rule consumea_refine) 
+       apply refine_dref_type
+       apply simp
       subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
     apply(rule bindT_refine_conc_time2) 
     subgoal apply(rule sp_E2 wfR_E2) done
-      apply(rule t1)
+      apply(rule consumea_refine) 
+       apply refine_dref_type
+       apply simp
       subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
     apply refine_rcg 
     apply (auto simp: nth_list_update split: if_splits)
@@ -369,7 +399,9 @@ lemma is_insert2_refine: "is_insert2 xs i \<le>\<Down>(\<langle>Id\<rangle>list_
     apply(simp add: consumea_shrink)  
     apply(rule bindT_refine_conc_time2) 
     subgoal apply(rule sp_E2 wfR_E2) done
-      apply(rule t1)
+      apply(rule consumea_refine) 
+       apply refine_dref_type
+       apply simp
       subgoal unfolding E2_def by(simp add: lift_acost_zero timerefineA_upd  timerefineA_TId)
       apply refine_rcg
     apply (auto simp: ii2_loop_rel_def nth_list_update in_set_conv_nth intro: list_eq_iff_nth_eq[THEN iffD2])
@@ -438,8 +470,9 @@ lemma gt_refine:
   by (simp add: timerefine_id idx_shift_rel_def)
 
 lemma sub_refine:
-  "(x2c,x2b)\<in>idx_shift_rel l \<Longrightarrow> SPECc2 ''i_sub'' (-) x2c 1 \<le> \<Down> (idx_shift_rel l) (timerefine TId (SPECc2 ''i_sub'' (-) x2b 1))"
-  sorry
+  "x2b>0 \<Longrightarrow> (x2c,x2b)\<in>idx_shift_rel l \<Longrightarrow> (SPECc2 ''i_sub'' (-) x2c 1 :: (_,(_,enat)acost) nrest) \<le> \<Down> (idx_shift_rel l) (timerefine TId (SPECc2 ''i_sub'' (-) x2b 1))"
+  apply(rule SPECc2_refine) using SPECc2_refine
+  by(auto simp:   cost_n_leq_TId_n idx_shift_rel_def) 
 
 lemma is_insert3_refine: "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i')\<in>idx_shift_rel l; i<h \<rbrakk> \<Longrightarrow> is_insert3 xs l i \<le>\<Down>(slice_rel xs\<^sub>0 l h) (timerefine TId (is_insert2 xs' i'))"
   unfolding is_insert2_def is_insert3_def
@@ -451,12 +484,12 @@ lemma is_insert3_refine: "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h; (i,i'
     RELATESI[of "slice_rel (map Some xs\<^sub>0) l h \<times>\<^sub>r idx_shift_rel l"] 
   apply (refine_rcg slice_nth_refine' slice_upd_refine' 
     mop_eo_extract_slice_refine mop_eo_set_slice_refine mop_to_eo_conv_slice_refine
-    mop_cmp_v_idx_slice_refine mop_to_wo_conv_slice_refine bindT_refine_conc_time2
+    mop_cmp_v_idx_slice_refine mop_to_wo_conv_slice_refine bindT_refine_conc_time_my_inres
 
     gt_refine MIf_refine sub_refine
   )
   apply refine_dref_type
-  apply (simp_all only: sp_TId wfR''_TId)
+  apply (simp_all only: inres_SPECc2 sp_TId wfR''_TId)
   apply (all \<open>(assumption|simp add: idx_shift_rel_def;simp add: slice_rel_def in_br_conv)?\<close>)
   done
 
@@ -519,16 +552,10 @@ definition "is_insert4 xs l i \<equiv> doN {
 
 definition "E_insert4 == TId(''list_cmpo_v'':=(lift_acost mop_array_upd_cost + lift_acost mop_array_nth_cost + cost lt_curr_name 1),
                             ''olist_extract'':=lift_acost mop_array_nth_cost,
-                            ''olist_set'':=lift_acost mop_array_upd_cost)   "
-
-thm cmpo_v_idx2'_refine cmpo_v_idx2_refine
-lemma cmpo_v_idx2'_refine4:
-  "(cmpo_v_idx2', mop_cmpo_v_idxN) \<in> Id \<rightarrow> Id \<rightarrow> nat_rel \<rightarrow> nrest_trel bool_rel E_insert4"
-  sorry
-
-lemma cmpo_v_idx2'_refine4': "\<lbrakk>(x, x') \<in> Id; (xa, x'a) \<in> Id; (xb, x'b) \<in> nat_rel\<rbrakk> \<Longrightarrow> cmpo_v_idx2' x xa xb \<le> \<Down> bool_rel (timerefine E_insert4 (mop_cmpo_v_idxN x' x'a x'b))"
-  using  cmpo_v_idx2'_refine4[unfolded nrest_trel_def_internal, THEN fun_relD, THEN fun_relD, THEN fun_relD]
-  by simp
+                            ''olist_set'':=lift_acost mop_array_upd_cost,
+                            ''i_gt'':=cost ''icmp_slt'' 1,
+                            ''i_sub'':=cost ''sub'' 1,
+                            ''i_add'':= cost ''add'' 1)   "
 
 lemma wfR''E4[simp]: "wfR'' E_insert4"
   unfolding E_insert4_def
@@ -538,33 +565,77 @@ lemma sp_E4[simp]: "struct_preserving E_insert4"
   by (auto intro!: struct_preservingI simp: E_insert4_def timerefineA_upd timerefineA_TId)
 
 
+thm cmpo_v_idx2'_refine cmpo_v_idx2_refine
+lemma cmpo_v_idx2'_refine4_elegant:
+  "(cmpo_v_idx2', mop_cmpo_v_idxN) \<in> Id \<rightarrow> Id \<rightarrow> nat_rel \<rightarrow> nrest_trel bool_rel E_insert4"
+  oops
+
+lemma cmpo_v_idx2'_refine4:
+  "(cmpo_v_idx2', mop_cmpo_v_idxN) \<in> Id \<rightarrow> Id \<rightarrow> nat_rel \<rightarrow> nrest_trel bool_rel E_insert4"
+  supply conc_Id[simp del]
+  apply(intro fun_relI nrest_trelI)
+  apply(auto simp add: cmpo_v_idx2'_def mop_oarray_extract_def SPECc2_alt unborrow_def mop_oarray_upd_def)
+  apply normalize_blocks 
+  apply(split prod.splits)
+  apply normalize_blocks
+  apply simp
+  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
+  apply refine_dref_type 
+   apply(auto simp add: E_insert4_def timerefineA_update_apply_same_cost intro!: wfR''_upd)
+   apply sc_solve apply simp 
+  done
+
+lemma cmpo_v_idx2'_refine4': "\<lbrakk>(x, x') \<in> Id; (xa, x'a) \<in> Id; (xb, x'b) \<in> nat_rel\<rbrakk> \<Longrightarrow> cmpo_v_idx2' x xa xb \<le> \<Down> bool_rel (timerefine E_insert4 (mop_cmpo_v_idxN x' x'a x'b))"
+  using  cmpo_v_idx2'_refine4[unfolded nrest_trel_def_internal, THEN fun_relD, THEN fun_relD, THEN fun_relD]
+  by simp
+
 lemma mop_oarray_extract_refine4: 
   "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> 
     mop_oarray_extract a b \<le> \<Down> Id (timerefine E_insert4 (mop_eo_extract (\<lambda>_. cost ''olist_extract'' 1) a' b'))"
   unfolding mop_oarray_extract_def E_insert4_def
-  sorry
+  supply conc_Id[simp del]
+  apply (simp)
+  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
+  by(auto simp: timerefineA_update_apply_same_cost intro!: wfR''_upd) 
+
 
 lemma mop_oarray_set_refine4: 
   "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> 
     mop_oarray_upd xs a b \<le> \<Down> Id (timerefine E_insert4 (mop_eo_set (\<lambda>_. cost ''olist_set'' 1) xs' a' b'))"
-  unfolding mop_oarray_extract_def E_insert4_def
-  sorry
+  unfolding mop_oarray_extract_def E_insert4_def mop_oarray_upd_def
+  supply conc_Id[simp del]
+  apply (simp)
+  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
+  by(auto simp: timerefineA_update_apply_same_cost intro!: wfR''_upd)
 
-lemma mop_gt_refine4: 
+lemma mop_gt_refine4:                                                               
    "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc2 ''icmp_slt'' (<) a b \<le> \<Down> Id ( timerefine E_insert4 (SPECc2 ''i_gt'' (<) a' b'))"
-  sorry
+  apply(rule SPECc2_refine)
+  by(simp_all add: E_insert4_def)
 
 lemma mop_sub_refine4: 
   "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc2 ''sub'' (-) a b \<le> \<Down> Id ( timerefine E_insert4 (SPECc2 ''i_sub'' (-) a' b'))"
-  sorry
+  apply(rule SPECc2_refine)
+  by(simp_all add: E_insert4_def)
+
+(* Move *)
+lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
+  by(auto simp: timerefineA_def zero_acost_def)
 
 lemma mop_to_wo_conv_refine4:
   "(xs,xs')\<in>Id \<Longrightarrow> mop_to_wo_conv xs \<le> \<Down> Id (timerefine E_insert4 (mop_to_wo_conv xs'))"
-  sorry
+  supply conc_Id[simp del]
+  apply (simp add: mop_to_wo_conv_def)
+  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
+  by(auto simp: lift_acost_zero E_insert4_def timerefineA_update_apply_same_cost intro!: wfR''_upd)
+  
 
 lemma mop_to_eo_conv_refine4:
   "(xs,xs')\<in>Id \<Longrightarrow> mop_to_eo_conv xs \<le> \<Down> Id (timerefine E_insert4 (mop_to_eo_conv xs'))"
-  sorry
+  supply conc_Id[simp del]
+  apply (simp add: mop_to_eo_conv_def)
+  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
+  by(auto simp: lift_acost_zero E_insert4_def timerefineA_update_apply_same_cost intro!: wfR''_upd)
 
 lemma is_insert4_refine: "(is_insert4,is_insert3) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> nrest_trel Id E_insert4"
   unfolding is_insert4_def is_insert3_def
@@ -855,16 +926,14 @@ definition "insertion_sort_whole2 xs \<equiv> doN {
 
 lemma gt_Id_refine: 
   "(a,a')\<in>nat_rel \<Longrightarrow>(x2c,x2b)\<in>nat_rel \<Longrightarrow> (SPECc2 ''i_gt'' (<) a x2c :: (_,(_,enat)acost) nrest)\<le> \<Down> bool_rel (timerefine (E_sort_one_more xs) (SPECc2 ''i_gt'' (<) a' x2b))"
-  unfolding SPECc2_def
-  apply (simp add: timerefine_id E_sort_one_more_def)
-  sorry
+  apply(rule SPECc2_refine)
+  by (auto simp add: timerefine_id E_sort_one_more_def cost_n_leq_TId_n) 
 
 
 lemma plus_Id_refine: 
   "(a,a')\<in>nat_rel \<Longrightarrow>(x2c,x2b)\<in>nat_rel \<Longrightarrow> (SPECc2 ''i_add'' (+) a x2c :: (_,(_,enat)acost) nrest)\<le> \<Down> nat_rel (timerefine (E_sort_one_more xs) (SPECc2 ''i_add'' (+) a' x2b))"
-  unfolding SPECc2_def
-  apply (simp add: timerefine_id E_sort_one_more_def)
-  sorry
+  apply(rule SPECc2_refine)
+  by (auto simp add: timerefine_id E_sort_one_more_def cost_n_leq_TId_n) 
 
 
 lemma wfR''_E_sort_one_more[simp]: "wfR'' (E_sort_one_more a')" 
@@ -982,7 +1051,8 @@ abbreviation "mop_nat_addN \<equiv> SPECc2 ''add'' (+)"
 
 lemma mop_add_refine4: 
   "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc2 ''add'' (+) a b \<le> \<Down> Id ( timerefine E_insert4 (SPECc2 ''i_add'' (+) a' b'))"
-  sorry
+  apply(rule SPECc2_refine)
+  by (auto simp add: timerefine_id E_insert4_def cost_n_leq_TId_n) 
 
 lemmas is_insert4_refine' = is_insert4_refine[to_foparam, THEN nrest_trelD ]
 
@@ -1106,27 +1176,40 @@ lemma aaah: "hn_refine (hn_ctxt arr_assn a ai \<and>* hn_val snat_rel bb bia \<a
 term hn_refine
 thm  hn_refineI''
 
-lemma timerefineA_propagate: "timerefineA E (a + b) = timerefineA E a + timerefineA E b"
-  unfolding timerefineA_def
-  sorry
-
 lemma skalar_acost_propagate:
   "acostC (\<lambda>x. (a::enat) * the_acost (cost n t + z) x) = cost n (a * t) + (acostC (\<lambda>x. a * the_acost z x))"
   "acostC (\<lambda>x. (a::enat) * the_acost (cost n t) x) = cost n (a * t)"
-  sorry
+  apply(cases z)
+  by(auto simp: cost_def zero_acost_def plus_acost_alt ring_distribs intro!: ext) 
 
 definition in_sort_time :: "nat \<Rightarrow> (char list, nat) acost" where "in_sort_time h = cost lt_curr_name (  (h * h)) +
     (cost ''if'' (  (1+ (h + h * (3 * h)))) +
      (cost ''call'' (  (h * h)) +
-      (cost ''i_gt'' (  (1+ (h + (h + h * h)))) +
+      (cost ''icmp_slt'' (  (1+ (h + (h + h * h)))) +
        (cost ''load'' (  (h + (h + h * h + h * h))) +
-        (cost ''i_add'' (  h) +
+        (cost ''add'' (  h) +
          (cost ''store'' (  (h * h)) +
-          (cost ''i_sub'' (  (h * (2 * h))) +
+          (cost ''sub'' (  (h * (2 * h))) +
            (cost ''store'' (  (h * (2 * h))) +
             (cost ''ofs_ptr'' (  (5 * (h * h) + 2 * h)) + cost ''call'' (  (1+ h)))))))))))"
 lemma pfar: "a=a' \<Longrightarrow> b=b' \<Longrightarrow> (a+b) = (a'+b')"
   by simp
+
+lemma iii_le: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_final h)) (cost ''slice_sort'' 1)
+    \<le> lift_acost (in_sort_time h)"
+  supply [simp] = timerefineA_TId_eq timerefineA_upd lift_acost_cost add.assoc
+                  skalar_acost_propagate lift_acost_propagate timerefineA_propagate
+  apply(simp add: timerefineA_pp)
+  apply(simp add: E_final_def)
+  apply(simp add: insort_time_def)
+  apply(simp add: E_sort_one_more_def E_u_def)
+  apply(simp add: E2_def)
+  apply(simp add: E_insert4_def)
+  apply(simp add: add.left_commute cost_same_curr_add cost_same_curr_left_add)
+  unfolding in_sort_time_def
+  apply sc_solve_debug apply safe apply(all \<open>(auto simp: sc_solve_debug_def zero_enat_def; fail)?\<close>)
+  done
+
 lemma iii: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_final h)) (cost ''slice_sort'' 1)
     = lift_acost (in_sort_time h)"
   supply [simp] = timerefineA_TId_eq timerefineA_upd lift_acost_cost add.assoc
@@ -1139,19 +1222,31 @@ lemma iii: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_final 
   apply(simp add: E_insert4_def)
   apply(simp add: add.left_commute cost_same_curr_add cost_same_curr_left_add)
   unfolding in_sort_time_def
-  by(auto intro!: pfar simp: one_enat_def numeral_eq_enat)
+  apply (auto intro!: pfar simp: one_enat_def numeral_eq_enat) sorry
 
-lemma ht_from_hnr: "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))
-    \<Longrightarrow> \<Phi> \<Longrightarrow> llvm_htriple ($(timerefineA E T) ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')"
-  using aaah 
-  unfolding slice_sort_spec_def
-  sorry          
+
 
 term "(insertion_sort_impl ai bia bi)"
 
 text \<open>the final Hoare Triple:\<close>
 
 thm aaah[unfolded slice_sort_spec_def SPEC_REST_emb'_conv, THEN ht_from_hnr, unfolded iii]
+
+
+lemmas pff = aaah[unfolded slice_sort_spec_def SPEC_REST_emb'_conv, THEN ht_from_hnr]
+
+thm llvm_htriple_more_time[OF iii_le pff, simplified, no_vars]
+
+lemma "bb \<le> bc \<and> bc \<le> length a \<Longrightarrow>
+llvm_htriple ($lift_acost (in_sort_time (bc - bb)) \<and>* hn_ctxt arr_assn a ai \<and>* hn_val snat_rel bb bia \<and>* hn_val snat_rel bc bi) (insertion_sort_impl ai bia bi)
+ (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(length x = length a \<and> take bb x = take bb a \<and> drop bc x = drop bc a \<and> sort_spec (\<^bold><) (slice bb bc a) (slice bb bc x)) \<and>* arr_assn x r) s) \<and>*
+      hn_invalid arr_assn a ai \<and>* hn_val snat_rel bb bia \<and>* hn_val snat_rel bc bi)"
+  apply(rule llvm_htriple_more_time)
+   apply(rule iii_le)
+  apply(rule pff) apply simp 
+  done
+
+
 
 lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
   unfolding cost_def by (simp add: zero_acost_def)
