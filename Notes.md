@@ -1,4 +1,72 @@
+# Dienstag 4.8.
 
+## Aktueller Stand
+
+- Insertion Sort
+  - beweise fertig
+  - sepref synthese funktioniert
+  - TODO:
+      - kleinere sorries (extract hoare triple)
+      - global_interpretation
+- Heap Sort
+  - Beweise fertig
+  - TODO:
+    - sepref synthese
+      - wie vorgehen? manuel verfeinerung zu synthetisierbaren ops? oder automatisieren ?
+- Refactoring
+- Next steps
+
+## Diskussion
+- ll_call, mop_call,
+- global_interpretation fixen
+- diskussion parametrisieren vs higher-order
+  - higher order bisher technisch nicht gut unterstützt
+- diskussion, sepref verfeinerung von Heapsort
+  - option A: in locale programm nochmal hinschreiben, per hand verfeinerung beweisen
+  - option B: programm und verfeinerung + Zeitverfeinerung synthetisieren
+  - option C: hnr aufbohren und Sepreftool konstante zeitverfeinerung synthetisieren lassen
+
+![](time_synthesis.png)
+
+- Verschiedene Arten von Verfeinerung
+  - lockstep
+  - SPEC verfeinerung
+  - strukturell nicht gleich -> normalize blocks
+
+![](types_of_refinement.png)
+      
+      
+cmp a i j = a[i]<a[j]
+
+sort (cmp a, xs, l , h)
+
+closure_assn A xs a f fi =
+(%fxs fia. A xs a ** pure(f, fi : A -> nat -> nat -> bool  & fxs=f xs & fia = fi a)) 
+
+hnr ( ( closure_assn array_assn xs a cmp cmpi) cmpxs cmpia    )
+ (doN { .... cmpxs }) ( ... ) bool_rel (doN { .... cmpia })
+
+
+
+## Next Steps
+### Max
+- Heapsort fertig machen
+  - mit Variante A: algorithmus nochmal hinschreiben, in sort_context_impl locale
+  - refactor 
+- introsort anschauen
+- pdqsort
+
+### Urlaub
+- Max ab Fr 7.- Fr 14.
+- Peter ab Fr 14.
+
+## nächstes Treffen
+wohl Donnerstag 6.8. 10 UKTime
+
+
+  
+
+      
 
 
 # Treffen Mittwoch 22.7.2020
