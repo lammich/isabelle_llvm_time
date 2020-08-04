@@ -26,14 +26,14 @@
   - option B: programm und verfeinerung + Zeitverfeinerung synthetisieren
   - option C: hnr aufbohren und Sepreftool konstante zeitverfeinerung synthetisieren lassen
 
-![](time_synthesis.png)
+![](img/time_synthesis.png)
 
 - Verschiedene Arten von Verfeinerung
   - lockstep
   - SPEC verfeinerung
   - strukturell nicht gleich -> normalize blocks
 
-![](types_of_refinement.png)
+![](img/types_of_refinement.png)
       
       
 cmp a i j = a[i]<a[j]
