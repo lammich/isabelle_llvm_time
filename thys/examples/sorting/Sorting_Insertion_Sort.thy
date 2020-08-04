@@ -21,11 +21,31 @@ Akra_Bazzi.Landau_Real_Products \<rightarrow> HOL-Library.Function_Algebras
 
 *)
 
+
+
+(* TODO: Move *)
+definition mop_call where
+  "mop_call m = consume m (cost ''call'' 1)"
+
+thm ll_call_def Monad.consume_def
+
+lemma hn_refine_call[sepref_comb_rules]:
+  assumes "hn_refine \<Gamma> mi \<Gamma>' R m"
+  shows  "hn_refine \<Gamma> (ll_call mi) \<Gamma>' R (mop_call $ m)"
+  unfolding mop_call_def ll_call_def APP_def
+  apply(rule hnr_consume) apply(fact assms)
+  by (simp add: lift_acost_cost one_enat_def) 
+
+
+
 (* TODO: Move *)
 
 lemma inres_SPECc2: "inres (SPECc2 n op a b) t \<longleftrightarrow> (op a b = t)"
   by(auto simp: inres_def SPECc2_def)
 
+(* Move *)
+lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
+  by(auto simp: timerefineA_def zero_acost_def)
 
 (* TODO: solve *)
 
@@ -519,6 +539,7 @@ end
   
 context sort_impl_context begin
 
+thm sepref_fr_rules
 
 abbreviation "mop_nat_gtN \<equiv> SPECc2 ''icmp_slt'' (<)"
 abbreviation "mop_nat_subN \<equiv> SPECc2 ''sub'' (-)"
@@ -618,9 +639,6 @@ lemma mop_sub_refine4:
   apply(rule SPECc2_refine)
   by(simp_all add: E_insert4_def)
 
-(* Move *)
-lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
-  by(auto simp: timerefineA_def zero_acost_def)
 
 lemma mop_to_wo_conv_refine4:
   "(xs,xs')\<in>Id \<Longrightarrow> mop_to_wo_conv xs \<le> \<Down> Id (timerefine E_insert4 (mop_to_wo_conv xs'))"
@@ -744,6 +762,25 @@ lemmas [llvm_inline] = eoarray_nth_impl_def
 export_llvm "unat_sort_is_insert_impl::32 word ptr \<Rightarrow> 64 word \<Rightarrow> 64 word \<Rightarrow> 32 word ptr llM"
 *)
 
+
+
+(*
+lemma id_mop_call[id_rules]: 
+  "mop_call ::\<^sub>i TYPE(('a, (char list, 'b) acost) nrest \<Rightarrow> ('a, (char list, 'b) acost) nrest)"
+  by simp
+
+lemma monadic_WHILEIT_comb[sepref_monadify_comb]:
+  "PR_CONST (monadic_WHILEIT I)$b$f$s \<equiv> 
+    NREST.bindT$(EVAL$s)$(\<lambda>\<^sub>2s. 
+      SP (PR_CONST (monadic_WHILEIT I))$b$f$s
+    )"
+  by (simp)
+find_in_thms  in sepref_monadify_comb
+
+sepref_register mop_call *)
+
+
+
 context weak_ordering begin
 
 lemma is_insert_spec_split: "is_insert_spec xs i xs' \<Longrightarrow> (\<exists>i'\<le>i. 
@@ -830,7 +867,7 @@ definition "insertion_sort_whole xs \<equiv> doN {
     i\<le>length xs' \<and> length xs'=length xs \<and> mset xs' = mset xs \<and> sorted_wrt_lt (\<^bold><) (take i xs')) 
     (\<lambda>(xs,i). SPECc2 ''i_gt'' (<) i (length xs)) 
     (\<lambda>(xs,i). doN {
-      xs \<leftarrow> sort_one_more_spec xs i;
+      xs \<leftarrow> mop_call (sort_one_more_spec xs i);
       ASSERT (i<length xs);
       i' \<leftarrow> SPECc2 ''i_add'' (+) i 1;
       RETURN (xs,i')
@@ -842,14 +879,14 @@ definition "E_is_whole \<equiv> (\<lambda>(xs,i). cost ''sort_one_more'' (length
                                      +  cost ''i_gt'' (1+length xs - i) 
                                      +  cost ''i_add'' (length xs - i) 
                                      +  cost ''if'' (1+length xs - i) 
-                                     +  cost ''call'' (1+length xs - i) )"
+                                     +  cost ''call'' (2*(1+length xs - i)) )"
 
 
 definition "insort_time lxs =   lift_acost (cost ''sort_one_more'' (lxs) 
                                         + cost ''i_gt'' (Suc (lxs))
                                         + cost ''i_add'' (lxs)
                                         + cost ''if'' (Suc (lxs))
-                                        + cost ''call'' (Suc (lxs)))"
+                                        + cost ''call'' (2*(Suc (lxs))))"
 
 
 definition "E_final lxs = TId(''slice_sort'':=insort_time lxs)"
@@ -867,6 +904,7 @@ lemma wfR2_E_is_whole: "wfR2 (E_is_whole s)"
 lemma insertion_sort_whole_correct: 
   "insertion_sort_whole xs \<le> SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. insort_time (length xs))"
   unfolding insertion_sort_whole_def sort_one_more_spec_def sort_spec_def sorted_sorted_wrt SPECc2_def
+  unfolding mop_call_def
   apply(subst monadic_WHILEIET_def[symmetric, where E=E_is_whole])
   apply(subst (2) SPEC_def)
   apply(rule gwp_specifies_I)
@@ -915,7 +953,7 @@ definition "insertion_sort_whole2 xs \<equiv> doN {
   (xs,_)\<leftarrow>monadic_WHILEIT (\<lambda>(xs',i). i\<le>length xs' \<and> mset xs' = mset xs \<and> sorted_wrt_lt (\<^bold><) (take i xs')) 
     (\<lambda>(xs,i). SPECc2 ''i_gt'' (<) i (length xs)) 
     (\<lambda>(xs,i). doN {
-      xs \<leftarrow> is_insert xs i;
+      xs \<leftarrow> mop_call (is_insert xs i);
       ASSERT (i<length xs);
       i' \<leftarrow> SPECc2 ''i_add'' (+) i 1;
       RETURN (xs,i')
@@ -947,7 +985,9 @@ lemma insertion_sort_whole2_refines:
  (* "(insertion_sort_whole2, insertion_sort_whole) \<in> \<langle>Id\<rangle>list_rel \<rightarrow> nrest_trel (\<langle>Id\<rangle>list_rel) (E_sort_one_more ys)" (* PROBLEM *)
   apply(intro nrest_trelI fun_relI)  *)
 "(a, a') \<in> \<langle>Id\<rangle>list_rel \<Longrightarrow> insertion_sort_whole2 a \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine (E_sort_one_more (length a')) (insertion_sort_whole a'))"
-  unfolding insertion_sort_whole2_def insertion_sort_whole_def                           
+  unfolding insertion_sort_whole2_def insertion_sort_whole_def   
+  unfolding mop_call_def
+  supply consume_refine[refine]
   supply bindT_refine_conc_time2[refine] 
   supply monadic_WHILEIT_refine_t[refine]
   supply gt_Id_refine[refine] 
@@ -955,14 +995,14 @@ lemma insertion_sort_whole2_refines:
   supply is_insert_sorts_one_more_refine_param[refine]
   apply (refine_rcg )
   apply refine_dref_type
-  by auto
-
+  apply auto
+  by (auto simp: E_sort_one_more_def)
 
 definition "insertion_sort xs l h \<equiv> doN {
   (xs,_)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)  
     (\<lambda>(xs,i). SPECc2 ''i_gt'' (<) i h) 
     (\<lambda>(xs,i). doN {                                            
-      xs \<leftarrow> is_insert3 xs l i;
+      xs \<leftarrow> mop_call (is_insert3 xs l i);
       ASSERT (i<h);
       i' \<leftarrow> SPECc2 ''i_add'' (+) i 1;
       RETURN (xs,i')
@@ -986,7 +1026,9 @@ lemma extract_knowledge_from_inresT_SPECc2[simp]:
   unfolding SPECc2_def project_acost_SPECT' inresT_def by (auto simp add: cost_def le_fun_def one_enat_def zero_enat_def zero_acost_def split: if_splits)
 
 lemma insertion_sort_refines: "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h \<rbrakk> \<Longrightarrow> insertion_sort xs l h \<le>\<Down>(slice_rel xs\<^sub>0 l h) (timerefine E2 (insertion_sort_whole2 xs'))"  
-  unfolding insertion_sort_def insertion_sort_whole2_def                       
+  unfolding insertion_sort_def insertion_sort_whole2_def 
+  unfolding mop_call_def
+  supply consume_refine[refine]
   supply bindT_refine_conc_time2[refine] 
   supply monadic_WHILEIT_refine_t[refine]
   supply plus_Id_refine2[refine] 
@@ -995,9 +1037,10 @@ lemma insertion_sort_refines: "\<lbrakk> (xs,xs')\<in>slice_rel xs\<^sub>0 l h \
   supply [refine_dref_RELATES] = 
     RELATESI[of "slice_rel xs\<^sub>0 l h"] 
     RELATESI[of "slice_rel xs\<^sub>0 l h \<times>\<^sub>r idx_shift_rel l"] 
-  apply refine_dref_type        
+  apply refine_dref_type        (* TODO: investigate ?aa16 *)
   apply (simp_all only: wfR_E2 sp_E2)
-  apply (auto simp: idx_shift_rel_def slice_rel_def in_br_conv)
+             apply (auto simp: idx_shift_rel_def slice_rel_def in_br_conv)
+  apply(auto simp: E2_def)
   done
 
 
@@ -1031,7 +1074,8 @@ lemma insertion_sort_correct: "(uncurry2 insertion_sort, uncurry2 (slice_sort_sp
   
   
 end  
-  
+
+
 context sort_impl_context begin
 
  
@@ -1041,7 +1085,7 @@ abbreviation "mop_nat_addN \<equiv> SPECc2 ''add'' (+)"
     (xs,_)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)  
       (\<lambda>(xs,i). mop_nat_gtN i h) 
       (\<lambda>(xs,i). doN {                                            
-        xs \<leftarrow> is_insert4 xs l i;
+        xs \<leftarrow> mop_call (is_insert4 xs l i);
         ASSERT (i<h);
         i' \<leftarrow> mop_nat_addN i 1;
         RETURN (xs,i')
@@ -1058,9 +1102,10 @@ lemmas is_insert4_refine' = is_insert4_refine[to_foparam, THEN nrest_trelD ]
 
 lemma insertion_sort'_refines: "(  insertion_sort',   insertion_sort) \<in> Id \<rightarrow> Id \<rightarrow>  Id \<rightarrow>  nrest_trel Id E_insert4"
   unfolding insertion_sort'_def insertion_sort_def
-  unfolding nrest_trel_def_internal
+  unfolding nrest_trel_def_internal mop_call_def
   apply (intro frefI nrest_relI fun_relI) 
   apply safe
+  supply consume_refine[refine]
   supply bindT_refine_conc_time2[refine] 
   supply mop_gt_refine4[refine]
   supply mop_add_refine4[refine]
@@ -1068,6 +1113,7 @@ lemma insertion_sort'_refines: "(  insertion_sort',   insertion_sort) \<in> Id \
   apply (refine_rcg) 
   apply refine_dref_type  
   apply (simp_all add: wfR''E4 sp_E4)
+  apply (simp_all add: E_insert4_def)
   done
 
   sepref_register insertion_sort'
@@ -1191,7 +1237,7 @@ definition in_sort_time :: "nat \<Rightarrow> (char list, nat) acost" where "in_
          (cost ''store'' (  (h * h)) +
           (cost ''sub'' (  (h * (2 * h))) +
            (cost ''store'' (  (h * (2 * h))) +
-            (cost ''ofs_ptr'' (  (5 * (h * h) + 2 * h)) + cost ''call'' (  (1+ h)))))))))))"
+            (cost ''ofs_ptr'' (  (5 * (h * h) + 2 * h)) + cost ''call'' ( 2* (1+ h)))))))))))"
 lemma pfar: "a=a' \<Longrightarrow> b=b' \<Longrightarrow> (a+b) = (a'+b')"
   by simp
 
@@ -1253,7 +1299,7 @@ lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
 
 
 
-lemma Sum_any_calc: "Sum_any (the_acost (in_sort_time x)) = 3 + (18 * (x * x) + 9 * x)"
+lemma Sum_any_calc: "Sum_any (the_acost (in_sort_time x)) = 4 + (18 * (x * x) + 10 * x)"
   unfolding in_sort_time_def 
   apply(simp add: the_acost_propagate add.assoc)
   apply(subst Sum_any.distrib; auto simp only: Sum_any_cost 
@@ -1280,7 +1326,8 @@ global_interpretation insort_interp: pure_sort_impl_context "(\<le>)" "(<)" ll_i
       and insort_interp_insertion_sort_impl = insort_interp.insertion_sort_impl
   by (rule unat_sort_impl_context)
 
-
+(* declare insort_interp.is_insert_impl_def[llvm_inline] *)
+declare eoarray_nth_impl_def [llvm_inline]
 export_llvm "insort_interp_insertion_sort_impl :: 64 word ptr \<Rightarrow> _" file "../code/insort.ll"
 
 
