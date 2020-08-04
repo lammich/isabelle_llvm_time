@@ -2124,7 +2124,7 @@ sepref_def mop_seth_impl [llvm_inline] is "uncurry4 mop_seth3" :: "size_assn\<^s
    apply sepref_dbg_constraints 
   sorry (* TODO: ask Peter *)
    
-
+(* TODO: Move *)
 sepref_register mop_to_eo_conv
 
 
@@ -2779,7 +2779,7 @@ end
 
 *)
 
-
+(* TODO: Peter *)
 global_interpretation heapsort_interp: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_ult "''icmp_ult''"  unat_assn
   defines heapsort_interp_mop_lchild_impl  = heapsort_interp.mop_lchild_impl 
       and heapsort_interp_mop_rchild_impl  = heapsort_interp.mop_rchild_impl 
