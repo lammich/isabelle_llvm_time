@@ -1707,6 +1707,16 @@ proof (rule, cases a, goal_cases)
 qed    
 
 
+
+lemma hn_refine_call[sepref_comb_rules]:
+  assumes "hn_refine \<Gamma> mi \<Gamma>' R m"
+  shows  "hn_refine \<Gamma> (ll_call mi) \<Gamma>' R (mop_call $ m)"
+  unfolding mop_call_def ll_call_def APP_def
+  apply(rule hnr_consume) apply(fact assms)
+  by (simp add: lift_acost_cost one_enat_def) 
+
+
+
 lemma hn_if[sepref_comb_rules]:
   assumes P: "\<Gamma> \<turnstile> hn_val bool1_rel a a' ** \<Gamma>1"
   assumes RT: "a \<Longrightarrow> hn_refine (hn_val bool1_rel a a' ** \<Gamma>1) b' \<Gamma>2b R b"

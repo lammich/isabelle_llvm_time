@@ -21,32 +21,6 @@ Akra_Bazzi.Landau_Real_Products \<rightarrow> HOL-Library.Function_Algebras
 
 *)
 
-
-
-(* TODO: Move *)
-definition mop_call where
-  "mop_call m = consume m (cost ''call'' 1)"
-
-thm ll_call_def Monad.consume_def
-
-lemma hn_refine_call[sepref_comb_rules]:
-  assumes "hn_refine \<Gamma> mi \<Gamma>' R m"
-  shows  "hn_refine \<Gamma> (ll_call mi) \<Gamma>' R (mop_call $ m)"
-  unfolding mop_call_def ll_call_def APP_def
-  apply(rule hnr_consume) apply(fact assms)
-  by (simp add: lift_acost_cost one_enat_def) 
-
-
-
-(* TODO: Move *)
-
-lemma inres_SPECc2: "inres (SPECc2 n op a b) t \<longleftrightarrow> (op a b = t)"
-  by(auto simp: inres_def SPECc2_def)
-
-(* Move *)
-lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
-  by(auto simp: timerefineA_def zero_acost_def)
-
 (* TODO: solve *)
 
 lemma ht_from_hnr: "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))
@@ -1313,8 +1287,8 @@ lemma "(\<lambda>x. Sum_any (the_acost (in_sort_time x)) ) \<in> \<Theta>(\<lamb
   thm hn_refine_result
 
 
-  lemmas insertion_sort_impl_hnr[sepref_fr_rules] = insertion_sort_impl.refine[FCOMP ah]
-  
+(*  lemmas insertion_sort_impl_hnr[sepref_fr_rules] = insertion_sort_impl.refine[FCOMP ah]
+  *)
 
 
 end

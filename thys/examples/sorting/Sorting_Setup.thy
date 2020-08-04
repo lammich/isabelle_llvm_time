@@ -360,6 +360,7 @@ locale sort_impl_context = weak_ordering +
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
+  notes [[sepref_register_adhoc "lt_curr_name"]]
 begin
 
   abbreviation "arr_assn \<equiv> array_assn elem_assn"
@@ -369,8 +370,8 @@ begin
     (vi,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 i;
     (vj,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs j;
     r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi vj;
-    xs \<leftarrow> mop_eo_set 0 xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
-    xs \<leftarrow> mop_eo_set 0 xs j vj;
+    xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
+    xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs j vj;
     unborrow xs xs\<^sub>0;
     RETURN r
   }"
@@ -402,7 +403,7 @@ begin
 
 
 
-  lemma cmpo_idxs2_refine: "(uncurry2 cmpo_idxs2, uncurry2 (PR_CONST (mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  lemma cmpo_idxs2_refine: "(uncurry2 cmpo_idxs2, uncurry2 (PR_CONST (mop_cmpo_idxs (cost ''eo_set'' 1 + cost ''eo_set'' 1 + cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding cmpo_idxs2_def  mop_cmpo_idxs_def unborrow_def SPECc2_def
     apply (intro frefI nrest_relI)
     apply clarsimp
@@ -410,7 +411,7 @@ begin
       apply(rule gwp_specifies_acr_I)
       apply (refine_vcg \<open>-\<close>)
            apply (simp_all add: list_update_swap[of i j] map_update[symmetric])
-      subgoal by force 
+      subgoal apply(simp add: add.assoc) by force 
       subgoal by (metis list_update_id list_update_overwrite option.sel)
       subgoal by auto
       subgoal by auto
@@ -490,7 +491,7 @@ begin
     unborrow xs xs\<^sub>0;
     RETURN b
   }"  
-  sepref_register cmpo_idx_v2' cmpo_v_idx2' 
+  sepref_register cmpo_idx_v2' cmpo_v_idx2' cmpo_idxs2'
 
   definition "E_mop_oarray_extract \<equiv> TId(''eo_extract'':=lift_acost mop_array_nth_cost, ''eo_set'':=lift_acost mop_array_upd_cost)"
  
@@ -558,7 +559,7 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
     done
   
   
-    lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST (mop_cmp_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1))))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST (mop_cmp_idxs (cost ''eo_set'' 1 + cost ''eo_set'' 1 + cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1))))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
       unfolding cmp_idxs2_def mop_cmp_idxs_def PR_CONST_def cmpo_idxs2_def unborrow_def SPECc2_def
       unfolding mop_to_eo_conv_def mop_to_wo_conv_def 
       apply (intro frefI nrest_relI)
@@ -566,7 +567,7 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
       subgoal for xs i j
         apply(rule gwp_specifies_acr_I)
         apply (refine_vcg \<open>-\<close>)
-        subgoal apply (simp add: lift_acost_zero) by force
+        subgoal apply (simp add: lift_acost_zero add.assoc) by force
         subgoal by auto 
         subgoal by auto
         subgoal by (metis Pair_inject list_update_id list_update_overwrite list_update_swap option.sel)

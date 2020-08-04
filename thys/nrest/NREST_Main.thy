@@ -278,6 +278,13 @@ lemma monadic_WHILEIT_refine_t[refine]:
   apply (assumption?; auto)+ 
   done
 
+subsection \<open>mop call\<close>
+
+
+definition mop_call where
+  "mop_call m = consume m (cost ''call'' 1)"
+
+
 
 subsection \<open>Shortcuts for specifications of operations\<close>
 
@@ -286,6 +293,10 @@ subsection \<open>Shortcuts for specifications of operations\<close>
   definition "SPECc2 name aop == ( (\<lambda>a b. SPECT ( [(aop a b)\<mapsto>(cost name 1)])))"
 
 
+
+
+lemma inres_SPECc2: "inres (SPECc2 n op a b) t \<longleftrightarrow> (op a b = t)"
+  by(auto simp: inres_def SPECc2_def)
 
 
 lemma SPECc2_alt: "SPECc2 name aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) (cost name 1)))"
@@ -302,6 +313,22 @@ lemma SPECc2_refine:
 
 subsection "normalize blocks"
 
+text \<open>The idea of the following tactic is to normalize all straight line blocks,
+      such that they have the form (doN { [ASSUMEs]; consumea T; [RETURNs]; FURTHER }.      
+      To that end, it assumes that most operations are unfolded and only contain consumea, RETURN
+      or consume (RETURN _) _. The RETURNs will be propagated with @{thm nres_bind_left_identity},
+      ASSERTIONs will be pulled to the front, consumeas will be shrinked and assoc rule is applied.
+
+      It then is assumed, that FURTHER statements in the concrete and abstract are in lock step.
+
+      [ Then refine_block will split products, collect and discharge ASSUME statements, 
+      pay for the consumea; and then stop at a FURTHER statement.
+      One can then give "rules" that process the FURTHER statements. ]
+      This process is way better done by refine_rcg!
+      
+      This allows that not only lockstep refinement is possible, but that by unfolding certain
+      operations, their effects get 
+        \<close>
 
 lemma consumea_refine:
   fixes t :: "(_,enat) acost"

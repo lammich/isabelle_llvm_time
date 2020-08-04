@@ -106,6 +106,10 @@ lemma timerefine_SPECT: "timerefine R (SPECT Q) = SPECT (timerefineF R Q)"
 lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
   by auto
 
+
+lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
+  by(auto simp: timerefineA_def zero_acost_def)
+
 lemma timerefineA_update_apply_same_cost: 
   "timerefineA (F(n := y)) (cost n (t::enat)) = acostC (\<lambda>x. t * the_acost y x)"
   by (auto simp: timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 

@@ -320,6 +320,7 @@ lemma "mop_oarray_new n = consume (RETURNT (replicate n None)) (lift_acost (cost
   by(auto simp: mop_oarray_new_def)
 
       
+sepref_register mop_oarray_extract
   
 definition "eoarray_assn A \<equiv> \<upharpoonleft>(nao_assn (mk_assn A))"
 
