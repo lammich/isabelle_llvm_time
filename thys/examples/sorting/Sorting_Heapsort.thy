@@ -2095,20 +2095,12 @@ sepref_def has_lchild_impl [llvm_inline] is "uncurry2 mop_has_lchild3" :: "[\<la
 sepref_def has_rchild_impl [llvm_inline] is "uncurry2 mop_has_rchild3" :: "[\<lambda>((l,h),i). l<h]\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow> bool1_assn"
   unfolding mop_has_rchild3_def apply (annot_snat_const "TYPE (size_t)") by sepref 
 
-sepref_def mop_geth_impl [llvm_inline] is "uncurry3 mop_geth3" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eoarray_assn elem_assn"
-  unfolding mop_geth3_def  
-  unfolding mop_oarray_extract_def[symmetric] thm mop_oarray_extract_def[symmetric]
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-    apply sepref_dbg_id  
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-        apply sepref_dbg_trans
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-   apply sepref_dbg_constraints 
-   sorry (* TODO: ask Peter *)
-  
+sepref_def mop_geth_impl [llvm_inline] is "uncurry3 mop_geth3" 
+  (*:: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eoarray_assn elem_assn" *)
+  :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ ((_,ai),_). elem_assn \<times>\<^sub>a cnc_assn (\<lambda>x. x=ai) (eoarray_assn elem_assn))"
+  unfolding mop_geth3_def
+  unfolding mop_oarray_extract_def[symmetric]
+  by sepref
   
 sepref_def mop_seth_impl [llvm_inline] is "uncurry4 mop_seth3" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a eoarray_assn elem_assn"
   unfolding mop_seth3_def  
