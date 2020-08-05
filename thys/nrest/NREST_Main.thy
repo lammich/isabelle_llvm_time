@@ -154,6 +154,21 @@ lemma SPEC_refine[refine]:
   unfolding SPEC_def
   by (auto simp: pw_acost_le_iff refine_pw_simps dest!: * intro: order.trans[OF _ the_acost_mono])
 
+    
+thm SPEC_timerefine SPEC_refine
+lemma SPEC_both_refine:
+  fixes T :: "_ \<Rightarrow> ((_,enat)acost)"
+  assumes "\<And>x. \<Phi> x \<Longrightarrow> \<exists>s'. \<Phi>' s' \<and> (x, s') \<in> R \<and> T x \<le> timerefineA TR (T' s')"
+  shows "SPEC \<Phi> T \<le> \<Down> R (timerefine TR (SPEC \<Phi>' T'))"
+  apply(rule order.trans) 
+  defer
+   apply(rule nrest_Rel_mono)
+   apply(rule SPEC_timerefine[where A=\<Phi>'])
+    prefer 3 apply(rule SPEC_refine[where T=T])
+    defer apply simp apply(rule order_refl)
+  by (fact assms)
+
+
 
 
 lemma build_rel_SPEC_conv:
@@ -240,6 +255,7 @@ lemma consume_refine_easy:
   apply(rule consume_mono) by auto
 
 
+
 lemma RECT_refine_t:
   assumes M: "mono2 body"
   assumes R0: "(x,x')\<in>R"
@@ -256,6 +272,37 @@ lemma RECT_refine_t:
   apply simp
   apply (simp add: trimonoD_flatf_ge)
   by (rule RS)
+
+
+
+lemma RECT'_refine_t:
+  fixes body :: "('b \<Rightarrow> ('c, (char list, enat) acost) nrest)
+   \<Rightarrow> 'b \<Rightarrow> ('c, (char list, enat) acost) nrest"
+  assumes M: "mono2 body"
+  assumes wfRE: "wfR'' E"
+  assumes spE: "struct_preserving E"
+  assumes R0: "(x,x')\<in>R"
+  assumes RS: "\<And>f f' x x'. \<lbrakk> \<And>x x'. (x,x')\<in>R \<Longrightarrow> f x \<le>\<Down>S (timerefine E (f' x')); (x,x')\<in>R \<rbrakk> 
+    \<Longrightarrow> body f x \<le>\<Down>S (timerefine E (body' f' x'))"
+  shows "RECT' (\<lambda>f x. body f x) x \<le>\<Down>S (timerefine E (RECT' (\<lambda>f' x'. body' f' x') x'))"
+  unfolding RECT'_def
+  apply(rule consume_refine[OF wfRE])
+  subgoal using spE[THEN struct_preservingD(1)] by simp
+  unfolding RECT_flat_gfp_def
+  apply (clarsimp simp add: M[THEN RECT'_unfold_aux])
+  apply (rule flatf_fixp_transfer[where 
+        fp'="flatf_gfp ((\<lambda>D. body (\<lambda>x. NREST.consume (D x) (cost ''call'' 1))))" 
+    and B'="(\<lambda>D. body (\<lambda>x. NREST.consume (D x) (cost ''call'' 1)))" 
+    and P="\<lambda>x x'. (x',x)\<in>R", 
+    OF _ _ flatf_ord.fixp_unfold[OF M[THEN RECT'_unfold_aux, THEN trimonoD_flatf_ge]] R0])
+  apply simp
+  apply (simp add: trimonoD_flatf_ge)
+  apply (rule RS)
+   apply(rule consume_refine[OF wfRE])
+  subgoal using spE[THEN struct_preservingD(1)] by simp
+   apply simp apply simp
+  done
+
 
 
 lemma monadic_WHILEIT_refine_t[refine]:  
@@ -398,6 +445,16 @@ shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
    apply fact
   apply(rule assms(3)) apply simp
   done
+
+lemma bindT_refine_easy:
+  fixes m :: "('e1,('c1,enat)acost) nrest"
+  fixes m' :: "('e2,('c2,enat)acost) nrest"
+  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
+  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'\<rbrakk>
+         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
+shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
+  apply(rule bindT_refine_conc_time2) using assms
+  by (auto dest: inres_if_inresT_acost)
 
 
 end

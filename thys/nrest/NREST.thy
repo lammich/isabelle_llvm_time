@@ -1364,8 +1364,9 @@ lemma RECT_flat_gfp_def: "RECT B x =
   by (auto simp: gfp_eq_flatf_gfp[OF trimonoD_flatf_ge trimonoD_mono])
 
 lemma RECT_unfold: "\<lbrakk>mono2 B\<rbrakk> \<Longrightarrow> RECT B = B (RECT B)"
-  unfolding RECT_def [abs_def]  
+  unfolding RECT_def [abs_def]
   by (auto dest: trimonoD_mono simp: gfp_unfold[ symmetric])
+
 
 
 definition whileT :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('a,_) nrest) \<Rightarrow> 'a \<Rightarrow> ('a,_) nrest" where
@@ -1378,6 +1379,8 @@ lemma trimonoI[refine_mono]:
 lemma [refine_mono]: "(\<And>f g x. (\<And>x. f x \<le> g x) \<Longrightarrow> B f x \<le> B g x) \<Longrightarrow> mono B"
   apply(rule monoI) apply(rule le_funI)
   by (simp add: le_funD)
+
+
     
 thm refine_mono
 
@@ -1421,6 +1424,7 @@ lemma flat_ge_RECT_aux:
     unfolding img_ord_def  flat_ord_def by simp
   done
 
+
 lemma flat_ge_RECT_aux2:
   fixes f :: "('a \<Rightarrow> ('b, (string, enat) acost) nrest)"
    assumes "mono2 B'"
@@ -1436,6 +1440,92 @@ lemma flat_ge_RECT_aux2:
   subgoal
     by(simp add: le_fun_def)
   done
+
+
+
+lemma RECT'_unfold_aux:
+  fixes B :: "('a \<Rightarrow> ('b, (char list, enat) acost) nrest)
+   \<Rightarrow> 'c \<Rightarrow> ('b, (char list, enat) acost) nrest"
+  shows "mono2 B \<Longrightarrow> mono2 (\<lambda>D. B (\<lambda>x. consume (D x) (cost ''call'' 1)))"
+  apply (refine_mono)
+  subgoal apply(rule flat_ge_RECT_aux) by simp
+  subgoal  apply(rule flat_ge_RECT_aux2) by simp
+  done 
+
+
+lemma off: "a=b \<Longrightarrow> consume a c = consume b c" by simp
+
+experiment
+begin
+definition "RECT'' F x =  (RECT (\<lambda>D x. consume (F D x) (cost ''call'' 1)) x) "
+
+
+lemma flat_ge_RECT''_aux:
+ fixes f :: "'a \<Rightarrow> ('b, (char list, 'c::{complete_lattice,monoid_add,comm_monoid_add,one}) acost) nrest"
+  assumes "mono2 B'"
+    and "\<And>x. flat_ge (f x) (g x)"
+  shows "flat_ge (B' (\<lambda>x. consume (f x) c) x) (B' (\<lambda>x. consume (g x) c) x)"
+ 
+  using assms(1)[THEN trimonoD_flatf_ge]
+  apply -
+  apply(drule monotoneD[of _ _ _ "(\<lambda>x. consume (f x) c)" "(\<lambda>x. consume (g x) c)"])
+  subgoal using assms(2)
+    by (smt consume_FAIL(2) flat_ord_def fun_ord_def) 
+  subgoal
+    unfolding fun_ord_def
+    unfolding img_ord_def  flat_ord_def by simp
+  done
+
+
+lemma RECT''_unfold:  
+  assumes "mono2 B"
+  shows "RECT'' B x= consume (B (\<lambda>x. RECT'' B x) x) (cost ''call'' 1)"
+  unfolding RECT''_def [abs_def]  
+  unfolding RECT_def [abs_def]   
+  apply auto  
+  apply(subst gfp_unfold)  
+    apply (auto dest: trimonoD_mono  ) []
+  apply simp
+  oops
+
+end
+
+lemma RECT'_unfold: 
+  fixes B ::  "('a \<Rightarrow> ('b, (char list, enat) acost) nrest)
+   \<Rightarrow> 'a \<Rightarrow> ('b, (char list, enat) acost) nrest"
+  assumes "mono2 B"
+  shows "RECT' B x= consume (B (\<lambda>x. RECT' B x) x) (cost ''call'' 1)"
+  unfolding RECT'_def [abs_def]  
+  unfolding RECT_def [abs_def]  
+  using RECT'_unfold_aux[OF assms]
+  apply auto 
+  apply(rule off)
+  apply(subst gfp_unfold)  
+  by (auto dest: trimonoD_mono  ) 
+
+lemma RECT_rule_arb:
+  assumes M: "mono2 body"
+  assumes WF: "wf (V::('x\<times>'x) set)"
+  assumes I0: "pre (arb::'arb) (x::'x)"
+  assumes IS: "\<And>f arb x. \<lbrakk> 
+      \<And>arb' x'. \<lbrakk>pre arb' x'; (x',x)\<in>V\<rbrakk> \<Longrightarrow> f x' \<le> M arb' x'; 
+      pre arb x;
+      RECT body = f
+    \<rbrakk>  \<Longrightarrow> body f x \<le> M arb x"
+  shows "RECT body x \<le> M arb x"
+  apply (rule wf_fixp_induct[where fp=RECT and pre=pre and B=body])
+  apply (rule RECT_unfold)
+  apply (simp_all add: M) [2]
+  apply (rule WF)
+  apply fact
+  apply (rule IS)
+  apply assumption
+  apply assumption
+  apply assumption
+  done
+
+
+
 
 lemma RECT'_mono[refine_mono]:
   fixes B :: "('a \<Rightarrow> ('b, (string, enat) acost) nrest)
@@ -1481,7 +1571,7 @@ lemma wf_fp_induct:
   assumes "\<And>x D. \<lbrakk>\<And>y. (y,x)\<in>R \<Longrightarrow> P y (D y)\<rbrakk> \<Longrightarrow> P x (B D x)"
   shows "P x (f x)"
   using wf
-  apply induction
+  apply (induction rule: wf_induct_rule)
   apply (subst fp)
   apply fact  
   done
@@ -1495,7 +1585,72 @@ lemma RECT_wf_induct_aux:
   assumes "(\<And>x D. (\<And>y. (y, x) \<in> R \<Longrightarrow> P y (D y)) \<Longrightarrow> P x (B D x))"
   shows "P x (RECT B x)"
   using wf_fp_induct[where f="RECT B" and B=B] RECT_unfold assms 
-     by metis 
+  by metis 
+
+
+
+lemma RECT'_wf_induct_aux:
+  fixes B :: "(_ \<Rightarrow> (_, (char list, enat) acost) nrest)
+   \<Rightarrow> _ \<Rightarrow> (_, (char list, enat) acost) nrest"
+  assumes wf: "wf R"
+  assumes mono: "mono2 B"
+  assumes "(\<And>x D. (\<And>y. (y, x) \<in> R \<Longrightarrow> P y (D y)) \<Longrightarrow> P x (consume (B D x) (cost ''call'' 1)))"
+  shows "P x (RECT' B x)"
+  apply(rule wf_fp_induct[where f="RECT' B" and B="\<lambda>D x. consume (B D x) (cost ''call'' 1)"])
+  subgoal apply(rule RECT'_unfold) by fact
+  using   assms by auto
+
+lemma RECT'_wf_induct_arb:
+  fixes B :: "(_ \<Rightarrow> (_, (char list, enat) acost) nrest)
+   \<Rightarrow> _ \<Rightarrow> (_, (char list, enat) acost) nrest"
+  assumes wf: "wf R"
+  assumes mono: "mono2 B"
+  assumes P0: "pre a x"
+  assumes STEP: "(\<And>x a D. RECT' B = D \<Longrightarrow> pre a x \<Longrightarrow> (\<And>a' x'. (x', x) \<in> R \<Longrightarrow> pre a' x' \<Longrightarrow> post a' x' (D x')) \<Longrightarrow> post a x (consume (B D x) (cost ''call'' 1)))"
+  shows "post a x (RECT' B x)"
+proof -
+  have "\<forall>a. pre a x \<longrightarrow> post a x (RECT' B x)"
+    using wf
+    apply (induct x rule: wf_induct_rule)
+    apply(intro allI impI)
+    apply (subst RECT'_unfold)
+     apply (rule mono)
+    apply(rule STEP)
+    apply simp
+    subgoal apply simp done
+    subgoal premises pr
+      apply(rule pr(1)[rule_format])
+      using pr
+      by simp_all
+    done
+  with P0 show ?thesis by blast
+qed
+
+
+lemma RECT'_rule_arb:
+  fixes body ::  "('x \<Rightarrow> ('b, (char list, enat) acost) nrest)
+   \<Rightarrow> 'x \<Rightarrow> ('b, (char list, enat) acost) nrest"
+  assumes M: "mono2 body"
+  assumes WF: "wf (V::('x\<times>'x) set)"
+  assumes I0: "pre (arb::'arb) (x::'x)"
+  assumes IS: "\<And>f arb x. \<lbrakk> 
+      \<And>arb' x'. \<lbrakk>pre arb' x'; (x',x)\<in>V\<rbrakk> \<Longrightarrow> f x' \<le> M arb' x'; 
+      pre arb x;
+      RECT' body = f
+    \<rbrakk>  \<Longrightarrow> consume (body f x) (cost ''call'' 1) \<le> M arb x"
+  shows "RECT' body x \<le> M arb x" 
+  apply (rule RECT'_wf_induct_arb[where a=arb and pre=pre])
+  apply (rule WF)
+  apply (rule M)
+  apply fact
+  apply (rule IS)
+  apply assumption
+  apply assumption
+  apply assumption
+  done
+
+
+
 
 theorem RECT_wf_induct[consumes 1]:
   assumes "RECT B x = r"
