@@ -96,6 +96,43 @@ lemma split_ifI: "\<lbrakk> b\<Longrightarrow>P; \<not>b\<Longrightarrow>Q \<rbr
     subgoal apply (drule trimonoD_flatf_ge) by simp
     subgoal by (rule RS) simp_all 
     done
+
+
+  lemma RECT'_dep_refine:
+  fixes body :: "('b \<Rightarrow> ('c, (char list, enat) acost) nrest)
+   \<Rightarrow> 'b \<Rightarrow> ('c, (char list, enat) acost) nrest"
+    assumes M: "mono2 body"
+    assumes wfRE: "wfR'' E"
+    assumes spE: "struct_preserving E"
+    assumes R0: "(x,x')\<in>R arb\<^sub>0"
+    assumes S0: "SS = S arb\<^sub>0 x"
+    assumes RS: "\<And>f f' x x' arb. \<lbrakk> \<And>x x' arb. (x,x')\<in>R arb \<Longrightarrow> f x \<le>\<Down>(S arb x) (timerefine E (f' x')); (x,x')\<in>R arb \<rbrakk> 
+      \<Longrightarrow> body f x \<le>\<Down>(S arb x) (timerefine E (body' f' x'))"
+    shows "RECT' (\<lambda>f x. body f x) x \<le>\<Down>SS (timerefine E (RECT' (\<lambda>f' x'. body' f' x') x'))"
+    unfolding RECT'_def
+  apply(rule consume_refine[OF wfRE])
+  subgoal using spE[THEN struct_preservingD(1)] by simp
+  unfolding RECT_flat_gfp_def
+    unfolding RECT_flat_gfp_def S0
+    apply (clarsimp simp add: M[THEN RECT'_unfold_aux])
+  
+    apply (rule flatf_fixp_dep_transfer[where 
+          fp'="flatf_gfp (\<lambda>D. body (\<lambda>x. NREST.consume (D x) (cost ''call'' 1)))" 
+      and B'="(\<lambda>D. body (\<lambda>x. NREST.consume (D x) (cost ''call'' 1)))" 
+      and P="\<lambda>arb x x'. (x',x)\<in>R arb"
+      and arb\<^sub>0=arb\<^sub>0, 
+      OF _ _ flatf_ord.fixp_unfold[OF M[THEN RECT'_unfold_aux,THEN trimonoD_flatf_ge]] R0])
+    subgoal by simp
+    subgoal apply (drule trimonoD_flatf_ge) by simp
+    subgoal  apply(rule RS)
+   apply(rule consume_refine[OF wfRE])
+      subgoal using spE[THEN struct_preservingD(1)] by simp
+      apply simp apply simp
+      done
+    done
+
+
+
   
 lemma sorted_lelI:
   assumes "transp R"
