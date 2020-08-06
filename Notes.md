@@ -1,3 +1,36 @@
+# Donnerstag 6.8.20
+
+# Plan
+- Peter macht quicksort-partition alleine oder: Peter raeumt heapsort auf
+  
+- Max: macht Urlaub!
+
+## Further ideas
+- Masterarbeits Idee: quicksort_partition ersetzen (blocks for branch prediction)
+https://arxiv.org/abs/1604.06697
+
+## Schema Introsort
+
+
+![](img/introsort_scheme.png)
+
+## Next Steps
+
+- Heapsort
+  - sift_down bisher nur linear, TODO: prove log bound
+  - Pull out NlogN result
+- Refactoring / Peter getting to know NREST
+  - go over theories, explore how NREST reasoning works, point out bad style/proofs, mark for refactoring.
+- Introsort
+  - started in `Sorting_Quicksort_Scheme`, nice overall timing argument.
+  - next easy step: Quicksort Partition
+    - maybe: edit together, Peter writes, Max observes; knowledge transfer OR Peter tries on his own :)
+  - next hard step: `Unguarded_Insertion_Sort`
+    - strengthen Invariants, maybe do this together at as a later step
+     
+
+
+
 # Dienstag 4.8.
 
 ## Aktueller Stand
