@@ -13,16 +13,6 @@ section "stuff to move"
 (* TODO : Move *)
 
 (* move *)
-lemma bindT_refine_easy:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'\<rbrakk>
-         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  apply(rule bindT_refine_conc_time2) using assms
-  by (auto dest: inres_if_inresT_acost)
-
 
 (* TODO: move *)
 lemma inres_bindT_SPECT_one[simp]: "inres (do {l' \<leftarrow> SPECT [x \<mapsto> t]; M l'}) r \<longleftrightarrow> inres (M x) r"
