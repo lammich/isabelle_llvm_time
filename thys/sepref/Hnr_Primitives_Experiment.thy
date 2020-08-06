@@ -324,7 +324,7 @@ sepref_register mop_oarray_extract
   
 definition "eoarray_assn A \<equiv> \<upharpoonleft>(nao_assn (mk_assn A))"
 
-definition "eoarray_nth_impl xsi ii \<equiv> doM {
+definition [llvm_inline]: "eoarray_nth_impl xsi ii \<equiv> doM {
   r \<leftarrow> array_nth xsi ii;
   return (r,xsi)
 }"  

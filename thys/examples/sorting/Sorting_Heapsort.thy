@@ -2085,34 +2085,18 @@ sepref_def has_lchild_impl [llvm_inline] is "uncurry2 mop_has_lchild3" :: "[\<la
 sepref_def has_rchild_impl [llvm_inline] is "uncurry2 mop_has_rchild3" :: "[\<lambda>((l,h),i). l<h]\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow> bool1_assn"
   unfolding mop_has_rchild3_def apply (annot_snat_const "TYPE (size_t)") by sepref 
 
-sepref_def mop_geth_impl [llvm_inline] is "uncurry3 mop_geth3" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eoarray_assn elem_assn"
-  unfolding mop_geth3_def  
-  unfolding mop_oarray_extract_def[symmetric] thm mop_oarray_extract_def[symmetric]
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-    apply sepref_dbg_id  
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-        apply sepref_dbg_trans
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-   apply sepref_dbg_constraints 
-   sorry (* TODO: ask Peter *)
+sepref_def mop_geth_impl [llvm_inline] is "uncurry3 mop_geth3" 
+  (*:: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eoarray_assn elem_assn" *)
+  :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ ((_,ai),_). elem_assn \<times>\<^sub>a cnc_assn (\<lambda>x. x=ai) (eoarray_assn elem_assn))"
+  unfolding mop_geth3_def
+  unfolding mop_oarray_extract_def[symmetric]
+  by sepref
   
-  
-sepref_def mop_seth_impl [llvm_inline] is "uncurry4 mop_seth3" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a eoarray_assn elem_assn"
+sepref_def mop_seth_impl [llvm_inline] is "uncurry4 mop_seth3" 
+  :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a elem_assn\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ (((_,ai),_),_). cnc_assn (\<lambda>x. x=ai) (eoarray_assn elem_assn))"
   unfolding mop_seth3_def  
   unfolding mop_oarray_upd_def[symmetric] thm mop_oarray_extract_def[symmetric]
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-    apply sepref_dbg_id  
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-        apply sepref_dbg_trans
-  apply sepref_dbg_opt
-    apply sepref_dbg_cons_solve
-   apply sepref_dbg_constraints 
-  sorry (* TODO: ask Peter *)
+  by sepref
    
 (* TODO: Move *)
 sepref_register mop_to_eo_conv
@@ -2372,21 +2356,22 @@ lemma elegant:
   using assms
   supply conc_Id[simp del] mop_cmpo_v_idx_def[simp del]
   unfolding sift_down5_def sift_down4_def
-  supply mop_to_eo_conv_refine[refine]
-  supply mop_geth3_refine[refine]
-  supply mop_seth3_refine[refine]
-  supply mop_has_rchild3_refine[refine]
-  supply mop_has_lchild3_refine[refine]
-  supply mop_lchild3_refine[refine]
-  supply mop_rchild3_refine[refine]
-  supply mop_to_wo_conv_refines[refine]
-  supply cmpo_idxs2'_refines_mop_cmpo_idxs_with_E[refine]
-  supply cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E[refine]
+  supply [refine] =
+    mop_to_eo_conv_refine
+    mop_geth3_refine
+    mop_seth3_refine
+    mop_has_rchild3_refine
+    mop_has_lchild3_refine
+    mop_lchild3_refine
+    mop_rchild3_refine
+    mop_to_wo_conv_refines
+    cmpo_idxs2'_refines_mop_cmpo_idxs_with_E
+    cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E
   apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
-                      apply refine_dref_type
-     apply(all \<open>(intro sp_E preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
-  
-  apply (auto)
+  apply refine_dref_type
+  apply(all \<open>(intro sp_E preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply (simp_all (no_asm))
+  apply auto
   done
 
 
@@ -2493,7 +2478,7 @@ lemma heapsort3_refine:
 
 
 sepref_register "sift_down5"
-sepref_def sift_down_impl is "uncurry3 (PR_CONST sift_down5)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a (array_assn elem_assn)"
+sepref_def sift_down_impl [llvm_inline] is "uncurry3 (PR_CONST sift_down5)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a (array_assn elem_assn)"
   unfolding sift_down5_def PR_CONST_def
   supply [[goals_limit = 1]]
   apply sepref_dbg_preproc
@@ -2513,7 +2498,7 @@ sepref_def sift_down_impl is "uncurry3 (PR_CONST sift_down5)" :: "size_assn\<^su
   
 
 sepref_register "heapify_btu3"
-sepref_def heapify_btu_impl is "uncurry2 (PR_CONST (heapify_btu3))" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a (array_assn elem_assn)"
+sepref_def heapify_btu_impl [llvm_inline] is "uncurry2 (PR_CONST (heapify_btu3))" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a (array_assn elem_assn)"
   unfolding heapify_btu3_def PR_CONST_def
   apply (annot_snat_const "TYPE (size_t)")
   supply [[goals_limit = 1]]
@@ -2769,15 +2754,18 @@ end
 
 *)
 
-(* TODO: Peter *)
+
 global_interpretation heapsort_interp: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_ult "''icmp_ult''"  unat_assn
-  defines heapsort_interp_mop_lchild_impl  = heapsort_interp.mop_lchild_impl 
-      and heapsort_interp_mop_rchild_impl  = heapsort_interp.mop_rchild_impl 
-      and heapsort_interp_has_rchild_impl  = heapsort_interp.has_rchild_impl 
+  defines (*heapsort_interp_mop_lchild_impl  = heapsort_interp.mop_lchild_impl 
+      and heapsort_interp_mop_rchild_impl  = heapsort_interp.mop_rchild_impl *)
+      (*    heapsort_interp_has_rchild_impl  = heapsort_interp.has_rchild_impl 
       and heapsort_interp_has_lchild_impl  = heapsort_interp.has_lchild_impl 
-      and heapsort_interp_mop_geth_impl    = heapsort_interp.mop_geth_impl  
+      *)
+      
+(*         heapsort_interp_mop_geth_impl    = heapsort_interp.mop_geth_impl  
       and heapsort_interp_mop_seth_impl    = heapsort_interp.mop_seth_impl  
-      and heapsort_interp_sift_down_impl   = heapsort_interp.sift_down_impl
+*)      
+       heapsort_interp_sift_down_impl   = heapsort_interp.sift_down_impl
       and heapsort_interp_heapify_btu_impl = heapsort_interp.heapify_btu_impl
       and heapsort_interp_heapsort_impl    = heapsort_interp.heapsort_impl
   by (rule unat_sort_impl_context)
