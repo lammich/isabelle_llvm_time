@@ -12,6 +12,19 @@ section "stuff to move"
 
 (* TODO : Move *)
 
+method_setup all_par =
+ \<open>Method.text_closure >> (fn m => fn ctxt => fn facts =>
+   let
+     fun tac i st' =
+       Goal.restrict i 1 st'
+       |> method_evaluate m ctxt facts
+       |> Seq.map (Goal.unrestrict i)
+
+   in SIMPLE_METHOD (PARALLEL_ALLGOALS tac) facts end)
+\<close>
+
+
+
 (* move *)
 
 (* TODO: move *)
@@ -748,7 +761,7 @@ abbreviation "mop_rchildN \<equiv> mop_rchild (\<lambda>_. cost ''rchild'' 1)"
     using in_heap_bounds(2) less_le_trans by blast
 
  
-declare less_eq_option_Some_None[simp]
+(*declare less_eq_option_Some_None[simp]*)
 lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> T=T' \<and> b"
   by (auto split: if_splits)
 
@@ -773,7 +786,7 @@ lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> 
     using assms    
     unfolding heapify_btu_invar_def sift_down_btu_invar_def
     apply (simp_all add: ifSome_iff del: in_heap_simps)
-    apply (all \<open>(auto simp: in_heap_len_bound diff_less_mono2 wo_leI; fail)?\<close>) (** Takes loooong *)
+    (* apply (all \<open>(auto simp: in_heap_len_bound diff_less_mono2 wo_leI; fail)?\<close>) (** Takes loooong *)*)
     subgoal by (force simp:  asym wo_leI simp: btu_heapify_down_right)  
 
     subgoal by (simp add: diff_less_mono2 less_Suc_eq)
@@ -783,15 +796,20 @@ lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> 
     subgoal by (simp add: diff_less_mono2 less_Suc_eq)
     subgoal apply simp using local.trans wo_leI by blast
     subgoal by (simp add: diff_less_mono less_imp_le)
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 wo_leI)
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 wo_leI)
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 wo_leI)
     subgoal 
       apply clarsimp
       using btu_heapify_down_left_no_right_child btu_sift_down_term1 connex lchild_of_no_rchild_term wo_leD by blast
     subgoal 
       apply clarsimp
       using btu_sift_down_term1 btu_sift_down_term2 btu_sift_down_term3 wo_leI by blast
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 wo_leI)
     subgoal 
       apply clarsimp
       using btu_sift_down_term1 btu_sift_down_term2 btu_sift_down_term3 wo_leI by blast
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 wo_leI)
 
     subgoal using btu_sift_down_init apply (auto simp: top_acost_absorbs)  
       using is_heap_btu_def by blast
@@ -815,8 +833,8 @@ lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> 
       and
       R = "measure (\<lambda>(xs,i,ctd). (if ctd then 1 else 0) + h - i)"    
     ] if_rule2 if_rule prod3)
-    apply (clarsimp_all simp add: ifSome_iff)
-    apply (all \<open>(auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap; fail)?\<close>)
+    apply (all_par \<open>(clarsimp simp add: ifSome_iff)?\<close>)
+    (*apply (all \<open>(auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap; fail)?\<close>)*)
     subgoal using asym sift_down_invar_step(2) wo_leI by blast
     subgoal by (simp add: diff_less_mono2 less_SucI)
     subgoal using wo_less_trans wo_not_le_imp_less by blast
@@ -825,6 +843,9 @@ lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> 
     subgoal by (simp add: diff_less_mono2 less_Suc_eq)
     subgoal using itrans wo_leI by blast 
     subgoal by (simp add: Suc_diff_le less_imp_le)
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap)
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap)
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap)
     subgoal apply rule
       subgoal unfolding sift_down_invar_def by simp    
       subgoal by (meson lchild_of_no_rchild_term sift_down_invar_def sift_down_invar_step(3) sift_down_term1 wo_leD wo_leI wo_less_not_sym)
@@ -833,10 +854,12 @@ lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> 
       subgoal unfolding sift_down_invar_def by simp     
       subgoal unfolding sift_down_invar_def by (meson wo_leI sift_down_term1 sift_down_term2 sift_down_term3)
       done
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap)
     subgoal apply rule
       subgoal unfolding sift_down_invar_def by simp    
       subgoal by (meson lchild_of_no_rchild_term less_imp_le not_le sift_down_invar_def sift_down_lemma_left_no_right_child sift_down_term1)
       done
+    subgoal by (auto simp: in_heap_len_bound diff_less_mono2 A sift_down_invar_step wo_leI root_in_heap)
     subgoal using A unfolding sift_down_invar_def is_heap_except_down_def by (auto simp: top_acost_absorbs)
     subgoal using A unfolding sift_down_invar_def is_heap_except_down_def root_in_heap by auto
     done
@@ -904,8 +927,6 @@ lemma ifSome_iff: "(if b then Some T else None) = Some T' \<longleftrightarrow> 
 
 
   definition "swap_opt_rel v \<equiv> {((xs,i,ctd),(xs',i',ctd')). xs' = xs[i:=v] \<and> i<length xs \<and> i'=i \<and> ctd'=ctd }"
-
-  thm swap_opt_rel_def
 
  lemma sift_down1_refine_functional_aux: "sift_down1 i\<^sub>0 xs \<le> \<Down> Id (timerefine TId (sift_down i\<^sub>0 xs))" 
     unfolding sift_down1_def sift_down_def
@@ -1290,14 +1311,16 @@ context heap_context begin
       subgoal apply(rule consumea_Id_refine) by (simp only: top_acost_absorbs timerefineA_TId_eq top_greatest)
 
       unfolding mop_seth3_def SPECc2_alt
-      apply simp
+      apply (simp (no_asm_use))
+      apply (simp (no_asm_simp))
       apply normalize_blocks
       apply(refine_rcg MIf_refine bindT_refine_easy)
                          apply refine_dref_type
       apply (auto simp only: sp_TId wfR''_TId timerefineA_TId_eq top_greatest intro!: consumea_refine)
-      
-      apply (auto simp: in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth
-                algebra_simps woe_eq_except_ith woe_eq_except_upd) (** Takes loooooooong *)
+      apply (clarsimp_all simp only: in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth
+                woe_eq_except_ith woe_eq_except_upd)
+      apply (simp_all (no_asm_use) add: algebra_simps)
+      apply (simp_all (no_asm_simp) add: algebra_simps woe_eq_except_upd)
       done
     subgoal
       unfolding mop_to_wo_conv_def 
