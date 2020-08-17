@@ -491,7 +491,7 @@ begin
     unborrow xs xs\<^sub>0;
     RETURN b
   }"  
-  sepref_register cmpo_idx_v2' cmpo_v_idx2' cmpo_idxs2'
+  sepref_register cmpo_idx_v2' cmpo_v_idx2' cmpo_idxs2' cmp_idxs2'
 
   definition "E_mop_oarray_extract \<equiv> TId(''eo_extract'':=lift_acost mop_array_nth_cost, ''eo_set'':=lift_acost mop_array_upd_cost)"
  
@@ -589,24 +589,13 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
    (* supply [sepref_fr_rules] = eo_hnr_dep *)
     by sepref
 
-
-(* TODO: HNR rules for mop_to_eo_conv and mop_to_wo_conv
+  thm cmp_idxs2_def cmp_idxs2'_def
+  term cmp_idxs2'
 
   sepref_def cmp_idxs_impl [llvm_inline] is "uncurry2 (PR_CONST cmp_idxs2')" :: "(array_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
     unfolding cmp_idxs2'_def cmpo_idxs2'_def PR_CONST_def
-  apply sepref_dbg_preproc
-  apply sepref_dbg_cons_init
-  apply sepref_dbg_id
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-  apply sepref_dbg_trans_keep
-  apply sepref_dbg_trans_step_keep
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_constraints
+    supply [sepref_fr_rules] = mop_to_wo_conv_hnr_dep mop_to_eo_conv_hnr_dep
     by sepref
-    *)
   
   sepref_definition cmpo_idx_v_impl [llvm_inline] is "uncurry2 cmpo_idx_v2'" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a elem_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
     unfolding cmpo_idx_v2'_def PR_CONST_def
@@ -1277,6 +1266,56 @@ abbreviation "mop_list_getF \<equiv> mop_list_get (\<lambda>_. top)"
 abbreviation "mop_list_setF \<equiv> mop_list_set (\<lambda>_. top)"
 abbreviation "mop_list_swapF \<equiv> mop_list_swap (\<lambda>_. top)"        
 abbreviation (in weak_ordering) "mop_cmp_idxsF \<equiv> mop_cmp_idxs top"
+
+
+
+subsubsection \<open>implement swap\<close>
+
+
+definition myswap where "myswap xs l h =
+  doN { 
+      xs \<leftarrow> mop_to_eo_conv xs;
+      (x,xs) \<leftarrow> mop_oarray_extract xs l;
+      (y,xs) \<leftarrow> mop_oarray_extract xs h;
+      xs \<leftarrow> mop_oarray_upd xs l y;
+      xs \<leftarrow> mop_oarray_upd xs h x;
+      xs \<leftarrow> mop_to_wo_conv xs;
+      RETURN xs
+  }"
+
+lemma myswap_refine:
+  assumes "wfR'' E"
+    "lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost + (lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost)) \<le> timerefineA E (cost ''list_swap'' 1)"
+  shows 
+   "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
+       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E (mop_list_swapN xs' l' h'))"
+  unfolding myswap_def mop_list_swap_def
+  unfolding mop_to_eo_conv_def mop_to_wo_conv_def
+  unfolding mop_oarray_extract_def mop_oarray_upd_def
+  unfolding mop_eo_extract_def mop_eo_set_def
+  apply normalize_blocks
+  apply(split prod.splits)+
+  apply normalize_blocks
+  apply safe
+  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
+  apply refine_dref_type 
+  subgoal apply auto done
+  subgoal apply auto done
+  subgoal apply auto done
+  subgoal apply auto done
+  subgoal apply auto
+    by (metis None_notin_image_Some list.set_map list_update_overwrite list_update_swap map_update)  
+  subgoal using assms by auto
+  subgoal by auto
+  subgoal
+    apply(rule order.trans[OF _ assms(2)])
+    by (auto simp: add.assoc timerefineA_update_apply_same_cost   lift_acost_zero)
+  subgoal by (auto simp add: More_List.swap_def list_update_swap map_update option.exhaust_sel)  
+  done
+
+
+
+
 
 
 end

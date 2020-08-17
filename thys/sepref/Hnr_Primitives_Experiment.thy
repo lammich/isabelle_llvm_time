@@ -471,11 +471,22 @@ lemma hnr_to_wo_conv[sepref_fr_rules]: "hn_refine
   (hn_invalid (eoarray_assn A) xs xsi)
   (array_assn A)
   (mop_to_wo_conv $ xs)"
-  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def mop_to_wo_conv_def
+  unfolding mop_to_wo_conv_def
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def 
     array_assn_def hr_comp_def
   apply Basic_VCG.vcg'
   apply (simp add: map_the_some_rel_list_rel_iff)
   done
+
+lemma mop_to_wo_conv_hnr_dep: "(return,mop_to_wo_conv)\<in>(eoarray_assn A)\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ xi. cnc_assn (\<lambda>x. x=xi) (array_assn A))"
+  unfolding mop_to_wo_conv_def cnc_assn_def
+  apply(rule hfrefI) apply simp
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def 
+    array_assn_def hr_comp_def
+  apply Basic_VCG.vcg'
+  apply (simp add: map_the_some_rel_list_rel_iff)
+  done
+  
 
 lemma hnr_to_eo_conv[sepref_fr_rules]: "hn_refine 
   (hn_ctxt (array_assn A) xs xsi)
@@ -487,7 +498,17 @@ lemma hnr_to_eo_conv[sepref_fr_rules]: "hn_refine
     array_assn_def hr_comp_def
   supply [simp] = in_some_rel_list_rel_conv
   by vcg
-  
+
+
+lemma mop_to_eo_conv_hnr_dep: "(return,mop_to_eo_conv)\<in>(array_assn A)\<^sup>d \<rightarrow>\<^sub>a\<^sub>d (\<lambda>_ xi. cnc_assn (\<lambda>x. x=xi) (eoarray_assn A))"
+  unfolding mop_to_eo_conv_def cnc_assn_def
+  apply(rule hfrefI) apply simp
+  unfolding mop_to_eo_conv_def cnc_assn_def
+  unfolding hn_ctxt_def pure_def invalid_assn_def eoarray_assn_def 
+    array_assn_def hr_comp_def
+  supply [simp] = in_some_rel_list_rel_conv
+  by vcg
+
 (* Array operations for pure content, backed by eoarray *)  
 
 lemma the_pure_pure_part_conv: "is_pure A \<Longrightarrow> the_pure A = {(c,a). pure_part (A a c)}"
@@ -641,7 +662,10 @@ context
 begin
   lemmas hnr_array_upd[sepref_fr_rules] = hnr_raw_array_upd[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], folded mop_array_upd_def]
 
-  lemmas hnr_array_nth[sepref_fr_rules] = hnr_raw_array_nth[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def]
+  (* TODO: solve side condition in FCOMP automatically
+  lemmas hnr_array_nth[sepref_fr_rules] = hnr_raw_array_nth[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def] *)
+  lemma hnr_array_nth[sepref_fr_rules]: "(uncurry array_nth, uncurry mop_array_nth) \<in> (array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A"
+    sorry   
   
 end  
 

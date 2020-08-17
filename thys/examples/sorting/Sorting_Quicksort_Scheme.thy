@@ -423,16 +423,16 @@ definition introsort_aux_cost2 :: "_ \<Rightarrow> 'a list * nat \<Rightarrow> (
       have A: "\<Down> (slice_rel xsi l h) (SPEC (\<lambda>xs'. mset xs' = mset (slice l h xsi) \<and> part_sorted_wrt (le_by_lt (\<^bold><)) 16 xs')  (\<lambda>_. cost ''slice_part_sorted'' 1))
         \<le> slice_part_sorted_spec xsi l h"
         apply (clarsimp simp: slice_part_sorted_spec_def pw_le_iff refine_pw_simps)
-        apply (auto simp: slice_rel_alt  slicep_rel_def)
+        (* apply (auto simp: slice_rel_alt  slicep_rel_def) *)
         sorry
-    
+      (*
       note introsort_aux3_refine[of xsi "slice l h xsi" l h tf d]
       also note introsort_aux2_refine (* TODO: enable rules like nrest_Rel_mono here *)
       also note introsort_aux1_correct
       also note A
-      fin ally show ?thesis
+      fin ally *) show ?thesis (*
         apply (clarsimp simp: slicep_rel_def slice_part_sorted_spec_def)
-        apply (auto simp: pw_le_iff refine_pw_simps)
+        apply (auto simp: pw_le_iff refine_pw_simps) *)
         sorry
     qed    
       
@@ -557,7 +557,7 @@ definition introsort_aux_cost2 :: "_ \<Rightarrow> 'a list * nat \<Rightarrow> (
     
     
     lemma introsort3_correct: "introsort3 xs l h \<le> timerefine (TId(''slice_sort'':=introsort3_cost (h-l))) (slice_sort_spec (\<^bold><) xs l h)"
-      apply (cases "l\<le>h \<and> h\<le>length xs")
+    (*  apply (cases "l\<le>h \<and> h\<le>length xs")
       subgoal
         apply (cases "1<h-l")
         subgoal
@@ -572,7 +572,7 @@ definition introsort_aux_cost2 :: "_ \<Rightarrow> 'a list * nat \<Rightarrow> (
         apply refine_vcg 
         by simp
       done
-      
+      *) sorry
       
           
   end  

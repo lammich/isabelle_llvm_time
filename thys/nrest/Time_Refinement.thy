@@ -1134,6 +1134,14 @@ lemma struct_preserving_upd_I[intro]:
   by (auto simp: struct_preserving_def)
 
 
+subsection \<open>preserving currency\<close>
+
+definition "preserves_curr R n \<longleftrightarrow> (R n = (cost n 1))"
+
+lemma preserves_curr_D: "preserves_curr R n \<Longrightarrow> R n = (cost n 1)"
+  unfolding preserves_curr_def by metis
+  
+
 subsection \<open>TId\<close>
 
 

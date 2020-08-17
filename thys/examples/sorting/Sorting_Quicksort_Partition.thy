@@ -1,6 +1,8 @@
 theory Sorting_Quicksort_Partition
 imports Sorting_Quicksort_Scheme
 begin
+
+hide_const pi
   
 (* TODO: Move. Found useful for ATPs *)
 lemma strict_itrans: "a < c \<Longrightarrow> a < b \<or> b < c" for a b c :: "_::linorder"
@@ -11,50 +13,42 @@ context weak_ordering begin
   
 subsection \<open>Find Median\<close>
 
+
 definition "move_median_to_first ri ai bi ci (xs::'a list) \<equiv> doN {
     ASSERT (ai\<noteq>bi \<and> ai\<noteq>ci \<and> bi\<noteq>ci \<and> ri\<noteq>ai \<and> ri\<noteq>bi \<and> ri\<noteq>ci);
-    a \<leftarrow> mop_list_get xs ai;
-    b \<leftarrow> mop_list_get xs bi;
-    c \<leftarrow> mop_list_get xs ci;
-  
-    if a\<^bold><b then (
-      if b\<^bold><c then
-        mop_list_swap xs ri bi
-      else if a\<^bold><c then
-        mop_list_swap xs ri ci
-      else 
-        mop_list_swap xs ri ai
-    ) 
-    else if a\<^bold><c then
-      mop_list_swap xs ri ai
-    else if b\<^bold><c then 
-      mop_list_swap xs ri ci
-    else 
-      mop_list_swap xs ri bi
+    
+    ab \<leftarrow> mop_cmp_idxs (cost ''cmp_idxs'' 1) xs ai bi;
+    MIf ab
+      (doN {    
+        bc \<leftarrow> mop_cmp_idxs (cost ''cmp_idxs'' 1) xs bi ci;
+        MIf bc
+          (mop_list_swapN xs ri bi)
+          (doN {
+            ac \<leftarrow> mop_cmp_idxs (cost ''cmp_idxs'' 1) xs ai ci;
+            MIf ac 
+              (mop_list_swapN xs ri ci)
+              (mop_list_swapN xs ri ai)
+            })
+      }) 
+      (doN {
+        ac \<leftarrow> mop_cmp_idxs (cost ''cmp_idxs'' 1) xs ai ci;
+        MIf ac
+          (mop_list_swapN xs ri ai)
+          (doN {
+            bc \<leftarrow> mop_cmp_idxs (cost ''cmp_idxs'' 1) xs bi ci;
+            MIf bc
+              (mop_list_swapN xs ri ci)
+              (mop_list_swapN xs ri bi)
+          })
+      })
   }"
 
-lemma move_median_to_first_alt: "move_median_to_first ri ai bi ci (xs::'a list) = doN {
-    ASSERT (ai\<noteq>bi \<and> ai\<noteq>ci \<and> bi\<noteq>ci \<and> ri\<noteq>ai \<and> ri\<noteq>bi \<and> ri\<noteq>ci);
-  
-    if\<^sub>N mop_cmp_idxs xs ai bi then (
-      if\<^sub>N mop_cmp_idxs xs bi ci then
-        mop_list_swap xs ri bi
-      else if\<^sub>N mop_cmp_idxs xs ai ci then
-        mop_list_swap xs ri ci
-      else 
-        mop_list_swap xs ri ai
-    ) 
-    else if\<^sub>N mop_cmp_idxs xs ai ci then
-      mop_list_swap xs ri ai
-    else if\<^sub>N mop_cmp_idxs xs bi ci then 
-      mop_list_swap xs ri ci
-    else 
-      mop_list_swap xs ri bi
-  }"
-  unfolding move_median_to_first_def
-  by (auto simp: pw_eq_iff refine_pw_simps split!: if_splits)
-  
-  
+definition "move_median_to_first_cost =  cost ''cmp_idxs'' 3 + cost ''if'' 3 + cost ''list_swap'' 1"
+
+
+lemma if_rule2: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then Some a else None)"
+  by auto
+
 lemma move_median_to_first_correct:
   "\<lbrakk> ri<ai; ai<bi; bi<ci; ci<length xs \<rbrakk> \<Longrightarrow> 
   move_median_to_first ri ai bi ci xs 
@@ -62,9 +56,12 @@ lemma move_median_to_first_correct:
         xs' = swap xs ri i
       \<and> (\<exists>j\<in>{ai,bi,ci}-{i}. xs!i\<^bold>\<le>xs!j)   
       \<and> (\<exists>j\<in>{ai,bi,ci}-{i}. xs!i\<^bold>\<ge>xs!j)   
-      )"
-  unfolding move_median_to_first_def
-  apply refine_vcg
+      ) (\<lambda>_. move_median_to_first_cost)"
+  unfolding move_median_to_first_def move_median_to_first_cost_def
+  unfolding SPEC_def mop_cmp_idxs_def SPECc2_def mop_list_swap_def
+  apply(rule gwp_specifies_I)
+  apply (refine_vcg \<open>-\<close> rules: if_rule2) 
+  apply (all \<open>(sc_solve,simp;fail)?\<close>)
   supply aux = bexI[where P="\<lambda>x. _=_ x \<and> _ x", OF conjI[OF refl]]
   apply ((rule aux)?; insert connex,auto simp: unfold_lt_to_le)+
   done
@@ -76,9 +73,9 @@ lemma move_median_to_first_correct':
     \<le> SPEC (\<lambda>xs'. slice_eq_mset ri (ci+1) xs' xs 
       \<and> (\<exists>i\<in>{ai,bi,ci}. xs'!i\<^bold>\<le>xs'!ri)
       \<and> (\<exists>i\<in>{ai,bi,ci}. xs'!i\<^bold>\<ge>xs'!ri)
-      )"
+      ) (\<lambda>_. move_median_to_first_cost)"
   apply (rule order_trans[OF move_median_to_first_correct])    
-  by auto
+  by (auto simp: SPEC_def le_fun_def)
   
 (* TODO: Clean up prove below, to use more concise aux-lemma! *)  
 lemma move_median_to_first_correct'':
@@ -87,18 +84,143 @@ lemma move_median_to_first_correct'':
     \<le> SPEC (\<lambda>xs'. slice_eq_mset ri (ci+1) xs' xs 
       \<and> (\<exists>i\<in>{ai..ci}. xs'!i\<^bold>\<le>xs'!ri)
       \<and> (\<exists>i\<in>{ai..ci}. xs'!i\<^bold>\<ge>xs'!ri)
-      )"
-  apply (rule order_trans[OF move_median_to_first_correct'])    
-  by auto
+      ) (\<lambda>_. move_median_to_first_cost)"
+  apply (rule order_trans[OF move_median_to_first_correct'])  
+  by (auto simp: SPEC_def le_fun_def)
   
 end
 
 context sort_impl_context begin 
-  
-sepref_register move_median_to_first
 
-sepref_def move_median_to_first_impl [llvm_inline] is "uncurry4 (PR_CONST move_median_to_first)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (arr_assn)\<^sup>d \<rightarrow>\<^sub>a arr_assn"
-  unfolding move_median_to_first_alt PR_CONST_def
+definition "aa = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost
+                 + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost
+                 + lift_acost mop_array_upd_cost)))"
+  
+
+
+definition cc :: ecost where "cc = lift_acost mop_array_nth_cost + lift_acost mop_array_nth_cost + lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost "
+abbreviation "E_mmtf == TId(''cmp_idxs'':=aa, ''list_swap'':= cc)"
+lemma wfR''E_mmtf[simp]: " wfR'' E_mmtf" by (auto intro!: wfR''_upd)
+
+lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
+  "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
+    cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine E_mmtf (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
+  supply conc_Id[simp del]
+    unfolding cmp_idxs2'_def cmpo_idxs2'_def  mop_cmp_idxs_def
+    unfolding  mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+          mop_oarray_upd_def mop_eo_set_def consume_alt
+    unfolding mop_to_eo_conv_def mop_to_wo_conv_def
+    apply normalize_blocks apply(split prod.splits)+
+    apply normalize_blocks
+    apply simp
+    apply(intro refine0 consumea_refine bindT_refine_easy)
+            apply refine_dref_type
+    subgoal by auto  
+    subgoal by auto  
+    subgoal by auto  
+    subgoal by auto   
+    subgoal by (metis list_update_id list_update_overwrite list_update_swap option.sel)
+    subgoal by simp
+    subgoal by simp
+    subgoal by(simp add: lift_acost_zero timerefineA_update_apply_same_cost  aa_def)
+    subgoal by simp
+    done
+
+
+
+definition "move_median_to_first2 ri ai bi ci (xs::'a list) \<equiv> doN {
+    ASSERT (ai\<noteq>bi \<and> ai\<noteq>ci \<and> bi\<noteq>ci \<and> ri\<noteq>ai \<and> ri\<noteq>bi \<and> ri\<noteq>ci);
+    
+    ab \<leftarrow> cmp_idxs2' xs ai bi;
+    MIf ab
+      (doN {    
+        bc \<leftarrow> cmp_idxs2' xs bi ci;
+        MIf bc
+          (myswap xs ri bi)
+          (doN {
+            ac \<leftarrow> cmp_idxs2' xs ai ci;
+            MIf ac 
+              (myswap xs ri ci)
+              (myswap xs ri ai)
+            })
+      }) 
+      (doN {
+        ac \<leftarrow> cmp_idxs2' xs ai ci;
+        MIf ac
+          (myswap xs ri ai)
+          (doN {
+            bc \<leftarrow> cmp_idxs2' xs bi ci;
+            MIf bc
+              (myswap xs ri ci)
+              (myswap xs ri bi)
+          })
+      })
+  }"
+
+lemma myswap_refine':
+  shows 
+   "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
+       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (mop_list_swapN xs' l' h'))"
+  apply(rule myswap_refine)
+  apply (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
+  by(simp add: add.assoc  cc_def)
+ 
+lemma move_median_to_first2_refine':
+  shows "move_median_to_first2 ri ai bi ci xs \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (move_median_to_first ri ai bi ci xs))"
+  unfolding move_median_to_first2_def move_median_to_first_def
+  supply cmp_idxs2'_refines_mop_cmp_idxs_with_E[refine]
+  supply SPECc2_refine[refine]
+  supply myswap_refine'[refine]
+  apply(refine_rcg bindT_refine_conc_time_my_inres MIf_refine)
+  by(auto intro: struct_preservingI)
+
+abbreviation costmult :: "enat \<Rightarrow> ('b, enat) acost \<Rightarrow> ('b, enat) acost" (infixl "*m" 80)
+  where  "costmult s c \<equiv> acostC (\<lambda>x. s * the_acost c x)"
+
+definition "move_median_to_first2_cost = 3 *m aa + cc + cost ''if'' 3"
+
+
+
+
+lemma 
+  SPEC_timerefine_eq_arh:
+  "(\<And>x. B x = timerefineA R (B' x)) \<Longrightarrow>  timerefine R (SPEC A B') = SPEC A (\<lambda>x. timerefineA R (B' x))"
+  apply(auto simp: SPEC_def)
+  unfolding timerefine_SPECT 
+  apply auto
+  unfolding timerefineF_def timerefineA_def
+  by auto
+
+
+lemma move_median_to_first2_correct: 
+  "\<lbrakk> ri<ai; ai<bi; bi<ci; ci<length xs \<rbrakk> \<Longrightarrow> 
+  move_median_to_first2 ri ai bi ci xs 
+    \<le> SPEC (\<lambda>xs'. \<exists>i\<in>{ai,bi,ci}. 
+        xs' = swap xs ri i
+      \<and> (\<exists>j\<in>{ai,bi,ci}-{i}. xs!i\<^bold>\<le>xs!j)   
+      \<and> (\<exists>j\<in>{ai,bi,ci}-{i}. xs!i\<^bold>\<ge>xs!j)   
+      ) (\<lambda>_. move_median_to_first2_cost)"
+  apply(rule order.trans[OF move_median_to_first2_refine'])
+  apply simp 
+  apply(rule order.trans)
+   apply(rule timerefine_mono2[OF _ move_median_to_first_correct])
+       prefer 6
+  subgoal apply(simp add: SPEC_timerefine_eq_arh)
+    apply(rule SPEC_leq_SPEC_I) apply simp
+    by(auto simp: move_median_to_first_cost_def move_median_to_first2_cost_def
+            timerefineA_update_apply_same_cost timerefineA_propagate add.assoc add.commute) 
+  by auto  
+
+
+  thm move_median_to_first_correct
+
+sepref_register move_median_to_first2
+
+find_in_thms mop_array_nth in sepref_fr_rules
+
+sepref_def move_median_to_first_impl [llvm_inline] is "uncurry4 (PR_CONST move_median_to_first2)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (arr_assn)\<^sup>d \<rightarrow>\<^sub>a arr_assn"
+  unfolding move_median_to_first2_def PR_CONST_def
+  unfolding myswap_def
   by sepref 
                     
 end
@@ -341,7 +463,7 @@ sepref_def partition_pivot_impl [llvm_inline] is "uncurry2 (PR_CONST partition_p
 
 end
 
-
+(*
 subsection \<open>Parameterization\<close>
 
 context parameterized_weak_ordering begin
@@ -532,6 +654,6 @@ sepref_def partition_pivot_impl (*[llvm_inline] *)
   
 
 end
-
+*)
 end                           
 

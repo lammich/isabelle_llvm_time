@@ -2181,11 +2181,6 @@ lemma mop_to_eo_conv_refine: "wfR'' R \<Longrightarrow> (xs,xs')\<in>Id \<Longri
   by (auto simp: lift_acost_zero  simp del: conc_Id )
 
 
-definition "preserves_curr R n \<longleftrightarrow> (R n = (cost n 1))"
-
-lemma preserves_curr_D: "preserves_curr R n \<Longrightarrow> R n = (cost n 1)"
-  unfolding preserves_curr_def by metis
-  
 lemma timerefineA_cost_apply: "timerefineA TR (cost n (t::enat)) = acostC (\<lambda>x. t * the_acost (TR n) x)"
   unfolding timerefineA_def cost_def zero_acost_def
   apply simp
@@ -2403,40 +2398,6 @@ lemma heapify_btu3_refine: "heapify_btu3 l h xs\<^sub>0 \<le> \<Down> Id (timere
   by auto
 
 
-definition myswap where "myswap xs l h =
-  doN { 
-      xs \<leftarrow> mop_to_eo_conv xs;
-      (x,xs) \<leftarrow> mop_oarray_extract xs l;
-      (y,xs) \<leftarrow> mop_oarray_extract xs h;
-      xs \<leftarrow> mop_oarray_upd xs l y;
-      xs \<leftarrow> mop_oarray_upd xs h x;
-      xs \<leftarrow> mop_to_wo_conv xs;
-      RETURN xs
-  }"
-
-lemma myswap_refine: "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
-       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E (mop_list_swapN xs' l' h'))"
-  unfolding myswap_def mop_list_swap_def
-  unfolding mop_to_eo_conv_def mop_to_wo_conv_def
-  unfolding mop_oarray_extract_def mop_oarray_upd_def
-  unfolding mop_eo_extract_def mop_eo_set_def
-  apply normalize_blocks
-  apply(split prod.splits)+
-  apply normalize_blocks
-  apply safe
-  apply(intro refine0 bindT_refine_conc_time_my_inres consumea_refine)
-  apply refine_dref_type 
-  subgoal apply auto done
-  subgoal apply auto done
-  subgoal apply auto done
-  subgoal apply auto done
-  subgoal apply auto
-    by (metis None_notin_image_Some list.set_map list_update_overwrite list_update_swap map_update)  
-  subgoal by auto
-  subgoal by auto
-  subgoal by (auto simp: add.assoc timerefineA_update_apply_same_cost cc_def lift_acost_zero)  
-  subgoal by (auto simp add: More_List.swap_def list_update_swap map_update option.exhaust_sel)  
-  done
 
   definition heapsort3 :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "heapsort3 xs\<^sub>0 l h\<^sub>0 \<equiv> doN {
     ASSERT (l\<le>h\<^sub>0);
@@ -2462,6 +2423,15 @@ lemma myswap_refine: "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightar
       RETURN xs\<^sub>0 )
   }"
 
+
+lemma myswap_refine':
+  shows 
+   "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
+       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E (mop_list_swapN xs' l' h'))"
+  apply(rule myswap_refine)
+  apply (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
+  by(simp add: add.assoc  cc_def)
+
 lemma heapsort3_refine:
   fixes xs\<^sub>0 :: "'a list" 
   shows "heapsort3  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine E (heapsort2 xs\<^sub>0 l h\<^sub>0))" 
@@ -2470,7 +2440,7 @@ lemma heapsort3_refine:
   supply SPECc2_refine'[refine]
   supply heapify_btu3_refine[refine]
   supply elegant[refine]
-  supply myswap_refine[refine]
+  supply myswap_refine'[refine]
   apply(refine_rcg bindT_refine_conc_time_my_inres MIf_refine monadic_WHILEIT_refine')
   apply refine_dref_type 
   apply(all \<open>(intro sp_E preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
