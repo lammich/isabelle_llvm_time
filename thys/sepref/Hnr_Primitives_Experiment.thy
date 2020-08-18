@@ -429,8 +429,21 @@ definition "mop_to_eo_conv xs \<equiv> do { consume (RETURNT (map Some xs)) (lif
 definition "mop_to_wo_conv xs \<equiv> do { ASSERT (None\<notin>set xs); consume (RETURNT (map the xs)) (lift_acost 0) }"  
 
 
+sepref_register mop_to_eo_conv
+
   lemma mop_to_eo_conv_alt: "mop_to_eo_conv xs \<equiv> (RETURNT (map Some xs)) "
     unfolding mop_to_eo_conv_def lift_acost_zero  consume_0 .
+
+
+lemma mop_to_eo_conv_refine: "wfR'' R \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> mop_to_eo_conv xs \<le> \<Down> Id (timerefine R (mop_to_eo_conv xs'))"
+  unfolding mop_to_eo_conv_def
+  apply(intro refine0)
+  by (auto simp: lift_acost_zero  simp del: conc_Id )
+  
+lemma mop_to_wo_conv_refines: "wfR'' R \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> mop_to_wo_conv a \<le> \<Down> Id (timerefine R (mop_to_wo_conv a'))"
+  unfolding mop_to_wo_conv_def 
+  apply(intro refine0 bindT_refine_easy SPECc2_refine')
+  by (auto simp: lift_acost_zero) 
 
 
 (* XXX: Need "array_assn A" first for this to be meaningful! ra-comp! *)  

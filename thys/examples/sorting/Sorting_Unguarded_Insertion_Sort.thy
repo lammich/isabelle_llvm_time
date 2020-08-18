@@ -6,27 +6,29 @@ begin
 (* TODO: Move *)
 
 
-  
-lemma mop_eo_extract_slice_refine: "\<lbrakk> (i, i') \<in> idx_shift_rel l; (xs, xs') \<in> slice_rel xs\<^sub>0 l h\<rbrakk>
-       \<Longrightarrow> mop_eo_extract xs i \<le> \<Down> (Id \<times>\<^sub>r slice_rel xs\<^sub>0 l h) (mop_eo_extract xs' i')"  
+text \<open>the time bound T needs to be agnostic of the length of the array.\<close>
+lemma mop_eo_extract_slice_refine: 
+  shows "\<lbrakk> (i, i') \<in> idx_shift_rel l; (xs, xs') \<in> slice_rel xs\<^sub>0 l h\<rbrakk>
+       \<Longrightarrow> mop_eo_extract (\<lambda>_. T) xs i \<le> \<Down> (Id \<times>\<^sub>r slice_rel xs\<^sub>0 l h) (timerefine TId (mop_eo_extract (\<lambda>_. T) xs' i'))"  
   by (auto intro!: refine0 simp: idx_shift_rel_def slice_rel_def in_br_conv take_map drop_map slice_nth slice_upd_sym algebra_simps)
-       
   
 lemma mop_eo_set_slice_refine: "\<lbrakk>(i, i') \<in> idx_shift_rel l; (xs, xs') \<in> slice_rel xs\<^sub>0 l h; (v,v')\<in>Id\<rbrakk> 
-      \<Longrightarrow> mop_eo_set xs i v \<le> \<Down> (slice_rel xs\<^sub>0 l h) (mop_eo_set xs' i' v')"  
+      \<Longrightarrow> mop_eo_set (\<lambda>_. T) xs i v \<le> \<Down> (slice_rel xs\<^sub>0 l h) (timerefine TId (mop_eo_set (\<lambda>_. T) xs' i' v'))"  
   by (auto intro!: refine0 simp: idx_shift_rel_def slice_rel_def in_br_conv take_map drop_map slice_nth slice_upd_sym algebra_simps)
   
 lemma mop_to_eo_conv_slice_refine: "\<lbrakk>(xs, xs') \<in> slice_rel xs\<^sub>0 l h; (i, i') \<in> idx_shift_rel l\<rbrakk>
-    \<Longrightarrow> mop_to_eo_conv xs \<le> \<Down> (slice_rel (map Some xs\<^sub>0) l h) (mop_to_eo_conv xs')"  
-  by (auto simp: idx_shift_rel_def slice_rel_def in_br_conv slice_map take_map drop_map)  
+    \<Longrightarrow> mop_to_eo_conv xs \<le> \<Down> (slice_rel (map Some xs\<^sub>0) l h) (timerefine TId (mop_to_eo_conv xs'))"  
+  by (auto intro!: refine0 simp: mop_to_eo_conv_def idx_shift_rel_def slice_rel_def in_br_conv slice_map take_map drop_map)  
   
-lemma mop_to_wo_conv_slice_refine: "\<lbrakk>(xs, xs') \<in> slice_rel (map Some xs\<^sub>0) l h\<rbrakk> \<Longrightarrow> mop_to_wo_conv xs \<le> \<Down> (slice_rel xs\<^sub>0 l h) (mop_to_wo_conv xs')"
-  apply simp
+lemma mop_to_wo_conv_slice_refine: "\<lbrakk>wfR'' E; (xs, xs') \<in> slice_rel (map Some xs\<^sub>0) l h\<rbrakk> \<Longrightarrow> mop_to_wo_conv xs \<le> \<Down> (slice_rel xs\<^sub>0 l h) (timerefine E (mop_to_wo_conv xs'))"
+  apply (simp add: mop_to_wo_conv_def)
   apply (intro refine0)
   subgoal
     apply (simp add: slice_rel_def in_br_conv)
     apply (auto simp: in_set_conv_nth slice_nth list_eq_iff_nth_eq algebra_simps)
     by (metis Groups.add_ac(2) add_diff_inverse_nat less_diff_conv)
+  subgoal by simp
+  subgoal by (simp add: lift_acost_zero)
   subgoal  
     by (auto simp: slice_rel_def in_br_conv drop_map take_map slice_map)
   done
@@ -34,7 +36,7 @@ lemma mop_to_wo_conv_slice_refine: "\<lbrakk>(xs, xs') \<in> slice_rel (map Some
 
 context weak_ordering begin
   lemma mop_cmp_v_idx_slice_refine: "\<lbrakk> (xs, xs') \<in> slice_rel xs\<^sub>0 l h; (i, i') \<in> idx_shift_rel l; (v,v')\<in>Id \<rbrakk>
-    \<Longrightarrow> mop_cmpo_v_idx xs v i \<le> \<Down> bool_rel (mop_cmpo_v_idx xs' v' i')"
+    \<Longrightarrow> mop_cmpo_v_idx T xs v i \<le> \<Down> bool_rel (timerefine TId (mop_cmpo_v_idx T xs' v' i'))"
     supply [simp del] = conc_Id
     by (auto intro!: refine0 simp: idx_shift_rel_def slice_rel_def in_br_conv slice_nth algebra_simps)
 end  
@@ -572,7 +574,7 @@ context sort_impl_context begin
     
 end    
 
-    
+(*
 context parameterized_weak_ordering begin  
 
   definition "is_insert_param GUARDED cparam xs l i \<equiv> doN {
@@ -691,6 +693,6 @@ context parameterized_sort_impl_context begin
     by sepref
     
 end
-
+*)
 
 end

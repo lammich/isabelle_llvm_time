@@ -1356,8 +1356,8 @@ lemma
   by (metis acost.sel diff_is_0_eq' leD less_acost_def zero_acost_def zero_enat_def) 
 
 
-definition "G b d = (if b then Some d else None)"
-definition "H Qs t Es0 Es = mm22 Qs (Someplus (Some t) (mm3 (Es0) (Some (Es))))"
+definition "loopbody_cond b d = (if b then Some d else None)"
+definition "loopexit_cond Qs t Es0 Es = mm22 Qs (Someplus (Some t) (mm3 (Es0) (Some (Es))))"
 
 lemma lift_acost_cancel: "lift_acost x - lift_acost x = 0"
   by(auto simp: lift_acost_def zero_acost_def zero_enat_def)
@@ -1459,8 +1459,8 @@ lemma
   assumes
   step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)])
        (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })
-                             (\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
-                 else H (Q s) t (lift_acost (E s0)) (lift_acost (E s)))))"
+                             (\<lambda>s'. loopbody_cond (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
+                 else loopexit_cond (Q s) t (lift_acost (E s0)) (lift_acost (E s)))))"
 (* and  progress: "\<And>s. progress (c s)" \<comment> \<open>This is actually not really needed, because ''call'' needs to decrease!
                                          As an improvement one could not look at ''call'' and ''if'' costs, by setting them to \<infinity>, then progress is needed again.\<close> *)
  and  i: "I s0"                                       
@@ -1482,12 +1482,12 @@ proof  -
       apply(drule monadic_WHILE_rule''_aux1) apply safe
     proof (goal_cases)
       case (1 x t'' M)
-      have A1: "(\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
+      have A1: "(\<lambda>s'. loopbody_cond (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
           = (\<lambda>s'. if I s' \<and> E s' \<le> E s then Some (lift_acost (E s - E s')) else None)"
-        unfolding G_def by simp
-      have A2:  "H (Q s) t (lift_acost (E s0)) (lift_acost (E s)) 
+        unfolding loopbody_cond_def by simp
+      have A2:  "loopexit_cond (Q s) t (lift_acost (E s0)) (lift_acost (E s)) 
             = mm22 (Q s) (Some (t + (lift_acost (E s0) - lift_acost (E s))))"
-        unfolding H_def unfolding mm3_def using 1(5) by simp
+        unfolding loopexit_cond_def unfolding mm3_def using 1(5) by simp
 
       (* thm progress[THEN progressD] 1 gwp_pw *)
       { fix tt Q
@@ -1600,8 +1600,8 @@ lemma
   assumes
   step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp (bm s) (\<lambda>b. gwp (SPECT [()\<mapsto> (cost ''if'' 1)])
        (\<lambda>_. if b then gwp (do { consume (c s) (cost ''call'' 1)  })
-                             (\<lambda>s'. G (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
-                 else H (Q s) (t + cost ''call'' 1) (lift_acost (E s0)) (lift_acost (E s)))))"
+                             (\<lambda>s'. loopbody_cond (I s' \<and> E s' \<le> E s) (lift_acost (E s - E s')))
+                 else loopexit_cond (Q s) (t + cost ''call'' 1) (lift_acost (E s0)) (lift_acost (E s)))))"
 (* and  progress: "\<And>s. progress (c s)" \<comment> \<open>This is actually not really needed, because ''call'' needs to decrease!
                                          As an improvement one could not look at ''call'' and ''if'' costs, by setting them to \<infinity>, then progress is needed again.\<close> *)
  and  i: "I s0"                                       
@@ -1682,7 +1682,7 @@ lemma
 shows gwp_monadic_WHILEIET: "Some t \<le> gwp (monadic_WHILEIET I E bm c s0) Q"
   apply(rule neueWhile_rule''_real)
      apply (fact wf)
-    unfolding G_def H_def neueWhile_rewrite
+    unfolding loopbody_cond_def loopexit_cond_def neueWhile_rewrite
     apply(rule step[unfolded loop_body_condition_def loop_exit_condition_def])
     apply simp
   apply (fact i)
@@ -1872,7 +1872,7 @@ shows gwpn_monadic_WHILEIET: "Some t \<le> gwp\<^sub>n (monadic_WHILEIET I E bm 
 
 
 
-thm neueWhile_rule''_real[unfolded G_def H_def]
+thm neueWhile_rule''_real[unfolded loopbody_cond_def loopexit_cond_def]
 
 
 
