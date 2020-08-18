@@ -1749,8 +1749,29 @@ lemma inres_SPECT: "inres (SPECT [x\<mapsto>t]) y \<longleftrightarrow> x = y"
   unfolding inres_def by auto 
 
 
+lemma inres_bindT_SPECT_one[simp]: "inres (do {l' \<leftarrow> SPECT [x \<mapsto> t]; M l'}) r \<longleftrightarrow> inres (M x) r"
+  by(auto simp: bindT_def inres_def split: nrest.splits)
+
+declare inres_SPECT[simp]
 
 
+
+
+lemma inres_consumea[simp]: "inres (do {_ \<leftarrow> consumea t; M}) r \<longleftrightarrow> inres M r"
+  by (cases M) (auto simp: bindT_def inres_def consumea_def)
+
+lemma inres_RETURNT[simp]: "inres (RETURNT x) y \<longleftrightarrow> (x=y)"
+  by(auto simp: inres_def )
+
+lemma inres_bind_ASSERT[simp]: "inres (do { ASSERT \<phi>; N }) r \<longleftrightarrow> (\<phi> \<and> inres N r)"
+  by(auto simp: inres_def ASSERT_def iASSERT_def)
+
+declare inres_consume_conv[simp]
+
+lemma inres_bindT_consume_conv[simp]:
+  fixes t :: "(_,enat) acost"
+  shows "inres (do { x  \<leftarrow> NREST.consume m t; M x}) r = inres (do { x \<leftarrow> m; M x }) r"
+  unfolding consume_alt2 by simp
 
 
 lemma

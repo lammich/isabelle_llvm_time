@@ -578,6 +578,66 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
         done
       done
 
+
+definition "cmpo_v_idx2'_cost = lift_acost mop_array_nth_cost + (cost lt_curr_name 1 + lift_acost mop_array_upd_cost)"
+
+
+lemma  cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E:
+  assumes "wfR'' EE"
+    and "cmpo_v_idx2'_cost \<le> timerefineA EE (cost ''cmpo_v_idxs'' 1)"
+  shows "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow> cmpo_v_idx2' a b c \<le> \<Down> bool_rel (timerefine EE (mop_cmpo_v_idx (cost ''cmpo_v_idxs'' 1) a' b' c'))"
+  supply conc_Id[simp del]
+    unfolding cmpo_v_idx2'_def mop_cmpo_v_idx_def
+    unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+          mop_oarray_upd_def mop_eo_set_def consume_alt
+    apply normalize_blocks apply(split prod.splits)+
+    apply normalize_blocks
+    apply simp
+    apply(intro refine0 consumea_refine bindT_refine_easy)
+            apply refine_dref_type
+    subgoal by auto  
+    subgoal by auto  
+    subgoal using assms(1) by auto  
+    subgoal by auto   
+    subgoal
+      apply(rule order.trans[OF _ assms(2)])
+      by(simp add: cmpo_v_idx2'_cost_def)
+    subgoal by simp
+    done
+
+definition "cmpo_idxs2'_cost = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost 
+        + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost)))"
+    
+    
+lemma cmpo_idxs2'_refines_mop_cmpo_idxs_with_E:
+  assumes "wfR'' E"
+    "cmpo_idxs2'_cost \<le> timerefineA E (cost ''cmpo_idxs'' 1)"
+  shows 
+  "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
+    cmpo_idxs2' a b c \<le> \<Down> bool_rel (timerefine E (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) a' b' c'))"
+  supply conc_Id[simp del]
+    unfolding cmpo_idxs2'_def mop_cmpo_idxs_def
+    unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+          mop_oarray_upd_def mop_eo_set_def consume_alt
+    apply normalize_blocks apply(split prod.splits)+
+    apply normalize_blocks
+    apply simp
+    apply(intro refine0 consumea_refine bindT_refine_easy)
+            apply refine_dref_type
+    subgoal by auto  
+    subgoal by auto  
+    subgoal by auto  
+    subgoal by auto   
+    subgoal by (metis list_update_id list_update_overwrite list_update_swap option.sel)
+    subgoal using assms(1) by simp
+    subgoal by simp
+    subgoal
+      apply(rule order.trans[OF _ assms(2)])
+      by(simp add: cmpo_idxs2'_cost_def)
+    subgoal by simp
+    done
+
+
 definition "cmp_idxs2'_cost = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost
                  + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost
                  + lift_acost mop_array_upd_cost)))"
@@ -605,7 +665,9 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
     subgoal by (metis list_update_id list_update_overwrite list_update_swap option.sel)
     subgoal using assms(1) by simp
     subgoal by simp
-    subgoal apply(rule order.trans[OF _ assms(2)[unfolded cmp_idxs2'_cost_def]]) by (simp add: lift_acost_zero) 
+    subgoal
+      apply(rule order.trans[OF _ assms(2)]) 
+      by (simp add: lift_acost_zero cmp_idxs2'_cost_def) 
     subgoal by simp
     done
 

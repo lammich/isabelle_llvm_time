@@ -3,6 +3,12 @@ imports NREST NREST_Type_Classes NREST_Backwards_Reasoning Time_Refinement Data_
 begin
 
 
+(* TODO: Move *)
+lemma top_acost_absorbs: "top + (x::(_,enat)acost) = top"
+  apply(cases x) by (auto simp: top_acost_def plus_acost_alt top_enat_def)
+
+
+
 class nrest_cost = complete_lattice + needname_zero + nonneg + ordered_semiring + semiring_no_zero_divisors
 
  
@@ -325,6 +331,20 @@ lemma monadic_WHILEIT_refine_t[refine]:
   apply (assumption?; auto)+ 
   done
 
+
+
+lemma monadic_WHILEIT_refine':  
+  fixes b :: "'c \<Rightarrow> (bool, (char list, enat) acost) nrest"
+  assumes wfR[simp]:  "wfR'' E"
+  assumes sp_E: "struct_preserving E"
+  assumes [refine]: "(s',s) \<in> R"
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s \<rbrakk> \<Longrightarrow> I' s'"  
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s' \<rbrakk> \<Longrightarrow> b' s' \<le>\<Down>bool_rel (timerefine E (b s))"
+  assumes [refine]: "\<And>s' s. \<lbrakk> (s',s)\<in>R; I s; I' s'; inres (b s) True \<rbrakk> \<Longrightarrow> f' s' \<le>\<Down>R (timerefine E (f s))"
+  shows "monadic_WHILEIT I' b' f' s' \<le> \<Down>R (timerefine E (monadic_WHILEIT I b f s))"
+  apply(rule monadic_WHILEIT_refine_t[OF assms(1-5)])
+  by(auto intro: assms(6) inres_if_inresT_acost)
+
 subsection \<open>mop call\<close>
 
 
@@ -372,6 +392,16 @@ lemma inres_SPECc2: "inres (SPECc2 n op a b) t \<longleftrightarrow> (op a b = t
 
 lemma SPECc2_alt: "SPECc2 name aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) (cost name 1)))"
   unfolding SPECc2_def consume_def by(auto simp: RETURNT_def intro!: ext)
+
+
+
+
+lemma SPECc2_refine':
+  fixes TR :: "'h \<Rightarrow> ('h, enat) acost"
+  shows "(op x y, op' x' y')\<in>R \<Longrightarrow> preserves_curr TR n  \<Longrightarrow> SPECc2 n op x y \<le> \<Down> R (timerefine TR (SPECc2 n op' x' y'))"
+  unfolding SPECc2_def    
+  apply(subst SPECT_refine_t) by (auto simp: preserves_curr_def timerefineA_cost_apply) 
+  
 
 
 lemma SPECc2_refine:

@@ -1664,6 +1664,11 @@ theorem RECT_wf_induct[consumes 1]:
 
 definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
 
+abbreviation monadic_If :: "(bool,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest"
+  ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
+  where "monadic_If b x y \<equiv> do { t \<leftarrow> b; MIf t x y }"
+
+
 definition "monadic_WHILEIT I b f s \<equiv> do {
   SPECT [()\<mapsto> (cost ''call'' 1)];
   RECT (\<lambda>D s. do {

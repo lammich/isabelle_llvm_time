@@ -97,6 +97,10 @@ definition timerefineA ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoi
   where "timerefineA R cm =  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))"
 
 
+lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
+  by(auto simp: timerefineA_def zero_acost_def)
+
+
 lemma timerefine_alt: "timerefine R m = case_nrest FAILi (\<lambda>M. SPECT (timerefineF R M)) m"
   unfolding timerefine_def timerefineF_def ..
 
@@ -119,8 +123,12 @@ lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m the
   by auto
 
 
-lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
-  by(auto simp: timerefineA_def zero_acost_def)
+lemma timerefineA_cost_apply: "timerefineA TR (cost n (t::enat)) = acostC (\<lambda>x. t * the_acost (TR n) x)"
+  unfolding timerefineA_def cost_def zero_acost_def
+  apply simp
+  apply(subst timerefineA_upd_aux)
+  apply(subst Sum_any.delta) by simp 
+
 
 lemma timerefineA_update_apply_same_cost: 
   "timerefineA (F(n := y)) (cost n (t::enat)) = acostC (\<lambda>x. t * the_acost y x)"
@@ -1158,6 +1166,11 @@ subsection \<open>preserving currency\<close>
 
 definition "preserves_curr R n \<longleftrightarrow> (R n = (cost n 1))"
 
+
+lemma preserves_curr_other_updI:
+  "preserves_curr R m \<Longrightarrow> n\<noteq>m \<Longrightarrow> preserves_curr (R(n:=t)) m"
+  by(auto simp: preserves_curr_def)
+
 lemma preserves_curr_D: "preserves_curr R n \<Longrightarrow> R n = (cost n 1)"
   unfolding preserves_curr_def by metis
   
@@ -1202,6 +1215,8 @@ definition "TId = (\<lambda>x. acostC (\<lambda>y. (if x=y then 1 else 0)))"
 
 
 
+lemma preserves_curr_TId[simp]: "preserves_curr TId n"
+  by(auto simp: preserves_curr_def TId_def cost_def zero_acost_def)
 
 lemma cost_n_leq_TId_n: "cost n (1::enat) \<le> TId n"
   by(auto simp:  TId_def cost_def zero_acost_def less_eq_acost_def)

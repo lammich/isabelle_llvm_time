@@ -110,7 +110,22 @@ begin
       \<comment> \<open>strange: thm  add_ac[where ?'a="(_,_) acost"] \<close>
 
 
-  
+lemma the_acost_costs_distrib_left:
+  "the_acost (cost n x + (r:: ('c, nat) acost)) m * p
+     = the_acost (cost n x) m * p + the_acost r m * p"
+  apply(cases r) by(auto simp: cost_def zero_acost_def ring_distribs )
+lemma the_acost_costs_distrib_right:
+  "the_acost ((r:: ('c, nat) acost) + cost n x ) m * p
+     = the_acost (cost n x) m * p + the_acost r m * p"
+  apply(cases r) by(auto simp: cost_def zero_acost_def ring_distribs )
+lemmas the_acost_costs_distrib = the_acost_costs_distrib_left the_acost_costs_distrib_right
+lemma the_acost_cost_mult: "the_acost (cost n c) x * (p::nat) = the_acost (cost n (c*p)) x"
+  by(auto simp: cost_def zero_acost_def)
+lemma acostC_the_acost_cost: "acostC (\<lambda>x. the_acost (cost n t) x + r x) = cost n t + acostC r"
+  by (auto simp: cost_def)
+lemma "acostC (\<lambda>x. the_acost (cost n t) x + r x) = cost n t + acostC r"
+  by (auto simp: cost_def)
+
   
   instantiation acost :: (type, Sup) Sup
   begin                                                   

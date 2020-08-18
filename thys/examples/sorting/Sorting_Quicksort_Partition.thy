@@ -51,11 +51,6 @@ definition "move_median_to_first ri ai bi ci (xs::'a list) \<equiv> doN {
       })
   }"
 
-
-abbreviation monadic_If :: "(bool,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest"
-  ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
-  where "monadic_If b x y \<equiv> doN { t \<leftarrow> b; MIf t x y }"
-
 thm move_median_to_first_def
 
 lemma "move_median_to_first ri ai bi ci (xs::'a list) \<equiv> doN {
