@@ -1,9 +1,9 @@
 theory Sorting_Final_insertion_Sort
-imports Sorting_Quicksort_Scheme Sorting_Unguarded_Insertion_Sort
+imports Sorting_Quicksort_Scheme (* Sorting_Unguarded_Insertion_Sort *)
 begin
 
 context weak_ordering begin
-
+  (*
   definition "final_insertion_sort xs \<equiv> doN {
     ASSERT (1 < length xs);
     if length xs \<le> is_threshold then
@@ -67,8 +67,9 @@ context weak_ordering begin
         by (metis slice_complete)
       done                
     done    
-  
-  definition "final_insertion_sort2 xs l h \<equiv> doN {
+  *)
+  definition "final_insertion_sort2 xs l h \<equiv> undefined"
+   (* doN {
     ASSERT (l<h);
     if h-l \<le> is_threshold then
       gen_insertion_sort2 True l (l+1) h xs
@@ -90,11 +91,13 @@ context weak_ordering begin
     done
   
     
-    
+    *)
     
   lemma final_insertion_sort2_correct: 
     assumes [simplified, simp]: "(xs',xs)\<in>Id" "(l',l)\<in>Id" "(h',h)\<in>Id"   
-    shows "final_insertion_sort2 xs' l' h' \<le> final_sort_spec xs l h"
+    shows "final_insertion_sort2 xs' l' h' \<le> \<Down>Id (timerefine (TId(''slice_sort'':=(enat (h-l+1)) *m cost ''call'' 1)) (final_sort_spec xs l h))"
+    sorry
+  (*
   proof (simp,rule le_nofailI)
     assume "nofail (final_sort_spec xs l h)"
     hence PS: "part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold (slice l h xs)"
@@ -114,10 +117,10 @@ context weak_ordering begin
       unfolding final_sort_spec_def using PS LB by simp
     finally show "final_insertion_sort2 xs l h \<le> final_sort_spec xs l h" .
   qed
-  
+  *)
   
 end
-  
+  (*
 context sort_impl_context begin
   sepref_register final_insertion_sort2  
   sepref_def final_insertion_sort_impl is "uncurry2 (PR_CONST final_insertion_sort2)" 
@@ -126,8 +129,8 @@ context sort_impl_context begin
     apply (annot_snat_const "TYPE(size_t)")
     by sepref
 
-end
-
+end *)
+(*
 context parameterized_weak_ordering begin  
   definition "final_insertion_sort_param cparam xs l h \<equiv> doN {
     ASSERT (l<h);
@@ -160,6 +163,6 @@ context parameterized_sort_impl_context begin
     by sepref
 
 end
-
+*)
 
 end
