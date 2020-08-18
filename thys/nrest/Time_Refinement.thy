@@ -103,6 +103,18 @@ lemma timerefine_alt: "timerefine R m = case_nrest FAILi (\<lambda>M. SPECT (tim
 lemma timerefine_SPECT: "timerefine R (SPECT Q) = SPECT (timerefineF R Q)" 
   unfolding timerefine_alt by simp
 
+
+
+lemma SPEC_timerefine_conv:
+  "timerefine R (SPEC A B') = SPEC A (\<lambda>x. timerefineA R (B' x))"
+  apply(auto simp: SPEC_def)
+  unfolding timerefine_SPECT 
+  apply auto
+  unfolding timerefineF_def timerefineA_def
+  by auto
+
+
+
 lemma timerefineA_upd_aux: "(if a = m then x else (0::enat)) * b = (if a = m then x * b else 0)"
   by auto
 
@@ -392,6 +404,14 @@ lemma [simp]: "timerefine R FAILT = FAILT" by(auto simp: timerefine_def)
 
 definition pp where
   "pp R2 R1 = (\<lambda>a. acostC (\<lambda>c. Sum_any (%b. the_acost (R1 a) b * the_acost (R2 b) c  ) ))"
+
+
+
+lemma pp_fun_upd: "pp A (B(a:=b))
+          = (pp A B)(a:=timerefineA A b)"
+  unfolding pp_def timerefineA_def
+  apply(rule ext) by simp 
+
 
 
 lemma timerefineA_pp: "\<And>E1 E2. timerefineA (pp E1 E2) R = timerefineA E1 (timerefineA E2 R)"  
@@ -1141,6 +1161,39 @@ definition "preserves_curr R n \<longleftrightarrow> (R n = (cost n 1))"
 lemma preserves_curr_D: "preserves_curr R n \<Longrightarrow> R n = (cost n 1)"
   unfolding preserves_curr_def by metis
   
+subsection \<open>skalar multiplication with acost\<close>
+definition costmult :: "_ \<Rightarrow> ('b, _ ) acost \<Rightarrow> ('b, _ ) acost" (infixl "*m" 80)
+  where  "costmult s c \<equiv> acostC (\<lambda>x. s * the_acost c x)"
+
+lemma costmult_1_absorb[simp]: "(1::('b::comm_semiring_1)) *m c = c"
+  "(Suc 0) *m d = d"
+  by(simp_all add: costmult_def)
+
+lemma timerefineA_update_apply_same_cost': 
+  "timerefineA (F(n := y)) (cost n (t::enat)) = t *m y"
+  by (auto simp: costmult_def timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
+
+
+
+lemma costmult_add_distrib:
+  fixes a :: "'b::semiring"
+  shows "a *m (c + d) = a *m c + a *m d"
+  apply(cases c; cases d) by (auto simp: costmult_def plus_acost_alt ring_distribs)
+
+lemma costmult_minus_distrib2:
+  fixes a :: nat
+  shows "a *m c - a *m d = a *m (c - d)"
+  apply(cases c; cases d) by (auto simp: costmult_def plus_acost_alt diff_mult_distrib2)
+
+lemma costmult_minus_distrib:
+  fixes a :: nat
+  shows "a *m c - b *m c = (a-b) *m c"
+  apply(cases c) by (auto simp: costmult_def plus_acost_alt diff_mult_distrib)
+
+lemma costmult_cost:
+  fixes x :: "'b::comm_semiring_1"
+  shows "x *m (cost n y) = cost n (x*y)"
+  by(auto simp: costmult_def cost_def zero_acost_def)
 
 subsection \<open>TId\<close>
 
@@ -1180,6 +1233,22 @@ lemma sp_TId[simp]: "struct_preserving (TId::_\<Rightarrow>(string, enat) acost)
 lemma timerefineA_TId_aux: "the_acost x a * (if b then (1::enat) else 0)
     = (if b then the_acost x a  else 0)"
   apply(cases b) by auto
+
+
+lemma pp_TId_absorbs_right:
+  fixes A :: "'b \<Rightarrow> ('c, enat) acost" 
+  shows "pp A TId = A"
+  unfolding pp_def TId_def apply simp
+  apply(rule ext) apply(subst timerefineA_upd_aux)
+  by simp
+
+lemma pp_TId_absorbs_left:
+  fixes A :: "'b \<Rightarrow> ('c, enat) acost" 
+  shows "pp TId A  = A"
+  unfolding pp_def TId_def apply simp
+  apply(rule ext) apply(subst timerefineA_TId_aux)
+  by simp
+
 
 lemma timerefineA_TId_eq[simp]:
   shows "timerefineA TId x = (x:: ('b, enat) acost)"

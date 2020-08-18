@@ -578,6 +578,39 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
         done
       done
 
+definition "cmp_idxs2'_cost = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost
+                 + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost
+                 + lift_acost mop_array_upd_cost)))"
+
+lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
+  assumes "wfR'' E"
+    "cmp_idxs2'_cost \<le> timerefineA E (cost ''cmp_idxs'' 1)"
+  shows 
+  "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
+    cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine E (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
+  supply conc_Id[simp del]
+    unfolding cmp_idxs2'_def cmpo_idxs2'_def  mop_cmp_idxs_def
+    unfolding  mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+          mop_oarray_upd_def mop_eo_set_def consume_alt
+    unfolding mop_to_eo_conv_def mop_to_wo_conv_def
+    apply normalize_blocks apply(split prod.splits)+
+    apply normalize_blocks
+    apply simp
+    apply(intro refine0 consumea_refine bindT_refine_easy)
+            apply refine_dref_type
+    subgoal by auto  
+    subgoal by auto  
+    subgoal by auto  
+    subgoal by auto   
+    subgoal by (metis list_update_id list_update_overwrite list_update_swap option.sel)
+    subgoal using assms(1) by simp
+    subgoal by simp
+    subgoal apply(rule order.trans[OF _ assms(2)[unfolded cmp_idxs2'_cost_def]]) by (simp add: lift_acost_zero) 
+    subgoal by simp
+    done
+
+
+
 
 
   sepref_def cmpo_idxs_impl [llvm_inline] is "uncurry2 (PR_CONST cmpo_idxs2')" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
@@ -1283,13 +1316,16 @@ definition myswap where "myswap xs l h =
       RETURN xs
   }"
 
+definition myswap_cost :: ecost where 
+  "myswap_cost = lift_acost mop_array_nth_cost + lift_acost mop_array_nth_cost + lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost "
+
 lemma myswap_refine:
   assumes "wfR'' E"
-    "lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost + (lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost)) \<le> timerefineA E (cost ''list_swap'' 1)"
+    "myswap_cost \<le> timerefineA E (cost ''list_swap'' 1)"
   shows 
    "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
        \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E (mop_list_swapN xs' l' h'))"
-  unfolding myswap_def mop_list_swap_def
+  unfolding myswap_def mop_list_swap_def 
   unfolding mop_to_eo_conv_def mop_to_wo_conv_def
   unfolding mop_oarray_extract_def mop_oarray_upd_def
   unfolding mop_eo_extract_def mop_eo_set_def
@@ -1309,6 +1345,7 @@ lemma myswap_refine:
   subgoal by auto
   subgoal
     apply(rule order.trans[OF _ assms(2)])
+    unfolding myswap_cost_def
     by (auto simp: add.assoc timerefineA_update_apply_same_cost   lift_acost_zero)
   subgoal by (auto simp add: More_List.swap_def list_update_swap map_update option.exhaust_sel)  
   done

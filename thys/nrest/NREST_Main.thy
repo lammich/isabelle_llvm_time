@@ -333,6 +333,30 @@ definition mop_call where
 
 
 
+lemma gwp_call[vcg_rules']:
+  fixes m :: "(_,(_,enat) acost) nrest"
+  assumes "Some (cost ''call'' 1 + t) \<le> gwp m Q"
+  shows  "Some t \<le> gwp (mop_call m) Q"
+  unfolding mop_call_def
+  apply(rule gwp_consume) by(rule assms)
+
+
+lemma mop_call_refine:
+  fixes M :: "('e, (string, enat) acost) nrest"
+  assumes "wfR'' E"
+    "struct_preserving E"
+  shows "\<lbrakk> M \<le> \<Down> R (timerefine E M')\<rbrakk> \<Longrightarrow> mop_call M \<le> \<Down>R (timerefine E (mop_call M'))"
+  unfolding mop_call_def
+  apply(subst timerefine_consume)
+  subgoal using assms(1) .
+  apply(subst conc_fun_consume)
+  apply(rule consume_mono) 
+  using assms(2)[THEN struct_preservingD(1)]  
+  by auto                                    
+ 
+
+
+
 subsection \<open>Shortcuts for specifications of operations\<close>
 
   definition "SPECc1' c aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>c]))"

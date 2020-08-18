@@ -4,14 +4,11 @@ begin
 
 (* TODO: move *)
 
-definition costmult :: "_ \<Rightarrow> ('b, _ ) acost \<Rightarrow> ('b, _ ) acost" (infixl "*m" 80)
-  where  "costmult s c \<equiv> acostC (\<lambda>x. s * the_acost c x)"
+lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
+  by auto
 
-lemma costmult_1_absorb[simp]: "(1::('b::comm_semiring_1)) *m c = c"
-  "(Suc 0) *m d = d"
-  by(simp_all add: costmult_def)
-
-
+lemma if_rule2: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then Some a else None)"
+  by auto
 
 hide_const pi
   
@@ -54,11 +51,34 @@ definition "move_median_to_first ri ai bi ci (xs::'a list) \<equiv> doN {
       })
   }"
 
+
+abbreviation monadic_If :: "(bool,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest"
+  ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
+  where "monadic_If b x y \<equiv> doN { t \<leftarrow> b; MIf t x y }"
+
+thm move_median_to_first_def
+
+lemma "move_median_to_first ri ai bi ci (xs::'a list) \<equiv> doN {
+    ASSERT (ai\<noteq>bi \<and> ai\<noteq>ci \<and> bi\<noteq>ci \<and> ri\<noteq>ai \<and> ri\<noteq>bi \<and> ri\<noteq>ci);
+    
+    if\<^sub>N mop_cmp_idxs (cost ''cmp_idxs'' 1) xs ai bi then
+      if\<^sub>N mop_cmp_idxs (cost ''cmp_idxs'' 1) xs bi ci then
+        mop_list_swapN xs ri bi
+      else if\<^sub>N mop_cmp_idxs (cost ''cmp_idxs'' 1) xs ai ci then
+        mop_list_swapN xs ri ci
+      else
+        mop_list_swapN xs ri ai
+    else  
+      if\<^sub>N mop_cmp_idxs (cost ''cmp_idxs'' 1) xs ai ci then
+        mop_list_swapN xs ri ai
+      else if\<^sub>N mop_cmp_idxs (cost ''cmp_idxs'' 1) xs bi ci then
+        mop_list_swapN xs ri ci
+      else 
+        mop_list_swapN xs ri bi
+  }"
+  unfolding move_median_to_first_def .
+
 definition "move_median_to_first_cost =  cost ''cmp_idxs'' 3 + cost ''if'' 3 + cost ''list_swap'' 1"
-
-
-lemma if_rule2: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then Some a else None)"
-  by auto
 
 lemma move_median_to_first_correct:
   "\<lbrakk> ri<ai; ai<bi; bi<ci; ci<length xs \<rbrakk> \<Longrightarrow> 
@@ -103,42 +123,6 @@ end
 
 context sort_impl_context begin 
 
-definition "aa = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost
-                 + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost
-                 + lift_acost mop_array_upd_cost)))"
-  
-
-
-definition cc :: ecost where "cc = lift_acost mop_array_nth_cost + lift_acost mop_array_nth_cost + lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost "
-abbreviation "E_mmtf == TId(''cmp_idxs'':=aa, ''list_swap'':= cc)"
-lemma wfR''E_mmtf[simp]: " wfR'' E_mmtf" by (auto intro!: wfR''_upd)
-
-lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
-  "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
-    cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine E_mmtf (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
-  supply conc_Id[simp del]
-    unfolding cmp_idxs2'_def cmpo_idxs2'_def  mop_cmp_idxs_def
-    unfolding  mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
-          mop_oarray_upd_def mop_eo_set_def consume_alt
-    unfolding mop_to_eo_conv_def mop_to_wo_conv_def
-    apply normalize_blocks apply(split prod.splits)+
-    apply normalize_blocks
-    apply simp
-    apply(intro refine0 consumea_refine bindT_refine_easy)
-            apply refine_dref_type
-    subgoal by auto  
-    subgoal by auto  
-    subgoal by auto  
-    subgoal by auto   
-    subgoal by (metis list_update_id list_update_overwrite list_update_swap option.sel)
-    subgoal by simp
-    subgoal by simp
-    subgoal by(simp add: lift_acost_zero timerefineA_update_apply_same_cost  aa_def)
-    subgoal by simp
-    done
-
-
-
 definition "move_median_to_first2 ri ai bi ci (xs::'a list) \<equiv> doN {
     ASSERT (ai\<noteq>bi \<and> ai\<noteq>ci \<and> bi\<noteq>ci \<and> ri\<noteq>ai \<and> ri\<noteq>bi \<and> ri\<noteq>ci);
     
@@ -168,45 +152,34 @@ definition "move_median_to_first2 ri ai bi ci (xs::'a list) \<equiv> doN {
       })
   }"
 
+abbreviation "E_mmtf == TId(''cmp_idxs'':=cmp_idxs2'_cost, ''list_swap'':= myswap_cost)"
+
+lemma wfR''E_mmtf[simp]: "wfR'' E_mmtf" by (auto intro!: wfR''_upd)
+
+lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E':
+  "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
+    cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine E_mmtf (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
+  apply(rule cmp_idxs2'_refines_mop_cmp_idxs_with_E)
+  by(auto simp: timerefineA_update_apply_same_cost')
+
 lemma myswap_refine':
-  shows 
    "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
        \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (mop_list_swapN xs' l' h'))"
   apply(rule myswap_refine)
-  apply (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
-  by(simp add: add.assoc  cc_def)
+  by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero) 
  
 lemma move_median_to_first2_refine':
-  shows "move_median_to_first2 ri ai bi ci xs \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (move_median_to_first ri ai bi ci xs))"
+  assumes "(ri,ri')\<in>Id" "(ai,ai')\<in>Id" "(bi,bi')\<in>Id" "(ci,ci')\<in>Id" "(xs,xs')\<in>Id"
+  shows "move_median_to_first2 ri ai bi ci xs \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (move_median_to_first ri' ai' bi' ci' xs'))"
+  using assms
   unfolding move_median_to_first2_def move_median_to_first_def
-  supply cmp_idxs2'_refines_mop_cmp_idxs_with_E[refine]
+  supply cmp_idxs2'_refines_mop_cmp_idxs_with_E'[refine]
   supply SPECc2_refine[refine]
   supply myswap_refine'[refine]
   apply(refine_rcg bindT_refine_conc_time_my_inres MIf_refine)
   by(auto intro: struct_preservingI)
 
-definition "move_median_to_first2_cost = 3 *m aa + cc + cost ''if'' 3"
-
-
-
-
-lemma 
-  SPEC_timerefine_eq_arh:
-  "(\<And>x. B x = timerefineA R (B' x)) \<Longrightarrow>  timerefine R (SPEC A B') = SPEC A (\<lambda>x. timerefineA R (B' x))"
-  apply(auto simp: SPEC_def)
-  unfolding timerefine_SPECT 
-  apply auto
-  unfolding timerefineF_def timerefineA_def
-  by auto
-
-
-thm timerefineA_update_apply_same_cost
-
-lemma timerefineA_update_apply_same_cost': 
-  "timerefineA (F(n := y)) (cost n (t::enat)) = t *m y"
-  by (auto simp: costmult_def timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
-
-print_classes
+definition "move_median_to_first2_cost = 3 *m cmp_idxs2'_cost + myswap_cost + cost ''if'' 3"
 
 lemma move_median_to_first2_correct: 
   "\<lbrakk> ri<ai; ai<bi; bi<ci; ci<length xs \<rbrakk> \<Longrightarrow> 
@@ -217,11 +190,11 @@ lemma move_median_to_first2_correct:
       \<and> (\<exists>j\<in>{ai,bi,ci}-{i}. xs!i\<^bold>\<ge>xs!j)   
       ) (\<lambda>_. move_median_to_first2_cost)"
   apply(rule order.trans[OF move_median_to_first2_refine'])
-  apply simp 
+  apply simp_all [6] 
   apply(rule order.trans)
    apply(rule timerefine_mono2[OF _ move_median_to_first_correct])
        prefer 6
-  subgoal apply(simp add: SPEC_timerefine_eq_arh)
+  subgoal apply(simp add: SPEC_timerefine_conv)
     apply(rule SPEC_leq_SPEC_I) apply simp
     by(auto simp: move_median_to_first_cost_def move_median_to_first2_cost_def
             timerefineA_update_apply_same_cost' timerefineA_propagate add.assoc add.commute) 
@@ -259,10 +232,11 @@ definition "ungrd_qsp_next_h_spec T xs pi li0 hi \<equiv>
     SPEC (\<lambda>hi'. li0\<le>hi' \<and> hi'<hi \<and> (\<forall>i\<in>{hi'<..<hi}. xs!i\<^bold>>xs!pi) \<and> xs!hi'\<^bold>\<le>xs!pi) (\<lambda>hi'. T hi hi')
   }"
 
-
-lemma "\<lbrakk>\<exists>i\<in>{li0..<hi}. xs ! i \<^bold>\<le> xs!pi; (\<forall>i\<in>{xa'<..<hi}. xs ! pi \<^bold>< xs! i) \<rbrakk> \<Longrightarrow> li0 \<le> xa'" 
+text \<open>This is a major insight, limiting the resulting hi' of ungrd_qsp_next_h_spec
+      to not surpass the lower limit li0. Similar argument works for the lower pointer being
+      limited by hi0.\<close>
+lemma "\<lbrakk>\<exists>i\<in>{li0..<hi}. xs ! i \<^bold>\<le> xs!pi; (\<forall>i\<in>{hi'<..<hi}. xs ! pi \<^bold>< xs! i) \<rbrakk> \<Longrightarrow> li0 \<le> hi'" 
     by (meson atLeastLessThan_iff greaterThanLessThan_iff leI less_le_trans wo_leD)
-
   
   
 definition qsp_next_l :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> (nat, ecost) nrest" where            
@@ -271,41 +245,10 @@ definition qsp_next_l :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarr
       (\<lambda>li. doN {ASSERT (li\<noteq>pi); mop_cmp_idxs (cost ''cmp_idxs'' 1) xs li pi}) (\<lambda>li. SPECc2 ''add'' (+) li 1) li
   }"  
 
-
-lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
-  by auto
-
 definition uqnl_body 
   where "uqnl_body \<equiv> (cost ''if'' (1) + cost ''call'' 1
                                                             + cost ''cmp_idxs'' 1)"
 definition "ungrd_qsp_next_l_cost li li' = (enat(li'-li+1)) *m uqnl_body + cost ''add'' (enat(li'-li))"
-
-
-lemma costmult_add_distrib:
-  fixes a :: "'b::semiring"
-  shows "a *m (c + d) = a *m c + a *m d"
-  apply(cases c; cases d) by (auto simp: costmult_def plus_acost_alt ring_distribs)
-
-lemma costmult_minus_distrib2:
-  fixes a :: nat
-  shows "a *m c - a *m d = a *m (c - d)"
-  apply(cases c; cases d) by (auto simp: costmult_def plus_acost_alt diff_mult_distrib2)
-
-lemma costmult_minus_distrib:
-  fixes a :: nat
-  shows "a *m c - b *m c = (a-b) *m c"
-  apply(cases c) by (auto simp: costmult_def plus_acost_alt diff_mult_distrib)
-
-lemma costmult_cost:
-  fixes x :: "'b::comm_semiring_1"
-  shows "x *m (cost n y) = cost n (x*y)"
-  by(auto simp: costmult_def cost_def zero_acost_def)
-
-(*
-lemma fixes a :: enat
-  shows "b\<le>a \<Longrightarrow> a *m x - b *m x = (a-b) *m x"
-  apply(auto simp: costmult_def minus_acost_alt intro!: ext)
-  done *)
 
 lemma qsp_next_l_refine: "(qsp_next_l,PR_CONST (ungrd_qsp_next_l_spec ungrd_qsp_next_l_cost))\<in>Id\<rightarrow>Id\<rightarrow>Id\<rightarrow>Id\<rightarrow>\<langle>Id\<rangle>nrest_rel"
   unfolding qsp_next_l_def ungrd_qsp_next_l_spec_def ungrd_qsp_next_l_cost_def PR_CONST_def
@@ -391,7 +334,7 @@ definition uqnr_body
                                                            + cost ''sub'' 1 + cost ''cmp_idxs'' 1)"
 definition "ungrd_qsp_next_r_cost hi hi' =  (enat(hi-hi')) *m uqnr_body"
   
-lemma tt: "hi>0 \<Longrightarrow> {hi'<..hi - Suc 0} = {hi'<..<hi}" by auto
+lemma qsp_next_h_refine_aux1: "hi>0 \<Longrightarrow> {hi'<..hi - Suc 0} = {hi'<..<hi}" by auto
 
 lemma qsp_next_h_refine: "(qsp_next_h,PR_CONST (ungrd_qsp_next_h_spec ungrd_qsp_next_r_cost)) \<in> Id  \<rightarrow> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
   unfolding qsp_next_h_def ungrd_qsp_next_h_spec_def ungrd_qsp_next_r_cost_def PR_CONST_def 
@@ -445,7 +388,7 @@ lemma qsp_next_h_refine: "(qsp_next_h,PR_CONST (ungrd_qsp_next_h_spec ungrd_qsp_
         *) done
       subgoal
         apply (intro conjI) 
-        subgoal unfolding tt  by (meson atLeastLessThan_iff greaterThanLessThan_iff leI less_le_trans wo_leD)  
+        subgoal unfolding qsp_next_h_refine_aux1  by (meson atLeastLessThan_iff greaterThanLessThan_iff leI less_le_trans wo_leD)  
         subgoal using nat_le_Suc_less by blast
         subgoal by (simp add: nat_le_Suc_less_imp)
         subgoal using wo_leI by blast
@@ -498,7 +441,7 @@ definition "qs_partition li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<equiv> doN {
       \<and> (\<forall>i\<in>{hi<..<hi\<^sub>0}. xs!i \<^bold>\<ge> xs\<^sub>0!pi)
       \<and> xs!hi \<^bold>\<le> xs\<^sub>0!pi  
     )
-    (\<lambda>(xs,li,hi). SPECc2 ''lt'' (<) li hi) 
+    (\<lambda>(xs,li,hi). SPECc2 ''icmp_slt'' (<) li hi) 
     (\<lambda>(xs,li,hi). doN {
       ASSERT(li<hi \<and> li<length xs \<and> hi<length xs \<and> li\<noteq>hi);
       xs \<leftarrow> mop_list_swapN xs li hi;
@@ -512,59 +455,10 @@ definition "qs_partition li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<equiv> doN {
   RETURN (xs,li)
 }"  
 
-
-definition uqnlr_body 
-  where "uqnlr_body \<equiv> (cost ''list_swap'' 1 + cost ''add'' 1 + cost ''if'' 3 + cost ''call'' 3
-                         + cost ''sub'' 1 + cost ''cmp_idxs'' 2)"
-
 abbreviation "qs_body_cost \<equiv> (cost ''add'' (1::enat) + cost ''sub'' 1
-      + cost ''list_swap'' 1 + cost ''if'' 3 + cost ''call'' 3 + cost ''lt'' 1 + cost ''cmp_idxs'' 2)"
+      + cost ''list_swap'' 1 + cost ''if'' 3 + cost ''call'' 3 + cost ''icmp_slt'' 1 + cost ''cmp_idxs'' 2)"
 definition "qs_partition_cost xs\<^sub>0 li hi = (enat (hi-li)) *m qs_body_cost"
 
-lemma qs_partition_correct_aux1:
-  fixes hi'' :: nat
-  assumes "hi''\<ge>li''" and "hi'\<ge>li'"
-  shows "hi'' - li'' + hi' + li'' - (hi'' + li') \<le> hi' - li'"
-proof -
-  have "hi'' - li'' + hi' + li'' - (hi'' + li')
-        = hi' + (hi'' - li'' +  li'') - (hi'' + li')"
-    by auto
-  also have  "\<dots> = hi' + hi'' - (hi'' + li')"
-    using assms(1) by simp
-  also have "\<dots> = hi' - li'"
-    using assms(2) by simp
-  finally show ?thesis by simp    
-qed
-
-lemma pff:
-  assumes "hi''<hi'" "li'<li''"
-  shows "( (hi''::int) - li'') * 2 + hi' + li'' - (hi'' + li') \<le> (hi' - li') * 2"
-  using assms(1) assms(2) by auto
-
-lemma
-  assumes   "li'<li''"  "hi''<hi'" (* "li<li'" "hi'<hi" "li<hi" "li'<hi'" *)
-  shows "(1::int) + (hi'' - li'' + (hi'' - li + (hi + hi'))) - (hi'' + li') \<le> hi' + hi' + hi - (li' + li + li')"
-  using assms by simp
-
-lemma woaleack:
-  assumes A: "li'<li''" "li''<hi" and B: "hi''<hi'" "li<hi''" and C: "hi''<hi'" "li'<li''" "li'<hi'"
-  shows "(hi''::nat) - li'' + (hi'' - li) + (hi - li'') + (hi' - hi'') + (li'' - li') + 1 \<le> 0 + (hi' - li') + (hi' - li) + (hi - li')"
-proof -
-  have *: "((hi - li'') + (li'' - li')) = hi - li'"
-    using A by auto
-  have **: "(hi' - hi'') + (hi'' - li) = hi' - li"
-    using B by auto
-  have ***: "((hi'' - li'') + 1) \<le> (hi' - li')"
-    using C by auto    
-  have "hi'' - li'' + (hi'' - li) + (hi - li'') + (hi' - hi'') + (li'' - li') + 1 
-      = ((hi - li'') + (li'' - li')) + ((hi' - hi'') + (hi'' - li)) + ((hi'' - li'') + 1)"
-    by simp
-  also have "\<dots> = ((hi - li') + (hi' - li)) + ((hi'' - li'') + 1)" using * ** by simp
-  also have "\<dots> \<le> ((hi - li') + (hi' - li)) + (hi' - li')"
-    apply(rule add_left_mono) apply(subst ***) by simp 
-  also have "\<dots> = 0 + (hi' - li') + (hi' - li) + (hi - li')" by simp
-  finally show ?thesis .
-qed
  
 lemma qs_partition_correct:
   fixes xs\<^sub>0 :: "'a list"
@@ -577,7 +471,7 @@ lemma qs_partition_correct:
   apply(rule gwp_specifies_I)
 
   apply(subst monadic_WHILEIET_def[symmetric, where E="\<lambda>(xs::'a list,li'::nat,hi'::nat).
-             (hi-li') *m (uqnl_body+ cost ''add'' 1) + (hi'-li) *m uqnr_body + (hi'-li') *m (cost ''list_swap'' 1 + cost ''call'' 1 + cost ''lt'' 1 + cost ''if'' 1) "])
+             (hi-li') *m (uqnl_body+ cost ''add'' 1) + (hi'-li) *m uqnr_body + (hi'-li') *m (cost ''list_swap'' 1 + cost ''call'' 1 + cost ''icmp_slt'' 1 + cost ''if'' 1) "])
   apply (refine_vcg \<open>-\<close> rules: gwp_RETURNT_I gwp_monadic_WHILEIET if_rule split_ifI)  
  
   subgoal unfolding wfR2_def 
@@ -588,13 +482,11 @@ lemma qs_partition_correct:
   subgoal  for _ _ _ xs li' hi' li'' hi'' 
     apply(rule loop_body_conditionI)
     subgoal 
-      unfolding ungrd_qsp_next_l_cost_def ungrd_qsp_next_r_cost_def 
-            uqnlr_body_def uqnl_body_def uqnr_body_def
+      unfolding ungrd_qsp_next_l_cost_def ungrd_qsp_next_r_cost_def uqnl_body_def uqnr_body_def
       apply(simp add: costmult_add_distrib costmult_cost lift_acost_cost lift_acost_propagate)
       apply sc_solve  by auto   
     subgoal apply simp
-      unfolding ungrd_qsp_next_l_cost_def ungrd_qsp_next_r_cost_def 
-            uqnlr_body_def uqnl_body_def uqnr_body_def
+      unfolding ungrd_qsp_next_l_cost_def ungrd_qsp_next_r_cost_def uqnl_body_def uqnr_body_def
       apply(simp add: costmult_add_distrib costmult_cost lift_acost_cost lift_acost_propagate)
       apply sc_solve_debug
       apply safe
@@ -653,7 +545,7 @@ lemma qs_partition_correct:
       apply(subst lift_acost_diff_to_the_right) subgoal 
         by(simp add: cost_zero costmult_add_distrib costmult_cost lift_acost_cost lift_acost_propagate)
       unfolding ungrd_qsp_next_r_cost_def ungrd_qsp_next_l_cost_def
-      unfolding    uqnlr_body_def uqnl_body_def uqnr_body_def
+      unfolding uqnl_body_def uqnr_body_def
       apply simp
       unfolding qs_partition_cost_def
       apply(simp add: cost_zero costmult_add_distrib costmult_cost lift_acost_cost lift_acost_propagate)
@@ -732,13 +624,13 @@ lemma qs_partition_correct:
 definition "partition_pivot xs\<^sub>0 l h \<equiv> doN {
   ASSERT (l\<le>h \<and> h\<le>length xs\<^sub>0 \<and> h-l\<ge>4);
   hl \<leftarrow> SPECc2 ''sub'' (-) h l;
-  d \<leftarrow> SPECc2 ''div'' (div) hl 2;
+  d \<leftarrow> SPECc2 ''udiv'' (div) hl 2;
   m \<leftarrow> SPECc2 ''add'' (+) l d;
   l' \<leftarrow> SPECc2 ''add'' (+) l 1;
   h' \<leftarrow> SPECc2 ''sub'' (-) h 1;
   xs\<^sub>1 \<leftarrow> move_median_to_first l l' m h' xs\<^sub>0;
   ASSERT (l<length xs\<^sub>1 \<and> length xs\<^sub>1 = length xs\<^sub>0);
-  (xs,m) \<leftarrow> qs_partition l' h l xs\<^sub>1;
+  (xs,m) \<leftarrow> mop_call (qs_partition l' h l xs\<^sub>1);
 
   \<comment> \<open>TODO: Use an auxiliary lemma, instead of this assertion chain! \<close>
   ASSERT (l<m \<and> m<h);
@@ -762,27 +654,15 @@ lemma slice_LT_I_aux:
   done
   
 
-lemma (in -)
-  SPEC_timerefine_eq_arh:
-  "timerefine R (SPEC A B') = SPEC A (\<lambda>x. timerefineA R (B' x))"
-  apply(auto simp: SPEC_def)
-  unfolding timerefine_SPECT 
-  apply auto
-  unfolding timerefineF_def timerefineA_def
-  by auto
 
-lemma (in -) timerefineA_update_apply_same_cost': 
-  "timerefineA (F(n := y)) (cost n (t::enat)) = t *m y"
-  by (auto simp: costmult_def timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
+lemma partition_pivot_correct_aux1: "hi>0 \<Longrightarrow> {hi'..hi - Suc 0} = {hi'..<hi}" by auto
 
-
-lemma tt2: "hi>0 \<Longrightarrow> {hi'..hi - Suc 0} = {hi'..<hi}" by auto
 
 lemma partition_pivot_correct: "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> 
-  \<Longrightarrow> partition_pivot xs l h \<le> \<Down>Id (timerefine (TId(''partition'':=qs_body_cost + move_median_to_first_cost + cost ''sub'' 2 + cost ''add'' 2 + cost ''div'' 1)) (partition3_spec xs' l' h'))"
+  \<Longrightarrow> partition_pivot xs l h \<le> \<Down>Id (timerefine (TId(''partition'':=qs_body_cost + move_median_to_first_cost + cost ''sub'' 2 + cost ''call'' 2 + cost ''add'' 2 + cost ''udiv'' 1)) (partition3_spec xs' l' h'))"
   unfolding partition_pivot_def partition3_spec_def
   apply(intro ASSERT_D3_leI)
-  apply(subst SPEC_timerefine_eq_arh)
+  apply(subst SPEC_timerefine_conv)
   unfolding SPEC_def SPECc2_def
   apply simp
   apply(rule gwp_specifies_I)
@@ -798,7 +678,7 @@ lemma partition_pivot_correct: "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\
   subgoal by auto
   apply clarsimp
   subgoal by auto
-  subgoal by (metis le_less_trans less_imp_diff_less linorder_not_less tt2 zero_less_numeral)
+  subgoal by (metis le_less_trans less_imp_diff_less linorder_not_less partition_pivot_correct_aux1 zero_less_numeral)
   subgoal apply auto
     unfolding move_median_to_first_cost_def qs_partition_cost_def
       apply(auto simp: timerefineA_update_apply_same_cost' costmult_add_distrib costmult_cost lift_acost_cost lift_acost_propagate) 
@@ -837,31 +717,134 @@ lemma partition_pivot_correct: "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\
 end  
   
 context sort_impl_context begin
+
+
   
-sepref_register ungrd_qsp_next_l_spec ungrd_qsp_next_h_spec 
+definition qsp_next_l2 :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> (nat, ecost) nrest" where            
+  "qsp_next_l2 xs pi li hi \<equiv> doN {
+    monadic_WHILEIT (\<lambda>li'. (\<exists>i\<in>{li'..<hi}. xs!i\<^bold>\<ge>xs!pi) \<and> li\<le>li' \<and> (\<forall>i\<in>{li..<li'}. xs!i\<^bold><xs!pi)) 
+      (\<lambda>li. doN {ASSERT (li\<noteq>pi); cmp_idxs2' xs li pi}) (\<lambda>li. SPECc2 ''add'' (+) li 1) li
+  }"  
+ 
+
+definition qsp_next_h2 :: "'a list \<Rightarrow> nat  \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> (nat, ecost) nrest" where
+  "qsp_next_h2 xs pi li0 hi \<equiv> doN {
+    ASSERT (hi>0);
+    hi \<leftarrow> SPECc2 ''sub'' (-) hi 1;
+    ASSERT (hi<length xs);
+    monadic_WHILEIT (\<lambda>hi'. hi'\<le>hi \<and> (\<exists>i\<le>hi'. xs!i\<^bold>\<le>xs!pi) \<and> (\<forall>i\<in>{hi'<..hi}. xs!i\<^bold>>xs!pi))
+      (\<lambda>hi. doN {ASSERT(pi\<noteq>hi); cmp_idxs2' xs pi hi})
+      (\<lambda>hi. doN { ASSERT(hi>0); SPECc2 ''sub'' (-) hi 1}) hi
+  }"  
+
+sepref_register ungrd_qsp_next_l_spec ungrd_qsp_next_h_spec  qsp_next_h2 qsp_next_l2
 
 (* TODO: We can get rid of the length xs restriction: the stopper element will always lie within <h, which is size_t representable! *)
-sepref_definition qsp_next_l_impl [llvm_inline] is "uncurry3 (qsp_next_l)" :: "(arr_assn)\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
-  unfolding qsp_next_l_def PR_CONST_def
+sepref_definition qsp_next_l_impl [llvm_inline] is "uncurry3 (PR_CONST qsp_next_l2)" :: "(arr_assn)\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
+  unfolding qsp_next_l2_def PR_CONST_def                            
+  apply (annot_snat_const "TYPE(size_t)")
+  apply sepref 
+  done
+
+declare  qsp_next_l_impl.refine[sepref_fr_rules]
+ 
+(* TODO: lemmas [sepref_fr_rules] = qsp_next_l_impl.refine[FCOMP qsp_next_l_refine]  *)
+  
+sepref_definition qsp_next_h_impl [llvm_inline] is "uncurry3 (PR_CONST qsp_next_h2)" :: "(arr_assn)\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
+  unfolding qsp_next_h2_def PR_CONST_def
   apply (annot_snat_const "TYPE(size_t)")
   by sepref
 
-lemmas [sepref_fr_rules] = qsp_next_l_impl.refine[FCOMP qsp_next_l_refine]  
+declare qsp_next_h_impl.refine[sepref_fr_rules]
   
-sepref_definition qsp_next_h_impl [llvm_inline] is "uncurry2 (qsp_next_h)" :: "(arr_assn)\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
-  unfolding qsp_next_h_def PR_CONST_def
+(* TODO: lemmas [sepref_fr_rules] = qsp_next_h_impl.refine[FCOMP qsp_next_h_refine]  *)
+  
+
+lemma qsp_next_l2_refines:
+  "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (pi,pi')\<in>Id \<Longrightarrow> (li\<^sub>0,li\<^sub>0')\<in>Id \<Longrightarrow> (hi\<^sub>0,hi\<^sub>0')\<in>Id
+     \<Longrightarrow> qsp_next_l2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0 \<le> \<Down> Id (timerefine E_mmtf (ungrd_qsp_next_l_spec ungrd_qsp_next_l_cost xs\<^sub>0' pi' li\<^sub>0' hi\<^sub>0'))"
+  apply(rule order.trans)
+   defer
+  apply(rule nrest_Rel_mono)  apply(rule timerefine_mono2)
+  subgoal by simp
+  apply(rule qsp_next_l_refine[to_foparam, THEN nrest_relD, simplified])
+  apply simp_all [4]
+  unfolding qsp_next_l2_def qsp_next_l_def
+  apply(refine_rcg SPECc2_refine cmp_idxs2'_refines_mop_cmp_idxs_with_E')
+  supply conc_Id[simp del]
+  by (auto intro: struct_preservingI simp: cost_n_leq_TId_n)
+
+lemma qsp_next_h2_refines:
+  "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (pi,pi')\<in>Id \<Longrightarrow> (li\<^sub>0,li\<^sub>0')\<in>Id \<Longrightarrow> (hi\<^sub>0,hi\<^sub>0')\<in>Id
+     \<Longrightarrow> qsp_next_h2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0 \<le> \<Down> Id (timerefine E_mmtf (ungrd_qsp_next_h_spec ungrd_qsp_next_r_cost xs\<^sub>0' pi' li\<^sub>0' hi\<^sub>0'))"
+  apply(rule order.trans)
+   defer
+  apply(rule nrest_Rel_mono)  apply(rule timerefine_mono2)
+  subgoal by simp
+  apply(rule qsp_next_h_refine[to_foparam, THEN nrest_relD, simplified])
+  apply simp_all [4]
+  unfolding qsp_next_h2_def qsp_next_h_def
+  apply(refine_rcg bindT_refine_easy SPECc2_refine cmp_idxs2'_refines_mop_cmp_idxs_with_E')
+  apply refine_dref_type
+  supply conc_Id[simp del]
+  by (auto intro: struct_preservingI simp: cost_n_leq_TId_n)
+
+definition "qs_partition2 li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<equiv> doN {
+  ASSERT (pi < li\<^sub>0 \<and> li\<^sub>0<hi\<^sub>0 \<and> hi\<^sub>0\<le>length xs\<^sub>0);
+  
+  \<comment> \<open>Initialize\<close>
+  li \<leftarrow> qsp_next_l2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0;
+  hi \<leftarrow> qsp_next_h2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0;
+  
+  ASSERT (li\<^sub>0\<le>hi);
+  
+  (xs,li,hi) \<leftarrow> monadic_WHILEIT 
+    (\<lambda>(xs,li,hi). 
+        li\<^sub>0\<le>li \<and> hi<hi\<^sub>0
+      \<and> li<hi\<^sub>0 \<and> hi\<ge>li\<^sub>0  
+      \<and> slice_eq_mset li\<^sub>0 hi\<^sub>0 xs xs\<^sub>0
+      \<and> xs!pi = xs\<^sub>0!pi
+      \<and> (\<forall>i\<in>{li\<^sub>0..<li}. xs!i \<^bold>\<le> xs\<^sub>0!pi)
+      \<and> xs!li \<^bold>\<ge> xs\<^sub>0!pi
+      \<and> (\<forall>i\<in>{hi<..<hi\<^sub>0}. xs!i \<^bold>\<ge> xs\<^sub>0!pi)
+      \<and> xs!hi \<^bold>\<le> xs\<^sub>0!pi  
+    )
+    (\<lambda>(xs,li,hi). SPECc2 ''icmp_slt'' (<) li hi) 
+    (\<lambda>(xs,li,hi). doN {
+      ASSERT(li<hi \<and> li<length xs \<and> hi<length xs \<and> li\<noteq>hi);
+      xs \<leftarrow> myswap xs li hi;
+      li \<leftarrow> SPECc2 ''add'' (+) li 1;
+      li \<leftarrow> qsp_next_l2 xs pi li hi\<^sub>0;
+      hi \<leftarrow> qsp_next_h2 xs pi li\<^sub>0 hi;
+      RETURN (xs,li,hi)
+    }) 
+    (xs\<^sub>0,li,hi);
+  
+  RETURN (xs,li)
+}"   
+lemma qs_partition2_refines:
+  "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (pi,pi')\<in>Id \<Longrightarrow> (li\<^sub>0,li\<^sub>0')\<in>Id \<Longrightarrow> (hi\<^sub>0,hi\<^sub>0')\<in>Id
+   \<Longrightarrow> qs_partition2 li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<le> \<Down> Id (timerefine E_mmtf (qs_partition li\<^sub>0' hi\<^sub>0' pi' xs\<^sub>0'))"
+  unfolding qs_partition2_def qs_partition_def
+  supply qsp_next_l2_refines[refine]
+  supply qsp_next_h2_refines[refine]
+  apply(refine_rcg bindT_refine_easy SPECc2_refine myswap_refine')
+  apply refine_dref_type
+
+  supply conc_Id[simp del]
+  apply (auto simp: cost_n_leq_TId_n intro: struct_preservingI) 
+   
+  done
+
+
+sepref_register qs_partition2 
+sepref_def qs_partition_impl (*[llvm_inline]*) is "uncurry3 (PR_CONST qs_partition2)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (arr_assn)\<^sup>d \<rightarrow>\<^sub>a arr_assn \<times>\<^sub>a size_assn"
+  unfolding qs_partition2_def myswap_def PR_CONST_def
   apply (annot_snat_const "TYPE(size_t)")
-  by sepref
-  
-lemmas [sepref_fr_rules] = qsp_next_h_impl.refine[FCOMP qsp_next_h_refine]  
-  
-                        
-sepref_register qs_partition  
-sepref_def qs_partition_impl (*[llvm_inline]*) is "uncurry3 (PR_CONST qs_partition)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (arr_assn)\<^sup>d \<rightarrow>\<^sub>a arr_assn \<times>\<^sub>a size_assn"
-  unfolding qs_partition_def PR_CONST_def
-  apply (annot_snat_const "TYPE(size_t)")
-  supply [dest] = slice_eq_mset_eq_length
-  by sepref
+  supply [dest] = slice_eq_mset_eq_length 
+  apply sepref 
+  done
+
 
 (*sepref_register qs_partitionXXX  
 sepref_def qs_partitionXXX_impl (*[llvm_inline]*) is "uncurry3 (PR_CONST qs_partitionXXX)" :: "[\<lambda>(((l,h),p),xs). length xs < max_snat LENGTH(size_t)]\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (arr_assn)\<^sup>d \<rightarrow> arr_assn \<times>\<^sub>a size_assn"
@@ -871,13 +854,90 @@ sepref_def qs_partitionXXX_impl (*[llvm_inline]*) is "uncurry3 (PR_CONST qs_part
   by sepref
 *)  
 
-sepref_register partition_pivot  
-sepref_def partition_pivot_impl [llvm_inline] is "uncurry2 (PR_CONST partition_pivot)" :: "arr_assn\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn \<times>\<^sub>a size_assn"
-  unfolding partition_pivot_def PR_CONST_def    
-  apply (annot_snat_const "TYPE(size_t)")
-  by sepref
 
+definition "partition_pivot2 xs\<^sub>0 l h \<equiv> doN {
+  ASSERT (l\<le>h \<and> h\<le>length xs\<^sub>0 \<and> h-l\<ge>4);
+  hl \<leftarrow> SPECc2 ''sub'' (-) h l;
+  d \<leftarrow> SPECc2 ''udiv'' (div) hl 2;
+  m \<leftarrow> SPECc2 ''add'' (+) l d;
+  l' \<leftarrow> SPECc2 ''add'' (+) l 1;
+  h' \<leftarrow> SPECc2 ''sub'' (-) h 1;
+  xs\<^sub>1 \<leftarrow> move_median_to_first2 l l' m h' xs\<^sub>0;
+  ASSERT (l<length xs\<^sub>1 \<and> length xs\<^sub>1 = length xs\<^sub>0);
+  (xs,m) \<leftarrow> mop_call (qs_partition2 l' h l xs\<^sub>1);
+
+  \<comment> \<open>TODO: Use an auxiliary lemma, instead of this assertion chain! \<close>
+  ASSERT (l<m \<and> m<h);
+  ASSERT ((\<forall>i\<in>{l+1..<m}. xs!i\<^bold>\<le>xs\<^sub>1!l) \<and> xs!l\<^bold>\<le>xs\<^sub>1!l);
+  ASSERT (\<forall>i\<in>{l..<m}. xs!i\<^bold>\<le>xs\<^sub>1!l);
+  ASSERT (\<forall>i\<in>{m..<h}. xs\<^sub>1!l\<^bold>\<le>xs!i);
   
+  
+  RETURN (xs,m)
+}"
+
+lemma partition_pivot2_refines:
+  "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
+    \<Longrightarrow> partition_pivot2 xs\<^sub>0 l h \<le> \<Down> Id (timerefine E_mmtf (partition_pivot xs\<^sub>0' l' h'))"
+  unfolding partition_pivot2_def partition_pivot_def
+  supply move_median_to_first2_refine'[refine]
+  supply qs_partition2_refines[refine]
+  supply mop_call_refine[refine]
+  apply(refine_rcg bindT_refine_easy SPECc2_refine myswap_refine')
+  apply refine_dref_type
+
+  supply conc_Id[simp del]
+  apply (auto simp: cost_n_leq_TId_n intro: struct_preservingI)
+  done
+  
+
+sepref_register partition_pivot2  
+sepref_def partition_pivot_impl [llvm_inline] is "uncurry2 (PR_CONST partition_pivot2)" :: "arr_assn\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn \<times>\<^sub>a size_assn"
+  unfolding partition_pivot2_def PR_CONST_def    
+  apply (annot_snat_const "TYPE(size_t)")
+  apply sepref_dbg_preproc
+     apply sepref_dbg_cons_init
+    apply sepref_dbg_id  
+  apply sepref_dbg_monadify
+  apply sepref_dbg_opt_init
+      apply sepref_dbg_trans_keep
+
+  apply sepref_dbg_opt
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_constraints 
+  done
+
+
+
+text \<open>A way to synthesize the final Timerefinement Relation, without ever touching the constants.\<close>
+
+schematic_goal partition_pivot2_correct: "(xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id        
+   \<Longrightarrow> partition_pivot2 xs l h \<le> \<Down> Id (timerefine ?E (partition3_spec xs' l' h'))"
+  apply(rule order.trans)
+   apply(rule partition_pivot2_refines)
+     apply simp_all [3]
+  apply simp 
+  apply(rule order.trans)
+   apply(rule timerefine_mono2)
+    apply simp
+   apply(rule partition_pivot_correct[simplified])
+     apply simp_all [3]
+  apply(subst timerefine_iter2) 
+    apply auto [2]  
+  unfolding move_median_to_first_cost_def
+  apply(simp only: pp_fun_upd pp_TId_absorbs_right timerefineA_propagate[OF wfR''E_mmtf]) 
+  apply (simp add:  cmp_idxs2'_cost_def myswap_cost_def
+        lift_acost_cost lift_acost_propagate timerefineA_update_cost add.assoc
+         timerefineA_update_apply_same_cost' costmult_add_distrib costmult_cost)
+  apply(simp add: add.commute add.left_commute ) 
+  apply(simp add: cost_same_curr_left_add plus_enat_simps times_enat_simps numeral_eq_enat)
+  apply auto done
+
+concrete_definition partition_pivot2_TR is partition_pivot2_correct uses "_ \<le> \<Down> Id (timerefine \<hole> _) "
+
+print_theorems
+thm partition_pivot2_TR_def
 
 end
 

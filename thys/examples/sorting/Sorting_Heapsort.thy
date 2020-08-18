@@ -12,6 +12,11 @@ section "stuff to move"
 
 (* TODO : Move *)
 
+lemma preserves_curr_other_updI:
+  "preserves_curr R m \<Longrightarrow> n\<noteq>m \<Longrightarrow> preserves_curr (R(n:=t)) m"
+  by(auto simp: preserves_curr_def)
+
+
 method_setup all_par =
  \<open>Method.text_closure >> (fn m => fn ctxt => fn facts =>
    let
@@ -2242,14 +2247,13 @@ lemma  mop_seth3_refine:
         apply (auto  simp: pr timerefineA_cost timerefineA_cost_apply lift_acost_propagate lift_acost_cost timerefineA_propagate)
   by(auto simp: preserves_curr_def ) 
 
-lemma preserves_curr_other_updI:
-  "preserves_curr R m \<Longrightarrow> n\<noteq>m \<Longrightarrow> preserves_curr (R(n:=t)) m"
-  by(auto simp: preserves_curr_def)
 
 definition aa :: ecost where "aa = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost)))"
+
 definition bb :: ecost where "bb = lift_acost mop_array_nth_cost + (cost lt_curr_name 1 + lift_acost mop_array_upd_cost)"
-definition cc :: ecost where "cc = lift_acost mop_array_nth_cost + lift_acost mop_array_nth_cost + lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost "
-abbreviation "E \<equiv> TId(''cmpo_idxs'':=aa,''cmpo_v_idxs'':=bb, ''list_swap'':= cc)"
+
+abbreviation "E \<equiv> TId(''cmpo_idxs'':=aa,''cmpo_v_idxs'':=bb, ''list_swap'':= myswap_cost)"
+
 lemma wfR''E[simp]: " wfR'' E" by (auto intro!: wfR''_upd)
 
 lemma preserves_curr_TId[simp]: "preserves_curr TId n"
@@ -2448,12 +2452,10 @@ lemma heapify_btu3_refine: "heapify_btu3 l h xs\<^sub>0 \<le> \<Down> Id (timere
 
 
 lemma myswap_refine':
-  shows 
    "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
        \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E (mop_list_swapN xs' l' h'))"
   apply(rule myswap_refine)
-  apply (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
-  by(simp add: add.assoc  cc_def)
+  by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
 
 lemma heapsort3_refine:
   fixes xs\<^sub>0 :: "'a list" 
