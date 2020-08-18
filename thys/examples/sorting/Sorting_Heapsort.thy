@@ -1300,11 +1300,11 @@ definition E_sd3_l :: "_ \<Rightarrow> _ \<Rightarrow> (char list, nat) acost" w
   "E_sd3_l i ctd \<equiv> 
       (let p=(if ctd then 1+i else i) in
             cost ''add'' (4*p) +
-            ( (acostC (\<lambda>x. the_acost mop_array_nth_cost x * p))) +
-           ( ( (acostC (\<lambda>x. the_acost mop_array_upd_cost x * p))) +
+            ( p *m mop_array_nth_cost) +
+           ( p *m mop_array_upd_cost ) +
             (cost ''if'' p + (cost ''cmpo_idxs'' p + (cost ''if'' p + (cost ''cmpo_v_idxs'' p
            + (cost_rchild p + (cost_lchild (2*p) + (cost ''call'' p + (cost_has_rchild (2*p)
-             + cost ''and'' p + cost ''if'' p))))))))))"
+             + cost ''and'' p + cost ''if'' p)))))))))"
 
 definition sift_down3_cost :: "_ \<Rightarrow> ecost" where
   "sift_down3_cost i =
@@ -1318,14 +1318,147 @@ definition sift_down3_cost :: "_ \<Rightarrow> ecost" where
       + lift_acost mop_array_upd_cost + lift_acost mop_array_nth_cost
       + cost ''call'' 1"
 
+term Discrete.log
+
+lemma "l<h \<Longrightarrow> i' < h - l \<Longrightarrow> Suc (Discrete.log (h - Suc (Suc (l + i' * 2)))) \<le> Discrete.log (h - (l + i'))"
+    try
+    sorry
+
+lemma 
+  assumes "i' < h - l"
+    "i' < (h - l - 1) div 2"
+    "2 * i' + 1 < h"
+    "2 * i' + 2 < h"
+    "l + (i' * 2 + 1) < h \<and> l + (i' * 2 + 2) < h"
+    "l + (i' * 2 + 1) \<noteq> l + (i' * 2 + 2)"
+    "l + (i' * 2 + 2) \<le> h"
+    "l + i' \<le> h" 
+  shows 
+"l<h \<Longrightarrow> i' < h - l \<Longrightarrow> Suc (Discrete.log ( h - Suc ( (l + i' * 2)))) \<le> Discrete.log ( h - (l + i'))"
+proof -
+  have "h - Suc ( (l + i' * 2)) > 0" sorry 
+  then
+  have "Suc (Discrete.log ( h - Suc ( (l + i' * 2))))
+        = (Discrete.log ( 2 * (h - Suc ( (l + i' * 2)))))" 
+    by simp
+  also have "\<dots> = (Discrete.log ( 2 * h - (2*l + i' * 4+2)))"
+    apply(rule arg_cong[where f="Discrete.log"]) by auto 
+  also have "\<dots> \<le>  Discrete.log ( h - (l + i'))"
+  proof -
+    have "2 * h - (2*l + i' * 4+2) \<le> h - (l + i')"
+      apply auto
+      sorry
+    then show ?thesis by(rule log_mono[THEN monoD])
+  qed
+  finally show ?thesis .
+qed
+
+lemma "Suc (Discrete.log (6 - Suc (Suc (0 + 0 * 2)))) = f" apply (simp add: log.simps) oops
+lemma "Suc (Discrete.log (6 - 0)) = f" apply (simp add: log.simps) oops
+lemma "Discrete.log 8 = f" apply (simp add: log.simps) oops
 
 
-lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (\<lambda>_. True) (%_. sift_down3_cost (h-i)))"
+lemma E_sd3_l_True_mono: "x\<le>y \<Longrightarrow> E_sd3_l x True \<le> E_sd3_l y True"
+  sorry
+lemma E_sd3_l_dontknow_mono: "x\<le>y \<Longrightarrow> lift_acost (E_sd3_l x t) \<le> lift_acost (E_sd3_l y True)"
+  unfolding E_sd3_l_def
+  apply(cases t) 
+  unfolding Let_def
+   apply (auto simp: the_acost_propagate costmult_add_distrib costmult_cost)
+  subgoal apply sc_solve apply safe by auto
+  subgoal apply sc_solve apply safe by auto
+  done
+ 
+lemma lift_acost_leq_conv: "lift_acost x \<le> lift_acost y \<longleftrightarrow> x \<le> y"
+  by(auto simp: less_eq_acost_def lift_acost_def)
+
+
+
+lemma log_odd: "Discrete.log (Suc (2*(Suc x))) = Discrete.log (2*(Suc x))" 
+  by (metis dvd_triv_left even_Suc_div_two le_Suc_eq le_add1 log_rec mult_Suc_right)  
+
+lemma BBB:
+  assumes "Suc (Suc (i' * 2)) \<le> s "
+  shows "Suc (Discrete.log (s) - Discrete.log (Suc (Suc ( (i' * 2)))))
+     = Discrete.log (s) - Discrete.log (Suc i')"
+proof -
+  have ***: "Discrete.log (Suc (Suc (i' * 2))) 
+        = Suc (Discrete.log (Suc i'))"
+    by (metis One_nat_def add_Suc log_twice mult.commute mult_Suc_right nat.simps(3) numeral_2_eq_2 plus_1_eq_Suc)
+
+  have **: "Suc i' < s" 
+    using assms by auto
+  then have "Suc i' \<le> s" by auto
+  then have **: "Discrete.log (Suc i') \<le> Discrete.log s"
+    by(rule log_mono[THEN monoD]) 
+
+  from log_mono[THEN monoD, OF assms]
+  have **: "Suc (Discrete.log (Suc i')) \<le> Discrete.log s"
+    unfolding *** by simp
+
+  have "Suc (Discrete.log (s) - Discrete.log (Suc (Suc ( (i' * 2)))))
+      = Suc (Discrete.log (s) - Suc (Discrete.log (Suc i')))"
+    unfolding *** by simp
+  also have "...   =  (Discrete.log (s) -  (Discrete.log (Suc i')))"
+    using ** by auto 
+  finally show ?thesis by simp
+qed
+
+lemma BBB':
+  assumes \<open>Suc (Suc (l + i' * 2)) < h\<close>
+  shows "Suc (Discrete.log (h-l) - Discrete.log (Suc (Suc ( (i' * 2)))))
+     = Discrete.log (h-l) - Discrete.log (Suc i')"
+  apply(rule BBB)
+  using assms by auto
+
+lemma AAA:
+  assumes "Suc (Suc (i' * 2)) \<le> s "
+  shows "Suc (Discrete.log (s) - Discrete.log (Suc (Suc (Suc (i' * 2)))))
+     = Discrete.log (s) - Discrete.log (Suc i')"
+proof -
+  have ***: "Discrete.log (Suc (Suc (i' * 2))) 
+        = Suc (Discrete.log (Suc i'))"
+    by (metis One_nat_def add_Suc log_twice mult.commute mult_Suc_right nat.simps(3) numeral_2_eq_2 plus_1_eq_Suc)
+
+  have *: "Discrete.log (Suc (Suc (Suc (i' * 2)))) 
+        = Suc (Discrete.log (Suc i'))"
+    apply(subst log_twice[symmetric]) apply simp
+    apply(subst log_odd[symmetric]) by (simp add: mult.commute)
+     
+     (* by (metis One_nat_def add_Suc log_twice mult.commute mult_Suc_right nat.simps(3) numeral_2_eq_2 plus_1_eq_Suc)
+ *)
+  have **: "Suc i' < s" 
+    using assms by auto
+  then have "Suc i' \<le> s" by auto
+  then have **: "Discrete.log (Suc i') \<le> Discrete.log s"
+    by(rule log_mono[THEN monoD]) 
+
+  from log_mono[THEN monoD, OF assms]
+  have **: "Suc (Discrete.log (Suc i')) \<le> Discrete.log s"
+    unfolding *** by simp
+
+  have "Suc (Discrete.log (s) - Discrete.log (Suc (Suc (Suc (i' * 2)))))
+      = Suc (Discrete.log (s) - Suc (Discrete.log (Suc i')))"
+    unfolding * by simp
+  also have "...   =  (Discrete.log (s) -  (Discrete.log (Suc i')))"
+    using ** by auto 
+  finally show ?thesis by simp
+qed
+
+lemma AAA':
+  assumes \<open>l + (i' * 2 + 2) \<le> h\<close>
+  shows "Suc (Discrete.log (h-l) - Discrete.log (Suc (Suc (Suc (i' * 2)))))
+     = Discrete.log (h-l) - Discrete.log (Suc i')"
+  apply(rule AAA)
+  using assms by auto
+
+
+lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (\<lambda>_. True) (%_. sift_down3_cost (Discrete.log (h-l))))"
   unfolding sift_down3_def SPEC_def
     apply(rule gwpn_specifies_I)
 
 
-  apply(subst monadic_WHILEIET_def[symmetric, where E="\<lambda>(_,i,ctd). E_sd3_l ((h-l)-i) ctd"])
+  apply(subst monadic_WHILEIET_def[symmetric, where E="\<lambda>(_,i,ctd). E_sd3_l (Discrete.log (h-l) - Discrete.log (Suc i)) ctd"])
                          
   unfolding Let_def mop_to_eo_conv_def mop_geth3_def mop_eo_extract_def
   unfolding mop_has_rchild3_def mop_lchild3_def mop_rchild3_def 
@@ -1336,7 +1469,7 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
                       gwpn_consume gwpn_RETURNT_I gwpn_SPECT_I 
                       prod3 if_rule2 if_rule) 
   apply(rule gwpn_monadic_WHILEIET)
-  subgoal unfolding wfR2_def E_sd3_l_def zero_acost_def cost_def Let_def by auto
+  subgoal unfolding wfR2_def E_sd3_l_def zero_acost_def cost_def Let_def costmult_def by auto
   subgoal for e xs s
     apply(refine_vcg \<open>-\<close> rules: gwpn_bindT_I gwpn_consume gwpn_RETURNT_I gwpn_SPECT_I if_rule gwpn_ASSERT_I gwpn_MIf_I)
         prefer 5
@@ -1349,18 +1482,25 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         apply clarsimp
         apply(simp add: add.assoc lift_acost_zero lift_acost_diff_to_the_front lift_acost_diff_to_the_right lift_acost_diff_to_the_right_Some)
         apply(simp only: add.commute add.left_commute)
-        apply(rule add_left_mono) 
+        apply(rule add_mono) 
+        subgoal premises prems apply (rule lift_acost_mono) apply(rule E_sd3_l_True_mono) by simp
         subgoal premises prems
           apply sc_solve_debug apply safe   by (all \<open>(auto simp: one_enat_def numeral_eq_enat sc_solve_debug_def;fail)?\<close>)
         done
       subgoal by simp
-      subgoal
+      subgoal premises p1
         unfolding Let_def   sift_down3_cost_def
         apply clarsimp
         apply(simp add: add.assoc the_acost_costs_distrib lift_acost_zero lift_acost_diff_to_the_front lift_acost_diff_to_the_right lift_acost_diff_to_the_right_Some)
-        apply(simp only: add.commute add.left_commute)
-        apply(rule add_left_mono) 
+        
+        apply(subst lift_acost_diff_to_the_right) 
+        subgoal apply(rule E_sd3_l_dontknow_mono[unfolded lift_acost_leq_conv]) apply(rule diff_le_mono2)
+            apply(rule log_mono[THEN monoD]) using p1(5) by simp
         subgoal premises prems
+          apply(simp only: add.commute add.left_commute)
+          apply(simp add: add.assoc)
+          apply(rule add_mono)
+          subgoal apply (rule lift_acost_mono) apply(rule E_sd3_l_True_mono) by simp  
           apply sc_solve by auto
         done
       subgoal by simp
@@ -1368,7 +1508,8 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         unfolding Let_def   sift_down3_cost_def
         apply(simp add: add.assoc lift_acost_zero lift_acost_diff_to_the_front lift_acost_diff_to_the_right lift_acost_diff_to_the_right_Some)
         apply(simp only: add.commute add.left_commute)
-        apply(rule add_left_mono) 
+        apply(rule add_mono)
+        subgoal apply (rule lift_acost_mono) apply(rule E_sd3_l_True_mono) by simp
         apply sc_solve by auto
       subgoal by simp
       done 
@@ -1378,16 +1519,23 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         subgoal premises prems
         unfolding E_sd3_l_def Let_def
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
+        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc costmult_add_distrib costmult_cost)
           apply sc_solve
-          apply safe by (auto simp: one_enat_def numeral_eq_enat) 
+        apply safe  
+                    apply (auto simp only: one_enat_def numeral_eq_enat plus_enat_simps zero_enat_def lift_ord)
+        apply auto
+         apply(all \<open>intro log_mono[THEN monoD] diff_le_mono2 add_mono; auto\<close>)
         done
-      subgoal (* diff pays *)
-        apply simp apply safe
+      done
+      subgoal premises prems (* diff pays *)
+        apply simp
         unfolding E_sd3_l_def Let_def
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
-          apply sc_solve_debug apply safe   by (all \<open>(auto simp: one_enat_def numeral_eq_enat sc_solve_debug_def;fail)?\<close>)
+        apply(simp add: the_acost_propagate costmult_add_distrib costmult_cost acostC_the_acost_cost add.assoc)
+        apply sc_solve_debug apply safe 
+                    apply(auto simp: sc_solve_debug_def one_enat_def numeral_eq_enat )
+        by(auto simp: AAA'[OF \<open>l + (i' * 2 + 2) \<le> h\<close>, symmetric])    
+         
       subgoal 
         apply simp done
       done
@@ -1397,15 +1545,16 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         subgoal premises prems
         unfolding E_sd3_l_def Let_def
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
-          apply sc_solve apply safe apply (auto simp: numeral_eq_enat one_enat_def) done  
+        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc  costmult_add_distrib costmult_cost)
+        apply sc_solve
+        apply safe apply (auto simp: numeral_eq_enat one_enat_def) done  
         done
       subgoal (* diff pays *)
         apply simp apply safe
         subgoal premises prems
         unfolding E_sd3_l_def Let_def 
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
+        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc costmult_add_distrib costmult_cost)
         apply sc_solve 
           apply safe by (auto simp: numeral_eq_enat one_enat_def) 
         done
@@ -1418,17 +1567,22 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         unfolding E_sd3_l_def Let_def
         subgoal premises prems
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
-         apply sc_solve apply safe apply (auto simp: numeral_eq_enat one_enat_def) done
+        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc costmult_add_distrib costmult_cost)
+          apply sc_solve apply safe apply (auto simp: numeral_eq_enat one_enat_def)
+           
+         apply(all \<open>intro log_mono[THEN monoD] diff_le_mono2 add_mono; auto\<close>)
+          done
         done
       subgoal (* diff pays *)
         apply simp apply safe
         unfolding E_sd3_l_def Let_def
         subgoal premises prems
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)        
+        apply(simp add: the_acost_propagate lift_acost_propagate lift_acost_cost acostC_the_acost_cost add.assoc costmult_add_distrib costmult_cost)        
         apply sc_solve 
-          apply safe using prems by (auto simp: one_enat_def) 
+          apply safe  apply (auto simp: one_enat_def numeral_eq_enat) 
+
+          by(auto simp: BBB'[OF \<open>Suc (Suc (l + i' * 2)) < h\<close>, symmetric])    
         done
       subgoal 
         by auto
@@ -1439,7 +1593,7 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         unfolding E_sd3_l_def Let_def
         subgoal premises prems
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-          apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc) 
+          apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc costmult_add_distrib costmult_cost) 
           apply sc_solve apply safe apply (auto simp: one_enat_def) done 
         done
       subgoal (* diff pays *)
@@ -1447,7 +1601,7 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         unfolding E_sd3_l_def Let_def
         subgoal premises prems
         apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
-        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
+        apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc costmult_add_distrib costmult_cost)
         apply sc_solve 
           apply safe by (auto simp: one_enat_def) 
         done
@@ -1459,11 +1613,11 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
   done
 
 thm separate_correct_and_time
- 
+
 
 lemma sift_down_btu_correct':
   assumes "heapify_btu_invar xs\<^sub>0 l' xs" "l<l'"
-  shows "sift_down3 (l'-Suc 0) xs \<le> SPEC (\<lambda>xs'. heapify_btu_invar xs\<^sub>0 (l'-Suc 0) xs') (%_. sift_down3_cost (h-(l' - Suc 0)))"
+  shows "sift_down3 (l'-Suc 0) xs \<le> SPEC (\<lambda>xs'. heapify_btu_invar xs\<^sub>0 (l'-Suc 0) xs') (%_. sift_down3_cost (Discrete.log (h-l)))"
   apply(rule separate_correct_and_time)
   subgoal 
     apply(rule order.trans) 
@@ -1472,9 +1626,8 @@ lemma sift_down_btu_correct':
      apply(rule sift_down2_refine)  apply (simp add: timerefine_id)
     apply(rule order.trans)
      apply(rule sift_down1_refine_functional_aux)  apply (simp add: timerefine_id)
-    apply(rule  sift_down_btu_correct) using assms by auto
+    apply(rule  sift_down_btu_correct) using assms by auto 
   by (rule sift_down3_refine_time)
- 
 
 definition "sift_down3_t1 i\<^sub>0 xs = sup (sift_down3 i\<^sub>0 xs) (SPEC (\<lambda>_. True) (%_. cost ''sift_down'' 1))"
 
@@ -1490,10 +1643,10 @@ definition sift_down_restore
 
 
 
-definition Rsd where "Rsd i = TId(''sift_down'':=sift_down3_cost i)"
+definition Rsd where "Rsd i = TId(''sift_down'':=sift_down3_cost (Discrete.log i))"
 
 lemma sift_down3_refines_heapify_btu_step:
-    shows "sift_down3  l' xs \<le> \<Down>Id( timerefine (Rsd (h-l')) (heapify_btu_step l' xs\<^sub>0 xs))"
+    shows "sift_down3  l' xs \<le> \<Down>Id( timerefine (Rsd (h-l)) (heapify_btu_step l' xs\<^sub>0 xs))"
   unfolding heapify_btu_step_def
   apply(rule ASSERT_D3_leI)
   apply simp  
@@ -1502,7 +1655,7 @@ lemma sift_down3_refines_heapify_btu_step:
    apply simp
   apply(rule SPEC_timerefine)
   subgoal by simp
-  subgoal by(auto simp: Rsd_def  timerefineA_upd)
+  subgoal by (auto simp: Rsd_def  timerefineA_upd)
   done
 
 
@@ -1511,7 +1664,7 @@ thm sift_down_restore_correct
 
 lemma sift_down_restore_correct':
   assumes "l < h" "sift_down_invar xs\<^sub>0 l xs"
-  shows "sift_down3 l xs \<le> SPEC (\<lambda>xs'. slice_eq_mset l h xs' xs\<^sub>0 \<and> is_heap xs') (%_. sift_down3_cost (h-l))"
+  shows "sift_down3 l xs \<le> SPEC (\<lambda>xs'. slice_eq_mset l h xs' xs\<^sub>0 \<and> is_heap xs') (%_. sift_down3_cost (Discrete.log (h-l)))"
   apply(rule separate_correct_and_time)
   subgoal 
     apply(rule order.trans) 
@@ -1521,7 +1674,7 @@ lemma sift_down_restore_correct':
     apply(rule order.trans)
      apply(rule sift_down1_refine_functional_aux)  apply (simp add: timerefine_id)
     apply(rule  sift_down_restore_correct) using assms by auto
-  by (rule sift_down3_refine_time)
+  by (rule sift_down3_refine_time) 
 
 lemma sift_down3_refines_sift_down_restore:
   shows "sift_down3 l xs \<le>  \<Down>Id( timerefine (Rsd (h-l)) ( sift_down_restore xs\<^sub>0 xs))"
@@ -1561,7 +1714,7 @@ context heap_context begin
   qed *)
 
   lemmas bla = sift_down_ab.refine[OF heap_context_axioms, symmetric, unfolded heapify_btu_step_def]
-  lemma sift_down4_refine: "sift_down4 (\<^bold><) l h l' xs \<le> \<Down>Id( timerefine (Rsd (h-l')) (sift_down_ab (\<^bold>\<le>) l h l' xs\<^sub>0 xs))"
+  lemma sift_down4_refine: "sift_down4 (\<^bold><) l h l' xs \<le> \<Down>Id( timerefine (Rsd (h-l)) (sift_down_ab (\<^bold>\<le>) l h l' xs\<^sub>0 xs))"
   proof -
     note sift_down4.refine[OF heap_context_axioms, symmetric, THEN meta_eq_to_obj_eq]
     also note sift_down3_refines_heapify_btu_step
@@ -1580,7 +1733,7 @@ context heap_context begin
     "x\<le>y \<Longrightarrow> sift_down3_cost x \<le> sift_down3_cost y"
     unfolding sift_down3_cost_def E_sd3_l_def Let_def
     apply(simp add: lift_acost_propagate lift_acost_cost)
-        apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
+        apply (clarsimp simp add: costmult_add_distrib costmult_cost the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
         apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
     apply sc_solve by auto
 
@@ -1590,13 +1743,13 @@ context heap_context begin
     apply(rule order.trans[OF sift_down4_refine, of _  xs\<^sub>0])
     unfolding sift_down_ab_def
     apply(rule ASSERT_D5_leI)
-    apply simp
+    apply simp done (*
     apply(rule timerefine_R_mono_wfR'')
     subgoal by(auto simp: Rsd_def wfR''_TId intro: wfR''_upd)
     unfolding Rsd_def
     apply(simp add: le_fun_def) 
     apply(rule sift_down3_cost_mono)
-    by auto
+    by auto *)
 
   definition "heapify_btu xs\<^sub>0 \<equiv> doN {
     ASSERT(h>0);
@@ -1992,9 +2145,11 @@ proof -
           subgoal apply(auto simp: le_fun_def)
             unfolding N.E_sd3_l_def Let_def prems(1)[symmetric]
             apply simp
-            apply (clarsimp simp add: the_acost_costs_distrib the_acost_cost_mult acostC_the_acost_cost)
+            apply (clarsimp simp add: the_acost_costs_distrib costmult_add_distrib costmult_cost the_acost_cost_mult acostC_the_acost_cost)
             apply(simp add: the_acost_propagate  acostC_the_acost_cost add.assoc)
-            apply sc_solve_debug apply safe using \<open>h' \<le> h\<^sub>0\<close>  by (all \<open>(auto simp: sc_solve_debug_def numeral_eq_enat one_enat_def;fail)?\<close>)
+            apply sc_solve_debug apply safe using \<open>h' \<le> h\<^sub>0\<close>  apply (all \<open>(auto intro: log_mono[THEN monoD] simp: sc_solve_debug_def numeral_eq_enat one_enat_def;fail)?\<close>)
+            apply (auto intro: log_mono[THEN monoD] intro!: add_mono simp: sc_solve_debug_def numeral_eq_enat one_enat_def)
+            done
           done
       qed
       done        
@@ -2002,6 +2157,42 @@ qed
 
 definition heapsort_TR
   where "heapsort_TR l h = pp (Rsd_a (h-l)) (TId(''slice_sort'':=heapsort_time l h))"
+
+
+lemma wfR''_Rsd_a[simp]: "wfR'' (Rsd_a x)"
+  unfolding Rsd_a_def by auto
+ 
+lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
+  unfolding cost_def by (simp add: zero_acost_def)
+
+lemma finite_sum_nonzero_cost_enat:
+  "finite {a. the_acost (cost n m) a \<noteq> 0}"
+  unfolding cost_def by (auto simp: zero_acost_def)
+
+lemma finite_sum_nonzero_if_summands_finite_nonzero_enat:
+  "finite {a. f a \<noteq> 0} \<Longrightarrow> finite {a. g a \<noteq> 0} \<Longrightarrow> finite {a. (f a ::enat) + g a \<noteq> 0}"
+  apply(rule finite_subset[where B="{a. f a \<noteq> 0} \<union> {a. g a \<noteq> 0}"])
+  by auto
+
+text \<open>Heap sort is in O(n log n)\<close>
+
+lemma "Sum_any (the_acost (timerefineA (heapsort_TR l h) (cost ''slice_sort'' 1))) = 
+      enat (73 * (h - Suc l) + 75 * (h - l) + 12 + 29 * (Discrete.log (h - l) * (h - Suc l)) + 29 * ((h - l) * Discrete.log (h - l))) "
+  unfolding heapsort_TR_def  singleton_heap_context.sift_down3_cost_def heapsort_time_def
+  unfolding pp_fun_upd pp_TId_absorbs_right 
+  apply(auto simp add: timerefineA_propagate)
+  unfolding Rsd_a_def heapsort_lbc_def 
+  apply(auto simp:   timerefineA_update_apply_same_cost' lift_acost_cost costmult_cost
+                lift_acost_propagate timerefineA_update_cost wfR''_TId intro!: wfR''_upd)
+  apply(subst timerefineA_propagate, auto)+
+  unfolding singleton_heap_context.sift_down3_cost_def  singleton_heap_context.E_sd3_l_def
+  apply(auto simp: costmult_cost costmult_add_distrib lift_acost_propagate lift_acost_cost)
+  apply(simp only: add.left_commute add.assoc cost_same_curr_left_add plus_enat_simps)
+  apply(simp add: timerefineA_update_apply_same_cost' costmult_cost costmult_add_distrib)
+  apply(simp only: the_acost_propagate )
+  apply(subst  Sum_any.distrib; auto  simp only: Sum_any_cost intro!: finite_sum_nonzero_if_summands_finite_nonzero_enat finite_sum_nonzero_cost)+
+  apply (simp add: plus_enat_simps one_enat_def numeral_eq_enat add_mult_distrib2 add_mult_distrib)
+  done
 
 lemma heapsort_correct': 
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> \<Longrightarrow> heapsort2 xs l h \<le>
