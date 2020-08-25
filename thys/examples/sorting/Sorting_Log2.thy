@@ -51,7 +51,7 @@ lemma word_clz'_simps2:
   "\<not>(0 <s x) \<Longrightarrow> word_clz' x = 0"  
   using word_clz'_rec2 by metis+
   
-definition word_clz2 :: "'a::len2 word \<Rightarrow> nat nres"
+definition word_clz2 :: "'a::len2 word \<Rightarrow> (nat,_) nrest"
   where "word_clz2 x \<equiv> do {
     (c,_) \<leftarrow> WHILET (\<lambda>(c,x). 0 <s x) (\<lambda>(c,x). do {
       ASSERT (c + 1 < max_snat LENGTH('a));

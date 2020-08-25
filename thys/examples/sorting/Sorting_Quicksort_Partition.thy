@@ -537,6 +537,7 @@ lemma qs_partition_correct:
     unfolding emb'_def
     apply(rule if_rule2)
     subgoal 
+      apply simp
       apply(subst lift_acost_diff_to_the_right) subgoal 
         by(simp add: cost_zero costmult_add_distrib costmult_cost lift_acost_cost lift_acost_propagate)
       unfolding ungrd_qsp_next_r_cost_def ungrd_qsp_next_l_cost_def

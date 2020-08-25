@@ -39,13 +39,13 @@ definition introsort_aux1 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Ri
 
 
 
-definition introsort_aux_cost :: "_ \<Rightarrow> 'a list * nat \<Rightarrow> (char list, enat) acost"
-  where "introsort_aux_cost tf = (\<lambda>(xs, d). lift_acost (
+definition introsort_aux_cost :: "_ \<Rightarrow> nat * nat \<Rightarrow> (char list, enat) acost"
+  where "introsort_aux_cost tf = (\<lambda>(lxs, d). lift_acost (
         cost ''if'' (2^(d+1)-1) + cost ''eq'' (2^(d+1)-1) + cost ''if'' (2^(d+1)-1)
          + cost ''lt'' (2^(d+1)-1) + cost ''call'' ((2^(d+1)-1)) 
         + cost ''list_length'' (2^(d+1)-1) 
         + cost ''list_append'' (2^(d+1)-1) 
-        +   cost ''slice_sort_p'' (tf (length xs)) + cost ''partition'' (d*(length xs))
+        +   cost ''slice_sort_p'' (tf (lxs)) + cost ''partition'' (d*(lxs))
          )
         )"
  
@@ -136,11 +136,13 @@ proof -
     done      
 qed
 
+definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (length xs,d) )"
 
-  lemma introsort_aux1_correct:
+
+  lemma introsort_aux1_correct':
     assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c"
     shows 
-   "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost tf (xs, d))"
+   "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost' tf (xs, d))"
     
       unfolding introsort_aux1_def partition1_spec_def sort_spec_def
  
@@ -157,7 +159,7 @@ qed
         using  prems(2)
       subgoal unfolding emb'_def apply auto
         subgoal  by (simp add: sorted_wrt_imp_part_sorted)
-        subgoal unfolding introsort_aux_cost_def
+        subgoal unfolding introsort_aux_cost_def introsort_aux_cost'_def
             apply (simp add: lift_acost_propagate lift_acost_cost)
           apply sc_solve by (auto simp: one_enat_def)
         done
@@ -173,7 +175,7 @@ qed
           apply (subst slice_LT_mset_eq2, assumption)
           using le_by_lt by blast
         subgoal premises p
-          unfolding introsort_aux_cost_def
+          unfolding introsort_aux_cost_def introsort_aux_cost'_def
           using p(3,8)
           apply (simp add: lift_acost_propagate lift_acost_cost)
           apply sc_solve_debug apply safe apply(all \<open>((auto simp: sc_solve_debug_def),fail)?\<close>)
@@ -202,7 +204,7 @@ qed
       subgoal
         using prems(2) apply (auto simp add: emb'_def handy_if_lemma)
         subgoal by (simp add: part_sorted_wrt_init)
-        subgoal unfolding introsort_aux_cost_def apply (simp add: lift_acost_propagate lift_acost_cost)
+        subgoal unfolding introsort_aux_cost_def introsort_aux_cost'_def apply (simp add: lift_acost_propagate lift_acost_cost)
           apply sc_solve apply (auto simp: one_enat_def)
           subgoal 
             by(rule zz)
@@ -212,7 +214,15 @@ qed
         done
       done
     done
- 
+
+  lemma introsort_aux1_correct:
+    assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c" "lxs = length xs"
+    shows 
+   "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost tf (lxs, d))"
+    unfolding assms(2)
+    apply(rule  introsort_aux1_correct'[OF assms(1), unfolded introsort_aux_cost'_def, simplified])
+    by simp
+
       
     definition "partition2_spec xs \<equiv> doN { 
       ASSERT (length xs \<ge> 4); 
@@ -435,7 +445,7 @@ lemma introsort_aux3_correct:
   assumes tf_mono: "\<And>x y. x \<le> y \<Longrightarrow> tf x \<le> tf y"
     and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"    
   shows 
-    "introsort_aux3 tf xsi l h d \<le> \<Down>Id (timerefine TR_i_aux (timerefine (TId(''slice_part_sorted'':=introsort_aux_cost tf (xsi,d))) (slice_part_sorted_spec xsi l h)))"
+    "introsort_aux3 tf xsi l h d \<le> \<Down>Id (timerefine TR_i_aux (timerefine (TId(''slice_part_sorted'':=introsort_aux_cost tf (h-l,d))) (slice_part_sorted_spec xsi l h)))"
   apply(subst timerefine_iter2)
   subgoal by simp
   subgoal by (auto intro!: wfR''_upd)
@@ -468,7 +478,7 @@ lemma introsort_aux3_correct:
   apply(rule SPEC_leq_SPEC_I_strong)
   subgoal apply auto  
     using eq_outside_range_def by blast  
-  subgoal apply(sc_solve) apply safe apply auto apply(rule tf_mono) by auto
+  subgoal by(sc_solve) 
   done
 
   \<^cancel>\<open>
@@ -605,14 +615,16 @@ lemma introsort_aux3_correct:
     
     definition "introsort3 xs l h \<equiv> doN {
       ASSERT(l\<le>h);
-      if h-l>1 then doN {
+      hml \<leftarrow> SPECc2 ''sub'' (-) h l;
+      if\<^sub>N SPECc2 ''lt'' (<) 1 hml then doN {
         xs \<leftarrow> slice_part_sorted_spec xs l h;
         xs \<leftarrow> final_sort_spec xs l h;
         RETURN xs
       } else RETURN xs
     }"  
 
-    definition "introsort3_cost = cost ''slice_sort'' 1 +  cost ''slice_part_sorted'' (1::enat)"
+definition "introsort3_cost = cost ''sub'' 1 + cost ''lt'' 1 + cost ''if'' 1
+                               + cost ''slice_sort'' 1 +  cost ''slice_part_sorted'' (1::enat)"
     
     
 lemma if_rule2: "(c \<Longrightarrow> Some x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then a else None)"
@@ -625,20 +637,27 @@ lemma introsort3_correct: "introsort3 xs l h \<le> \<Down>Id (timerefine (TId(''
     subgoal
       unfolding introsort3_def slice_part_sorted_spec_def final_sort_spec_def slice_sort_spec_alt
       apply(auto intro: refine0 simp: SPEC_timerefine_conv)
-      unfolding SPEC_REST_emb'_conv
+      unfolding SPEC_REST_emb'_conv SPECc2_def
       apply(rule gwp_specifies_I) 
       apply(refine_vcg \<open>-\<close> rules: )
       subgoal unfolding emb'_def apply(rule if_rule2)
          apply (auto simp: introsort3_cost_def timerefineA_update_apply_same_cost' add.commute)
+        subgoal apply sc_solve  apply safe by auto  
         by (auto elim: eq_outside_range_gen_trans[of _ _ l h _ l h l h, simplified])
       subgoal using eq_outside_range_list_rel_on_conv by blast  
       subgoal by blast
+      subgoal by(auto simp: emb'_def)
       done
     subgoal
       unfolding introsort3_def slice_sort_spec_alt slice_part_sorted_spec_def final_sort_spec_def
       apply(auto intro: refine0 simp: SPEC_timerefine_conv)
-      unfolding SPEC_def RETURNT_def
-      by (auto simp add: eq_outside_range_triv sorted_wrt01 le_fun_def ecost_nneg)
+      unfolding SPEC_REST_emb'_conv SPECc2_def
+      apply(rule gwp_specifies_I) 
+      apply(refine_vcg \<open>-\<close> rules: )
+      apply (auto simp add: emb'_def eq_outside_range_triv sorted_wrt01 le_fun_def ecost_nneg) 
+      apply (auto simp: introsort3_cost_def timerefineA_update_apply_same_cost' add.commute)
+      apply sc_solve apply auto    
+      done
     done
   subgoal            
     unfolding slice_sort_spec_alt
