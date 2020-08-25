@@ -653,9 +653,10 @@ lemma slice_LT_I_aux:
 
 lemma partition_pivot_correct_aux1: "hi>0 \<Longrightarrow> {hi'..hi - Suc 0} = {hi'..<hi}" by auto
 
+abbreviation "TR_pp \<equiv> (TId(''partition'':=qs_body_cost + move_median_to_first_cost + cost ''sub'' 2 + cost ''call'' 2 + cost ''add'' 2 + cost ''udiv'' 1))"
 
 lemma partition_pivot_correct: "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> 
-  \<Longrightarrow> partition_pivot xs l h \<le> \<Down>Id (timerefine (TId(''partition'':=qs_body_cost + move_median_to_first_cost + cost ''sub'' 2 + cost ''call'' 2 + cost ''add'' 2 + cost ''udiv'' 1)) (partition3_spec xs' l' h'))"
+  \<Longrightarrow> partition_pivot xs l h \<le> \<Down>Id (timerefine TR_pp (partition3_spec xs' l' h'))"
   unfolding partition_pivot_def partition3_spec_def
   apply(intro ASSERT_D3_leI)
   apply(subst SPEC_timerefine_conv)

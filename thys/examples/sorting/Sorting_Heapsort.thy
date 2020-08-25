@@ -2477,7 +2477,7 @@ lemma elegant:
   }"   
 
 
-lemma heapify_btu3_refine: "heapify_btu3 l h xs\<^sub>0 \<le> \<Down> Id (timerefine E45 (heapify_btu2 (\<^bold><) l h xs\<^sub>0))"
+lemma heapify_btu3_refine: "(l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> heapify_btu3 l h xs\<^sub>0 \<le> \<Down> Id (timerefine E45 (heapify_btu2 (\<^bold><) l' h' xs\<^sub>0'))"
   supply conc_Id[simp del] 
   unfolding heapify_btu3_def heapify_btu2_def
   supply SPECc2_refine'[refine]
@@ -2522,7 +2522,7 @@ lemma myswap_refine':
 
 lemma heapsort3_refine:
   fixes xs\<^sub>0 :: "'a list" 
-  shows "heapsort3  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine E45 (heapsort2 xs\<^sub>0 l h\<^sub>0))" 
+  shows "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h\<^sub>0,h\<^sub>0')\<in>Id \<Longrightarrow> heapsort3  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine E45 (heapsort2 xs\<^sub>0' l' h\<^sub>0'))" 
   unfolding heapsort3_def heapsort2_def
   supply conc_Id[simp del] 
   supply SPECc2_refine'[refine]
