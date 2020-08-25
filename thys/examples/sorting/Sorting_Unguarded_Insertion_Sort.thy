@@ -73,31 +73,125 @@ end
         using is_insert_spec_aux_def by blast
       done    
     
-    definition is_insert :: "bool \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> 'a list nres" where "is_insert GUARDED xs i \<equiv> doN {
-      ASSERT ((\<not>GUARDED \<longrightarrow> 0<i) \<and> i<length xs);
-      x \<leftarrow> mop_list_get xs i;
+    (* TODO: Add type constraint to definition *)  
+    abbreviation monadic_WHILEIET :: 
+      "('b \<Rightarrow> bool) \<Rightarrow> ('b \<Rightarrow> (char list, nat) acost) \<Rightarrow> ('b \<Rightarrow> (bool, (char list, enat) acost) nrest) \<Rightarrow> ('b \<Rightarrow> ('b, (char list, enat) acost) nrest) \<Rightarrow> 'b \<Rightarrow> ('b, (char list, enat) acost) nrest"
+      where "monadic_WHILEIET I E b f s \<equiv> NREST.monadic_WHILEIET I E b f s"
+      
+    definition "cost_is_insert_step :: (char list, nat) acost \<equiv> cost ''list_set'' 1 + (cost ''list_get'' 1 + (cost ''call'' 1 + (cost ''mop_cmp_v_idx'' 1 + cost ''sub'' 1 + cost ''if'' 1) + cost ''sub'' 1))"  
+      
+    definition is_insert_unguarded :: "nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "is_insert_unguarded N xs i \<equiv> doN {
+      \<^cancel>\<open>(*ASSERT (\<exists>guard_idx. guard_idx<i \<and> \<not>xs!i\<^bold><xs!guard_idx);*)\<close>
+      ASSERT (i<length xs);
+      x \<leftarrow> mop_list_getN xs i;
     
-      (xs,i)\<leftarrow>WHILEIT (\<lambda>(xs',i'). 
-        i'\<ge>0 \<and> (\<not>GUARDED \<longrightarrow> i'>0) \<and> i'\<le>i \<and> length xs'=length xs
-      \<and> (\<forall>j\<in>{0..i'}. xs'!j = xs!j)  
-      \<and> (\<forall>j\<in>{i'<..i}. xs'!j = xs!(j-1) \<and> x\<^bold><xs'!j)  
-      \<and> (\<forall>j\<in>{i<..<length xs}. xs'!j=xs!j)
-      ) 
-        (\<lambda>(xs,i). (GUARDED \<longrightarrow> i>0) \<and> xs!(i-1)\<^bold>>x) (\<lambda>(xs,i). doN {
+      (xs,i)\<leftarrow>monadic_WHILEIET
+        (\<lambda>(xs',i'). 
+          i'>0 \<and> i-i'\<le>N \<and> i'\<le>i \<and> length xs'=length xs
+        \<and> (\<forall>j\<in>{0..i'}. xs'!j = xs!j)  
+        \<and> (\<forall>j\<in>{i'<..i}. xs'!j = xs!(j-1) \<and> x\<^bold><xs'!j)  
+        \<and> (\<forall>j\<in>{i<..<length xs}. xs'!j=xs!j)
+        )
+        (\<lambda>(xs,i'). (N - (i-i')) *m cost_is_insert_step) 
+        (\<lambda>(xs,i). (doN { 
+          t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; mop_cmp_v_idx (cost ''mop_cmp_v_idx'' 1) xs x t\<^sub>2
+        }))
+        (\<lambda>(xs,i). doN {
           ASSERT (i>0 \<and> i<length xs);
-          let xs = xs[i:=xs!(i-1)];
-          let i = i-1;
-          RETURN (xs,i)
+          i' \<leftarrow> SPECc2 ''sub'' (-) i 1;
+          x \<leftarrow> mop_list_getN xs i';
+          xs \<leftarrow> mop_list_setN xs i x;
+          RETURNT (xs,i')
         }) (xs,i);
     
-      xs \<leftarrow> mop_list_set xs i x;  
+      xs \<leftarrow> mop_list_setN xs i x;  
       
       RETURN xs
     }"
+
     
-    definition "is_insert_spec GUARDED xs i \<equiv> doN {
+    definition "is_insert_spec_unguarded N xs i \<equiv> doN {
+      ASSERT (i<length xs \<and> (0<i \<and> (\<exists>j'<i. i-j'\<le>N \<and> (\<forall>j\<le>j'. \<not>xs!i\<^bold><xs!j))));
+      SPEC (is_insert_spec_aux xs i) (\<lambda>_. cost ''is_insert'' 1)
+    }"  
+    
+    (* TODO: Move. DUP! *)
+    lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
+      by auto        
+
+  lemma lift_acost_propagate_minus: "lift_acost (t-t') = lift_acost t - lift_acost t' "
+    unfolding lift_acost_def by (cases t; cases t'; auto)
+      
+  (* TODO: N \<rightarrow> N-1 ?*)  
+  definition "cost_insert N \<equiv> 
+    (lift_acost (N *m cost_is_insert_step) +
+      cost ''list_set'' 1 + (cost ''mop_cmp_v_idx'' 1 + cost ''sub'' 1 + cost ''if'' 1 + (cost ''list_get'' 1 + cost ''call'' 1)))"
+    
+      
+    lemma is_insert_unguarded_correct: "is_insert_unguarded N xs i \<le> \<Down>Id (timerefine (TId (''is_insert'' := cost_insert N)) (is_insert_spec_unguarded N xs i))"
+      unfolding is_insert_unguarded_def is_insert_spec_unguarded_def
+      apply (rule refine0)
+      apply (simp add: SPEC_timerefine_conv)
+      thm timerefine_SPECT
+      unfolding SPEC_def
+      unfolding SPECc2_def
+      apply(rule gwp_specifies_I)
+      apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
+      subgoal sorry
+      subgoal for s a b
+        apply (rule loop_body_conditionI)
+        subgoal sorry
+        subgoal 
+          apply (clarsimp simp: cost_is_insert_step_def costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost)
+          apply sc_solve
+          apply (simp add: one_enat_def algebra_simps)
+          apply (intro conjI)
+          apply (metis Suc_diff_Suc diff_diff_cancel diff_le_self diff_zero le_diff_conv le_trans nat_add_left_cancel_le neq0_conv zero_less_diff)
+          subgoal 
+            apply (subgoal_tac "1 + (N+b-Suc i) = N+b-i")
+            apply simp 
+            apply (simp)
+            apply (metis Suc_diff_Suc diff_diff_cancel diff_le_self diff_zero le_diff_conv le_trans nat_add_left_cancel_le neq0_conv zero_less_diff)
+            done
+          subgoal 
+            by (metis Suc_diff_Suc Suc_pred add_diff_cancel_left' le_diff_conv le_eq_less_or_eq le_simps(3) linorder_not_le)
+          done
+        subgoal
+          apply simp  
+          apply (intro conjI)
+          subgoal by (metis (full_types) diff_is_0_eq' not_less zero_le)
+          subgoal by (metis Suc_le_eq Suc_pred le_diff_conv le_eq_less_or_eq nat_add_left_cancel_le)
+          subgoal by linarith
+          subgoal by (metis atLeastAtMost_iff diff_Suc_less diff_le_self le_trans linorder_not_le nth_list_update')
+          subgoal by (smt Suc_diff_Suc diff_zero greaterThanAtMost_iff le_eq_less_or_eq le_less_trans le_simps(3) nth_list_update_eq nth_list_update_neq)
+        done
+      done  
+      subgoal for _ _ i'
+        apply (rule loop_exit_conditionI)
+        apply (refine_vcg \<open>simp\<close>)
+        apply simp
+        apply (intro conjI)
+        subgoal
+          unfolding is_insert_spec_aux_def
+          apply (rule exI[where x=i']) 
+          by auto
+        subgoal
+          apply (simp add: algebra_simps lift_acost_diff_to_the_right)
+          apply (simp add: cost_insert_def)
+          apply (clarsimp simp: cost_is_insert_step_def costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost timerefineA_update_apply_same_cost')
+          apply sc_solve
+          by auto
+        done
+          
+      subgoal by auto
+      done
+    
+    
+    (*    
+        
+    definition "is_insert_spec N GUARDED xs i \<equiv> doN {
       ASSERT (i<length xs \<and> (\<not>GUARDED \<longrightarrow> 0<i \<and> \<not>xs!i\<^bold><xs!0));
-      SPEC (is_insert_spec_aux xs i)
+      SPEC (is_insert_spec_aux xs i) (\<lambda>_. N)
     }"  
 
     text \<open>When unguarded, the first element of the list cannot change\<close>
@@ -148,37 +242,121 @@ end
       
       RETURN xs
     }"
+    *)
+    
+    abbreviation "mop_eo_extract' \<equiv> mop_eo_extract (\<lambda>_. lift_acost mop_array_nth_cost)"
+    abbreviation "mop_eo_set' \<equiv> mop_eo_set (\<lambda>_. lift_acost mop_array_upd_cost)"
+    
+    definition is_insert2_unguarded :: "nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "is_insert2_unguarded N xs i \<equiv> doN {
+      \<^cancel>\<open>(*ASSERT (\<exists>guard_idx. guard_idx<i \<and> \<not>xs!i\<^bold><xs!guard_idx);*)\<close>
+      ASSERT (i<length xs);
+      
+      xs \<leftarrow> mop_to_eo_conv xs;
+      (x,xs) \<leftarrow> mop_eo_extract' xs i;
+    
+      (xs,i)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
+        (\<lambda>(xs,i). (doN { 
+          t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; mop_cmpo_v_idx (cost ''mop_cmpo_v_idx'' 1) xs x t\<^sub>2
+        }))
+        (\<lambda>(xs,i). doN {
+          ASSERT (i>0 \<and> i<length xs);
+          i' \<leftarrow> SPECc2 ''sub'' (-) i 1;
+          (x,xs) \<leftarrow> mop_eo_extract' xs i';
+          xs \<leftarrow> mop_eo_set' xs i x;
+          RETURNT (xs,i')
+        }) (xs,i);
+
+      xs \<leftarrow> mop_eo_set' xs i x;  
+      
+      xs \<leftarrow> mop_to_wo_conv xs;
+      
+      RETURN xs
+    }"
+
     
     
     definition "ii2_loop_rel \<equiv> {((xs',i'), (xs,i)). i'=i \<and> length xs' = length xs \<and> i<length xs \<and> (\<forall>j\<in>{0..<length xs}-{i}. xs'!j = Some (xs!j)) \<and> xs'!i=None}"
     
-    lemma is_insert2_refine: "is_insert2 GUARDED xs i \<le>\<Down>(\<langle>Id\<rangle>list_rel) (is_insert GUARDED xs i)"
-      unfolding is_insert2_def is_insert_def
+    abbreviation "TR_ii2 \<equiv> TId(
+      ''list_get'' := lift_acost mop_array_nth_cost,
+      ''list_set'' := lift_acost mop_array_upd_cost,
+      ''mop_cmp_v_idx'' := cost ''mop_cmpo_v_idx'' 1
+    )"
+    
+    lemma is_insert2_unguarded_refine: "is_insert2_unguarded N xs i \<le>\<Down>(\<langle>Id\<rangle>list_rel) (timerefine TR_ii2 (is_insert_unguarded N xs i))"
+      unfolding is_insert2_unguarded_def is_insert_unguarded_def
       supply [simp del] = conc_Id
       
       apply simp
-      apply (intro refine0; simp)
-      apply (rule refine)
-      apply (rule monadic_WHILEIT_refine_WHILEIT[where R=ii2_loop_rel])
+      unfolding mop_to_eo_conv_def
+      apply normalize_blocks
+      
+      apply (intro refine0 bindT_refine_easy consumea_refine; simp)
+      apply force
+      apply (rule IdI)
+      subgoal sorry
+      apply (rule bindT_refine_easy)
+      apply force
+      
+      unfolding monadic_WHILEIET_def
+      apply (rule monadic_WHILEIT_refine'[where R=ii2_loop_rel])
+      apply force
+      apply force
       subgoal by (auto simp: ii2_loop_rel_def)
       subgoal by simp
       subgoal
         apply (clarsimp split: prod.splits simp: ii2_loop_rel_def)
-        apply refine_vcg
-        apply (auto)
+        apply (refine_rcg bindT_refine_conc_time_my_inres SPECc2_refine' consumea_refine)
+        apply refine_dref_type
+        subgoal sorry
+        subgoal by (simp (no_asm))
+        subgoal sorry
+        subgoal by (simp add: inres_SPECc2)
+        subgoal sorry
+        subgoal by (simp (no_asm))
+        subgoal by (simp (no_asm) add: timerefineA_update_apply_same_cost')
+        subgoal by (auto simp: inres_SPECc2)
         done
       subgoal  
         apply clarsimp
-        apply refine_vcg
+        apply normalize_blocks
+        apply (refine_rcg bindT_refine_conc_time_my_inres SPECc2_refine' consumea_refine)
+        apply refine_dref_type
         unfolding ii2_loop_rel_def
-        apply (auto simp: nth_list_update split: if_splits)
+        apply (auto simp: nth_list_update split: if_splits) []
+        subgoal sorry
+        apply simp
+        subgoal sorry
+        subgoal by (auto simp: inres_SPECc2)
+        subgoal by (auto simp: inres_SPECc2)
+        subgoal sorry
+        subgoal by (simp (no_asm))
+        subgoal 
+          apply (subst timerefineA_propagate)
+          apply force
+          apply (auto simp add: timerefineA_propagate timerefineA_update_apply_same_cost' )
+          done
+        subgoal
+          by (auto simp: nth_list_update split: if_splits) []
         done
       subgoal
-        apply refine_vcg
-        apply (auto simp: ii2_loop_rel_def nth_list_update in_set_conv_nth intro: list_eq_iff_nth_eq[THEN iffD2])  
+        unfolding mop_to_wo_conv_def
+        apply normalize_blocks
+        apply clarsimp
+        apply (refine_rcg bindT_refine_conc_time_my_inres SPECc2_refine' consumea_refine)
+        apply refine_dref_type
+        unfolding ii2_loop_rel_def
+        subgoal by auto
+        subgoal by (auto simp: in_set_conv_nth nth_list_update intro: list_eq_iff_nth_eq[THEN iffD2])
+        subgoal by force
+        subgoal by simp
+        subgoal by (auto simp add: timerefineA_propagate timerefineA_update_apply_same_cost' lift_acost_zero)
+        subgoal by (auto simp: ii2_loop_rel_def nth_list_update in_set_conv_nth intro: list_eq_iff_nth_eq[THEN iffD2])
         done
       done
       
+      
+    xxx, ctd here  
       
     definition "is_insert3 GUARDED xs l i \<equiv> doN {
     
@@ -474,7 +652,7 @@ context weak_ordering begin
   
     
   lemma gen_insertion_sort_correct: 
-    "\<lbrakk>sorted_wrt_lt (\<^bold><) (take i\<^sub>0 xs); \<not>GUARDED \<longrightarrow> 0<i\<^sub>0; i\<^sub>0<h; h\<le>length xs; \<not>GUARDED \<longrightarrow> (\<forall>i\<in>{i\<^sub>0..<h}. \<not>xs!i \<^bold>< xs!0) \<rbrakk> 
+    "\<lbrakk>sorted_wrt_lt (\<^bold><) (take i\<^sub>0 xs); \<not>GUARDED \<longrightarrow> 0<i\<^sub>0; i\<^sub>0<h; h\<le>length xs; \<not>GUARDED \<longrightarrow> (\<forall>i\<in>{i\<^sub>0..<h}. \<exists>j<i. i-j<N \<and> \<not>xs!i \<^bold>< xs!j) \<rbrakk> 
       \<Longrightarrow> gen_insertion_sort GUARDED i\<^sub>0 h xs \<le> slice_sort_spec (\<^bold><) xs 0 h"
     unfolding gen_insertion_sort_def sort_one_more_spec_def slice_sort_spec_def sort_spec_def sorted_sorted_wrt
     apply (refine_vcg 
