@@ -256,6 +256,7 @@ end
     
       (xs,i)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
         (\<lambda>(xs,i). (doN { 
+          ASSERT (i>0);
           t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; mop_cmpo_v_idx (cost ''mop_cmpo_v_idx'' 1) xs x t\<^sub>2
         }))
         (\<lambda>(xs,i). doN {
@@ -356,8 +357,81 @@ end
       done
       
       
-    xxx, ctd here  
+    lemma is_insert3_unguarded_refine': "\<lbrakk> (xs,xs')\<in>slicep_rel l h; (i,i')\<in>idx_shift_rel l; i<h \<rbrakk> 
+      \<Longrightarrow> is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine TId (is_insert2_unguarded N xs' i'))"
+      unfolding is_insert2_unguarded_def
       
+      supply [simp del] = conc_Id
+      (*apply (simp cong: if_cong)*)
+      supply [refine_dref_RELATES] = 
+        RELATESI[of "slicep_rel l h"] 
+        RELATESI[of "idx_shift_rel l"] 
+        RELATESI[of "slice_rel (map Some xs) l h"] 
+        RELATESI[of "slice_rel (map Some xs) l h \<times>\<^sub>r idx_shift_rel l"] 
+      apply (refine_rcg 
+        bindT_refine_conc_time_my_inres SPECc2_refine' consumea_refine
+        slice_nth_refine' slice_upd_refine' 
+        mop_eo_extract_slice_refine mop_eo_set_slice_refine mop_to_eo_conv_slice_refine
+        mop_cmp_v_idx_slice_refine mop_to_wo_conv_slice_refine
+      )
+      supply [[goals_limit=20]]
+      apply refine_dref_type
+      apply (all \<open>(assumption|simp (no_asm);fail|simp add: idx_shift_rel_def;simp add: slice_map slice_rel_def slicep_rel_def in_br_conv)?\<close>)
+      subgoal by linarith
+      done
+      
+        
+
+    (* TODO: Move. Side-conditions? @Max *)          
+    lemma timerefine_comm_concfun:
+      fixes C :: "('f, ('b, enat) acost) nrest"
+      assumes "wfR'' E"
+      shows "timerefine E (\<Down> R C) = \<Down>R (timerefine E C)"
+      sorry
+      
+    lemma conc_tr_trans[trans]:
+      fixes m\<^sub>1 m\<^sub>2 m\<^sub>3 :: "(_,(_,enat) acost)nrest"
+      assumes "m\<^sub>1 \<le> \<Down>R\<^sub>1 (timerefine TR\<^sub>1 m\<^sub>2)"  
+      assumes "m\<^sub>2 \<le> \<Down>R\<^sub>2 (timerefine TR\<^sub>2 m\<^sub>3)"
+      assumes WF1: "wfR'' TR\<^sub>1" 
+      assumes WF2: "wfR'' TR\<^sub>2"
+      shows "m\<^sub>1 \<le> \<Down>(R\<^sub>1 O R\<^sub>2) (timerefine (pp TR\<^sub>1 TR\<^sub>2) m\<^sub>3)"
+      apply (rule order_trans[OF assms(1)])
+      apply (simp add: conc_fun_complete_lattice_chain[symmetric] timerefine_iter2[OF WF1 WF2, symmetric]) (* TODO: Why the special version conc_fun_chain for enat? *)
+      apply (rule nrest_Rel_mono)
+      apply (subst timerefine_comm_concfun[symmetric])
+      apply fact
+      apply (rule timerefine_mono2[OF WF1])
+      by fact
+      
+        
+    find_theorems pp fun_upd
+    find_theorems timerefineA fun_upd  
+      
+    
+    abbreviation "TR_ii3 N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert N))" (* @Max: what's a good format here? *)
+    
+    lemma is_insert3_unguarded_correct': 
+      assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
+      shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3 N) (is_insert_spec_unguarded N xs' i'))"
+    proof -
+      note is_insert3_unguarded_refine'[OF assms]
+      also note is_insert2_unguarded_refine
+      also note is_insert_unguarded_correct
+      finally show ?thesis
+        apply (simp add: pp_TId_absorbs_left pp_TId_absorbs_right)
+        apply rprems
+        apply force+
+        done
+    qed
+        
+
+    
+    
+    
+    
+      
+            
     definition "is_insert3 GUARDED xs l i \<equiv> doN {
     
       ASSERT (i<length xs);
