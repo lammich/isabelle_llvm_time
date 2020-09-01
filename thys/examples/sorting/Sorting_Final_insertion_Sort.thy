@@ -1,19 +1,184 @@
 theory Sorting_Final_insertion_Sort
-imports Sorting_Quicksort_Scheme (* Sorting_Unguarded_Insertion_Sort *)
+imports Sorting_Quicksort_Scheme Sorting_Unguarded_Insertion_Sort
 begin
 
 context weak_ordering begin
-  (*
+
   definition "final_insertion_sort xs \<equiv> doN {
     ASSERT (1 < length xs);
     if length xs \<le> is_threshold then
-      gen_insertion_sort True 1 (length xs) xs
+      gen_insertion_sort_guarded 1 (length xs) xs
     else doN {
-      xs \<leftarrow> gen_insertion_sort True 1 is_threshold xs;
-      gen_insertion_sort False is_threshold (length xs) xs
+      xs \<leftarrow> gen_insertion_sort_guarded 1 is_threshold xs;
+      gen_insertion_sort_unguarded is_threshold is_threshold (length xs) xs
     }
   }"  
+
+
+  lemma has_stopperI:
+    assumes "i<length xs" "j'<i" "i-j'\<le>N" "\<forall>j\<le>j'. \<not>xs!i\<^bold><xs!j"
+    shows "has_stopper N xs i"
+    using assms unfolding has_stopper_def by blast
   
+  
+  lemma part_sorted_guardedI:
+    assumes S: "part_sorted_wrt (le_by_lt (\<^bold><)) N xs" and B: "N\<le>i" "i<length xs"  
+    shows "has_stopper N xs i"  
+  proof -  
+    from S have "N\<noteq>0" \<open>i\<noteq>0\<close> using B by (cases N; auto)+
+    
+    
+    from S obtain ss where SL: "is_slicing N xs ss" and SORTED: "sorted_wrt (slice_LT (le_by_lt (\<^bold><))) ss" unfolding part_sorted_wrt_def by auto
+
+    have XS_EQ: "xs = concat ss" using SL unfolding is_slicing_def by auto
+    
+    define xi where "xi = xs!i"
+    
+    obtain xs1 xs2 where XSEQ2: "xs=xs1@xi#xs2" and LEN_XS1: "length xs1 = i"
+      unfolding xi_def using id_take_nth_drop[OF \<open>i<length xs\<close>] B by simp
+    
+    have [simp]: "ss\<noteq>[]"
+      using XS_EQ assms(3) by auto
+    have "concat ss = xs1@xi#xs2" by (simp add: XS_EQ[symmetric] XSEQ2)
+    then obtain ss1 ssi1 ssi2 ss2 where 1: "ss = ss1 @ (ssi1 @ ssi2) # ss2" "xs1 = concat ss1 @ ssi1" "xi # xs2 = ssi2 @ concat ss2"
+      by (auto dest: concat_eq_appendD)
+
+    have SS1_NGT: "\<forall>x\<in>set (concat ss1). \<forall>y\<in>set (ssi1@ssi2). \<not>x \<^bold>> y"  
+      using SORTED by (auto simp add: "1"(1) sorted_wrt_append slice_LT_def le_by_lt_def)
+      
+    have XS1_NGT: "\<forall>x\<in>set xs1. \<forall>y\<in>set (concat ss2). \<not>x \<^bold>> y"  
+      using SORTED by (auto simp add: "1" sorted_wrt_append slice_LT_def le_by_lt_def)
+      
+      
+    from SL 1 have SLI_BND: "length (ssi1@ssi2) \<le> N" unfolding is_slicing_def by auto
+          
+    show ?thesis proof (cases ssi2)  
+      case [simp]: Nil 
+      
+      obtain ssi2' ss2' where [simp]: "ss2 = (xi#ssi2') # ss2'" using 1 
+        apply simp
+        apply (cases ss2; simp)
+        subgoal for ss2_1 ss2_r 
+          using SL unfolding is_slicing_def
+          apply (cases ss2_1; simp)
+          done
+        done
+      
+      show ?thesis 
+        apply (rule has_stopperI[where j'="length xs1 - 1"])
+        subgoal by fact
+        subgoal using \<open>i \<noteq> 0\<close> \<open>length xs1 = i\<close> by auto
+        subgoal
+          using LEN_XS1 \<open>N \<noteq> 0\<close> by linarith
+        subgoal
+          apply (auto simp add: XS_EQ 1 simp flip: LEN_XS1)
+          apply (simp add: nth_append split: if_splits)
+          subgoal for j using XS1_NGT nth_mem unfolding 1(2) by fastforce
+          subgoal for j using XS1_NGT nth_mem unfolding 1(2) by fastforce
+          done
+        done
+        
+    next
+      case (Cons _ ssi2') hence [simp]: "ssi2 = xi#ssi2'" using 1 by auto
+      
+      have "ss1\<noteq>[]" proof
+        assume [simp]: "ss1=[]" 
+        from 1 have "xs1 = ssi1" by simp
+        hence "length ssi1 = i" using \<open>length xs1 = i\<close> by simp
+        hence "length (ssi1@ssi2) > i" by simp
+        moreover note SLI_BND
+        ultimately show False using \<open>N\<le>i\<close> by auto
+      qed
+      
+      have 11: "length (concat ss1) \<le> i" using \<open>length xs1 = i\<close> by (simp add: 1)
+      
+      have 12: "i < N + length (concat ss1)"
+        by (metis "1"(2) "11" SLI_BND \<open>length xs1 = i\<close> add_diff_cancel_left' add_lessD1 le_eq_less_or_eq length_append length_greater_0_conv less_add_same_cancel1 less_diff_conv2 list.simps(3) local.Cons)
+      
+      show ?thesis 
+        apply (rule has_stopperI[where j'="length (concat ss1) - 1"])  
+        subgoal using assms(3) by auto
+        subgoal using "1"(2) \<open>i \<noteq> 0\<close> \<open>length xs1 = i\<close> by auto
+        subgoal using 12 by linarith
+        subgoal 
+          apply (auto simp add: XS_EQ 1 simp flip: LEN_XS1)
+          apply (simp add: nth_append split: if_splits)
+          subgoal for j using SS1_NGT using nth_mem by fastforce
+          subgoal using "12" assms(2) by linarith
+          done
+        done
+    qed
+  qed        
+      
+  lemma mset_slice_eq_xform_aux:
+    assumes "mset (slice 0 N xs') = mset (slice 0 N xs)"
+    assumes "j < N" "N < length xs" "length xs' = length xs"
+    obtains jj where "jj<N" "xs'!j = xs!jj"
+    using assms by (auto simp: list_eq_iff_nth_eq set_slice_conv dest!: mset_eq_setD; auto) 
+  
+  lemma transfer_stopper_over_initial_sorting:
+    assumes "has_stopper N xs i"
+    assumes B: "length xs' = length xs" "0<N" "N \<le> i" "i < length xs"
+    assumes DEQ: "drop N xs' = drop N xs" 
+    assumes SORTED: "sort_spec (\<^bold><) (slice 0 N xs) (slice 0 N xs')" 
+    shows "has_stopper N xs' i"
+    using assms[unfolded sort_spec_def has_stopper_def]
+    apply clarify
+    subgoal for j'
+      apply (cases "j'<N")
+      subgoal
+        Idee: Das Segment xs[0..<N] enthaelt mindestens j' Stopper. (Alles \<le> j' sind Stopper)
+        Nach dem Sortieren: Der 'letzte' Stopper muss an Index \<ge>j' kommen, alles davor auch Stopper da sortiert.
+        \<longrightarrow> Index j' immernoch ein Stopper
+        
+        
+      
+       sorry
+      subgoal
+        apply (rule has_stopperI[where j'=j'])
+        apply auto
+        subgoal for j
+          apply (subgoal_tac "xs'!i = xs!i")
+          subgoal
+            apply (cases "j<N")
+            subgoal by (erule (1) mset_slice_eq_xform_aux[where j=j]; simp)
+            subgoal by (smt assms(6) drop_eq_mono hd_drop_conv_nth leI le_eq_less_or_eq le_less_trans)
+            done 
+          subgoal by (metis assms(4) drop_eq_mono hd_drop_conv_nth)
+          done
+        done
+      done
+    done  
+      
+        apply (cases "j<N")
+        apply (auto simp: list_eq_iff_nth_eq)
+        subgoal sorry
+        
+        by (smt assms(6) drop_eq_mono hd_drop_conv_nth leI le_eq_less_or_eq le_less_trans)
+    
+  
+  
+  
+  lemma transfer_guard_over_initial_sorting:
+    assumes PS: "part_sorted_wrt (le_by_lt (\<^bold><)) N xs"
+    assumes B: "0<N" "N \<le> i" "i < length xs"
+    shows "has_stopper N xs i"
+    using assms unfolding has_stopper_def part_sorted_wrt_def is_slicing_def 
+  
+    
+  
+  lemma transfer_guard_over_initial_sorting:
+    assumes PS: "part_sorted_wrt (le_by_lt (\<^bold><)) N xs"
+    assumes B: "length xs' = length xs" "0<N" "N \<le> i" "i < length xs"
+    assumes DEQ: "drop N xs' = drop N xs" 
+    assumes SORTED: "sort_spec (\<^bold><) (slice 0 N xs) (slice 0 N xs')" 
+    shows "has_stopper N xs' i"
+  proof -
+  
+  
+  
+  
+    
   lemma transfer_guard_over_initial_sorting:
     assumes PS: "part_sorted_wrt (le_by_lt (\<^bold><)) n xs"
     assumes B: "length xs' = length xs" "0<n" "n \<le> i" "i < length xs"
