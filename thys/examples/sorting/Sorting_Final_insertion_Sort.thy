@@ -116,6 +116,101 @@ context weak_ordering begin
     obtains jj where "jj<N" "xs'!j = xs!jj"
     using assms by (auto simp: list_eq_iff_nth_eq set_slice_conv dest!: mset_eq_setD; auto) 
   
+    
+    
+  find_theorems sorted_wrt mset
+  
+  find_consts "_ multiset \<Rightarrow> nat"
+  
+  
+  lemma filter_mset_eq_empty_conv: "filter_mset P m = {#} \<longleftrightarrow> (\<forall>x\<in>#m. \<not>P x)"
+    by (auto simp: filter_mset_eq_conv)
+  
+  lemma filter_mset_eq_same_conv: "filter_mset P m = m \<longleftrightarrow> (\<forall>x\<in>#m. P x)"
+    by (auto simp: filter_mset_eq_conv)
+    
+    
+  lemma sorted_pos_aux:
+    assumes "size (filter_mset (\<lambda>x. x \<^bold>\<le> a) (mset xs)) \<ge> n" "sorted_wrt (\<^bold>\<le>) xs"
+    shows "\<forall>i<n. xs!i \<^bold>\<le> a"
+  proof -
+  
+    from assms(1) have NL: "n\<le>length xs" 
+      by (metis le_trans size_filter_mset_lesseq size_mset)
+  
+      
+    show ?thesis proof (rule ccontr, simp add: unfold_le_to_lt, clarify)
+      fix i
+      assume "i<n" "a \<^bold>< xs!i"
+      hence 1: "\<forall>j\<in>{i..<length xs}. a \<^bold>< xs!j"
+        by (metis antisym_conv2 assms(2) atLeastLessThan_iff itrans sorted_wrt_nth_less wo_leD)
+      
+      define xs\<^sub>1 where "xs\<^sub>1 = take i xs" 
+      define xs\<^sub>2 where "xs\<^sub>2 = drop i xs"
+      
+      have "xs = xs\<^sub>1@xs\<^sub>2" "\<forall>x\<in>set xs\<^sub>2. \<not>x\<^bold>\<le>a"
+        unfolding xs\<^sub>1_def xs\<^sub>2_def using 1
+        by (auto simp: in_set_conv_nth unfold_le_to_lt)
+      
+      hence "filter_mset (\<lambda>x. x \<^bold>\<le> a) (mset xs) = filter_mset (\<lambda>x. x \<^bold>\<le> a) (mset xs\<^sub>1)"
+        by (auto simp: filter_mset_eq_empty_conv)
+        
+      hence "size (filter_mset (\<lambda>x. x \<^bold>\<le> a) (mset xs)) \<le> length xs\<^sub>1"  
+        apply auto
+        by (metis size_filter_mset_lesseq size_mset)
+      also have "length xs\<^sub>1 < n" unfolding xs\<^sub>1_def using \<open>i<n\<close> NL by auto
+      finally show False using assms(1) by simp
+    qed
+  qed  
+       
+  
+  
+  lemma filter_mset_eq_sameI: 
+    "(\<forall>x\<in>#m. P x) \<Longrightarrow> filter_mset P m = m" by (simp add: filter_mset_eq_same_conv)
+  
+  lemma xfer_stopper_leN_aux:
+    assumes "length xs' = length xs"
+    assumes I: "N \<le> i" "i < length xs"
+    assumes DEQ: "drop N xs' = drop N xs" 
+    assumes S: "mset (slice 0 N xs') = mset (slice 0 N xs)" "sorted_wrt_lt (\<^bold><) (slice 0 N xs')"
+    assumes LE: "\<forall>j\<le>j'. \<not> xs ! i \<^bold>< xs ! j" "j' < N" "j \<le> j'"
+    shows "\<not> (xs' ! i \<^bold>< xs' ! j)"
+  proof -
+
+    define xs\<^sub>1 where "xs\<^sub>1 = take (Suc j') (slice 0 N xs)" 
+    define xs\<^sub>2 where "xs\<^sub>2 = drop (Suc j') (slice 0 N xs)"
+    
+    have S0NXS_EQ: "(slice 0 N xs) = xs\<^sub>1@xs\<^sub>2"
+      unfolding xs\<^sub>1_def xs\<^sub>2_def by (auto)
+  
+    have "\<forall>x\<in>set (take (Suc j') xs). x \<^bold>\<le> xs!i"
+      unfolding unfold_le_to_lt using LE
+      by (auto simp: in_set_conv_nth)
+    also have "take (Suc j') xs = xs\<^sub>1" 
+      using LE
+      apply (auto simp: take_slice xs\<^sub>1_def)
+      by (simp add: Misc.slice_def)
+    finally have 1: "\<forall>x\<in>set xs\<^sub>1. x \<^bold>\<le> xs ! i" .
+    
+    have [simp]: "xs!i = xs'!i"
+      by (metis DEQ assms(1) assms(2) assms(3) drop_eq_mono hd_drop_conv_nth)
+    
+    have "Suc j' = length xs\<^sub>1" unfolding xs\<^sub>1_def using LE I by auto 
+    also from 1 have "length xs\<^sub>1 \<le> size (filter_mset (\<lambda>x. x \<^bold>\<le> xs!i) (mset (slice 0 N xs)))"
+      by (simp add: S0NXS_EQ filter_mset_eq_sameI)
+    also have "mset (slice 0 N xs) = mset (slice 0 N xs')" using S by simp
+    finally have "\<forall>ia<Suc j'. slice 0 N xs' ! ia \<^bold>\<le> xs ! i"
+      using S(2)
+      apply -
+      apply (erule sorted_pos_aux)
+      using le_by_lt by blast
+    hence "\<forall>ia<Suc j'. xs' ! ia \<^bold>\<le> xs ! i"
+      using LE by (simp add: Misc.slice_def)
+    thus ?thesis using LE by (auto simp: unfold_le_to_lt)
+  qed    
+      
+      
+    
   lemma transfer_stopper_over_initial_sorting:
     assumes "has_stopper N xs i"
     assumes B: "length xs' = length xs" "0<N" "N \<le> i" "i < length xs"
@@ -127,13 +222,10 @@ context weak_ordering begin
     subgoal for j'
       apply (cases "j'<N")
       subgoal
-        Idee: Das Segment xs[0..<N] enthaelt mindestens j' Stopper. (Alles \<le> j' sind Stopper)
-        Nach dem Sortieren: Der 'letzte' Stopper muss an Index \<ge>j' kommen, alles davor auch Stopper da sortiert.
-        \<longrightarrow> Index j' immernoch ein Stopper
-        
-        
-      
-       sorry
+        apply (rule has_stopperI[where j'=j'])
+        using xfer_stopper_leN_aux
+        apply auto
+        done
       subgoal
         apply (rule has_stopperI[where j'=j'])
         apply auto
@@ -149,23 +241,6 @@ context weak_ordering begin
         done
       done
     done  
-      
-        apply (cases "j<N")
-        apply (auto simp: list_eq_iff_nth_eq)
-        subgoal sorry
-        
-        by (smt assms(6) drop_eq_mono hd_drop_conv_nth leI le_eq_less_or_eq le_less_trans)
-    
-  
-  
-  
-  lemma transfer_guard_over_initial_sorting:
-    assumes PS: "part_sorted_wrt (le_by_lt (\<^bold><)) N xs"
-    assumes B: "0<N" "N \<le> i" "i < length xs"
-    shows "has_stopper N xs i"
-    using assms unfolding has_stopper_def part_sorted_wrt_def is_slicing_def 
-  
-    
   
   lemma transfer_guard_over_initial_sorting:
     assumes PS: "part_sorted_wrt (le_by_lt (\<^bold><)) N xs"
@@ -173,41 +248,11 @@ context weak_ordering begin
     assumes DEQ: "drop N xs' = drop N xs" 
     assumes SORTED: "sort_spec (\<^bold><) (slice 0 N xs) (slice 0 N xs')" 
     shows "has_stopper N xs' i"
-  proof -
+    using assms transfer_stopper_over_initial_sorting part_sorted_guardedI by blast
   
-  
-  
-  
-    
-  lemma transfer_guard_over_initial_sorting:
-    assumes PS: "part_sorted_wrt (le_by_lt (\<^bold><)) n xs"
-    assumes B: "length xs' = length xs" "0<n" "n \<le> i" "i < length xs"
-    assumes DEQ: "drop n xs' = drop n xs" 
-    assumes SORTED: "sort_spec (\<^bold><) (slice 0 n xs) (slice 0 n xs')" 
-    assumes LT: "xs' ! i \<^bold>< xs' ! 0" 
-    shows False
-  proof -
-    from part_sorted_guardedI[OF PS \<open>n\<le>i\<close> \<open>i < length xs\<close>] have GUARD: "xs!0 \<^bold>\<le> xs!i"
-      by (auto simp: le_by_lt)
-  
-    have [simp]: "xs!i = xs'!i" using B DEQ by (metis atLeastLessThan_iff conv_idxs_to_drop_eq)
-      
-    have "xs!0 \<in># mset (slice 0 n xs)" using B
-      apply (auto simp: Misc.slice_def)
-      by (metis atLeast0LessThan image_eqI le_less_trans lessThan_iff less_imp_le_nat nth_image)
-    hence "xs!0 \<in># mset (slice 0 n xs')" using SORTED unfolding sort_spec_def by auto 
-    then obtain j where "j<n" and [simp]: "xs!0=xs'!j" using B by (auto simp: in_set_conv_nth slice_nth)
-    have "xs'!0 \<^bold>\<le> xs'!j" using SORTED B \<open>j<n\<close>
-      apply (cases "j=0")
-      apply simp
-      unfolding sort_spec_def by (auto simp: le_by_lt sorted_wrt_iff_nth_less slice_nth)
-    then show False using LT GUARD
-      apply simp
-      using local.trans wo_leD by blast
-      
-  qed
-   
 
+  xxx, ctd here. Just completed proof that we have a guard after initial sorting!  
+    
   lemma final_insertion_sort_correct: 
     "\<lbrakk>part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs; 1 < length xs\<rbrakk> \<Longrightarrow> final_insertion_sort xs \<le> SPEC (sort_spec (\<^bold><) xs)"
     unfolding final_insertion_sort_def
