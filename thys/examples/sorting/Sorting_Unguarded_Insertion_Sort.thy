@@ -729,11 +729,8 @@ end
 end
   
 context sort_impl_context begin
-  sepref_register 
-    is_guarded_insert3: "is_insert3 True"
-    is_unguarded_insert3: "is_insert3 False"
   
-  sepref_def is_guarded_insert_impl is "uncurry2 (PR_CONST (is_insert3 True))" 
+  sepref_def is_guarded_insert_impl is "uncurry2 (PR_CONST (is_insert3_guarded))" 
     :: "(woarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a woarray_assn elem_assn"
     unfolding is_insert3_def PR_CONST_def
     apply (simp named_ss HOL_ss:)
