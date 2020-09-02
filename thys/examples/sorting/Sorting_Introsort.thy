@@ -16,13 +16,14 @@ context weak_ordering begin
     where "introsort_aux4 xs l h d \<equiv> RECT' (\<lambda>introsort_aux (xs,l,h,d). doN {
     ASSERT (l\<le>h);
     lxs \<leftarrow> SPECc2 ''sub'' (-) h l; 
-    if\<^sub>N SPECc2 ''lt'' (<) is_threshold lxs then doN {
-      if\<^sub>N SPECc2 ''eq'' (=) d 0 then
+    if\<^sub>N SPECc2 ''icmp_slt'' (<) is_threshold lxs then doN {
+      if\<^sub>N SPECc2 ''icmp_eq'' (=) d 0 then
         heapsort2 xs l h
       else doN {
         (xs,m)\<leftarrow>partition_pivot xs l h;
-        xs \<leftarrow> introsort_aux (xs,l,m,d-1);
-        xs \<leftarrow> introsort_aux (xs,m,h,d-1);
+        d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
+        xs \<leftarrow> introsort_aux (xs,l,m,d');
+        xs \<leftarrow> introsort_aux (xs,m,h,d');
         RETURN xs
       }
     }
@@ -58,12 +59,15 @@ thm heapsort_correct' partition_pivot_correct
 
 text \<open>Here we assemble a Timerefinement from @{term heapsort_TR} and @{term TR_pp}.\<close>
 
-(* TODO *)
-definition "Tia43 \<equiv> TId(''slice_sort_p'':=
+(* TODO: find the right Tia43 *)
+definition "Tia43 \<equiv> TId(''eq'':=cost ''icmp_eq'' 1,
+          ''lt'':=cost ''icmp_slt'' 1,
+        ''partition'':=TR_pp ''partition'',
+        ''slice_sort_p'':=
         cost ''call'' (enat 10)
          + cost ''if'' (enat 24) \<^cancel>\<open>
          + cost ''sub'' c
-         + cost ''cmpo_v_idxs'' d
+         + cost ''cmpo_v_idx'' d
          + cost ''mul'' e
          + cost ''ofs_ptr'' f
          + cost ''add'' g
@@ -78,13 +82,13 @@ lemma cost_n_eq_TId_n: "cost n (1::enat) = TId n"
   by(auto simp:  TId_def cost_def zero_acost_def less_eq_acost_def)
 
 lemma wfR''Tia43[simp]: "wfR'' (Tia43)"
-  by(auto simp: Tia43_def) 
+  by(auto simp: Tia43_def intro!: wfR''_upd)
 lemma spTia43[simp]: "struct_preserving (Tia43)"
-  by(auto simp: Tia43_def) 
+  by(auto simp: Tia43_def intro!: struct_preserving_upd_I) 
 lemma pcTia43[simp]: 
   "preserves_curr (Tia43) ''sub''"
-  "preserves_curr (Tia43) ''lt''"
-  "preserves_curr (Tia43) ''eq''"
+  "preserves_curr (Tia43) ''icmp_slt''"
+  "preserves_curr (Tia43) ''icmp_eq''"
   by(auto simp: Tia43_def preserves_curr_def cost_n_eq_TId_n) 
 
 
@@ -183,7 +187,7 @@ lemma
 lemma
   fixes R :: "_ \<Rightarrow> ('a, enat) acost"
   shows "R' \<le> sup R' R"
-  sorry
+  by simp
 
 
 lemma wfR''_supI:
@@ -244,11 +248,14 @@ lemma "sup (TId(''a'':=cost ''n'' (2::enat))) (TId(''a'':=cost ''n'' 3, ''b'':=c
 
 
 
-thm partition_pivot_correct 
+thm partition_pivot_correct_flexible 
 lemma partition_pivot_correct':
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> 
   \<Longrightarrow> partition_pivot xs l h \<le> \<Down>Id (timerefine (Tia43) (partition3_spec xs' l' h'))"
-  sorry
+  apply(rule partition_pivot_correct_flexible)
+  unfolding Tia43_def
+  apply (auto )
+  done
 
 
 thm slice_sort_specT_def slice_sort_spec_def
@@ -256,11 +263,12 @@ thm slice_sort_specT_def slice_sort_spec_def
   lemma introsort_aux4_refine: "introsort_aux4 xs l h d \<le> \<Down>Id (timerefine (Tia43) ((introsort_aux3 (\<lambda>n. n * Discrete.log n) xs l h d)))"
     unfolding introsort_aux4_def introsort_aux3_def 
     supply conc_Id[simp del]
-    apply (refine_rcg RECT'_refine_t bindT_refine_conc_time_my_inres SPECc2_refine' MIf_refine
+    apply (refine_rcg RECT'_refine_t bindT_refine_conc_time_my_inres SPECc2_refine' SPECc2_refine MIf_refine
             heapsort_correct'' partition_pivot_correct')
     apply refine_mono
     apply refine_dref_type
     apply (simp_all add: inres_SPECc2) 
+    apply(auto simp: Tia43_def )
     done
 
 lemma nlogn_mono:
@@ -295,15 +303,39 @@ lemma introsort_aux4_correct: "introsort_aux4 xs l h d \<le> \<Down> Id (timeref
   subgoal apply(intro nlogn_sums) by simp
   apply (simp add: timerefine_iter2)
   apply(subst timerefine_iter2)
-  subgoal sorry
+  subgoal
+    apply(simp add: pp_fun_upd pp_TId_absorbs_right)
+    apply(intro wfR''_upd)
+    by simp
   subgoal by auto
   unfolding bla_def apply simp
   done
- 
+
+lemma TR_sps_important2:
+  assumes "TR ''slice_part_sorted'' = bla d (h - l) ''slice_part_sorted''"
+  shows "timerefine TR (slice_part_sorted_spec xs l h) = (timerefine (bla d (h-l)) (slice_part_sorted_spec xs l h))"
+  unfolding slice_part_sorted_spec_def
+  apply(cases "l \<le> h \<and> h \<le> length xs"; auto)
+  apply(simp only: SPEC_timerefine_conv)
+  apply(rule SPEC_cong, simp)
+  apply(rule ext)
+  apply(simp add: norm_tr)
+  apply(subst assms(1))
+  apply simp
+  done
+
+lemma introsort_aux4_correct_flexible:
+  assumes "TR ''slice_part_sorted'' = bla d (h - l) ''slice_part_sorted''"
+  shows "introsort_aux4 xs l h d \<le> \<Down> Id (timerefine TR (slice_part_sorted_spec xs l h))"
+  apply(subst TR_sps_important2[where TR=TR, OF assms])
+  apply(rule introsort_aux4_correct)
+  done
+  
+
   definition "introsort4 xs l h \<equiv> doN {
     ASSERT(l\<le>h);
     hml \<leftarrow> SPECc2 ''sub'' (-) h l;
-    if\<^sub>N SPECc2 ''lt'' (<) 1 hml then doN {
+    if\<^sub>N SPECc2 ''icmp_slt'' (<) 1 hml then doN {
       xs \<leftarrow> introsort_aux4 xs l h (Discrete.log (h-l)*2);
       xs \<leftarrow> final_insertion_sort2 xs l h;
       RETURN xs
@@ -316,30 +348,47 @@ lemma wfR''_bla[simp]: " wfR'' (bla d xs)"
 
 thm introsort_aux4_correct
 
-thm final_insertion_sort2_correct
+lemmas final_insertion_sort2_correct_flexible = final_insertion_sort2_correct
 
-  lemma final_insertion_sort2_correct': 
-    assumes [simplified, simp]: "(xs',xs)\<in>Id" "(l',l)\<in>Id" "(h',h)\<in>Id"   
-    shows "final_insertion_sort2 xs' l' h' \<le> \<Down>Id (timerefine (bla (Discrete.log (h-l)*2) (h-l)) (final_sort_spec xs l h))"
-    sorry (* TODO *)
+thm introsort_aux4_correct_flexible
+thm final_insertion_sort2_correct_flexible
+
+abbreviation "TR_is d s == TId(''lt'':=cost ''icmp_slt'' 1, ''slice_part_sorted'':= bla d s ''slice_part_sorted'',''slice_sort'' := fi2_cost s)"
 
 lemma pc_bla[simp]:
   "preserves_curr (bla d hl) ''sub''"
-  "preserves_curr (bla d hl) ''lt''"
+  "preserves_curr (bla d hl) ''icmp_slt''"
   by(auto simp: pcTia43[unfolded preserves_curr_def] pp_fun_upd pp_TId_absorbs_right  bla_def preserves_curr_def cost_n_eq_TId_n) 
+
+lemma pc_TR_is[simp]:
+  "preserves_curr (TR_is d hl) ''sub''"
+  "preserves_curr (TR_is d hl) ''icmp_slt''"
+  by(auto simp: preserves_curr_def cost_n_eq_TId_n) 
+
+
+lemma wfR''_TR_is[simp]: "wfR'' (TR_is d hl)"
+  by (auto intro!: wfR''_upd)
+
+lemma sp_TR_is[simp]:
+  "struct_preserving (TR_is d hl)"
+  by (auto intro!: struct_preserving_upd_I) 
+
 
 lemma sp_bla[simp]:
   "struct_preserving (bla d hl)"
   by (auto simp: pp_fun_upd pp_TId_absorbs_right  bla_def intro!: struct_preserving_upd_I)  
 
-  lemma introsort4_refine: "introsort4 xs l h \<le> \<Down>Id (timerefine (bla (Discrete.log (h-l)*2) (h-l)) (introsort3 xs l h))"
+  lemma introsort4_refine: "introsort4 xs l h \<le> \<Down>Id (timerefine (TR_is (Discrete.log (h-l)*2) (h-l)) (introsort3 xs l h))"
     unfolding introsort4_def introsort3_def 
     supply conc_Id[simp del]
-    apply (refine_rcg SPECc2_refine' bindT_refine_conc_time_my_inres MIf_refine introsort_aux4_correct final_insertion_sort2_correct' )
-    apply refine_dref_type
-    by auto   
+    apply (refine_rcg SPECc2_refine' SPECc2_refine bindT_refine_conc_time_my_inres MIf_refine
+                introsort_aux4_correct_flexible final_insertion_sort2_correct_flexible )
+    apply refine_dref_type                                          
+    by auto 
 
-  lemmas introsort4_correct = order_trans[OF introsort4_refine introsort3_correct]
+  thm introsort4_refine introsort3_correct
+
+  (* lemmas introsort4_correct = order_trans[OF introsort4_refine introsort3_correct] *)
 
 end
 
@@ -366,7 +415,6 @@ context sort_impl_context begin
 
 thm partition_pivot2_refines heapsort3_refine
 
-definition "TR5 = sup E_mmtf E45"
 
 lemma TR_sup_Tid: "sup TId TId = TId"
   by simp
@@ -377,23 +425,19 @@ lemma pullin_right:
   shows "sup R' (R(m:=x)) = (sup R' R)(m:=sup (R' m) x)"
   apply(rule ext) by auto
 
-lemma "TR5 = E45"
-  unfolding TR5_def  
-  apply(simp add: pullin_left pullin_right cost_n_eq_TId_n[symmetric])
-  oops
-
 
   definition introsort_aux5 :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list, ecost) nrest"
     where "introsort_aux5 xs l h d \<equiv> RECT' (\<lambda>introsort_aux (xs,l,h,d). doN {
     ASSERT (l\<le>h);
     lxs \<leftarrow> SPECc2 ''sub'' (-) h l; 
-    if\<^sub>N SPECc2 ''lt'' (<) is_threshold lxs then doN {
-      if\<^sub>N SPECc2 ''eq'' (=) d 0 then
+    if\<^sub>N SPECc2 ''icmp_slt'' (<) is_threshold lxs then doN {
+      if\<^sub>N SPECc2 ''icmp_eq'' (=) d 0 then
         heapsort3 xs l h
       else doN {
         (xs,m)\<leftarrow>partition_pivot2 xs l h;
-        xs \<leftarrow> introsort_aux (xs,l,m,d-1);
-        xs \<leftarrow> introsort_aux (xs,m,h,d-1);
+        d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
+        xs \<leftarrow> introsort_aux (xs,l,m,d');
+        xs \<leftarrow> introsort_aux (xs,m,h,d');
         RETURN xs
       }
     }
@@ -402,28 +446,46 @@ lemma "TR5 = E45"
   }) (xs,l,h,d)"
 
 
-lemma sp_E_mmtf[simp]: "struct_preserving E_mmtf"
-  sorry
+lemma pc_TR_cmp_swap: "x\<noteq>''cmp_idxs'' \<Longrightarrow> x\<noteq>''cmpo_idxs'' \<Longrightarrow> x\<noteq>''cmpo_v_idx'' \<Longrightarrow> x\<noteq>''list_swap''
+  \<Longrightarrow> preserves_curr TR_cmp_swap x"
+  apply(intro preserves_curr_other_updI)
+  by auto
 
-  lemma introsort_aux5_refine: "introsort_aux5 xs l h d \<le> \<Down>Id (timerefine (E_mmtf) ((introsort_aux4 xs l h d)))"
+
+  lemma introsort_aux5_refine: "introsort_aux5 xs l h d \<le> \<Down>Id (timerefine (TR_cmp_swap) ((introsort_aux4 xs l h d)))"
     unfolding introsort_aux4_def introsort_aux5_def 
     supply conc_Id[simp del]
     apply (refine_rcg RECT'_refine_t bindT_refine_conc_time_my_inres SPECc2_refine' MIf_refine
             heapsort3_refine partition_pivot2_refines)
     apply refine_mono
     apply refine_dref_type
-    apply (simp_all add: inres_SPECc2) 
+    apply (auto simp add: inres_SPECc2 intro!: pc_TR_cmp_swap) 
     done
 
 
 
 
 
-sepref_register introsort_aux4
-sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux4)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
-  unfolding introsort_aux4_def PR_CONST_def
+sepref_register introsort_aux5
+sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
+  unfolding introsort_aux5_def PR_CONST_def
   apply (annot_snat_const "TYPE(size_t)")
-  by sepref
+  supply [[goals_limit = 1]]
+  apply sepref_dbg_preproc
+     apply sepref_dbg_cons_init
+     apply sepref_dbg_id
+  apply sepref_dbg_monadify
+     apply sepref_dbg_opt_init
+
+  using hn_RECT_wiewirshabenwollen
+
+      apply sepref_dbg_trans_keep
+
+  apply sepref_dbg_opt
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_constraints 
+  done
   
   
   

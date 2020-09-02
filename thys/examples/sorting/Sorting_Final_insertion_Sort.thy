@@ -6,11 +6,15 @@ context weak_ordering begin
 
   definition "final_insertion_sort xs \<equiv> doN {
     ASSERT (1 < length xs);
-    if length xs \<le> is_threshold then
-      gen_insertion_sort_guarded 1 (length xs) xs
+    lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''list_length'' 1];
+    if\<^sub>N SPECc2 ''icmp_sle'' (\<le>) lxs is_threshold then doN {
+      SPECT [() \<mapsto> cost ''prepareif'' 1];
+      gen_insertion_sort_guarded 1 lxs xs
+    }
     else doN {
+      SPECT [() \<mapsto> cost ''prepareelse'' 1];
       xs \<leftarrow> gen_insertion_sort_guarded 1 is_threshold xs;
-      gen_insertion_sort_unguarded is_threshold is_threshold (length xs) xs
+      gen_insertion_sort_unguarded is_threshold is_threshold lxs xs
     }
   }"  
 
@@ -249,64 +253,300 @@ context weak_ordering begin
     assumes SORTED: "sort_spec (\<^bold><) (slice 0 N xs) (slice 0 N xs')" 
     shows "has_stopper N xs' i"
     using assms transfer_stopper_over_initial_sorting part_sorted_guardedI by blast
+
+
+  term slice_sort_specT
+lemma puulla: "slice_sort_specT (enat (h-i\<^sub>0+1) *m insort_guarded_step_cost) (\<^bold><) xs 0 h
+  = \<Down>Id (timerefine (TId(''slice_sort'' := enat (h-i\<^sub>0+1) *m insort_guarded_step_cost)) (
+          slice_sort_spec (\<^bold><) xs 0 h))"
+  unfolding slice_sort_spec_def slice_sort_specT_def
+  apply(cases "h \<le> length xs"; auto)
+  apply(simp add: SPEC_timerefine_conv) 
+  apply(rule SPEC_cong, simp)
+  by(simp add: timerefineA_cost) 
   
 
-  xxx, ctd here. Just completed proof that we have a guard after initial sorting!  
-    
+  abbreviation "guarded_insort_cost lxs \<equiv> enat (lxs+1) *m insort_guarded_step_cost"
+
+  lemma gen_insertion_sort_guarded_correct_fl: 
+    "\<lbrakk>sorted_wrt_lt (\<^bold><) (take i\<^sub>0 xs); h\<le>length xs ; i\<^sub>0<h; h\<le>length xs \<rbrakk> 
+      \<Longrightarrow> gen_insertion_sort_guarded i\<^sub>0 h xs 
+        \<le> slice_sort_specT (guarded_insort_cost (h-i\<^sub>0)) (\<^bold><) xs 0 h"
+    apply(subst puulla)
+    apply(rule gen_insertion_sort_guarded_correct)
+       apply auto
+    done
+
+
+(* TODO: move*)
+lemma nrest_le_formatI:
+  fixes a :: "(_,(_,enat)acost) nrest"
+  shows  "a \<le> \<Down>Id (timerefine TId b) \<Longrightarrow> a \<le> b"
+  by (auto simp add: timerefine_id)
+
+lemma costmult_right_mono:
+  fixes a :: enat
+  shows "a \<le> a' \<Longrightarrow> a *m c \<le> a' *m c"
+  unfolding costmult_def less_eq_acost_def
+  by (auto simp add: mult_right_mono)  
+
+
+
+  lemma gen_insertion_sort_guarded_correct_threshold: 
+    "\<lbrakk>sorted_wrt_lt (\<^bold><) (take i\<^sub>0 xs); h\<le>length xs ; i\<^sub>0<h; h\<le>length xs; (h-i\<^sub>0)\<le>is_threshold \<rbrakk> 
+      \<Longrightarrow> gen_insertion_sort_guarded i\<^sub>0 h xs 
+        \<le> slice_sort_specT (guarded_insort_cost is_threshold) (\<^bold><) xs 0 h"
+    apply(rule order_trans)
+     apply(rule gen_insertion_sort_guarded_correct_fl)
+        apply auto [4]
+    unfolding slice_sort_specT_def
+    apply(rule nrest_le_formatI)
+    apply(intro refine0 SPEC_both_refine)
+    apply clarsimp
+    apply(rule costmult_right_mono)
+    by auto
+
+lemma brr: "\<lbrakk>sorted_wrt_lt (\<^bold><) (take i\<^sub>0 xs\<^sub>0); h \<le> length xs\<^sub>0; i\<^sub>0 < h; h \<le> length xs\<^sub>0; h - i\<^sub>0 \<le> is_threshold;
+          0 \<le> h \<and> h \<le> length xs\<^sub>0\<rbrakk>
+  \<Longrightarrow> gen_insertion_sort_guarded i\<^sub>0 h xs\<^sub>0 \<le> 
+        SPECT
+         (emb (\<lambda>xs. length xs = length xs\<^sub>0 \<and> take 0 xs = take 0 xs\<^sub>0 \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec (\<^bold><) (slice 0 h xs\<^sub>0) (slice 0 h xs))
+           (guarded_insort_cost is_threshold))
+      "
+  using gen_insertion_sort_guarded_correct_threshold[of i\<^sub>0 xs\<^sub>0 h]
+  unfolding slice_sort_specT_def SPEC_REST_emb'_conv
+  by(cases "0 \<le> h \<and> h \<le> length xs\<^sub>0", auto)
+
+
+  abbreviation "unguarded_insort_cost lxs \<equiv> enat (lxs+1) *m insort_step_cost"
+
+  thm gen_insertion_sort_unguarded_correct
+
+lemma puulla_guarded: "slice_sort_specT (enat (h-i\<^sub>0+1) *m insort_step_cost) (\<^bold><) xs 0 h
+  = \<Down>Id (timerefine (TId(''slice_sort'' := enat (h-i\<^sub>0+1) *m insort_step_cost)) (
+          slice_sort_spec (\<^bold><) xs 0 h))"
+  unfolding slice_sort_spec_def slice_sort_specT_def
+  apply(cases "h \<le> length xs"; auto)
+  apply(simp add: SPEC_timerefine_conv) 
+  apply(rule SPEC_cong, simp)
+  by(simp add: timerefineA_cost) 
+
+  lemma gen_insertion_sort_unguarded_correct_prepared: 
+    "\<lbrakk>sorted_wrt_lt (\<^bold><) (take i\<^sub>0 xs\<^sub>0); (\<forall>i\<in>{i\<^sub>0..<h}. has_stopper N xs\<^sub>0 i) \<and> h\<le>length xs\<^sub>0 ; i\<^sub>0<h; h\<le>length xs\<^sub>0 \<rbrakk> 
+      \<Longrightarrow> gen_insertion_sort_unguarded N i\<^sub>0 h xs\<^sub>0 
+        \<le> SPECT
+         (emb (\<lambda>xs. length xs = length xs\<^sub>0 \<and> take 0 xs = take 0 xs\<^sub>0 \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec (\<^bold><) (slice 0 h xs\<^sub>0) (slice 0 h xs))
+ (unguarded_insort_cost (h)))"
+    apply(rule order.trans)
+     apply(rule gen_insertion_sort_unguarded_correct)
+        apply auto [4]
+    unfolding slice_sort_spec_def slice_sort_specT_def
+    apply auto
+    unfolding SPEC_timerefine_conv SPEC_REST_emb'_conv[symmetric]
+    apply(rule SPEC_leq_SPEC_I, simp)
+    apply(simp add: timerefineA_cost)
+    apply(rule costmult_right_mono)
+    apply simp
+    done
+
+
+
+abbreviation "fi_cost lxs == guarded_insort_cost (is_threshold)
+       + cost ''prepareif'' 1 + cost ''prepareelse'' 1
+      + cost ''if'' 1 +  cost ''list_length'' 1 + cost ''icmp_sle'' 1
+      + unguarded_insort_cost lxs
+    "
+
   lemma final_insertion_sort_correct: 
-    "\<lbrakk>part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs; 1 < length xs\<rbrakk> \<Longrightarrow> final_insertion_sort xs \<le> SPEC (sort_spec (\<^bold><) xs)"
-    unfolding final_insertion_sort_def
-    apply (refine_vcg gen_insertion_sort_correct[THEN order_trans])
+    "\<lbrakk>part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs; 1 < length xs; lxs=length xs\<rbrakk> 
+      \<Longrightarrow> final_insertion_sort xs \<le> \<Down>Id (timerefine (TId(''sort_spec'':=fi_cost lxs)) (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''sort_spec'' 1)))"
+    unfolding final_insertion_sort_def SPEC_timerefine_conv
+    apply simp
+    unfolding SPEC_def
+    unfolding SPECc2_def
+    apply(rule gwp_specifies_I)
+    apply (refine_vcg \<open>-\<close>)
+
+    subgoal (* if branch *)
+      apply(rule brr[THEN gwp_specifies_rev_I, THEN gwp_conseq_0 ])
+      thm  brr[THEN gwp_specifies_rev_I, THEN gwp_conseq_0 ]
+
     apply simp_all
-    subgoal apply (rule sorted_wrt01) by auto  
-    subgoal
-      unfolding slice_sort_spec_def apply refine_vcg
-      apply (auto simp: ) using slice_complete by metis
-    subgoal apply (rule sorted_wrt01) by auto  
-    subgoal
-      unfolding slice_sort_spec_def 
-      apply (refine_vcg gen_insertion_sort_correct[THEN order_trans])
-      apply (simp_all)
+      subgoal apply (rule sorted_wrt01) by auto  
+      apply safe
+      apply(simp_all add: emb_eq_Some_conv)
+      subgoal apply auto  using slice_complete by metis
+      apply(simp add: norm_cost add.assoc )
+      apply sc_solve by auto
+
+    subgoal (* else branch *)
+      apply(rule brr[THEN gwp_specifies_rev_I, THEN gwp_conseq_0 ])
+      apply simp_all
+      subgoal apply (rule sorted_wrt01) by auto  
+      apply(rule gen_insertion_sort_unguarded_correct_prepared[THEN gwp_specifies_rev_I, THEN gwp_conseq_0 ])
+      apply(simp_all add: emb_eq_Some_conv)
       subgoal by (simp add: Misc.slice_def sort_spec_def) 
-      subgoal for xs'
-        apply (clarsimp)
-        by (auto intro!: transfer_guard_over_initial_sorting)
-      subgoal unfolding slice_sort_spec_def apply refine_vcg
-        apply (auto simp: sort_spec_def)
-        apply (metis Misc.slice_def append_take_drop_id drop0 drop_take slice_complete union_code)
-        by (metis slice_complete)
+      subgoal for xs' t M (* transfer guard over initial sorting *)
+        apply safe
+        apply(rule transfer_guard_over_initial_sorting[where xs=xs])
+        by auto
+      subgoal 
+        apply rule
+        subgoal 
+          apply (auto simp: sort_spec_def)
+           apply (metis Misc.slice_def append_take_drop_id drop0 drop_take slice_complete union_code)
+          by (metis slice_complete)
+        subgoal 
+          apply(simp add: norm_cost add.assoc)
+          apply sc_solve
+          by auto
       done                
     done    
-  *)
-  definition "final_insertion_sort2 xs l h \<equiv> undefined"
-   (* doN {
+  done
+
+  definition "final_insertion_sort2 xs l h \<equiv> doN {
     ASSERT (l<h);
-    if h-l \<le> is_threshold then
-      gen_insertion_sort2 True l (l+1) h xs
+    lxs \<leftarrow> SPECc2 ''sub'' (-) h l;
+    if\<^sub>N SPECc2 ''icmp_sle'' (\<le>) lxs is_threshold then do {
+      l' \<leftarrow> SPECc2 ''add'' (+) l 1;
+      gen_insertion_sort_guarded2 l l' h xs
+    }
     else doN {
-      xs \<leftarrow> gen_insertion_sort2 True l (l+1) (l+is_threshold) xs;
-      gen_insertion_sort2 False l (l+is_threshold) h xs
+      l' \<leftarrow> SPECc2 ''add'' (+) l 1;
+      l'' \<leftarrow> SPECc2 ''add'' (+) l is_threshold;
+      xs \<leftarrow> gen_insertion_sort_guarded2 l l' l'' xs;
+      gen_insertion_sort_unguarded2 is_threshold l'' h xs
     }
   }"  
-    
-  lemma final_insertion_sort2_refine: "\<lbrakk>(xsi,xs) \<in> slicep_rel l h\<rbrakk> 
-    \<Longrightarrow> final_insertion_sort2 xsi l h \<le> \<Down>(slice_rel xsi l h) (final_insertion_sort xs)"  
-    unfolding final_insertion_sort2_def final_insertion_sort_def
-    apply (refine_rcg gen_insertion_sort2_refine)
-    apply clarsimp_all
-    apply (auto simp: slicep_rel_def idx_shift_rel_def) [7]
-    apply (subst slice_rel_rebase, assumption)
-    apply (refine_rcg gen_insertion_sort2_refine)
-    apply (auto simp: slice_rel_alt idx_shift_rel_def slicep_rel_def)
-    done
+
+abbreviation "TR_fi2 N == ((TR_is_insert3_guarded N)(''list_length'':=cost ''sub'' 1,
+        ''prepareif'':= cost ''add'' 1, ''prepareelse'':= cost ''add'' (2::enat)  ))"
+
+lemma wfR''_TR_is_insert3_guarded[simp]: "wfR'' (TR_is_insert3_guarded N)"
+  unfolding TR_is_insert3_guarded_def  
+  by (auto simp: pp_TId_absorbs_right pp_fun_upd intro!: wfR''_upd)
+
+lemma wfR''_TR_fi2[simp]: "wfR'' (TR_fi2 N)"
+  by (auto simp: pp_TId_absorbs_right pp_fun_upd intro!: wfR''_upd)
+lemma sp_TR_fi2[simp]: "struct_preserving (TR_fi2 N)" 
+  unfolding TR_is_insert3_guarded_def   
+  by (auto simp: pp_TId_absorbs_right pp_fun_upd intro!: struct_preserving_upd_I)
+
   
-    
-    *)
-    
+  (* TODO: make these refinement steps use the correct TimeRefine *)
+
+  thm gen_insertion_sort_guarded2_refine
+  lemma gen_insertion_sort_guarded2_refine_prepared: 
+    "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l; j\<le>N \<rbrakk> 
+      \<Longrightarrow> gen_insertion_sort_guarded2 l ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_fi2 N) (gen_insertion_sort_guarded i j xs))"
+    sorry                       
+
+  lemma gen_insertion_sort_unguarded2_refine_prepared: 
+    "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l \<rbrakk> 
+      \<Longrightarrow> gen_insertion_sort_unguarded2 N ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_fi2 N) (gen_insertion_sort_unguarded N i j xs))"
+    sorry
+
+
+
+  lemma final_insertion_sort2_refine: "\<lbrakk>(xsi,xs) \<in> slicep_rel l h\<rbrakk> 
+    \<Longrightarrow> final_insertion_sort2 xsi l h \<le> \<Down>(slice_rel xsi l h) (timerefine (TR_fi2 is_threshold) (final_insertion_sort xs))"  
+    unfolding final_insertion_sort2_def final_insertion_sort_def
+    unfolding SPECc2_alt consume_RETURNT[symmetric] 
+    apply normalize_blocks
+
+    supply [refine] = gen_insertion_sort_guarded2_refine_prepared
+                        gen_insertion_sort_unguarded2_refine_prepared
+
+    apply (refine_rcg bindT_refine_conc_time_my_inres MIf_refine consumea_refine) 
+    apply refine_dref_type
+   apply clarsimp_all
+
+
+      apply(all \<open>(simp add: timerefineA_propagate timerefineA_update_cost timerefineA_update_apply_same_cost;fail)?\<close>)
+
+
+             apply (auto simp: slicep_rel_def idx_shift_rel_def ) [9] 
+    subgoal
+      apply(simp add: norm_cost norm_pp TR_is_insert3_guarded_def)
+      apply(subst timerefineA_propagate)
+      by(auto simp: norm_cost  intro!: wfR''_upd)
+    subgoal
+      apply(simp add: norm_cost norm_pp TR_is_insert3_guarded_def)
+      apply sc_solve by simp
+    subgoal 
+        apply (subst slice_rel_rebase, assumption)
+      apply(refine_rcg gen_insertion_sort_unguarded2_refine_prepared)
+      by (auto simp: slice_rel_alt idx_shift_rel_def slicep_rel_def) 
+    done
+
+
+  thm final_insertion_sort2_refine final_insertion_sort_correct
+
+abbreviation "fi2_cost s \<equiv> enat 17 *m TR_is_insert3_guarded is_threshold ''icmp_slt'' + enat 17 *m TR_is_insert3_guarded is_threshold ''add'' + enat 17 *m TR_is_insert3_guarded is_threshold ''is_insert'' +
+        enat 17 *m TR_is_insert3_guarded is_threshold ''call'' +
+        enat 17 *m TR_is_insert3_guarded is_threshold ''if'' +
+        cost ''add'' 1 +
+        cost ''add'' 2 +
+        TR_is_insert3_guarded is_threshold ''if'' +
+        cost ''sub'' 1 +
+        TR_is_insert3_guarded is_threshold ''icmp_sle'' +
+        (enat (Suc s) *m TR_is_insert3_guarded is_threshold ''icmp_slt'' + enat (Suc s) *m TR_is_insert3_guarded is_threshold ''add'' +
+         enat (Suc s) *m TR_is_insert3_guarded is_threshold ''is_insert'' +
+         enat (Suc s) *m TR_is_insert3_guarded is_threshold ''call'' +
+         enat (Suc s) *m TR_is_insert3_guarded is_threshold ''if'')"
+
   lemma final_insertion_sort2_correct: 
     assumes [simplified, simp]: "(xs',xs)\<in>Id" "(l',l)\<in>Id" "(h',h)\<in>Id"   
-    shows "final_insertion_sort2 xs' l' h' \<le> \<Down>Id (timerefine (TId(''slice_sort'':=(enat (h-l+1)) *m cost ''call'' 1)) (final_sort_spec xs l h))"
-    sorry
+      and "T ''slice_sort'' = fi2_cost (h-l)"
+    shows "final_insertion_sort2 xs' l' h' \<le> \<Down>Id (timerefine T (final_sort_spec xs l h))"
+    unfolding final_sort_spec_def slice_sort_spec_def
+    apply(intro refine0)
+    apply(rule order_trans)
+    apply(rule final_insertion_sort2_refine[where xs="slice l h xs"])
+    subgoal by(auto simp: slicep_rel_def)
+    apply(rule order_trans[OF nrest_Rel_mono])
+    apply(rule timerefine_mono2)
+    subgoal
+      apply(intro wfR''_upd) by simp
+    apply(rule final_insertion_sort_correct)
+       apply simp
+      apply simp
+     apply simp
+    apply(simp add: SPEC_timerefine_conv)
+    unfolding slice_rel_def
+    apply(simp add: build_rel_SPEC_conv)
+    apply(rule SPEC_leq_SPEC_I_strong)
+    subgoal by auto
+    subgoal apply (auto simp: timerefineA_cost_apply_costmult   norm_cost)
+      apply(subst assms(4)) apply simp
+      done
+    done
+
+
+lemma fl: 
+  assumes "TR ''slice_sort'' = (enat (h-l+1)) *m cost ''call'' 1"
+  shows  "(timerefine TR (final_sort_spec xs l h))
+        = (timerefine (TId(''slice_sort'':=(enat (h-l+1)) *m cost ''call'' 1)) (final_sort_spec xs l h))"
+  unfolding final_sort_spec_def slice_sort_spec_def
+  apply(cases "1 < h - l \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold (slice l h xs)"; auto)
+  apply(cases "l \<le> h \<and> h \<le> length xs"; auto)
+  apply(simp only: SPEC_timerefine_conv)
+  apply(rule SPEC_cong, simp)
+  apply(rule ext)
+  apply(simp add: norm_tr)
+  apply(subst assms(1))
+  apply simp
+  done
+
+  lemma final_insertion_sort2_correct_flexible: 
+    assumes a[simplified, simp]: "(xs',xs)\<in>Id" "(l',l)\<in>Id" "(h',h)\<in>Id"     
+      and tr: "TR ''slice_sort'' = (enat (h-l+1)) *m cost ''call'' 1"
+    shows "final_insertion_sort2 xs' l' h' \<le> \<Down>Id (timerefine TR (final_sort_spec xs l h))"
+    apply(subst fl[where TR=TR, OF tr])
+    apply(rule final_insertion_sort2_correct)
+      apply (fact assms)+
+    oops
+
   (*
   proof (simp,rule le_nofailI)
     assume "nofail (final_sort_spec xs l h)"
