@@ -130,6 +130,11 @@ end
       cost ''list_set'' 1 + (cost ''mop_cmp_v_idx'' 1 + cost ''sub'' 1 + cost ''if'' 1 + (cost ''list_get'' 1 + cost ''call'' 1)))"
     
       
+
+lemma finite_sum_gtzero_nat_cost:
+  "finite {a. the_acost (cost n m) a > (0::nat)}"
+  unfolding cost_def by (auto simp: zero_acost_def)
+
     lemma is_insert_unguarded_correct: "is_insert_unguarded N xs i \<le> \<Down>Id (timerefine (TId (''is_insert'' := cost_insert N)) (is_insert_spec_unguarded N xs i))"
       unfolding is_insert_unguarded_def is_insert_spec_unguarded_def
       apply (rule refine0)
@@ -140,12 +145,19 @@ end
       unfolding has_stopper_def
       apply(rule gwp_specifies_I)
       apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
-      subgoal sorry
+      subgoal
+        apply(auto simp:  wfR2_def the_acost_zero_app) 
+        unfolding cost_is_insert_step_def
+        apply(auto simp: norm_cost ) 
+        by(auto simp: finite_sum_gtzero_nat_cost)
       subgoal for s a b
         apply (rule loop_body_conditionI)
-        subgoal sorry
+        subgoal
+          unfolding cost_is_insert_step_def
+          apply(simp add: norm_cost)
+          apply sc_solve by auto 
         subgoal 
-          apply (clarsimp simp: cost_is_insert_step_def costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost)
+          apply (clarsimp simp: cost_is_insert_step_def norm_cost)
           apply sc_solve
           apply (simp add: one_enat_def algebra_simps)
           apply (intro conjI)
@@ -301,7 +313,8 @@ end
       apply (intro refine0 bindT_refine_easy consumea_refine; simp)
       apply force
       apply (rule IdI)
-      subgoal sorry
+      subgoal
+        by(simp add: norm_cost)  
       apply (rule bindT_refine_easy)
       apply force
       
@@ -315,11 +328,11 @@ end
         apply (clarsimp split: prod.splits simp: ii2_loop_rel_def)
         apply (refine_rcg bindT_refine_conc_time_my_inres SPECc2_refine' consumea_refine)
         apply refine_dref_type
-        subgoal sorry
+        subgoal apply(intro wfR''_upd) by simp
         subgoal by (simp (no_asm))
-        subgoal sorry
+        subgoal by(auto intro!: preserves_curr_other_updI)
         subgoal by (simp add: inres_SPECc2)
-        subgoal sorry
+        subgoal apply(intro wfR''_upd) by simp
         subgoal by (simp (no_asm))
         subgoal by (simp (no_asm) add: timerefineA_update_apply_same_cost')
         subgoal by (auto simp: inres_SPECc2)
@@ -331,12 +344,12 @@ end
         apply refine_dref_type
         unfolding ii2_loop_rel_def
         apply (auto simp: nth_list_update split: if_splits) []
-        subgoal sorry
+        subgoal  apply(intro wfR''_upd) by simp
         apply simp
-        subgoal sorry
+        subgoal  by(auto intro!: preserves_curr_other_updI)
         subgoal by (auto simp: inres_SPECc2)
         subgoal by (auto simp: inres_SPECc2)
-        subgoal sorry
+        subgoal  apply(intro wfR''_upd) by simp
         subgoal by (simp (no_asm))
         subgoal 
           apply (subst timerefineA_propagate)
@@ -489,7 +502,11 @@ end
       unfolding SPECc2_def
       apply(rule gwp_specifies_I)
       apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
-      subgoal sorry
+      subgoal
+        apply(auto simp:  wfR2_def the_acost_zero_app) 
+        unfolding cost_is_insert_guarded_step_def
+        apply(auto simp: costmult_cost costmult_add_distrib the_acost_propagate ) 
+        by(auto simp: finite_sum_gtzero_nat_cost)
       subgoal 
         apply (rule loop_exit_conditionI)
         apply (refine_vcg \<open>simp\<close>)
@@ -512,7 +529,10 @@ end
       done 
       subgoal for s a b
         apply (rule loop_body_conditionI)
-        subgoal sorry
+        subgoal
+          unfolding cost_is_insert_guarded_step_def
+          apply(simp add: norm_cost)
+          apply sc_solve by auto 
         subgoal 
           apply (clarsimp simp: cost_is_insert_guarded_step_def costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost)
           apply sc_solve
@@ -590,7 +610,7 @@ end
       apply (intro refine0 bindT_refine_easy consumea_refine; simp)
       apply force
       apply (rule IdI)
-      subgoal sorry
+      subgoal by (simp add: norm_cost) 
       apply (rule bindT_refine_easy)
       apply force
       
@@ -607,14 +627,14 @@ end
         
         apply (simp_all (no_asm))
         
-        subgoal apply (rule asm_rl[of "wfR'' _"]) sorry
-        subgoal apply (rule asm_rl[of "preserves_curr _ _"]) sorry
-        subgoal apply (rule asm_rl[of "struct_preserving _"]) sorry
-        subgoal apply (rule asm_rl[of "wfR'' _"]) sorry
-        subgoal apply (rule asm_rl[of "wfR'' _"]) sorry
-        subgoal apply (rule asm_rl[of "preserves_curr _ _"]) sorry
+        subgoal apply(intro wfR''_upd) by simp
+        subgoal  by(auto intro!: preserves_curr_other_updI)
+        subgoal  by(auto intro!: struct_preserving_upd_I)
+        subgoal apply(intro wfR''_upd) by simp
+        subgoal apply(intro wfR''_upd) by simp
+        subgoal  by(auto intro!: preserves_curr_other_updI)
         subgoal by (simp add: inres_SPECc2)
-        subgoal apply (rule asm_rl[of "wfR'' _"]) sorry
+        subgoal apply(intro wfR''_upd) by simp
         subgoal by (simp (no_asm) add: timerefineA_update_apply_same_cost')
         subgoal by (auto simp: inres_SPECc2)
         done
@@ -625,12 +645,12 @@ end
         apply refine_dref_type
         unfolding ii2_loop_rel_def
         apply (auto simp: nth_list_update split: if_splits) []
-        subgoal sorry
+        subgoal apply(intro wfR''_upd) by simp
         apply simp
-        subgoal sorry
+        subgoal  by(auto intro!: preserves_curr_other_updI)
         subgoal by (auto simp: inres_SPECc2)
         subgoal by (auto simp: inres_SPECc2)
-        subgoal sorry
+        subgoal apply(intro wfR''_upd) by simp
         subgoal by (simp (no_asm))
         subgoal 
           apply (subst timerefineA_propagate)
@@ -1057,10 +1077,17 @@ context weak_ordering begin
     unfolding SPEC_REST_emb'_conv SPECc2_def
     apply(rule gwp_specifies_I)
     apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
-    subgoal sorry
+      subgoal
+        apply(auto simp:  wfR2_def the_acost_zero_app) 
+        unfolding cost_is_insert_step_def
+        apply(auto simp: costmult_cost costmult_add_distrib the_acost_propagate ) 
+        by(auto simp: finite_sum_gtzero_nat_cost)
     subgoal
       apply (rule loop_body_conditionI)
-      subgoal sorry
+        subgoal
+          unfolding cost_is_insert_guarded_step_def
+          apply(simp add: norm_cost)
+          apply sc_solve by auto 
       subgoal 
         apply (clarsimp simp: cost_is_insert_guarded_step_def costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost)
         apply sc_solve
@@ -1106,7 +1133,8 @@ context weak_ordering begin
                    (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1))
                          (TId(''is_insert'' := cost_insert N)))
                      TId))"
-  
+
+  (* TODO: enable this kind of reasoning *)
   lemma is_insert3_sorts_one_more: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "i'<j'"
     shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_unguarded N xs' i' j'))"
@@ -1118,11 +1146,56 @@ context weak_ordering begin
       apply rprems
       apply simp_all
       apply (simp add: idx_shift_rel_def)
-      subgoal sorry
+      subgoal apply(simp add: norm_pp ) apply(intro wfR''_upd) by simp
       done
   qed
+(*
+lemma timerefine_mono3: 
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR'' R"
+  shows "c\<le>c' \<Longrightarrow> R=R' \<Longrightarrow> timerefine R c \<le> timerefine R' c'"
+  apply simp
+  apply(rule timerefine_mono2)
+  using assms by auto
 
+  lemma is_insert3_sorts_one_more: 
+    assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "i'<j'"
+    shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_unguarded N xs' i' j'))"
+    using assms apply -
+      apply(rule order_trans)
+     apply(rule is_insert3_unguarded_correct')
+       apply auto [3]
+    apply(rule nrest_Rel_mono) 
+    apply(rule timerefine_mono3)
+    using timerefine_mono3
+    using is_insert_unguarded_sorts_one_more
+    
+    oops 
   
+  proof -
+    note is_insert3_unguarded_correct'
+    also note is_insert_unguarded_sorts_one_more
+    finally show ?thesis using assms unfolding TR_is_insert3_def 
+      apply simp
+      apply rprems
+      apply simp_all
+      apply (simp add: idx_shift_rel_def)
+      subgoal sorry
+      done
+  qed*)
+
+
+lemma wfR''_TR_is_insert3[simp]: "wfR'' (TR_is_insert3 N)"
+  unfolding TR_is_insert3_def
+  apply(simp add: norm_pp )
+  apply(intro wfR''_upd) by simp
+
+
+lemma sp_TR_is_insert3[simp]:"struct_preserving (TR_is_insert3 N)"
+  unfolding TR_is_insert3_def
+  apply(simp add: norm_pp )  by(auto intro!: struct_preserving_upd_I)
+  
+
   lemma gen_insertion_sort_unguarded2_refine: 
     "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l \<rbrakk> 
       \<Longrightarrow> gen_insertion_sort_unguarded2 N ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_is_insert3 N) (gen_insertion_sort_unguarded N i j xs))"
@@ -1132,19 +1205,14 @@ context weak_ordering begin
     apply refine_dref_type
     apply (clarsimp_all simp: inres_SPECc2)
     
-    subgoal sorry
-    subgoal sorry
-    subgoal sorry
     applyS (auto simp: idx_shift_rel_def slice_rel_alt eq_outside_range_triv slicep_rel_def)[]
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal sorry
-    subgoal sorry
+    subgoal unfolding TR_is_insert3_def  by(auto simp: norm_pp intro!: preserves_curr_other_updI)
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal sorry
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal sorry
+    subgoal unfolding TR_is_insert3_def  by(auto simp: norm_pp intro!: preserves_curr_other_updI)
     
     subgoal
       apply (clarsimp simp: idx_shift_rel_def slice_rel_alt) []
@@ -1280,10 +1348,16 @@ context weak_ordering begin
     unfolding SPEC_REST_emb'_conv SPECc2_def
     apply(rule gwp_specifies_I)
     apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
-    subgoal sorry
+      subgoal
+        apply(auto simp:  wfR2_def the_acost_zero_app) 
+        unfolding cost_is_insert_step_def
+        apply(auto simp: costmult_cost costmult_add_distrib the_acost_propagate ) 
+        by(auto simp: finite_sum_gtzero_nat_cost)
     subgoal
       apply (rule loop_body_conditionI)
-      subgoal sorry
+      subgoal
+        apply(simp add: norm_cost)
+        apply sc_solve by auto 
       subgoal 
         apply (clarsimp simp: cost_is_insert_guarded_step_def costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost)
         apply sc_solve
@@ -1333,6 +1407,17 @@ context weak_ordering begin
                    (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1))
                          (TId(''is_insert'' := cost_insert_guarded N)))
                      TId))"
+
+
+
+
+
+
+lemma "TR_is_insert3_guarded N =
+      G"
+  unfolding TR_is_insert3_guarded_def apply(auto simp add: norm_cost  norm_pp)
+  oops
+
   
   (* TODO: Move, better name *)                     
   lemma timerefine_R_cf_mono:
@@ -1350,17 +1435,38 @@ context weak_ordering begin
     finally show ?thesis using assms unfolding TR_is_insert3_guarded_def 
       apply (simp add: idx_shift_rel_def)
       
-      apply (rule order_trans[OF _ timerefine_R_cf_mono])
+      apply (rule order_trans[OF _ ])
       
       apply rprems
       apply simp_all
-      subgoal sorry
-      subgoal sorry
-      subgoal sorry
+      subgoal apply(simp add: norm_pp ) apply(intro wfR''_upd) by simp
+      apply(rule nrest_Rel_mono)
+      unfolding sort_one_more_spec_guarded_def 
+      apply(cases "i' < length xs' \<and> sorted_wrt_lt (\<^bold><) (take i' xs')", auto)
+      apply(simp add: SPEC_timerefine_conv)
+      apply(rule SPEC_leq_SPEC_I, simp)
+      subgoal premises prems
+        unfolding cost_insert_guarded_def cost_is_insert_guarded_step_def
+        apply(auto simp add: norm_pp norm_cost intro!: wfR''_upd )
+        apply(subst timerefineA_propagate, intro wfR''_upd, simp)+
+        apply (simp add: norm_cost )
+        apply sc_solve 
+        using \<open>i' \<le> N\<close> by auto
       done
   qed
 
-  
+
+
+lemma wfR''_TR_is_insert3_guarded[simp]: "wfR'' (TR_is_insert3_guarded N)"
+  unfolding TR_is_insert3_guarded_def
+  apply(simp add: norm_pp )
+  apply(intro wfR''_upd) by simp
+
+lemma sp_TR_is_insert3_guarded[simp]: "struct_preserving (TR_is_insert3_guarded N)"
+  unfolding TR_is_insert3_guarded_def
+  apply(simp add: norm_pp ) 
+  by(auto intro!: struct_preserving_upd_I)
+
   lemma gen_insertion_sort_guarded2_refine: 
     "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l; j\<le>N \<rbrakk> 
       \<Longrightarrow> gen_insertion_sort_guarded2 l ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_is_insert3_guarded N) (gen_insertion_sort_guarded i j xs))"
@@ -1372,21 +1478,16 @@ context weak_ordering begin
     apply (clarsimp_all simp: inres_SPECc2)
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
     
-    subgoal sorry
-    subgoal sorry
-    subgoal sorry
     applyS (auto simp: idx_shift_rel_def slice_rel_alt eq_outside_range_triv slicep_rel_def)[]
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal sorry
-    subgoal sorry
+    subgoal unfolding TR_is_insert3_guarded_def apply(simp add: norm_pp )   by(auto intro!: preserves_curr_other_updI)
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     
-    subgoal sorry
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal sorry
+    subgoal unfolding TR_is_insert3_guarded_def apply(simp add: norm_pp )   by(auto intro!: preserves_curr_other_updI)
     
     subgoal
       apply (clarsimp simp: idx_shift_rel_def slice_rel_alt) []
