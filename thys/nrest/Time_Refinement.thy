@@ -84,6 +84,26 @@ definition timerefine ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoid
                 REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
                   Some cm \<Rightarrow> Some (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))))"
 
+lemma timerefine_alt3:
+  assumes "TR =( \<lambda>cm.  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
+  shows 
+ "timerefine R m = (case m of FAILi \<Rightarrow> FAILi |
+                REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
+                  Some cm \<Rightarrow> Some (TR cm) ))"
+  unfolding assms unfolding timerefine_def by simp
+
+definition "timerefine' TR m = (case m of FAILi \<Rightarrow> FAILi |
+                REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
+                  Some cm \<Rightarrow> Some (TR cm) ))"
+
+lemma timerefine_alt4:
+  fixes R
+  defines "TR \<equiv> ( \<lambda>cm.  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
+  shows "timerefine R m = timerefine' TR m"
+   unfolding timerefine_def timerefine'_def
+  unfolding assms by simp
+
+
 
 definition timerefineF ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoid_add,times,mult_zero}) acost)
                              \<Rightarrow> ('a \<Rightarrow> ('b,'d) acost option) \<Rightarrow> ('a \<Rightarrow> ('c,'d) acost option)"
@@ -1207,6 +1227,11 @@ lemma costmult_cost:
   fixes x :: "'b::comm_semiring_1"
   shows "x *m (cost n y) = cost n (x*y)"
   by(auto simp: costmult_def cost_def zero_acost_def)
+
+
+lemma timerefineA_cost_apply_costmult: "timerefineA TR (cost n (t::enat)) = t *m (TR n)"
+  by (simp add: costmult_def timerefineA_cost_apply)  
+
 
 subsection \<open>TId\<close>
 
