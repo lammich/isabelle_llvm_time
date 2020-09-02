@@ -1103,7 +1103,7 @@ context heap_context begin
 
       if\<^sub>N  mop_cmpo_idxs (cost ''cmpo_idxs'' 1) xs lplci lprci then
         doN {
-        if\<^sub>N mop_cmpo_v_idx (cost ''cmpo_v_idxs'' 1) xs v lprci then \<comment> \<open>this is actually one more list_get then in sift_down2 !\<close>
+        if\<^sub>N mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) xs v lprci then \<comment> \<open>this is actually one more list_get then in sift_down2 !\<close>
           doN {
             (rc,xs) \<leftarrow> mop_geth3 l h xs rci;
             xs \<leftarrow> mop_seth3 l h xs i rc;
@@ -1112,7 +1112,7 @@ context heap_context begin
         else
           RETURN (xs,i,False)
         }
-      else if\<^sub>N mop_cmpo_v_idx (cost ''cmpo_v_idxs'' 1) xs v lplci then
+      else if\<^sub>N mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) xs v lplci then
         doN {
           (lc,xs) \<leftarrow> mop_geth3 l h xs lci;
           xs \<leftarrow> mop_seth3 l h xs i lc;
@@ -1129,7 +1129,7 @@ context heap_context begin
       lci \<leftarrow> mop_lchild3 h i;
       ASSERT (l+lci<h);
       lplci \<leftarrow> SPECc2 ''add'' (+) l lci;
-      if\<^sub>N mop_cmpo_v_idx (cost ''cmpo_v_idxs'' 1) xs v lplci then
+      if\<^sub>N mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) xs v lplci then
         doN {
           (lc,xs) \<leftarrow> mop_geth3 l h xs lci;
           xs \<leftarrow> mop_seth3 l h xs i lc;
@@ -1302,7 +1302,7 @@ definition E_sd3_l :: "_ \<Rightarrow> _ \<Rightarrow> (char list, nat) acost" w
             cost ''add'' (4*p) +
             ( p *m mop_array_nth_cost) +
            ( p *m mop_array_upd_cost ) +
-            (cost ''if'' p + (cost ''cmpo_idxs'' p + (cost ''if'' p + (cost ''cmpo_v_idxs'' p
+            (cost ''if'' p + (cost ''cmpo_idxs'' p + (cost ''if'' p + (cost ''cmpo_v_idx'' p
            + (cost_rchild p + (cost_lchild (2*p) + (cost ''call'' p + (cost_has_rchild (2*p)
              + cost ''and'' p + cost ''if'' p)))))))))"
 
@@ -1311,7 +1311,7 @@ definition sift_down3_cost :: "_ \<Rightarrow> ecost" where
             cost ''sub'' 1
       + cost ''add'' 5 
       + lift_acost mop_array_upd_cost + lift_acost mop_array_nth_cost + lift_acost mop_array_upd_cost
-      + cost ''if'' 1 + cost ''cmpo_v_idxs'' 1 + cost_lchild 1 + cost ''if'' 1 
+      + cost ''if'' 1 + cost ''cmpo_v_idx'' 1 + cost_lchild 1 + cost ''if'' 1 
       + cost_has_lchild 2 +
       lift_acost (E_sd3_l i True) 
       + cost_has_rchild 2 + cost ''and'' 1 + cost ''if'' 1 + lift_acost mop_array_nth_cost
@@ -2358,12 +2358,6 @@ lemma  mop_seth3_refine:
   by(auto simp: preserves_curr_def ) 
 
 
-abbreviation "E45 \<equiv> TId(''cmpo_idxs'':=cmpo_idxs2'_cost,''cmpo_v_idxs'':=cmpo_v_idx2'_cost, ''list_swap'':= myswap_cost)"
-
-lemma wfR''E[simp]: " wfR'' E45" by (auto intro!: wfR''_upd)
-
-lemma sp_E45[simp]: "struct_preserving E45"
-  by (auto intro!: struct_preserving_upd_I)
 
 lemma mop_has_rchild3_refine:
   fixes TR :: "_ \<Rightarrow> ecost"
@@ -2423,21 +2417,21 @@ lemma mop_has_lchild3_refine:
 
 lemma cmpo_idxs2'_refines_mop_cmpo_idxs_with_E':
   "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
-    cmpo_idxs2' a b c \<le> \<Down> bool_rel (timerefine E45 (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) a' b' c'))"
+    cmpo_idxs2' a b c \<le> \<Down> bool_rel (timerefine TR_cmp_swap (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) a' b' c'))"
   apply(rule cmpo_idxs2'_refines_mop_cmpo_idxs_with_E)
   by (auto simp: timerefineA_update_apply_same_cost')
   
 
 lemma  cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E':
  "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id
-     \<Longrightarrow> cmpo_v_idx2' a b c \<le> \<Down> bool_rel (timerefine E45 (mop_cmpo_v_idx (cost ''cmpo_v_idxs'' 1) a' b' c'))"
+     \<Longrightarrow> cmpo_v_idx2' a b c \<le> \<Down> bool_rel (timerefine TR_cmp_swap (mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) a' b' c'))"
   apply(rule cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E)
   by (auto simp: timerefineA_update_apply_same_cost')
   
 
 lemma elegant: 
   assumes "(l,l')\<in>Id" "(h,h')\<in>Id" "(i\<^sub>0,i\<^sub>0')\<in>Id" "(xs,xs')\<in>Id"
-  shows " sift_down5 l h i\<^sub>0 xs \<le> \<Down>Id (timerefine E45 (sift_down4 (\<^bold><) l' h' i\<^sub>0' xs'))"
+  shows " sift_down5 l h i\<^sub>0 xs \<le> \<Down>Id (timerefine TR_cmp_swap (sift_down4 (\<^bold><) l' h' i\<^sub>0' xs'))"
   using assms
   supply conc_Id[simp del] mop_cmpo_v_idx_def[simp del]
   unfolding sift_down5_def sift_down4_def
@@ -2454,7 +2448,7 @@ lemma elegant:
     cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E'
   apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
   apply refine_dref_type
-  apply(all \<open>(intro sp_E45 preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply(all \<open>(intro  preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
   apply (simp_all (no_asm))
   apply auto
   done
@@ -2477,14 +2471,14 @@ lemma elegant:
   }"   
 
 
-lemma heapify_btu3_refine: "(l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> heapify_btu3 l h xs\<^sub>0 \<le> \<Down> Id (timerefine E45 (heapify_btu2 (\<^bold><) l' h' xs\<^sub>0'))"
+lemma heapify_btu3_refine: "(l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> heapify_btu3 l h xs\<^sub>0 \<le> \<Down> Id (timerefine TR_cmp_swap (heapify_btu2 (\<^bold><) l' h' xs\<^sub>0'))"
   supply conc_Id[simp del] 
   unfolding heapify_btu3_def heapify_btu2_def
   supply SPECc2_refine'[refine]
   supply elegant[refine]
   apply(refine_rcg bindT_refine_easy monadic_WHILEIT_refine')
   apply refine_dref_type 
-  apply(all \<open>(intro sp_E45 preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply(all \<open>(intro preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
   by auto
 
 
@@ -2516,13 +2510,13 @@ lemma heapify_btu3_refine: "(l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Long
 
 lemma myswap_refine':
    "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
-       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E45 (mop_list_swapN xs' l' h'))"
+       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (mop_list_swapN xs' l' h'))"
   apply(rule myswap_refine)
   by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
 
 lemma heapsort3_refine:
   fixes xs\<^sub>0 :: "'a list" 
-  shows "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h\<^sub>0,h\<^sub>0')\<in>Id \<Longrightarrow> heapsort3  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine E45 (heapsort2 xs\<^sub>0' l' h\<^sub>0'))" 
+  shows "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h\<^sub>0,h\<^sub>0')\<in>Id \<Longrightarrow> heapsort3  xs\<^sub>0 l h\<^sub>0 \<le> \<Down>Id (timerefine TR_cmp_swap (heapsort2 xs\<^sub>0' l' h\<^sub>0'))" 
   unfolding heapsort3_def heapsort2_def
   supply conc_Id[simp del] 
   supply SPECc2_refine'[refine]
@@ -2531,7 +2525,7 @@ lemma heapsort3_refine:
   supply myswap_refine'[refine]
   apply(refine_rcg bindT_refine_conc_time_my_inres MIf_refine monadic_WHILEIT_refine')
   apply refine_dref_type 
-  apply(all \<open>(intro sp_E45 preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply(all \<open>(intro preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
   by (auto simp: SPECc2_def)
 
 

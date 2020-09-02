@@ -145,27 +145,23 @@ definition "move_median_to_first2 ri ai bi ci (xs::'a list) \<equiv> doN {
               (myswap xs ri bi)
           })
       })
-  }"
-
-abbreviation "E_mmtf == TId(''cmp_idxs'':=cmp_idxs2'_cost, ''list_swap'':= myswap_cost)"
-
-lemma wfR''E_mmtf[simp]: "wfR'' E_mmtf" by (auto intro!: wfR''_upd)
+  }" 
 
 lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E':
   "b'\<noteq>c' \<Longrightarrow> (a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
-    cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine E_mmtf (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
+    cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine TR_cmp_swap (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
   apply(rule cmp_idxs2'_refines_mop_cmp_idxs_with_E)
   by(auto simp: timerefineA_update_apply_same_cost')
 
 lemma myswap_refine':
    "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
-       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (mop_list_swapN xs' l' h'))"
+       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (mop_list_swapN xs' l' h'))"
   apply(rule myswap_refine)
   by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero) 
  
 lemma move_median_to_first2_refine':
   assumes "(ri,ri')\<in>Id" "(ai,ai')\<in>Id" "(bi,bi')\<in>Id" "(ci,ci')\<in>Id" "(xs,xs')\<in>Id"
-  shows "move_median_to_first2 ri ai bi ci xs \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine E_mmtf (move_median_to_first ri' ai' bi' ci' xs'))"
+  shows "move_median_to_first2 ri ai bi ci xs \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (move_median_to_first ri' ai' bi' ci' xs'))"
   using assms
   unfolding move_median_to_first2_def move_median_to_first_def
   supply cmp_idxs2'_refines_mop_cmp_idxs_with_E'[refine]
@@ -709,7 +705,31 @@ lemma partition_pivot_correct: "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\
   subgoal by (metis diff_is_0_eq' le_trans nat_less_le not_numeral_le_zero slice_eq_mset_eq_length)
   subgoal by auto
   done
-  
+
+
+lemma TR_pp_important:
+  assumes "TR ''partition'' =  TR_pp ''partition''"
+  shows "timerefine TR (partition3_spec xs' l' h') = timerefine TR_pp (partition3_spec xs' l' h')"
+    unfolding partition3_spec_def
+  apply(cases "4 \<le> h' - l' \<and> h' \<le> length xs'"; auto)
+  apply(simp only: SPEC_timerefine_conv)
+  apply(rule SPEC_cong, simp)
+  apply(rule ext)
+  apply(simp add: norm_tr timerefineA_cost_apply_costmult)
+  apply(subst assms(1))
+  apply simp
+  done
+
+
+lemma partition_pivot_correct_flexible: 
+  assumes "TR ''partition'' =  TR_pp ''partition''"
+  shows "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> 
+  \<Longrightarrow> partition_pivot xs l h \<le> \<Down>Id (timerefine TR (partition3_spec xs' l' h'))"
+  apply(subst TR_pp_important[where TR=TR, OF assms])
+  apply(rule partition_pivot_correct)
+  apply auto
+  done
+
     
 end  
   
@@ -759,7 +779,7 @@ declare qsp_next_h_impl.refine[sepref_fr_rules]
 
 lemma qsp_next_l2_refines:
   "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (pi,pi')\<in>Id \<Longrightarrow> (li\<^sub>0,li\<^sub>0')\<in>Id \<Longrightarrow> (hi\<^sub>0,hi\<^sub>0')\<in>Id
-     \<Longrightarrow> qsp_next_l2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0 \<le> \<Down> Id (timerefine E_mmtf (ungrd_qsp_next_l_spec ungrd_qsp_next_l_cost xs\<^sub>0' pi' li\<^sub>0' hi\<^sub>0'))"
+     \<Longrightarrow> qsp_next_l2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0 \<le> \<Down> Id (timerefine TR_cmp_swap (ungrd_qsp_next_l_spec ungrd_qsp_next_l_cost xs\<^sub>0' pi' li\<^sub>0' hi\<^sub>0'))"
   apply(rule order.trans)
    defer
   apply(rule nrest_Rel_mono)  apply(rule timerefine_mono2)
@@ -773,7 +793,7 @@ lemma qsp_next_l2_refines:
 
 lemma qsp_next_h2_refines:
   "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (pi,pi')\<in>Id \<Longrightarrow> (li\<^sub>0,li\<^sub>0')\<in>Id \<Longrightarrow> (hi\<^sub>0,hi\<^sub>0')\<in>Id
-     \<Longrightarrow> qsp_next_h2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0 \<le> \<Down> Id (timerefine E_mmtf (ungrd_qsp_next_h_spec ungrd_qsp_next_r_cost xs\<^sub>0' pi' li\<^sub>0' hi\<^sub>0'))"
+     \<Longrightarrow> qsp_next_h2 xs\<^sub>0 pi li\<^sub>0 hi\<^sub>0 \<le> \<Down> Id (timerefine TR_cmp_swap (ungrd_qsp_next_h_spec ungrd_qsp_next_r_cost xs\<^sub>0' pi' li\<^sub>0' hi\<^sub>0'))"
   apply(rule order.trans)
    defer
   apply(rule nrest_Rel_mono)  apply(rule timerefine_mono2)
@@ -821,7 +841,7 @@ definition "qs_partition2 li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<equiv> doN {
 }"   
 lemma qs_partition2_refines:
   "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (pi,pi')\<in>Id \<Longrightarrow> (li\<^sub>0,li\<^sub>0')\<in>Id \<Longrightarrow> (hi\<^sub>0,hi\<^sub>0')\<in>Id
-   \<Longrightarrow> qs_partition2 li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<le> \<Down> Id (timerefine E_mmtf (qs_partition li\<^sub>0' hi\<^sub>0' pi' xs\<^sub>0'))"
+   \<Longrightarrow> qs_partition2 li\<^sub>0 hi\<^sub>0 pi xs\<^sub>0 \<le> \<Down> Id (timerefine TR_cmp_swap (qs_partition li\<^sub>0' hi\<^sub>0' pi' xs\<^sub>0'))"
   unfolding qs_partition2_def qs_partition_def
   supply qsp_next_l2_refines[refine]
   supply qsp_next_h2_refines[refine]
@@ -875,7 +895,7 @@ definition "partition_pivot2 xs\<^sub>0 l h \<equiv> doN {
 
 lemma partition_pivot2_refines:
   "(xs\<^sub>0,xs\<^sub>0')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
-    \<Longrightarrow> partition_pivot2 xs\<^sub>0 l h \<le> \<Down> Id (timerefine E_mmtf (partition_pivot xs\<^sub>0' l' h'))"
+    \<Longrightarrow> partition_pivot2 xs\<^sub>0 l h \<le> \<Down> Id (timerefine TR_cmp_swap (partition_pivot xs\<^sub>0' l' h'))"
   unfolding partition_pivot2_def partition_pivot_def
   supply move_median_to_first2_refine'[refine]
   supply qs_partition2_refines[refine]
@@ -923,7 +943,7 @@ schematic_goal partition_pivot2_correct: "(xs,xs')\<in>Id \<Longrightarrow> (l,l
   apply(subst timerefine_iter2) 
     apply auto [2]  
   unfolding move_median_to_first_cost_def
-  apply(simp only: pp_fun_upd pp_TId_absorbs_right timerefineA_propagate[OF wfR''E_mmtf]) 
+  apply(simp only: pp_fun_upd pp_TId_absorbs_right timerefineA_propagate[OF wfR''E]) (* TODO rename wfR''E *)
   apply (simp add:  cmp_idxs2'_cost_def myswap_cost_def
         lift_acost_cost lift_acost_propagate timerefineA_update_cost add.assoc
          timerefineA_update_apply_same_cost' costmult_add_distrib costmult_cost)

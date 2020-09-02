@@ -584,8 +584,8 @@ definition "cmpo_v_idx2'_cost = lift_acost mop_array_nth_cost + (cost lt_curr_na
 
 lemma  cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E:
   assumes "wfR'' EE"
-    and "cmpo_v_idx2'_cost \<le> timerefineA EE (cost ''cmpo_v_idxs'' 1)"
-  shows "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow> cmpo_v_idx2' a b c \<le> \<Down> bool_rel (timerefine EE (mop_cmpo_v_idx (cost ''cmpo_v_idxs'' 1) a' b' c'))"
+    and "cmpo_v_idx2'_cost \<le> timerefineA EE (cost ''cmpo_v_idx'' 1)"
+  shows "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow> cmpo_v_idx2' a b c \<le> \<Down> bool_rel (timerefine EE (mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) a' b' c'))"
   supply conc_Id[simp del]
     unfolding cmpo_v_idx2'_def mop_cmpo_v_idx_def
     unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
@@ -670,6 +670,10 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
       by (simp add: lift_acost_zero cmp_idxs2'_cost_def) 
     subgoal by simp
     done
+
+
+
+
 
 
 
@@ -1413,7 +1417,51 @@ lemma myswap_refine:
   done
 
 
+subsection \<open>A Timerefinement that refines compare and swap operations to executable ones\<close>
 
+context sort_impl_context
+begin
+
+abbreviation "TR_cmp_swap \<equiv> TId(''cmp_idxs'':=cmp_idxs2'_cost, ''cmpo_idxs'':=cmpo_idxs2'_cost,''cmpo_v_idx'':=cmpo_v_idx2'_cost, ''list_swap'':= myswap_cost)"
+
+lemma wfR''E[simp]: " wfR'' TR_cmp_swap" by (auto intro!: wfR''_upd)
+
+lemma sp_E45[simp]: "struct_preserving TR_cmp_swap"
+  by (auto intro!: struct_preserving_upd_I)
+
+
+lemma mop_oarray_upd_refines:
+  assumes "wfR'' TR"
+    and "preserves_curr TR ''store''"
+    and "preserves_curr TR ''ofs_ptr''"
+  shows "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow>
+      mop_oarray_upd a b c \<le> \<Down> Id (timerefine TR (mop_oarray_upd a' b' c'))"
+  unfolding mop_oarray_upd_def mop_eo_set_def   
+  using assms
+    apply(intro refine0)
+    apply (auto simp: timerefineA_cost_apply_costmult timerefineA_propagate
+          lift_acost_propagate lift_acost_cost timerefineA_update_apply_same_cost intro!: wfR''_upd) 
+  apply(simp add: assms(2,3)[THEN preserves_curr_D] costmult_cost)
+  done
+
+lemma mop_oarray_extract_refines:
+  assumes "wfR'' TR"
+    and "preserves_curr TR ''load''"
+    and "preserves_curr TR ''ofs_ptr''"
+  shows "(x,x')\<in>Id \<Longrightarrow> (i,i')\<in>Id \<Longrightarrow> 
+      mop_oarray_extract x i \<le> \<Down> Id (timerefine TR (mop_oarray_extract x' i'))"
+  unfolding mop_oarray_extract_def mop_eo_extract_def   
+  using assms
+    apply(intro refine0)
+    apply (auto simp: timerefineA_cost_apply_costmult timerefineA_propagate
+          lift_acost_propagate lift_acost_cost timerefineA_update_apply_same_cost intro!: wfR''_upd) 
+  apply(simp add: assms(2,3)[THEN preserves_curr_D] costmult_cost)
+  done 
+
+
+
+
+end
 
 
 
