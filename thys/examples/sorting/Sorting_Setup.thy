@@ -4,6 +4,20 @@ theory Sorting_Setup
 begin
   hide_const (open) Word.slice
 
+
+
+(* TODO: move *)
+lemma TId_apply: "TId x = cost x 1"
+  by (auto simp add: cost_def TId_def zero_acost_def)
+
+lemmas norm_cost = costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost
+              the_acost_propagate timerefineA_cost lift_acost_zero timerefineA_propagate TId_apply
+              timerefineA_cost_apply_costmult
+
+lemmas norm_pp = pp_TId_absorbs_right pp_TId_absorbs_left pp_fun_upd
+
+
+
 (* TODO: move *)
 lemma [simp]: "RETURNTecost v \<le> SPECc2 n f a b
       \<longleftrightarrow> (f a b = v)"
