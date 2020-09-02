@@ -262,7 +262,7 @@ end
       (xs,i)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
         (\<lambda>(xs,i). (doN { 
           ASSERT (i>0);
-          t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; mop_cmpo_v_idx (cost ''mop_cmpo_v_idx'' 1) xs x t\<^sub>2
+          t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) xs x t\<^sub>2
         }))
         (\<lambda>(xs,i). doN {
           ASSERT (i>0 \<and> i<length xs);
@@ -286,7 +286,7 @@ end
     abbreviation "TR_ii2 \<equiv> TId(
       ''list_get'' := lift_acost mop_array_nth_cost,
       ''list_set'' := lift_acost mop_array_upd_cost,
-      ''mop_cmp_v_idx'' := cost ''mop_cmpo_v_idx'' 1
+      ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1
     )"
     
     lemma is_insert2_unguarded_refine: "is_insert2_unguarded N xs i \<le>\<Down>(\<langle>Id\<rangle>list_rel) (timerefine TR_ii2 (is_insert_unguarded N xs i))"
@@ -559,7 +559,7 @@ end
           else doN {
             ASSERT(i>0);
             t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; 
-            mop_cmpo_v_idx (cost ''mop_cmpo_v_idx'' 1) xs x t\<^sub>2
+            mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) xs x t\<^sub>2
           }
         }))
         (\<lambda>(xs,i). doN {
@@ -670,7 +670,7 @@ end
           else doN {
             ASSERT(i>0);
             t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; 
-            mop_cmpo_v_idx (cost ''mop_cmpo_v_idx'' 1) xs x t\<^sub>2
+            mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) xs x t\<^sub>2
           }
         }))
         (\<lambda>(xs,i). doN {
@@ -738,29 +738,124 @@ end
 find_theorems mop_oarray_extract mop_eo_extract
 
 context sort_impl_context begin
-  
-  sepref_def is_guarded_insert_impl is "uncurry2 (PR_CONST (is_insert3_guarded))" 
-    :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
-    unfolding is_insert3_guarded_def PR_CONST_def
-    supply [[goals_limit = 1]]
-    apply (annot_snat_const "TYPE(size_t)")
-    apply sepref_dbg_keep
-    apply sepref_dbg_trans_keep
-    oops
-    
-    find_in_thms "(=)" in sepref_fr_rules
-    
 
-  sepref_def is_unguarded_insert_impl is "uncurry (PR_CONST (is_insert2_unguarded N))" 
+
+    definition is_insert_unguarded4 :: "nat \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "is_insert_unguarded4 N xs i \<equiv> doN {
+      \<^cancel>\<open>(*ASSERT (\<exists>guard_idx. guard_idx<i \<and> \<not>xs!i\<^bold><xs!guard_idx);*)\<close>
+      ASSERT (i<length xs);
+      
+      xs \<leftarrow> mop_to_eo_conv xs;
+      (x,xs) \<leftarrow> mop_oarray_extract xs i;
+    
+      (xs,i)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
+        (\<lambda>(xs,i). (doN { 
+          ASSERT (i>0);
+          t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1;
+          cmpo_v_idx2' xs x t\<^sub>2
+        }))
+        (\<lambda>(xs,i). doN {
+          ASSERT (i>0 \<and> i<length xs);
+          i' \<leftarrow> SPECc2 ''sub'' (-) i 1;
+          (x,xs) \<leftarrow> mop_oarray_extract xs i';
+          xs \<leftarrow> mop_oarray_upd xs i x;
+          RETURNT (xs,i')
+        }) (xs,i);
+
+      xs \<leftarrow> mop_oarray_upd xs i x;  
+      
+      xs \<leftarrow> mop_to_wo_conv xs;
+      
+      RETURN xs
+    }"
+
+
+  lemma is_insert_unguarded4_refines:
+    "(xs,xs')\<in>Id \<Longrightarrow> (i,i')\<in>Id \<Longrightarrow> 
+      is_insert_unguarded4 N xs i \<le> \<Down>Id (timerefine TR_cmp_swap (is_insert2_unguarded N xs' i'))"
+    supply conc_Id[simp del] mop_cmpo_v_idx_def[simp del]
+    unfolding is_insert_unguarded4_def is_insert2_unguarded_def
+    supply [refine] = mop_to_eo_conv_refine  mop_to_wo_conv_refines
+          cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E
+          mop_oarray_extract_refines mop_oarray_upd_refines
+    apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
+                        apply refine_dref_type
+  apply(all \<open>(intro  preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply (simp_all (no_asm))
+  apply (auto simp: timerefineA_cost)  
+    done
+
+  context 
+    fixes N :: nat
+  begin
+        sepref_register "is_insert_unguarded4 N"
+  end
+
+
+  sepref_def is_unguarded_insert_impl is "uncurry (PR_CONST (is_insert_unguarded4 N))" 
     :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
-    unfolding is_insert2_unguarded_def PR_CONST_def
-    supply [[goals_limit = 1]]
+    unfolding is_insert_unguarded4_def PR_CONST_def
     apply (annot_snat_const "TYPE(size_t)")
-    apply sepref_dbg_keep
-    apply sepref_dbg_trans_keep
-    oops
+    by sepref
     
 
+  
+
+  definition is_insert_guarded4 :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest"
+    where "is_insert_guarded4 xs l i \<equiv> doN {
+      \<^cancel>\<open>(*ASSERT (\<exists>guard_idx. guard_idx<i \<and> \<not>xs!i\<^bold><xs!guard_idx);*)\<close>
+      ASSERT (i<length xs);
+      
+      xs \<leftarrow> mop_to_eo_conv xs;
+      (x,xs) \<leftarrow> mop_oarray_extract xs i;
+    
+      (xs,i)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
+        (\<lambda>(xs,i). (doN { 
+          if\<^sub>N SPECc2 ''icmp_eq'' (=) i l then RETURNT False
+          else doN {
+            ASSERT(i>0);
+            t\<^sub>2 \<leftarrow> SPECc2 ''sub'' (-) i 1; 
+            cmpo_v_idx2' xs x t\<^sub>2
+          }
+        }))
+        (\<lambda>(xs,i). doN {
+          ASSERT (i>0 \<and> i<length xs);
+          i' \<leftarrow> SPECc2 ''sub'' (-) i 1;
+          (x,xs) \<leftarrow> mop_oarray_extract xs i';
+          xs \<leftarrow> mop_oarray_upd xs i x;
+          RETURNT (xs,i')
+        }) (xs,i);
+
+      xs \<leftarrow> mop_oarray_upd xs i x;  
+      
+      xs \<leftarrow> mop_to_wo_conv xs;
+      
+      RETURN xs
+    }"
+
+
+  lemma is_insert_guarded4_refines:
+    "(xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (i,i')\<in>Id
+       \<Longrightarrow> is_insert_guarded4 xs l i \<le> \<Down>Id (timerefine TR_cmp_swap (is_insert3_guarded xs' l' i'))"
+    supply conc_Id[simp del] mop_cmpo_v_idx_def[simp del]
+    unfolding is_insert_guarded4_def is_insert3_guarded_def
+    supply [refine] = mop_to_eo_conv_refine  mop_to_wo_conv_refines
+          cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E
+          mop_oarray_extract_refines mop_oarray_upd_refines
+    apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
+                        apply refine_dref_type
+  apply(all \<open>(intro  preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply (simp_all (no_asm))
+  apply (auto simp: timerefineA_cost)  
+  done
+    
+
+  sepref_register is_insert_guarded4
+
+  sepref_def is_guarded_insert_impl is "uncurry2 (PR_CONST (is_insert_guarded4))" 
+    :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
+    unfolding is_insert_guarded4_def PR_CONST_def
+    apply (annot_snat_const "TYPE(size_t)")
+    by sepref 
     
 end    
 
@@ -1008,7 +1103,7 @@ context weak_ordering begin
   }"  
   
   definition "TR_is_insert3 N \<equiv> (
-                   (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''mop_cmpo_v_idx'' 1))
+                   (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1))
                          (TId(''is_insert'' := cost_insert N)))
                      TId))"
   
@@ -1062,26 +1157,47 @@ context weak_ordering begin
 end
     
 context sort_impl_context begin
+
+
+  definition "gen_insertion_sort_unguarded3 N i h xs \<equiv> doN {
+    (xs,_)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
+      (\<lambda>(xs,i). SPECc2 ''icmp_slt'' (<) i h) 
+      (\<lambda>(xs,i). doN {
+        xs \<leftarrow> is_insert_unguarded4 N xs i;
+        ASSERT (i<h);
+        i \<leftarrow> SPECc2 ''add'' (+) i 1;
+        RETURN (xs,i)
+      }) (xs,i);
+    RETURN xs
+  }"  
+
+
+  lemma gen_insertion_sort_unguarded3_refines:
+    "(i,i')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (xs,xs')\<in>Id
+      \<Longrightarrow> gen_insertion_sort_unguarded3 N i h xs \<le> \<Down>Id (timerefine TR_cmp_swap (gen_insertion_sort_unguarded2 N i' h' xs'))"
+    supply conc_Id[simp del]
+    unfolding gen_insertion_sort_unguarded3_def gen_insertion_sort_unguarded2_def
+    supply [refine] = is_insert_unguarded4_refines
+    apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
+                        apply refine_dref_type
+  apply(all \<open>(intro  preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply (simp_all (no_asm))
+  apply (auto simp: timerefineA_cost)  
+  done
+
+
+
   context fixes N :: nat begin
   sepref_register 
-    unguarded_insertion_sort2: "gen_insertion_sort_unguarded2 N"
-    (*guarded_insertion_sort2: "gen_insertion_sort2 True"*)
+    unguarded_insertion_sort2: "gen_insertion_sort_unguarded3 N"
   end
     
-  sepref_def unguarded_insertion_sort_impl is "uncurry2 (PR_CONST (gen_insertion_sort_unguarded2 N))" 
+  sepref_def unguarded_insertion_sort_impl is "uncurry2 (PR_CONST (gen_insertion_sort_unguarded3 N))" 
     :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn elem_assn"
-    unfolding gen_insertion_sort_unguarded2_def PR_CONST_def
+    unfolding gen_insertion_sort_unguarded3_def PR_CONST_def
     apply (annot_snat_const "TYPE(size_t)")
-    apply sepref_dbg_keep
-    oops
+    by sepref 
     
-  (*  
-  sepref_def guarded_insertion_sort_impl is "uncurry3 (PR_CONST (gen_insertion_sort2 True))" 
-    :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (woarray_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a woarray_assn elem_assn"
-    unfolding gen_insertion_sort2_def PR_CONST_def
-    apply (annot_snat_const "TYPE(size_t)")
-    by sepref
-  *)
 end    
     
     
@@ -1214,7 +1330,7 @@ context weak_ordering begin
   }"  
   
   definition "TR_is_insert3_guarded N \<equiv> (
-                   (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''mop_cmpo_v_idx'' 1))
+                   (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1))
                          (TId(''is_insert'' := cost_insert_guarded N)))
                      TId))"
   
@@ -1280,7 +1396,55 @@ context weak_ordering begin
 end    
     
     
+     
+context sort_impl_context begin
+
+  
     
+  definition "gen_insertion_sort_guarded3 l i h xs \<equiv> doN {
+    ASSERT (l \<le> i);
+    (xs,_)\<leftarrow>monadic_WHILEIT (\<lambda>_. True)
+      (\<lambda>(xs,i). SPECc2 ''icmp_slt'' (<) i h) 
+      (\<lambda>(xs,i). doN {
+        xs \<leftarrow> is_insert_guarded4 xs l i;
+        ASSERT (i<h);
+        i \<leftarrow> SPECc2 ''add'' (+) i 1;
+        RETURN (xs,i)
+      }) (xs,i);
+    RETURN xs
+  }"  
+
+
+  lemma gen_insertion_sort_guarded3_refines:
+    "(l,l')\<in>Id \<Longrightarrow> (i,i')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (xs,xs')\<in>Id
+      \<Longrightarrow> gen_insertion_sort_guarded3 l i h xs \<le> \<Down>Id (timerefine TR_cmp_swap (gen_insertion_sort_guarded2 l i' h' xs'))"
+    supply conc_Id[simp del]
+    unfolding gen_insertion_sort_guarded3_def gen_insertion_sort_guarded2_def
+    supply [refine] = is_insert_guarded4_refines
+    apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
+                        apply refine_dref_type
+  apply(all \<open>(intro  preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+  apply (simp_all (no_asm))
+  apply (auto simp: timerefineA_cost)  
+  done
+
+
+
+  
+
+
+
+
+  sepref_register    
+    guarded_insertion_sort3: "gen_insertion_sort_guarded3"
+
+  sepref_def guarded_insertion_sort_impl is "uncurry3 (PR_CONST (gen_insertion_sort_guarded3))" 
+    :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn elem_assn"
+    unfolding gen_insertion_sort_guarded3_def PR_CONST_def
+    apply (annot_snat_const "TYPE(size_t)")
+    by sepref    
+
+end 
     
     
     
@@ -1288,24 +1452,6 @@ end
     
     
 (*    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-oops sorry end end end    
-    
-    
-    
-    
     
   definition "sort_one_more_spec GUARDED xs i \<equiv> doN {
       ASSERT (i<length xs \<and> sorted_wrt_lt (\<^bold><) (take i xs));
