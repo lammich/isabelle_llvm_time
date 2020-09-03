@@ -52,11 +52,14 @@ lemma word_clz'_simps2:
   using word_clz'_rec2 by metis+
   
 definition word_clz2 :: "'a::len2 word \<Rightarrow> (nat,_) nrest"
-  where "word_clz2 x \<equiv> do {
-    (c,_) \<leftarrow> WHILET (\<lambda>(c,x). 0 <s x) (\<lambda>(c,x). do {
+  where "word_clz2 x\<^sub>0 \<equiv> do {
+    (c,_) \<leftarrow> monadic_WHILEIT (\<lambda>(c,x). word_clz' x\<^sub>0 = c + word_clz' x)
+     (\<lambda>(c,x). SPECc2 ''icmp_slt'' (<s) 0 x) (\<lambda>(c,x). do {
       ASSERT (c + 1 < max_snat LENGTH('a));
-      RETURN (c+1,x << 1)
-    }) (0,x);
+      c' \<leftarrow> SPECc2 ''add'' (+) c 1;
+      x' \<leftarrow> SPECc2 ''shl'' (<<) x 1;
+      RETURN (c',x')
+    }) (0,x\<^sub>0);
     RETURN c
   }"
 
@@ -64,28 +67,92 @@ lemma word_clz'_fits_snat: "word_clz' (x::'a::len2 word) < max_snat LENGTH('a)"
   unfolding word_clz'_def using word_clz_nonzero_max[of x]
   apply (auto simp: word_size max_snat_def) 
   by (meson le_def n_less_equal_power_2 nat_le_Suc_less_imp order_trans)
-  
-lemma word_clz2_refine: "word_clz2 x\<^sub>0 \<le> RETURN (word_clz' x\<^sub>0)"
+
+abbreviation "word_clz2_body_cost \<equiv> cost ''icmp_slt'' 1 + cost ''add'' 1 
+                  + cost ''call'' 1 + cost ''if'' 1 + cost ''shl'' 1"
+
+abbreviation "word_clz2_cost w \<equiv>  (enat (1+word_clz' w)) *m word_clz2_body_cost"
+
+(* TODO: move, DUP *)
+lemma finite_sum_gtzero_nat_cost:
+  "finite {a. the_acost (cost n m) a > (0::nat)}"
+  unfolding cost_def by (auto simp: zero_acost_def)
+
+lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
+  by auto
+
+lemma costmult_0_nat:
+  shows "(0::nat) *m x = 0"
+  by(auto simp: costmult_def zero_acost_def)
+
+lemma word_clz2_refine: "word_clz2 x\<^sub>0 \<le> SPECT [word_clz' x\<^sub>0\<mapsto> word_clz2_cost x\<^sub>0]"
   unfolding word_clz2_def
-  supply [refine_vcg] = WHILET_rule[
-    where I="\<lambda>(c,x). word_clz' x\<^sub>0 = c + word_clz' x"
-      and R="measure (word_clz' o snd)"
-  ]
-  apply refine_vcg
-  using word_clz'_fits_snat[of x\<^sub>0]
-  apply (auto simp: word_clz'_simps2)
+  apply(subst monadic_WHILEIET_def[symmetric, where E="\<lambda>(c,x). ((word_clz' x)) *m word_clz2_body_cost"])
+
+  apply(rule gwp_specifies_I)
+  unfolding SPECc2_def
+
+  apply (refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET)
+  apply(rule gwp_monadic_WHILEIET) 
+  subgoal 
+    by(auto simp: wfR2_def the_acost_zero_app norm_cost intro!: finite_sum_gtzero_nat_cost)
+  subgoal for s
+    apply clarsimp
+    apply (refine_vcg \<open>-\<close> rules: if_rule)
+    subgoal 
+      apply(rule loop_body_conditionI)
+      subgoal
+        apply (auto simp: norm_cost)
+        apply sc_solve
+        by (auto simp add: word_clz'_rec2)
+      subgoal 
+        apply (auto simp: norm_cost)
+        apply sc_solve 
+        by (auto simp: one_enat_def word_clz'_rec2)   
+      subgoal
+        by (simp add: word_clz'_rec2)
+      done
+    subgoal using word_clz'_fits_snat[of x\<^sub>0]
+      by (auto simp: word_clz'_simps2)
+    subgoal
+      apply(rule loop_exit_conditionI)
+      apply(refine_vcg \<open>-\<close>)
+      apply (auto)
+      subgoal
+        using word_clz'_simps2(2) by blast
+      subgoal        
+        apply(simp add: costmult_0_nat)
+        apply(auto simp: norm_cost )
+        apply sc_solve
+        by (auto simp: one_enat_def)
+      done
+    done
+  subgoal by simp
   done
 
-lemma word_clz2_refine': "(word_clz2, RETURN o word_clz') \<in> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+(*
+lemma word_clz2_refine': "(word_clz2, RETURN o word_clz') \<in> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
   by (auto intro!: nres_relI simp: word_clz2_refine)
+*)  
   
-  
-sepref_def word_clz'_impl is word_clz2 :: "(word_assn' TYPE('a::len2))\<^sup>k \<rightarrow>\<^sub>a snat_assn' TYPE('a)"  
+sepref_def word_clz'_impl is word_clz2 :: "(word_assn' TYPE('b::len2))\<^sup>k \<rightarrow>\<^sub>a snat_assn' TYPE('b)"  
   unfolding word_clz2_def
-  apply (rewrite at "(_ + \<hole>,_)" snat_const_fold[where 'a='a])
-  apply (rewrite at "(_ << \<hole>)" snat_const_fold[where 'a='a])
-  apply (rewrite at "(\<hole>,_)" snat_const_fold[where 'a='a])
-  by sepref
+  apply (rewrite at "(SPECc2 ''shl'' (<<) _ \<hole>)" snat_const_fold[where 'a='b])
+  apply (rewrite at "(SPECc2 ''add'' (+) _ \<hole>)" snat_const_fold[where 'a='b])
+  apply (rewrite at "(\<hole>,_)" snat_const_fold[where 'a='b])
+
+  apply sepref_dbg_preproc
+     apply sepref_dbg_cons_init
+    apply sepref_dbg_id  
+  apply sepref_dbg_monadify
+  apply sepref_dbg_opt_init
+      apply sepref_dbg_trans_keep (* TODO: @Peter *)
+
+  apply sepref_dbg_opt
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_constraints 
+  done
 
 export_llvm "word_clz'_impl :: 64 word \<Rightarrow> 64 word llM" 
 
@@ -108,12 +175,41 @@ lemma word_clz_nonzero_max': "x\<noteq>0 \<Longrightarrow> word_clz (x::'a::len2
   using word_clz_nonzero_max[of x] unfolding word_size
   by simp
 
+
+lemma "x - 0 = (x::(_,enat) acost)"
+  apply(cases x)
+  by(auto simp: zero_acost_def minus_acost_alt)
+
+definition word_log22 where
+  "word_log22 w = doN {
+    w' \<leftarrow> SPECc2 ''sub'' (-) (size w) 1;
+    wclz \<leftarrow> word_clz2 w;
+    w'' \<leftarrow> SPECc2 ''sub'' (-) w' wclz;
+    RETURN w''
+    }"
+abbreviation "word_log22_cost w \<equiv> word_clz2_cost w + cost ''sub'' 2"
+
+lemma word_log22_correct:
+  assumes "w>0" "LENGTH('a::len2)>2"
+  shows "word_log22 w \<le> SPECT [word_log2 w \<mapsto> word_log22_cost w]"
+  unfolding word_log22_def
+  unfolding SPECc2_def
+  apply(rule gwp_specifies_I)
+
+  using assms
+  apply (refine_vcg \<open>-\<close> rules: word_clz2_refine[THEN gwp_specifies_rev_I, THEN gwp_conseq4])
+  apply(auto simp: word_log2_def  word_clz'_def split: if_splits)
+  apply(simp add: norm_cost needname_minus_absorb) 
+  apply sc_solve by auto
+
+
+
 sepref_def word_log2_impl is 
-  "RETURN o word_log2" :: "[\<lambda>x. x>0 \<and> LENGTH('a)>2]\<^sub>a (word_assn' TYPE('a::len2))\<^sup>k \<rightarrow> snat_assn' TYPE('a)"
-  unfolding word_log2_def word_size
+  "word_log22" :: "[\<lambda>x. x>0 \<and> LENGTH('a)>2]\<^sub>a (word_assn' TYPE('a::len2))\<^sup>k \<rightarrow> snat_assn' TYPE('a)"
+  unfolding word_log22_def word_size
   apply (annot_snat_const "TYPE('a)")
   supply [simp] = word_clz_nonzero_max'
-  by sepref  
+  by sepref  (* TODO: sepref *)
 
 export_llvm "word_log2_impl :: 64 word \<Rightarrow> _"
 
@@ -170,10 +266,17 @@ lemma word_clz_rec:
   apply (simp only: eq_zero_set_bl[symmetric])
   by (metis le_unat_uoi len2_simps(2) n_less_equal_power_2 of_nat_numeral unat_0 unat_of_nat_len word_le_0_iff zero_neq_numeral)
 
+
+lemma overflow_safe_hbound_check: "2*k\<le>n \<longleftrightarrow> k\<le>n div 2" for k n :: nat by auto
+
 lemma word_clz_ge2_max: "2\<le>(x::'a::len2 word) \<Longrightarrow> word_clz x + 1 < size x"  
   apply (simp only: word_clz_rec[symmetric] word_size)
   apply (rule word_clz_nonzero_max[of "x div 2", unfolded word_size])
-  by (smt One_nat_def Suc_pred add.left_neutral add.right_neutral add_diff_cancel_left' add_diff_cancel_right' add_left_cancel diff_Suc_Suc div_less div_of_0_id div_self lessI less_eq_Suc_le less_one linorder_neqE_nat linorder_not_le mult.right_neutral not_numeral_le_zero numeral_2_eq_2 numeral_One numeral_le_one_iff order_less_le overflow_safe_hbound_check pos2 power.simps(1) power.simps(2) semiring_norm(69) unat_0 unat_div unat_eq_zero unat_gt_0 unat_x_div_2_conv word_clz_rec word_gt_0_no word_le_nat_alt zero_less_one zero_neq_one)
+  by (smt One_nat_def Suc_pred add.left_neutral add.right_neutral add_diff_cancel_left' add_diff_cancel_right'
+        add_left_cancel diff_Suc_Suc div_less div_of_0_id div_self lessI less_eq_Suc_le less_one linorder_neqE_nat
+        linorder_not_le mult.right_neutral not_numeral_le_zero numeral_2_eq_2 numeral_One numeral_le_one_iff order_less_le
+        overflow_safe_hbound_check pos2 power.simps(1) power.simps(2) semiring_norm(69) unat_0 unat_div unat_eq_zero unat_gt_0
+        unat_x_div_2_conv word_clz_rec word_gt_0_no word_le_nat_alt zero_less_one zero_neq_one)
   
   
   
@@ -224,8 +327,9 @@ lemma word_log2_refine_snat: "(word_log2, Discrete.log) \<in> snat_rel' TYPE('a:
   using word_log2_is_discrete_log
   by (fastforce simp: snat_rel_def snat.rel_def in_br_conv snat_eq_unat)
 
-sepref_register Discrete.log
+sepref_register word_log22
 
+ (* TODO *)
 lemmas discrete_log_unat_hnr[sepref_fr_rules] = word_log2_impl.refine[FCOMP word_log2_refine_unat]
 lemmas discrete_log_snat_hnr[sepref_fr_rules] = word_log2_impl.refine[FCOMP word_log2_refine_snat]
 
