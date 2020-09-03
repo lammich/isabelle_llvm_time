@@ -336,7 +336,13 @@ lemma introsort_aux4_correct_flexible:
     ASSERT(l\<le>h);
     hml \<leftarrow> SPECc2 ''sub'' (-) h l;
     if\<^sub>N SPECc2 ''icmp_slt'' (<) 1 hml then doN {
-      xs \<leftarrow> introsort_aux4 xs l h (Discrete.log (h-l)*2);
+      loghml \<leftarrow> SPECc1 ''log'' Discrete.log hml; \<^cancel>\<open> TODO: need to specify cost for log computation
+                                                          already here, the running time of 
+                                                          our current implementation depends on the
+                                                          word size of the inputs l and h.
+                                                           \<close>
+      d \<leftarrow> SPECc2 ''mul'' (*) loghml 2;
+      xs \<leftarrow> introsort_aux4 xs l h d;
       xs \<leftarrow> final_insertion_sort2 xs l h;
       RETURN xs
     } else RETURN xs
@@ -353,7 +359,9 @@ lemmas final_insertion_sort2_correct_flexible = final_insertion_sort2_correct
 thm introsort_aux4_correct_flexible
 thm final_insertion_sort2_correct_flexible
 
-abbreviation "TR_is d s == TId(''lt'':=cost ''icmp_slt'' 1, ''slice_part_sorted'':= bla d s ''slice_part_sorted'',''slice_sort'' := fi2_cost s)"
+abbreviation "TR_is d s == TId(''prepare_cost'':=cost ''log'' 1+cost ''mul'' 1,
+            ''lt'':=cost ''icmp_slt'' 1,''slice_sort'' := fi2_cost s, 
+            ''slice_part_sorted'':= bla d s ''slice_part_sorted'')"
 
 lemma pc_bla[simp]:
   "preserves_curr (bla d hl) ''sub''"
@@ -378,15 +386,74 @@ lemma sp_bla[simp]:
   "struct_preserving (bla d hl)"
   by (auto simp: pp_fun_upd pp_TId_absorbs_right  bla_def intro!: struct_preserving_upd_I)  
 
+(*TODO: move*)
+
+lemma SPECc1_alt: "SPECc1 name aop = ( (\<lambda>a. consume (RETURNT (aop a)) (cost name 1)))"
+  unfolding SPECc1_def consume_def by(auto simp: RETURNT_def intro!: ext)
+
   lemma introsort4_refine: "introsort4 xs l h \<le> \<Down>Id (timerefine (TR_is (Discrete.log (h-l)*2) (h-l)) (introsort3 xs l h))"
     unfolding introsort4_def introsort3_def 
     supply conc_Id[simp del]
+    apply(subst (3) SPECc2_alt)
+    apply(subst SPECc1_alt)  
+    apply normalize_blocks
     apply (refine_rcg SPECc2_refine' SPECc2_refine bindT_refine_conc_time_my_inres MIf_refine
-                introsort_aux4_correct_flexible final_insertion_sort2_correct_flexible )
+                introsort_aux4_correct_flexible final_insertion_sort2_correct_flexible
+               consumea_refine   )
     apply refine_dref_type                                          
-    by auto 
+    by (auto simp: norm_cost inres_SPECc2)
 
   thm introsort4_refine introsort3_correct
+
+abbreviation "TR_is4 lmh \<equiv> pp (TR_is (Discrete.log (lmh)*2) (lmh)) (TId(''slice_sort'' := introsort3_cost))" 
+
+lemma "introsort4 xs l h \<le> \<Down> Id (timerefine (TR_is4 (h-l)) (slice_sort_spec (\<^bold><) xs l h))"
+  apply(rule order.trans)
+   apply(rule introsort4_refine)
+  apply simp
+      apply(subst timerefine_iter2[symmetric])
+      subgoal by(auto intro!: wfR''_upd)
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      apply(rule timerefine_mono2)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule order.trans)
+      apply(rule introsort3_correct)
+      apply simp
+      done
+
+lemma "\<Down> Id (timerefine (TR_is4 (h-l)) (slice_sort_spec (\<^bold><) xs l h))
+    = slice_sort_specT G (\<^bold><) xs l h"
+  apply(cases "l \<le> h \<and> h \<le> length xs")
+   apply (auto simp: slice_sort_spec_def slice_sort_specT_def SPEC_timerefine_conv )
+  apply(rule SPEC_cong)
+   apply simp
+  apply(rule ext)
+  apply (simp add: norm_cost norm_pp)
+  unfolding introsort3_cost_def bla_def TR_is_insert3_def Tia43_def
+    cost_insert_guarded_def cost_insert_def
+    cost_is_insert_step_def cost_is_insert_guarded_step_def
+    introsort_aux_cost_def
+  apply (simp add: norm_cost norm_pp)
+  apply(subst timerefineA_propagate, intro wfR''_upd wfR''_TId)+
+  apply (simp add: norm_cost norm_pp)
+  unfolding move_median_to_first_cost_def
+  apply (simp add: norm_cost norm_pp)
+  oops
+  (* TODO: the cost of insort contains a term
+        2 ^ (Discrete.log (h - l) * 2)
+       This means it is (h-l)^2 ?
+      why do we choose d := log (h-l) * 2 actually?
+    In wikipedia they say:
+      "The factor 2 in the maximum depth is arbitrary; it can be tuned for practical performance."
+
+      Either my proof is not detailed enough, or the latter statement is wrong.
+  
+      If we only look for comparisons then, this term does not occur.
+      But building together the results in the quicksort scheme does incurr costs dependent on that.
+
+    *)
+    
+    
 
   (* lemmas introsort4_correct = order_trans[OF introsort4_refine introsort3_correct] *)
 
@@ -485,9 +552,23 @@ sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_a
   apply sepref_dbg_cons_solve
   apply sepref_dbg_cons_solve
   apply sepref_dbg_constraints 
-  done
+  oops
   
-  
+
+  definition "introsort5 xs l h \<equiv> doN {
+    ASSERT(l\<le>h);
+    hml \<leftarrow> SPECc2 ''sub'' (-) h l;
+    if\<^sub>N SPECc2 ''icmp_slt'' (<) 1 hml then doN {
+      loghml \<leftarrow> SPECT [Discrete.log hml \<mapsto> word_log22_cost hml];
+      d \<leftarrow> SPECc2 ''mul'' (*) loghml 2;
+      xs \<leftarrow> introsort_aux5 xs l h d;
+      xs \<leftarrow> final_insertion_sort3 xs l h;
+      RETURN xs
+    } else RETURN xs
+  }"  
+
+
+
   
 sepref_register introsort4
 sepref_def introsort_impl is "uncurry2 (PR_CONST introsort4)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
