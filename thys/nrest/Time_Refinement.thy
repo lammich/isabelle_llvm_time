@@ -1206,6 +1206,12 @@ lemma timerefineA_update_apply_same_cost':
   "timerefineA (F(n := y)) (cost n (t::enat)) = t *m y"
   by (auto simp: costmult_def timerefineA_def cost_def zero_acost_def timerefineA_upd_aux ) 
 
+lemma costmult_right_mono:
+  fixes a :: enat
+  shows "a \<le> a' \<Longrightarrow> a *m c \<le> a' *m c"
+  unfolding costmult_def less_eq_acost_def
+  by (auto simp add: mult_right_mono)  
+
 
 
 lemma costmult_add_distrib:

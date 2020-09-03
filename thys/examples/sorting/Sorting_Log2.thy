@@ -71,7 +71,7 @@ lemma word_clz'_fits_snat: "word_clz' (x::'a::len2 word) < max_snat LENGTH('a)"
 abbreviation "word_clz2_body_cost \<equiv> cost ''icmp_slt'' 1 + cost ''add'' 1 
                   + cost ''call'' 1 + cost ''if'' 1 + cost ''shl'' 1"
 
-abbreviation "word_clz2_cost w \<equiv>  (enat (1+word_clz' w)) *m word_clz2_body_cost"
+abbreviation "word_clz2_cost w \<equiv>  (enat (1+size w)) *m word_clz2_body_cost"
 
 (* TODO: move, DUP *)
 lemma finite_sum_gtzero_nat_cost:
@@ -86,48 +86,54 @@ lemma costmult_0_nat:
   by(auto simp: costmult_def zero_acost_def)
 
 lemma word_clz2_refine: "word_clz2 x\<^sub>0 \<le> SPECT [word_clz' x\<^sub>0\<mapsto> word_clz2_cost x\<^sub>0]"
-  unfolding word_clz2_def
-  apply(subst monadic_WHILEIET_def[symmetric, where E="\<lambda>(c,x). ((word_clz' x)) *m word_clz2_body_cost"])
-
-  apply(rule gwp_specifies_I)
-  unfolding SPECc2_def
-
-  apply (refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET)
-  apply(rule gwp_monadic_WHILEIET) 
-  subgoal 
-    by(auto simp: wfR2_def the_acost_zero_app norm_cost intro!: finite_sum_gtzero_nat_cost)
-  subgoal for s
-    apply clarsimp
-    apply (refine_vcg \<open>-\<close> rules: if_rule)
+  apply(rule order_trans[where y="SPECT [word_clz' x\<^sub>0\<mapsto> (enat (1+word_clz' x\<^sub>0)) *m word_clz2_body_cost]"])
+  subgoal
+    unfolding word_clz2_def
+    apply(subst monadic_WHILEIET_def[symmetric, where E="\<lambda>(c,x). ((word_clz' x)) *m word_clz2_body_cost"])
+  
+    apply(rule gwp_specifies_I)
+    unfolding SPECc2_def
+  
+    apply (refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET)
+    apply(rule gwp_monadic_WHILEIET) 
     subgoal 
-      apply(rule loop_body_conditionI)
-      subgoal
-        apply (auto simp: norm_cost)
-        apply sc_solve
-        by (auto simp add: word_clz'_rec2)
+      by(auto simp: wfR2_def the_acost_zero_app norm_cost intro!: finite_sum_gtzero_nat_cost)
+    subgoal for s
+      apply clarsimp
+      apply (refine_vcg \<open>-\<close> rules: if_rule)
       subgoal 
-        apply (auto simp: norm_cost)
-        apply sc_solve 
-        by (auto simp: one_enat_def word_clz'_rec2)   
+        apply(rule loop_body_conditionI)
+        subgoal
+          apply (auto simp: norm_cost)
+          apply sc_solve
+          by (auto simp add: word_clz'_rec2)
+        subgoal 
+          apply (auto simp: norm_cost)
+          apply sc_solve 
+          by (auto simp: one_enat_def word_clz'_rec2)   
+        subgoal
+          by (simp add: word_clz'_rec2)
+        done
+      subgoal using word_clz'_fits_snat[of x\<^sub>0]
+        by (auto simp: word_clz'_simps2)
       subgoal
-        by (simp add: word_clz'_rec2)
+        apply(rule loop_exit_conditionI)
+        apply(refine_vcg \<open>-\<close>)
+        apply (auto)
+        subgoal
+          using word_clz'_simps2(2) by blast
+        subgoal        
+          apply(simp add: costmult_0_nat)
+          apply(auto simp: norm_cost )
+          apply sc_solve
+          by (auto simp: one_enat_def)
+        done
       done
-    subgoal using word_clz'_fits_snat[of x\<^sub>0]
-      by (auto simp: word_clz'_simps2)
-    subgoal
-      apply(rule loop_exit_conditionI)
-      apply(refine_vcg \<open>-\<close>)
-      apply (auto)
-      subgoal
-        using word_clz'_simps2(2) by blast
-      subgoal        
-        apply(simp add: costmult_0_nat)
-        apply(auto simp: norm_cost )
-        apply sc_solve
-        by (auto simp: one_enat_def)
-      done
+    subgoal by simp
     done
-  subgoal by simp
+  subgoal apply(simp add: le_fun_def)
+    apply(rule costmult_right_mono) 
+    using word_clz_max by (auto simp add: word_clz'_def )
   done
 
 (*
@@ -326,6 +332,14 @@ lemma word_log2_refine_unat: "(word_log2, Discrete.log) \<in> unat_rel' TYPE('a:
 lemma word_log2_refine_snat: "(word_log2, Discrete.log) \<in> snat_rel' TYPE('a::len2) \<rightarrow> nat_rel"
   using word_log2_is_discrete_log
   by (fastforce simp: snat_rel_def snat.rel_def in_br_conv snat_eq_unat)
+
+
+
+lemma word_log22_correct':
+  assumes "w>0" "LENGTH('a::len2)>2"
+  shows "word_log22 w \<le> SPECT [Discrete.log (unat w) \<mapsto> word_log22_cost w]"
+  apply(rule order_trans[OF word_log22_correct[OF assms]])
+  by (auto simp: le_fun_def word_log2_is_discrete_log)
 
 sepref_register word_log22
 
