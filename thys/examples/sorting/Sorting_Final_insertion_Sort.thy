@@ -6,13 +6,13 @@ context weak_ordering begin
 
   definition "final_insertion_sort xs \<equiv> doN {
     ASSERT (1 < length xs);
-    lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''list_length'' 1];
+    lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''sub'' 1];
     if\<^sub>N SPECc2 ''icmp_sle'' (\<le>) lxs is_threshold then doN {
-      SPECT [() \<mapsto> cost ''prepareif'' 1];
+      SPECT [() \<mapsto> cost ''add'' 1];
       gen_insertion_sort_guarded 1 lxs xs
     }
     else doN {
-      SPECT [() \<mapsto> cost ''prepareelse'' 1];
+      SPECT [() \<mapsto> cost ''add'' 2];
       xs \<leftarrow> gen_insertion_sort_guarded 1 is_threshold xs;
       gen_insertion_sort_unguarded is_threshold is_threshold lxs xs
     }
@@ -273,7 +273,7 @@ lemma puulla: "slice_sort_specT (enat (h-i\<^sub>0+1) *m insort_guarded_step_cos
       \<Longrightarrow> gen_insertion_sort_guarded i\<^sub>0 h xs 
         \<le> slice_sort_specT (guarded_insort_cost (h-i\<^sub>0)) (\<^bold><) xs 0 h"
     apply(subst puulla)
-    apply(rule gen_insertion_sort_guarded_correct)
+    apply(rule gen_insertion_sort_guarded_correct)                    
        apply auto
     done
 
@@ -283,12 +283,6 @@ lemma nrest_le_formatI:
   fixes a :: "(_,(_,enat)acost) nrest"
   shows  "a \<le> \<Down>Id (timerefine TId b) \<Longrightarrow> a \<le> b"
   by (auto simp add: timerefine_id)
-
-lemma costmult_right_mono:
-  fixes a :: enat
-  shows "a \<le> a' \<Longrightarrow> a *m c \<le> a' *m c"
-  unfolding costmult_def less_eq_acost_def
-  by (auto simp add: mult_right_mono)  
 
 
 
@@ -352,8 +346,8 @@ lemma puulla_guarded: "slice_sort_specT (enat (h-i\<^sub>0+1) *m insort_step_cos
 
 
 abbreviation "fi_cost lxs == guarded_insort_cost (is_threshold)
-       + cost ''prepareif'' 1 + cost ''prepareelse'' 1
-      + cost ''if'' 1 +  cost ''list_length'' 1 + cost ''icmp_sle'' 1
+       + cost ''add'' 1 + cost ''add'' 1
+      + cost ''if'' 1 +  cost ''sub'' 1 + cost ''icmp_sle'' 1
       + unguarded_insort_cost lxs
     "
 
@@ -377,7 +371,7 @@ abbreviation "fi_cost lxs == guarded_insort_cost (is_threshold)
       apply(simp_all add: emb_eq_Some_conv)
       subgoal apply auto  using slice_complete by metis
       apply(simp add: norm_cost add.assoc )
-      apply sc_solve by auto
+      apply sc_solve by (auto simp: one_enat_def)
 
     subgoal (* else branch *)
       apply(rule brr[THEN gwp_specifies_rev_I, THEN gwp_conseq_0 ])
@@ -399,7 +393,7 @@ abbreviation "fi_cost lxs == guarded_insort_cost (is_threshold)
         subgoal 
           apply(simp add: norm_cost add.assoc)
           apply sc_solve
-          by auto
+          by (auto simp: one_enat_def numeral_eq_enat)
       done                
     done    
   done
@@ -419,17 +413,14 @@ abbreviation "fi_cost lxs == guarded_insort_cost (is_threshold)
     }
   }"  
 
-abbreviation "TR_fi2 N == ((TR_is_insert3_guarded N)(''list_length'':=cost ''sub'' 1,
-        ''prepareif'':= cost ''add'' 1, ''prepareelse'':= cost ''add'' (2::enat)  ))"
+abbreviation "TR_fi2 N == (TR_is_insert3 N)"
 
-lemma wfR''_TR_is_insert3_guarded[simp]: "wfR'' (TR_is_insert3_guarded N)"
-  unfolding TR_is_insert3_guarded_def  
-  by (auto simp: pp_TId_absorbs_right pp_fun_upd intro!: wfR''_upd)
 
 lemma wfR''_TR_fi2[simp]: "wfR'' (TR_fi2 N)"
   by (auto simp: pp_TId_absorbs_right pp_fun_upd intro!: wfR''_upd)
+
 lemma sp_TR_fi2[simp]: "struct_preserving (TR_fi2 N)" 
-  unfolding TR_is_insert3_guarded_def   
+  unfolding TR_is_insert3_def   
   by (auto simp: pp_TId_absorbs_right pp_fun_upd intro!: struct_preserving_upd_I)
 
   
@@ -439,12 +430,14 @@ lemma sp_TR_fi2[simp]: "struct_preserving (TR_fi2 N)"
   lemma gen_insertion_sort_guarded2_refine_prepared: 
     "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l; j\<le>N \<rbrakk> 
       \<Longrightarrow> gen_insertion_sort_guarded2 l ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_fi2 N) (gen_insertion_sort_guarded i j xs))"
-    sorry                       
+    apply(rule gen_insertion_sort_guarded2_refine)
+    apply auto done
 
   lemma gen_insertion_sort_unguarded2_refine_prepared: 
     "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l \<rbrakk> 
       \<Longrightarrow> gen_insertion_sort_unguarded2 N ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_fi2 N) (gen_insertion_sort_unguarded N i j xs))"
-    sorry
+    apply(rule gen_insertion_sort_unguarded2_refine)
+    apply auto done
 
 
 
@@ -465,13 +458,15 @@ lemma sp_TR_fi2[simp]: "struct_preserving (TR_fi2 N)"
       apply(all \<open>(simp add: timerefineA_propagate timerefineA_update_cost timerefineA_update_apply_same_cost;fail)?\<close>)
 
 
-             apply (auto simp: slicep_rel_def idx_shift_rel_def ) [9] 
+             apply (auto simp: slicep_rel_def idx_shift_rel_def ) [10] 
     subgoal
-      apply(simp add: norm_cost norm_pp TR_is_insert3_guarded_def)
+      apply(simp add: norm_cost norm_pp TR_is_insert3_def)
       apply(subst timerefineA_propagate)
       by(auto simp: norm_cost  intro!: wfR''_upd)
     subgoal
-      apply(simp add: norm_cost norm_pp TR_is_insert3_guarded_def)
+      by (simp add: norm_cost norm_pp TR_is_insert3_def) 
+    subgoal
+      apply(simp add: norm_cost norm_pp TR_is_insert3_def)
       apply sc_solve by simp
     subgoal 
         apply (subst slice_rel_rebase, assumption)
@@ -482,18 +477,16 @@ lemma sp_TR_fi2[simp]: "struct_preserving (TR_fi2 N)"
 
   thm final_insertion_sort2_refine final_insertion_sort_correct
 
-abbreviation "fi2_cost s \<equiv> enat 17 *m TR_is_insert3_guarded is_threshold ''icmp_slt'' + enat 17 *m TR_is_insert3_guarded is_threshold ''add'' + enat 17 *m TR_is_insert3_guarded is_threshold ''is_insert'' +
-        enat 17 *m TR_is_insert3_guarded is_threshold ''call'' +
-        enat 17 *m TR_is_insert3_guarded is_threshold ''if'' +
-        cost ''add'' 1 +
-        cost ''add'' 2 +
-        TR_is_insert3_guarded is_threshold ''if'' +
-        cost ''sub'' 1 +
-        TR_is_insert3_guarded is_threshold ''icmp_sle'' +
-        (enat (Suc s) *m TR_is_insert3_guarded is_threshold ''icmp_slt'' + enat (Suc s) *m TR_is_insert3_guarded is_threshold ''add'' +
-         enat (Suc s) *m TR_is_insert3_guarded is_threshold ''is_insert'' +
-         enat (Suc s) *m TR_is_insert3_guarded is_threshold ''call'' +
-         enat (Suc s) *m TR_is_insert3_guarded is_threshold ''if'')"
+abbreviation "fi2_cost s \<equiv> enat 17 *m TR_is_insert3 is_threshold ''icmp_slt'' + enat 17 *m TR_is_insert3 is_threshold ''add'' + enat 17 *m TR_is_insert3 is_threshold ''is_insert_g'' + enat 17 *m TR_is_insert3 is_threshold ''call'' +
+        enat 17 *m TR_is_insert3 is_threshold ''if'' +
+        TR_is_insert3 is_threshold ''add'' +
+        TR_is_insert3 is_threshold ''add'' +
+        TR_is_insert3 is_threshold ''if'' +
+        TR_is_insert3 is_threshold ''sub'' +
+        TR_is_insert3 is_threshold ''icmp_sle'' +
+        (enat (Suc (s)) *m TR_is_insert3 is_threshold ''icmp_slt'' + enat (Suc (s)) *m TR_is_insert3 is_threshold ''add'' + enat (Suc (s)) *m TR_is_insert3 is_threshold ''is_insert'' +
+         enat (Suc (s)) *m TR_is_insert3 is_threshold ''call'' +
+         enat (Suc (s)) *m TR_is_insert3 is_threshold ''if'')"
 
   lemma final_insertion_sort2_correct: 
     assumes [simplified, simp]: "(xs',xs)\<in>Id" "(l',l)\<in>Id" "(h',h)\<in>Id"   
@@ -506,8 +499,7 @@ abbreviation "fi2_cost s \<equiv> enat 17 *m TR_is_insert3_guarded is_threshold 
     subgoal by(auto simp: slicep_rel_def)
     apply(rule order_trans[OF nrest_Rel_mono])
     apply(rule timerefine_mono2)
-    subgoal
-      apply(intro wfR''_upd) by simp
+    subgoal  by simp
     apply(rule final_insertion_sort_correct)
        apply simp
       apply simp
@@ -570,16 +562,50 @@ lemma fl:
   *)
   
 end
-  (*
+
+
+
 context sort_impl_context begin
+
+
+  definition "final_insertion_sort3 xs l h \<equiv> doN {
+    ASSERT (l<h);
+    lxs \<leftarrow> SPECc2 ''sub'' (-) h l;
+    if\<^sub>N SPECc2 ''icmp_sle'' (\<le>) lxs is_threshold then do {
+      l' \<leftarrow> SPECc2 ''add'' (+) l 1;
+      gen_insertion_sort_guarded3 l l' h xs
+    }
+    else doN {
+      l' \<leftarrow> SPECc2 ''add'' (+) l 1;
+      l'' \<leftarrow> SPECc2 ''add'' (+) l is_threshold;
+      xs \<leftarrow> gen_insertion_sort_guarded3 l l' l'' xs;
+      gen_insertion_sort_unguarded3 is_threshold l'' h xs
+    }
+  }"  
+
+  thm gen_insertion_sort_unguarded3_refines
+  lemma final_insertion_sort3_refines:
+    "(xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id 
+      \<Longrightarrow> final_insertion_sort3 xs l h \<le> \<Down>Id (timerefine TR_cmp_swap (final_insertion_sort2 xs' l' h'))"
+    supply conc_Id[simp del]
+    unfolding final_insertion_sort3_def final_insertion_sort2_def
+    supply [refine] = gen_insertion_sort_unguarded3_refines gen_insertion_sort_guarded3_refines
+    apply(refine_rcg MIf_refine SPECc2_refine' bindT_refine_conc_time_my_inres monadic_WHILEIT_refine' )
+    apply refine_dref_type
+    apply(all \<open>(intro  preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
+    apply (simp_all (no_asm))
+    by auto 
+
+ 
   sepref_register final_insertion_sort2  
-  sepref_def final_insertion_sort_impl is "uncurry2 (PR_CONST final_insertion_sort2)" 
-    :: "(woarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a woarray_assn elem_assn"
-    unfolding final_insertion_sort2_def PR_CONST_def
+  sepref_def final_insertion_sort_impl is "uncurry2 (PR_CONST final_insertion_sort3)" 
+    :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
+    unfolding final_insertion_sort3_def PR_CONST_def
     apply (annot_snat_const "TYPE(size_t)")
     by sepref
+ 
 
-end *)
+end 
 (*
 context parameterized_weak_ordering begin  
   definition "final_insertion_sort_param cparam xs l h \<equiv> doN {

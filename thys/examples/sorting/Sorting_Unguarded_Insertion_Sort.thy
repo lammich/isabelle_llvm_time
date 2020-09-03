@@ -130,12 +130,20 @@ end
       cost ''list_set'' 1 + (cost ''mop_cmp_v_idx'' 1 + cost ''sub'' 1 + cost ''if'' 1 + (cost ''list_get'' 1 + cost ''call'' 1)))"
     
       
+    definition "cost_is_insert_guarded_step :: (char list, nat) acost \<equiv>
+      cost ''list_set'' 1 + (cost ''list_get'' 1 + (cost ''call'' 1 + (cost ''mop_cmp_v_idx'' 1 + (cost ''if'' 1 + (0 + cost ''icmp_eq'' 1) + cost ''sub'' 1) + cost ''if'' 1) + cost ''sub'' 1))"
+    
+    definition "cost_insert_guarded N \<equiv> 
+      lift_acost (N *m cost_is_insert_guarded_step) +
+        cost ''list_set'' 1 + cost ''mop_cmp_v_idx'' 1 + cost ''sub'' 1 + cost ''if'' 1 + cost ''list_get'' 1 + cost ''call'' 1
+        + cost ''if'' 1 + cost ''icmp_eq'' 1 + cost ''if'' 1 + cost ''list_get'' 1 + cost ''call'' 1"
+    
 
 lemma finite_sum_gtzero_nat_cost:
   "finite {a. the_acost (cost n m) a > (0::nat)}"
   unfolding cost_def by (auto simp: zero_acost_def)
 
-    lemma is_insert_unguarded_correct: "is_insert_unguarded N xs i \<le> \<Down>Id (timerefine (TId (''is_insert'' := cost_insert N)) (is_insert_spec_unguarded N xs i))"
+    lemma is_insert_unguarded_correct: "is_insert_unguarded N xs i \<le> \<Down>Id (timerefine (TId (''is_insert'' := cost_insert N,   ''is_insert_g'' := cost_insert_guarded N)) (is_insert_spec_unguarded N xs i))"
       unfolding is_insert_unguarded_def is_insert_spec_unguarded_def
       apply (rule refine0)
       apply (simp add: SPEC_timerefine_conv)
@@ -428,10 +436,10 @@ lemma finite_sum_gtzero_nat_cost:
     find_theorems pp fun_upd
     find_theorems timerefineA fun_upd  
       
-    
-    abbreviation "TR_ii3 N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert N))" (* @Max: what's a good format here? *)
-    
-    lemma is_insert3_unguarded_correct': 
+    abbreviation "TR_ii3 N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert N,  ''is_insert_g'' := cost_insert_guarded N))" (* @Max: what's a good format here? *)
+
+    (* TODO: enable this! by fixing timerefine_comm_concfun *)
+    lemma is_insert3_unguarded_correct'_right: 
       assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
       shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3 N) (is_insert_spec_unguarded N xs' i'))"
     proof -
@@ -444,11 +452,29 @@ lemma finite_sum_gtzero_nat_cost:
         apply force+
         done
     qed
+
+
+  
+    lemma is_insert3_unguarded_correct': 
+      assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
+      shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3 N) (is_insert_spec_unguarded N xs' i'))"
+      apply(rule order.trans)
+      apply(rule is_insert3_unguarded_refine'[OF assms])
+      apply(rule nrest_Rel_mono)
+      apply (simp add: timerefine_id)
+      apply(rule order.trans)
+       apply(rule is_insert2_unguarded_refine)
+      apply simp
+      apply(subst timerefine_iter2[symmetric])
+      subgoal by(auto intro!: wfR''_upd)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule timerefine_mono2)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule order.trans)      
+       apply(rule is_insert_unguarded_correct)
+      by simp 
         
 
-    definition "cost_is_insert_guarded_step :: (char list, nat) acost \<equiv>
-      cost ''list_set'' 1 + (cost ''list_get'' 1 + (cost ''call'' 1 + (cost ''mop_cmp_v_idx'' 1 + (cost ''if'' 1 + (0 + cost ''icmp_eq'' 1) + cost ''sub'' 1) + cost ''if'' 1) + cost ''sub'' 1))"
-    
     definition is_insert_guarded :: "'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "is_insert_guarded xs i \<equiv> doN {
       \<^cancel>\<open>(*ASSERT (\<exists>guard_idx. guard_idx<i \<and> \<not>xs!i\<^bold><xs!guard_idx);*)\<close>
       ASSERT (i<length xs);
@@ -485,16 +511,12 @@ lemma finite_sum_gtzero_nat_cost:
     
     definition "is_insert_spec_guarded xs i \<equiv> doN {
       ASSERT (i<length xs);
-      SPEC (is_insert_spec_aux xs i) (\<lambda>_. cost ''is_insert'' 1)
+      SPEC (is_insert_spec_aux xs i) (\<lambda>_. cost ''is_insert_g'' 1)
     }"  
     
-    definition "cost_insert_guarded N \<equiv> 
-      lift_acost (N *m cost_is_insert_guarded_step) +
-        cost ''list_set'' 1 + cost ''mop_cmp_v_idx'' 1 + cost ''sub'' 1 + cost ''if'' 1 + cost ''list_get'' 1 + cost ''call'' 1
-        + cost ''if'' 1 + cost ''icmp_eq'' 1 + cost ''if'' 1 + cost ''list_get'' 1 + cost ''call'' 1"
     
     
-    lemma is_insert_guarded_correct: "is_insert_guarded xs i \<le> \<Down>Id (timerefine (TId (''is_insert'' := cost_insert_guarded i)) (is_insert_spec_guarded xs i))"
+    lemma is_insert_guarded_correct: "is_insert_guarded xs i \<le> \<Down>Id (timerefine (TId (''is_insert'' := cost_insert N, ''is_insert_g'' := cost_insert_guarded i)) (is_insert_spec_guarded xs i))"
       unfolding is_insert_guarded_def is_insert_spec_guarded_def
       apply (rule refine0)
       apply (simp add: SPEC_timerefine_conv)
@@ -734,9 +756,10 @@ lemma finite_sum_gtzero_nat_cost:
       subgoal by linarith
       done
     
-    abbreviation "TR_ii3_guarded N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert_guarded N))" (* @Max: what's a good format here? *)
+    abbreviation "TR_ii3_guarded N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert N, ''is_insert_g'' := cost_insert_guarded N))" (* @Max: what's a good format here? *)
       
-    lemma is_insert3_guarded_correct': 
+    (* TODO: enable this! by fixing timerefine_comm_concfun *)
+    lemma is_insert3_guarded_correct'_right: 
       assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
       shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3_guarded (i-l)) (is_insert_spec_guarded xs' i'))"
     proof -
@@ -751,7 +774,29 @@ lemma finite_sum_gtzero_nat_cost:
         apply force+
         done
     qed
-    
+
+    lemma is_insert3_guarded_correct': 
+      assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
+      shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3_guarded (i-l)) (is_insert_spec_guarded xs' i'))"
+    proof -
+      from assms(2) have [simp]: "i' = i-l" by (auto simp: idx_shift_rel_def)
+      show ?thesis
+          apply(rule order.trans)
+      apply(rule is_insert3_guarded_refine'[OF assms])
+      apply(rule nrest_Rel_mono)
+      apply (simp add: timerefine_id)
+      apply(rule order.trans)
+       apply(rule is_insert2_guarded_refine)
+      apply simp
+      apply(subst timerefine_iter2[symmetric])
+      subgoal by(auto intro!: wfR''_upd)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule timerefine_mono2)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule order.trans)      
+       apply(rule is_insert_guarded_correct[where N="(i - l)"])
+      by simp 
+  qed
         
 end
   
@@ -1131,11 +1176,11 @@ context weak_ordering begin
   
   definition "TR_is_insert3 N \<equiv> (
                    (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1))
-                         (TId(''is_insert'' := cost_insert N)))
+                         (TId(''is_insert'' := cost_insert N, ''is_insert_g'' := cost_insert_guarded N)))
                      TId))"
 
-  (* TODO: enable this kind of reasoning *)
-  lemma is_insert3_sorts_one_more: 
+  (* TODO: enable this kind of reasoning! by fixing timerefine_comm_concfun *)
+  lemma is_insert3_sorts_one_more_right: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "i'<j'"
     shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_unguarded N xs' i' j'))"
   proof -
@@ -1149,7 +1194,7 @@ context weak_ordering begin
       subgoal apply(simp add: norm_pp ) apply(intro wfR''_upd) by simp
       done
   qed
-(*
+ 
 lemma timerefine_mono3: 
   fixes R :: "_ \<Rightarrow> ('a, enat) acost"
   assumes "wfR'' R"
@@ -1158,31 +1203,27 @@ lemma timerefine_mono3:
   apply(rule timerefine_mono2)
   using assms by auto
 
+thm is_insert3_unguarded_correct'
+thm is_insert_unguarded_sorts_one_more
+
   lemma is_insert3_sorts_one_more: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "i'<j'"
     shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_unguarded N xs' i' j'))"
     using assms apply -
       apply(rule order_trans)
-     apply(rule is_insert3_unguarded_correct')
-       apply auto [3]
-    apply(rule nrest_Rel_mono) 
-    apply(rule timerefine_mono3)
-    using timerefine_mono3
-    using is_insert_unguarded_sorts_one_more
-    
-    oops 
-  
-  proof -
-    note is_insert3_unguarded_correct'
-    also note is_insert_unguarded_sorts_one_more
-    finally show ?thesis using assms unfolding TR_is_insert3_def 
+     apply(rule is_insert3_unguarded_correct'[OF assms(1-3)])
+    apply(rule nrest_Rel_mono)
+    unfolding TR_is_insert3_def
+      apply(subst (2) timerefine_iter2[symmetric])
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule timerefine_mono2)
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      apply(rule order_trans)
+       apply(rule is_insert_unguarded_sorts_one_more)
+       apply simp
       apply simp
-      apply rprems
-      apply simp_all
-      apply (simp add: idx_shift_rel_def)
-      subgoal sorry
       done
-  qed*)
 
 
 lemma wfR''_TR_is_insert3[simp]: "wfR'' (TR_is_insert3 N)"
@@ -1287,7 +1328,7 @@ context weak_ordering begin
         \<and> drop (i+1) xs' = drop (i+1) xs 
         \<and> length xs'=length xs 
         \<and> sorted_wrt_lt (\<^bold><) (take (i+1) xs') 
-        ) (\<lambda>_. cost ''is_insert'' (1::enat))
+        ) (\<lambda>_. cost ''is_insert_g'' (1::enat))
     }"  
     
     
@@ -1308,7 +1349,7 @@ context weak_ordering begin
     done
     
     
-  abbreviation "insort_guarded_step_cost \<equiv> cost ''icmp_slt'' 1 + cost ''add'' 1 + cost ''is_insert'' 1 + cost ''call'' 1
+  abbreviation "insort_guarded_step_cost \<equiv> cost ''icmp_slt'' 1 + cost ''add'' 1 + cost ''is_insert_g'' 1 + cost ''call'' 1
      + cost ''if'' 1"  
   
     
@@ -1402,22 +1443,10 @@ context weak_ordering begin
       }) (xs,i);
     RETURN xs
   }"  
-  
-  definition "TR_is_insert3_guarded N \<equiv> (
-                   (pp (pp (TId(''list_get'' := lift_acost mop_array_nth_cost, ''list_set'' := lift_acost mop_array_upd_cost, ''mop_cmp_v_idx'' := cost ''cmpo_v_idx'' 1))
-                         (TId(''is_insert'' := cost_insert_guarded N)))
-                     TId))"
+   
+ 
 
-
-
-
-
-
-lemma "TR_is_insert3_guarded N =
-      G"
-  unfolding TR_is_insert3_guarded_def apply(auto simp add: norm_cost  norm_pp)
-  oops
-
+ 
   
   (* TODO: Move, better name *)                     
   lemma timerefine_R_cf_mono:
@@ -1425,14 +1454,15 @@ lemma "TR_is_insert3_guarded N =
     assumes "wfR'' R'"
     shows "R\<le>R' \<Longrightarrow> \<Down> S (timerefine R c) \<le> \<Down> S (timerefine R' c)"
     by (simp add: assms nrest_Rel_mono timerefine_R_mono_wfR'')
-                     
-  lemma is_insert3_guarded_sorts_one_more: 
+
+  (* TODO: enable this kind of reasoning! by fixing timerefine_comm_concfun *)
+  lemma is_insert3_guarded_sorts_one_more_right: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "N\<ge>i-l"
-    shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3_guarded N) (sort_one_more_spec_guarded xs' i'))"
+    shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_guarded xs' i'))"
   proof -
     note is_insert3_guarded_correct'
     also note is_insert_guarded_sorts_one_more
-    finally show ?thesis using assms unfolding TR_is_insert3_guarded_def 
+    finally show ?thesis using assms unfolding TR_is_insert3_def 
       apply (simp add: idx_shift_rel_def)
       
       apply (rule order_trans[OF _ ])
@@ -1455,21 +1485,87 @@ lemma "TR_is_insert3_guarded N =
       done
   qed
 
+  thm timerefine_mono2 timerefine_R_mono_wfR''
+
+lemma timerefine_mono_both: 
+  fixes R :: "_ \<Rightarrow> ('c, 'd::{complete_lattice,nonneg,mult_zero,ordered_semiring}) acost"
+  assumes "wfR'' R'"
+    and "R\<le>R'"
+  shows "c\<le>c' \<Longrightarrow> timerefine R c \<le> timerefine R' c'"
+  apply(cases c) apply simp
+  apply(cases c') apply (auto simp: less_eq_acost_def timerefine_def split: nrest.splits option.splits simp: le_fun_def)
+  subgoal  by (metis le_some_optE) 
+  proof (goal_cases)
+    case (1 x2 x2a x x2b x2c xa)
+    then have l: "\<And>ac. the_acost x2b ac \<le>  the_acost x2c ac"
+      apply(cases x2b; cases x2c) unfolding less_eq_acost_def  
+      apply auto
+      by (metis acost.sel less_eq_acost_def less_eq_option_Some)
+    show ?case
+      apply(rule Sum_any_mono)
+      subgoal using l apply(rule ordered_semiring_class.mult_mono)
+        subgoal using assms(2) unfolding le_fun_def
+          by (simp add: the_acost_mono)
+        subgoal by (simp add: needname_nonneg)
+        subgoal
+          by (simp add: needname_nonneg)
+        done
+      apply(rule wfR_finite_mult_left2) by fact
+  qed 
 
 
-lemma wfR''_TR_is_insert3_guarded[simp]: "wfR'' (TR_is_insert3_guarded N)"
-  unfolding TR_is_insert3_guarded_def
-  apply(simp add: norm_pp )
-  apply(intro wfR''_upd) by simp
+lemma fun_upd_parallel_I: "f\<le>f' \<Longrightarrow> y\<le>y' \<Longrightarrow> f(x:=y) \<le> f'(x:=y')"
+  unfolding fun_upd_def le_fun_def  
+  by auto
 
-lemma sp_TR_is_insert3_guarded[simp]: "struct_preserving (TR_is_insert3_guarded N)"
-  unfolding TR_is_insert3_guarded_def
-  apply(simp add: norm_pp ) 
-  by(auto intro!: struct_preserving_upd_I)
+lemma cost_insert_guarded_mono: "a \<le> b \<Longrightarrow> cost_insert_guarded a \<le> cost_insert_guarded b"
+  unfolding cost_insert_guarded_def 
+          unfolding cost_insert_guarded_def cost_is_insert_guarded_step_def
+          apply(auto simp add: norm_pp norm_cost intro!: wfR''_upd )
+          apply sc_solve by auto
+
+lemma cost_insert_mono: "a \<le> b \<Longrightarrow> cost_insert a \<le> cost_insert b"
+  unfolding cost_insert_def 
+          unfolding cost_is_insert_step_def
+        apply(auto simp add: norm_pp norm_cost intro!: wfR''_upd )
+          apply sc_solve by auto
+
+
+  lemma is_insert3_guarded_sorts_one_more: 
+    assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "N\<ge>i-l"
+    shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_guarded xs' i'))"
+    using assms apply -
+      apply(rule order_trans)
+     apply(rule is_insert3_guarded_correct'[OF assms(1-3)])
+    apply(rule nrest_Rel_mono)
+    unfolding TR_is_insert3_def
+      apply(subst (2) timerefine_iter2[symmetric])
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(subst timerefine_iter2[symmetric])
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(subst timerefine_iter2[symmetric])
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      subgoal by(auto intro!: wfR''_upd)
+      apply(rule timerefine_mono2)
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      apply(rule timerefine_mono_both)
+      subgoal by(auto simp: norm_pp intro!: wfR''_upd)
+      subgoal premises prems
+        apply(intro fun_upd_parallel_I cost_insert_guarded_mono cost_insert_mono)
+        using assms(4)  by simp_all
+      apply(rule order.trans) 
+       apply(rule is_insert_guarded_sorts_one_more)
+      apply simp
+      done
+
+
+
 
   lemma gen_insertion_sort_guarded2_refine: 
     "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l; j\<le>N \<rbrakk> 
-      \<Longrightarrow> gen_insertion_sort_guarded2 l ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_is_insert3_guarded N) (gen_insertion_sort_guarded i j xs))"
+      \<Longrightarrow> gen_insertion_sort_guarded2 l ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_is_insert3 N) (gen_insertion_sort_guarded i j xs))"
     unfolding gen_insertion_sort_guarded2_def gen_insertion_sort_guarded_def monadic_WHILEIET_def
     apply (refine_rcg is_insert3_guarded_sorts_one_more monadic_WHILEIT_refine' bindT_refine_conc_time_my_inres SPECc2_refine')
     supply [refine_dref_RELATES] = 
@@ -1480,14 +1576,14 @@ lemma sp_TR_is_insert3_guarded[simp]: "struct_preserving (TR_is_insert3_guarded 
     
     applyS (auto simp: idx_shift_rel_def slice_rel_alt eq_outside_range_triv slicep_rel_def)[]
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal unfolding TR_is_insert3_guarded_def apply(simp add: norm_pp )   by(auto intro!: preserves_curr_other_updI)
+    subgoal unfolding TR_is_insert3_def apply(simp add: norm_pp )   by(auto intro!: preserves_curr_other_updI)
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     applyS (auto simp: idx_shift_rel_def slice_rel_alt) []
     
     applyS (auto simp: idx_shift_rel_def slicep_rel_def)[]
-    subgoal unfolding TR_is_insert3_guarded_def apply(simp add: norm_pp )   by(auto intro!: preserves_curr_other_updI)
+    subgoal unfolding TR_is_insert3_def apply(simp add: norm_pp )   by(auto intro!: preserves_curr_other_updI)
     
     subgoal
       apply (clarsimp simp: idx_shift_rel_def slice_rel_alt) []
@@ -1518,7 +1614,7 @@ context sort_impl_context begin
 
   lemma gen_insertion_sort_guarded3_refines:
     "(l,l')\<in>Id \<Longrightarrow> (i,i')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (xs,xs')\<in>Id
-      \<Longrightarrow> gen_insertion_sort_guarded3 l i h xs \<le> \<Down>Id (timerefine TR_cmp_swap (gen_insertion_sort_guarded2 l i' h' xs'))"
+      \<Longrightarrow> gen_insertion_sort_guarded3 l i h xs \<le> \<Down>Id (timerefine TR_cmp_swap (gen_insertion_sort_guarded2 l' i' h' xs'))"
     supply conc_Id[simp del]
     unfolding gen_insertion_sort_guarded3_def gen_insertion_sort_guarded2_def
     supply [refine] = is_insert_guarded4_refines
