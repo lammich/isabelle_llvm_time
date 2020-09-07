@@ -153,12 +153,6 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E':
   apply(rule cmp_idxs2'_refines_mop_cmp_idxs_with_E)
   by(auto simp: timerefineA_update_apply_same_cost')
 
-lemma myswap_refine':
-   "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
-       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (mop_list_swapN xs' l' h'))"
-  apply(rule myswap_refine)
-  by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero) 
- 
 lemma move_median_to_first2_refine':
   assumes "(ri,ri')\<in>Id" "(ai,ai')\<in>Id" "(bi,bi')\<in>Id" "(ci,ci')\<in>Id" "(xs,xs')\<in>Id"
   shows "move_median_to_first2 ri ai bi ci xs \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (move_median_to_first ri' ai' bi' ci' xs'))"
@@ -166,7 +160,7 @@ lemma move_median_to_first2_refine':
   unfolding move_median_to_first2_def move_median_to_first_def
   supply cmp_idxs2'_refines_mop_cmp_idxs_with_E'[refine]
   supply SPECc2_refine[refine]
-  supply myswap_refine'[refine]
+  supply myswap_TR_cmp_swap_refine[refine]
   apply(refine_rcg bindT_refine_conc_time_my_inres MIf_refine)
   by(auto intro: struct_preservingI)
 
@@ -845,7 +839,7 @@ lemma qs_partition2_refines:
   unfolding qs_partition2_def qs_partition_def
   supply qsp_next_l2_refines[refine]
   supply qsp_next_h2_refines[refine]
-  apply(refine_rcg bindT_refine_easy SPECc2_refine myswap_refine')
+  apply(refine_rcg bindT_refine_easy SPECc2_refine myswap_TR_cmp_swap_refine)
   apply refine_dref_type
 
   supply conc_Id[simp del]
@@ -900,7 +894,7 @@ lemma partition_pivot2_refines:
   supply move_median_to_first2_refine'[refine]
   supply qs_partition2_refines[refine]
   supply mop_call_refine[refine]
-  apply(refine_rcg bindT_refine_easy SPECc2_refine myswap_refine')
+  apply(refine_rcg bindT_refine_easy SPECc2_refine myswap_TR_cmp_swap_refine)
   apply refine_dref_type
 
   supply conc_Id[simp del]
