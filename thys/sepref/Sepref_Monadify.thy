@@ -277,7 +277,7 @@ lemma dflt_arity[sepref_monadify_arity]:
 
 lemma dflt_comb[sepref_monadify_comb]:
   "\<And>B x. RECT$B$x \<equiv> NREST.bindT$(EVAL$x)$(\<lambda>\<^sub>2x. SP (RECT$B$x))"
-  "RECT' \<equiv> \<lambda>\<^sub>2B x. SP RECT'$(\<lambda>\<^sub>2D x. B$(\<lambda>\<^sub>2x. RCALL$D$x)$x)$x" 
+  "\<And>B x. RECT'$B$x \<equiv> NREST.bindT$(EVAL$x)$(\<lambda>\<^sub>2x. SP (RECT'$B$x))"
   "\<And>D x. RCALL$D$x \<equiv> NREST.bindT$(EVAL$x)$(\<lambda>\<^sub>2x. SP (RCALL$D$x))"
   "\<And>fn fc l. case_list$fn$fc$l \<equiv> NREST.bindT$(EVAL$l)$(\<lambda>\<^sub>2l. (SP case_list$fn$fc$l))"
   "\<And>fp p. case_prod$fp$p \<equiv> NREST.bindT$(EVAL$p)$(\<lambda>\<^sub>2p. (SP case_prod$fp$p))"
