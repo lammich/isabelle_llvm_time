@@ -1518,7 +1518,6 @@ lemma of_nat_word_refine[sepref_import_param]:
 \<close>
 
 
-\<^cancel>\<open>
 subsubsection \<open>Bit-Shifting\<close>
 
 sepref_register 
@@ -1530,42 +1529,55 @@ context begin
 
 interpretation llvm_prim_arith_setup .
   
-lemma shl_hnr_unat[sepref_fr_rules]: "(uncurry ll_shl,uncurry (RETURN oo (<<))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len word \<Rightarrow> _)\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> word_assn"
+
+lemma shl_hnr_unat[sepref_fr_rules]: "(uncurry ll_shl,uncurry (PR_CONST (SPECc2 ''shl'' (<<)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len word \<Rightarrow> _)\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> word_assn"
   unfolding unat_rel_def unat.assn_is_rel[symmetric] unat.assn_def
+  unfolding SPECc2_def PR_CONST_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   apply sepref_to_hoare
   by vcg'
 
-lemma lshr_hnr_unat[sepref_fr_rules]: "(uncurry ll_lshr,uncurry (RETURN oo (>>))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len word \<Rightarrow> _)\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> word_assn"
+lemma lshr_hnr_unat[sepref_fr_rules]: "(uncurry ll_lshr,uncurry (PR_CONST (SPECc2 ''lshr'' (>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len word \<Rightarrow> _)\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> word_assn"
   unfolding unat_rel_def unat.assn_is_rel[symmetric] unat.assn_def
+  unfolding SPECc2_def PR_CONST_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   apply sepref_to_hoare
   by vcg'
 
-lemma ashr_hnr_unat[sepref_fr_rules]: "(uncurry ll_ashr,uncurry (RETURN oo (>>>))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len word \<Rightarrow> _)\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> word_assn"
+lemma ashr_hnr_unat[sepref_fr_rules]: "(uncurry ll_ashr,uncurry (PR_CONST (SPECc2 ''ashr'' (>>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len word \<Rightarrow> _)\<^sup>k *\<^sub>a unat_assn\<^sup>k \<rightarrow> word_assn"
   unfolding unat_rel_def unat.assn_is_rel[symmetric] unat.assn_def
+  unfolding SPECc2_def PR_CONST_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   apply sepref_to_hoare
   by vcg'
 
-lemma shl_hnr_snat[sepref_fr_rules]: "(uncurry ll_shl,uncurry (RETURN oo (<<))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len2 word \<Rightarrow> _)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> word_assn"
+lemma shl_hnr_snat[sepref_fr_rules]: "(uncurry ll_shl,uncurry (PR_CONST (SPECc2 ''shl'' (<<)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len2 word \<Rightarrow> _)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> word_assn"
   unfolding snat_rel_def snat.assn_is_rel[symmetric] snat.assn_def
+  unfolding SPECc2_def PR_CONST_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   supply [simp] = snat_eq_unat
   apply sepref_to_hoare
   by vcg'
   
-lemma lshr_hnr_snat[sepref_fr_rules]: "(uncurry ll_lshr,uncurry (RETURN oo (>>))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len2 word \<Rightarrow> _)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> word_assn"
+lemma lshr_hnr_snat[sepref_fr_rules]: "(uncurry ll_lshr,uncurry (PR_CONST (SPECc2 ''lshr'' (>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len2 word \<Rightarrow> _)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> word_assn"
   unfolding snat_rel_def snat.assn_is_rel[symmetric] snat.assn_def
+  unfolding SPECc2_def PR_CONST_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   supply [simp] = snat_eq_unat
   apply sepref_to_hoare
   by vcg'
 
-lemma ashr_hnr_snat[sepref_fr_rules]: "(uncurry ll_ashr,uncurry (RETURN oo (>>>))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len2 word \<Rightarrow> _)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> word_assn"
+lemma ashr_hnr_snat[sepref_fr_rules]: "(uncurry ll_ashr,uncurry (PR_CONST (SPECc2 ''ashr'' (>>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a (word_assn :: 'a::len2 word \<Rightarrow> _)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> word_assn"
   unfolding snat_rel_def snat.assn_is_rel[symmetric] snat.assn_def
+  unfolding SPECc2_def PR_CONST_def
+  unfolding one_enat_def lift_acost_cost[symmetric]
   supply [simp] = snat_eq_unat
   apply sepref_to_hoare
   by vcg'
   
       
 end
-\<close>
+
 subsubsection \<open>Bounds Solver Setup\<close>
 
 

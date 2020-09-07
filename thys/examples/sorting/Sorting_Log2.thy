@@ -138,7 +138,7 @@ lemma word_clz2_refine: "word_clz2 x\<^sub>0 \<le> SPECT [word_clz' x\<^sub>0\<m
 
 (*
 lemma word_clz2_refine': "(word_clz2, RETURN o word_clz') \<in> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
-  by (auto intro!: nres_relI simp: word_clz2_refine)
+  by (auto intro!: nrest_relI simp: word_clz2_refine)
 *)  
   
 sepref_def word_clz'_impl is word_clz2 :: "(word_assn' TYPE('b::len2))\<^sup>k \<rightarrow>\<^sub>a snat_assn' TYPE('b)"  
@@ -146,26 +146,19 @@ sepref_def word_clz'_impl is word_clz2 :: "(word_assn' TYPE('b::len2))\<^sup>k \
   apply (rewrite at "(SPECc2 ''shl'' (<<) _ \<hole>)" snat_const_fold[where 'a='b])
   apply (rewrite at "(SPECc2 ''add'' (+) _ \<hole>)" snat_const_fold[where 'a='b])
   apply (rewrite at "(\<hole>,_)" snat_const_fold[where 'a='b])
-
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-    apply sepref_dbg_id  
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-      apply sepref_dbg_trans_keep (* TODO: @Peter *)
-
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_constraints 
-  done
+  by sepref
 
 export_llvm "word_clz'_impl :: 64 word \<Rightarrow> 64 word llM" 
 
 sepref_register word_clz word_clz'
+
+(* @Max: Was ist die Spezifikation mit Zeit hier?
+    wie muss word_clz_alt aussehen?
+*)
+
 lemmas [sepref_fr_rules] = word_clz'_impl.refine[FCOMP word_clz2_refine']
 
-lemma word_clz_alt: "word_clz x = (if x=0 then size x else word_clz' x)"
+lemma word_clz_alt: "word_clz x = (if\<^sub>N SPECc2 ''ll_icmp_eq'' (=) x 0 then RETURNT (size x) else SPECT [word_clz' x\<^sub>0\<mapsto> word_clz2_cost x\<^sub>0])"
   unfolding word_clz'_def by (auto simp: word_size)
 
   
@@ -176,6 +169,7 @@ sepref_def word_clz_impl
   by sepref
   
 export_llvm "word_clz_impl :: 64 word \<Rightarrow> _"   
+
 
 lemma word_clz_nonzero_max': "x\<noteq>0 \<Longrightarrow> word_clz (x::'a::len2 word) \<le> LENGTH('a) - Suc 0"
   using word_clz_nonzero_max[of x] unfolding word_size
@@ -212,7 +206,7 @@ lemma word_log22_correct:
 
 sepref_def word_log2_impl is 
   "word_log22" :: "[\<lambda>x. x>0 \<and> LENGTH('a)>2]\<^sub>a (word_assn' TYPE('a::len2))\<^sup>k \<rightarrow> snat_assn' TYPE('a)"
-  unfolding word_log22_def word_size
+  unfolding word_log22_def word_size 
   apply (annot_snat_const "TYPE('a)")
   supply [simp] = word_clz_nonzero_max'
   by sepref  (* TODO: sepref *)
