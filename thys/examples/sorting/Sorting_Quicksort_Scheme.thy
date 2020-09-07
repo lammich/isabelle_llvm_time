@@ -16,12 +16,13 @@ begin
       SPEC (\<lambda>(xs1,xs2). mset xs = mset xs1 + mset xs2 \<and> xs1\<noteq>[] \<and> xs2\<noteq>[] \<and> slice_LT (\<^bold>\<le>) xs1 xs2) (\<lambda>_. cost ''partition'' (enat (length xs)))
     }"
 definition introsort_aux1 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "introsort_aux1 tf xs d \<equiv> RECT' (\<lambda>introsort_aux1 (xs,d). doN {
+      ASSERT (xs \<noteq> []);
       lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''list_length'' 1];
       b \<leftarrow> SPECc2 ''lt'' (<) is_threshold (length xs);
       MIf b (doN {
         b2 \<leftarrow> SPECc2 ''eq'' (=) d 0;
         MIf b2 (
-          SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (tf (length xs))))
+          mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (tf (length xs)))))
         )( doN {
           (xs1,xs2)\<leftarrow>partition1_spec xs;
           d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
@@ -42,12 +43,9 @@ definition introsort_aux1 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Ri
 
 definition introsort_aux_cost :: "_ \<Rightarrow> nat * nat \<Rightarrow> (char list, enat) acost"
   where "introsort_aux_cost tf = (\<lambda>(lxs, d). lift_acost (
-        cost ''if'' (2^(d+1)-1) + cost ''eq'' (2^(d+1)-1) + cost ''if'' (2^(d+1)-1)
-         + cost ''lt'' (2^(d+1)-1) + cost ''call'' ((2^(d+1)-1)) 
-        + cost ''list_length'' (2^(d+1)-1) 
-        + cost ''sub'' (2^(d+1)-1) 
-        + cost ''list_append'' (2^(d+1)-1) 
-        +   cost ''slice_sort_p'' (tf (lxs)) + cost ''partition'' (d*(lxs))
+        ((d+1)*lxs) *m (cost ''if'' 2 + cost ''eq'' 1 + cost ''lt'' 1 + cost ''call'' 1
+                    + cost ''list_length'' 1 + cost ''sub'' 1 + cost ''list_append'' 1) 
+            + cost ''slice_sort_p'' (tf (lxs)) + cost ''partition'' (d*(lxs))
          )
         )"
  
@@ -138,20 +136,52 @@ proof -
     done      
 qed
 
+
+lemma 
+  introsort_aux1_aux:
+  "b>0 \<Longrightarrow> lxs+lys>(16::nat) \<Longrightarrow> Suc ((b - Suc 0) * lxs + (b - Suc 0) * lys) \<le> b * (lxs + lys)"
+  by (smt One_nat_def Suc_leI add.commute add_le_cancel_left less_imp_le_nat local.z neq0_conv not_numeral_le_zero plus_1_eq_Suc)
+  
+lemma 
+  introsort_aux1_aux2:
+  "b>0 \<Longrightarrow> lxs+lys>(16::nat) \<Longrightarrow> Suc ((b - Suc 0) * lys + (b - Suc 0) * lxs) \<le> b * (lxs + lys)"
+  by (smt One_nat_def Suc_leI add.commute add_le_cancel_left less_imp_le_nat local.z neq0_conv not_numeral_le_zero plus_1_eq_Suc)
+  
+lemma 
+  introsort_aux1_aux4:
+  assumes "b>0" "lxs+lys>(16::nat)"
+  shows "Suc(Suc ((b - Suc 0) * lxs * 2 + (b - Suc 0) * lys * 2)) \<le> b * (lxs + lys) * 2"
+proof - 
+  have "Suc(Suc ((b - Suc 0) * lxs * 2 + (b - Suc 0) * lys * 2))
+    = (Suc ((b - Suc 0) * lxs + (b - Suc 0) * lys)) + (Suc ((b - Suc 0) * lxs + (b - Suc 0) * lys))"
+    by auto
+  also have "\<dots> \<le> (b * (lxs + lys)) + (b * (lxs + lys))"
+    apply(rule add_mono)
+    subgoal apply(rule introsort_aux1_aux) using assms by auto
+    subgoal apply(rule introsort_aux1_aux) using assms by auto
+    done
+  also have "\<dots> = b * (lxs + lys) * 2"
+    by auto
+  finally show ?thesis .
+qed
+
+
 definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (length xs,d) )"
 
 
   lemma introsort_aux1_correct':
     assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c"
+      and "xs \<noteq> []"
     shows 
    "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost' tf (xs, d))"
     
       unfolding introsort_aux1_def partition1_spec_def sort_spec_def
  
 
-      apply (rule RECT'_rule_arb[where V="measure (\<lambda>(xs,d). d+1)" and pre="\<lambda>xss (xs',d). xss=xs'"])
+      apply (rule RECT'_rule_arb[where V="measure (\<lambda>(xs,d). d+1)" and pre="\<lambda>xss (xs',d). length xs' > 0 \<and> xss=xs'"])
       apply refine_mono
-      apply (all \<open>(auto intro: sorted_wrt_imp_part_sorted part_sorted_wrt_init; fail)?\<close>)
+        apply (all \<open>(auto intro: sorted_wrt_imp_part_sorted part_sorted_wrt_init; fail)?\<close>)
+      subgoal using  assms by simp
 
       unfolding SPEC_REST_emb'_conv SPECc2_alt
       subgoal premises prems for f xss x
@@ -162,7 +192,7 @@ definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (l
       subgoal unfolding emb'_def apply auto
         subgoal  by (simp add: sorted_wrt_imp_part_sorted)
         subgoal unfolding introsort_aux_cost_def introsort_aux_cost'_def
-            apply (simp add: lift_acost_propagate lift_acost_cost)
+            apply (simp add: norm_cost lift_acost_propagate lift_acost_cost)
           apply sc_solve by (auto simp: one_enat_def)
         done
             apply simp apply simp
@@ -179,49 +209,85 @@ definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (l
         subgoal premises p
           unfolding introsort_aux_cost_def introsort_aux_cost'_def
           using p(3,8)
-          apply (simp add: lift_acost_propagate lift_acost_cost)
+          apply (simp add: norm_cost)
           apply sc_solve_debug apply safe apply(all \<open>((auto simp: sc_solve_debug_def),fail)?\<close>)
-          subgoal (* append *) unfolding sc_solve_debug_def by (simp add: one_enat_def argh) 
+          subgoal (* append *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def  )
+            apply(rule introsort_aux1_aux) by auto
           subgoal (* partition *)
             unfolding sc_solve_debug_def
             apply(drule lengths_sums_if_msets_do)
             apply auto apply(simp only: z) apply simp done
-          subgoal (* sub *) unfolding sc_solve_debug_def by (simp add: one_enat_def argh) 
+          subgoal (* sub *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def  )
+            apply(rule introsort_aux1_aux) by auto
           subgoal (* ''slice_sort_p'' *) unfolding sc_solve_debug_def
             apply (simp add: one_enat_def)
             apply(rule tf_suplinear)
             by (metis add.commute length_append less_or_eq_imp_le mset_append mset_eq_length) 
-          subgoal  (* if *) unfolding sc_solve_debug_def apply (simp add: one_enat_def argh) 
-            apply(rule add_le_imp_le_diff) apply simp apply(rule ha) by simp 
-          subgoal  (* list_length *) unfolding sc_solve_debug_def apply (simp add: one_enat_def argh) 
-            apply(rule add_le_imp_le_diff) apply simp apply(rule haha) by simp 
-          subgoal (* eq *) unfolding sc_solve_debug_def by (simp add: one_enat_def argh) 
-          subgoal (* call *) unfolding sc_solve_debug_def apply (simp add: one_enat_def ) 
-            apply(rule argh2) by simp 
-          subgoal  (* lt *) unfolding sc_solve_debug_def by (simp add: one_enat_def argh)
+          subgoal  (* if *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def) 
+            apply(rule introsort_aux1_aux4) by auto
+          subgoal  (* list_length *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def  )
+            apply(rule introsort_aux1_aux2) by auto
+          subgoal (* eq *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def  )
+            apply(rule introsort_aux1_aux) by auto
+          subgoal (* call *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def  )
+            apply(rule introsort_aux1_aux2) by auto
+          subgoal  (* lt *)
+            unfolding sc_solve_debug_def
+            apply(drule lengths_sums_if_msets_do)
+            using p(2)
+            apply (simp add: one_enat_def  )
+            apply(rule introsort_aux1_aux) by auto
           done
         done
       subgoal by auto
       subgoal
         using prems(2) apply (auto simp add: emb'_def handy_if_lemma)
         subgoal by (simp add: part_sorted_wrt_init)
-        subgoal unfolding introsort_aux_cost_def introsort_aux_cost'_def apply (simp add: lift_acost_propagate lift_acost_cost)
+        subgoal
+          unfolding introsort_aux_cost_def introsort_aux_cost'_def
+          apply (simp add: norm_cost)
           apply sc_solve apply (auto simp: one_enat_def)
-          subgoal 
-            by(rule zz)
+          subgoal
+            by (simp add: Suc_leI)
           subgoal  
-            by (smt Suc_leI Suc_pred le_SucE mult_pos_pos n_not_Suc_n numeral_2_eq_2 one_eq_mult_iff pos2 zero_less_power)  
+            by (simp add: Suc_leI)
           done
         done
+      subgoal using prems by simp
       done
     done
 
   lemma introsort_aux1_correct:
-    assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c" "lxs = length xs"
+    assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c"
+      and "xs \<noteq> []" "lxs = length xs"
     shows 
    "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost tf (lxs, d))"
-    unfolding assms(2)
-    apply(rule  introsort_aux1_correct'[OF assms(1), unfolded introsort_aux_cost'_def, simplified])
+    unfolding assms(3)
+    apply(rule  introsort_aux1_correct'[OF assms(1,2), unfolded introsort_aux_cost'_def, simplified])
     by simp
 
       
@@ -246,7 +312,7 @@ definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (l
       MIf b (doN {
         b2 \<leftarrow> SPECc2 ''eq'' (=) d 0;
         MIf b2 (
-          SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (tf (length xs))))
+          mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (tf (length xs)))))
         )( doN {
           (xs,m)\<leftarrow>partition2_spec xs;
           ASSERT (m\<le>length xs);
@@ -262,7 +328,7 @@ definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (l
                                                                                        
     lemma introsort_aux2_refine: "introsort_aux2 tf xs d \<le>\<Down>Id (timerefine TId (introsort_aux1 tf xs d))"  
       unfolding introsort_aux2_def introsort_aux1_def
-      apply (refine_rcg partition2_spec_refine SPEC_both_refine MIf_refine SPECc2_refine RECT'_refine_t bindT_refine_conc_time_my_inres)
+      apply (refine_rcg mop_call_refine partition2_spec_refine SPEC_both_refine MIf_refine SPECc2_refine RECT'_refine_t bindT_refine_conc_time_my_inres)
       apply refine_dref_type
       apply refine_mono
       apply (auto simp: in_br_conv cost_n_leq_TId_n)
@@ -317,7 +383,7 @@ definition "slice_sort_specT T lt xs\<^sub>0 l h \<equiv> doN {
         MIf b (doN {
           b2 \<leftarrow> SPECc2 ''eq'' (=) d 0;
           MIf b2 (
-            slice_sort_specT (cost ''slice_sort_p'' (enat (tf lxs))) (\<^bold><) xs l h
+            mop_call (slice_sort_specT (cost ''slice_sort_p'' (enat (tf lxs))) (\<^bold><) xs l h)
           )( doN {
             (xs,m)\<leftarrow>partition3_spec xs l h;
             d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
@@ -358,7 +424,7 @@ lemma introsort_aux3_refine: "(xsi,xs)\<in>slicep_rel l h
           ]
       thm recref
       unfolding SPECc2_def
-      apply (refine_rcg bindT_refine_conc_time_my_inres MIf_refine
+      apply (refine_rcg bindT_refine_conc_time_my_inres MIf_refine mop_call_refine
         recref 
         partition3_spec_refine'
         my_slice_sort_spec_refine_sort'
@@ -408,7 +474,7 @@ lemma introsort_aux3_refine: "(xsi,xs)\<in>slicep_rel l h
       done
 
 
-    definition "slice_part_sorted_spec xsi l h \<equiv> doN { ASSERT (l\<le>h \<and> h\<le>length xsi); SPEC (\<lambda>xsi'. 
+    definition "slice_part_sorted_spec xsi l h \<equiv> doN { ASSERT (l<h \<and> h\<le>length xsi); SPEC (\<lambda>xsi'. 
         eq_outside_range xsi' xsi l h 
       \<and> mset (slice l h xsi') = mset (slice l h xsi) 
       \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold (slice l h xsi')) (\<lambda>_. cost ''slice_part_sorted'' 1)}"
@@ -447,7 +513,7 @@ lemma
 
 lemma introsort_aux3_correct:
   assumes tf_mono: "\<And>x y. x \<le> y \<Longrightarrow> tf x \<le> tf y"
-    and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"    
+    and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"   
   shows 
     "introsort_aux3 tf xsi l h d \<le> \<Down>Id (timerefine TR_i_aux (timerefine (TId(''slice_part_sorted'':=introsort_aux_cost tf (h-l,d))) (slice_part_sorted_spec xsi l h)))"
   apply(subst timerefine_iter2)
@@ -473,6 +539,7 @@ lemma introsort_aux3_correct:
   subgoal by (auto intro!: wfR''_upd)
     apply(rule introsort_aux1_correct)
   subgoal using tf_sums by blast
+  subgoal by (metis Sorting_Misc.slice_len length_greater_0_conv zero_less_diff)
    apply (simp add: timerefine_id)
    apply(rule order.refl)
   apply(simp add: SPEC_timerefine_conv introsort_aux_cost_def timerefineA_propagate lift_acost_propagate lift_acost_cost
@@ -480,8 +547,8 @@ lemma introsort_aux3_correct:
   unfolding slice_rel_def
   apply(subst build_rel_SPEC_conv) apply simp
   apply(rule SPEC_leq_SPEC_I_strong)
-  subgoal apply auto  
-    using eq_outside_range_def by blast  
+  subgoal apply auto   
+    by (simp add: eq_outside_range_def)
   subgoal by(sc_solve) 
   done
 
@@ -493,7 +560,7 @@ lemma TR_sps_important:
   shows "(timerefine TR_i_aux (timerefine (TId(''slice_part_sorted'':=introsort_aux_cost tf (h-l,d))) (slice_part_sorted_spec xsi l h)))
     = timerefine TR (slice_part_sorted_spec xsi l h)"
   unfolding slice_part_sorted_spec_def 
-  apply(cases "l \<le> h \<and> h \<le> length xsi") apply auto
+  apply(cases "l < h \<and> h \<le> length xsi") apply auto
   apply(simp only: SPEC_timerefine_conv)
   apply(rule SPEC_cong, simp)
   apply(rule ext)
@@ -505,7 +572,7 @@ lemma TR_sps_important:
 
 lemma introsort_aux3_correct_flexible:
   assumes tf_mono: "\<And>x y. x \<le> y \<Longrightarrow> tf x \<le> tf y"
-    and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"    
+    and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"
    and  "TR ''slice_part_sorted'' = timerefineA TR_i_aux (introsort_aux_cost tf (h-l,d))"
   shows 
     "introsort_aux3 tf xsi l h d \<le> \<Down>Id (timerefine TR (slice_part_sorted_spec xsi l h))"
@@ -679,6 +746,7 @@ lemma introsort3_correct: "introsort3 xs l h \<le> \<Down>Id (timerefine (TId(''
         by (auto elim: eq_outside_range_gen_trans[of _ _ l h _ l h l h, simplified])
       subgoal using eq_outside_range_list_rel_on_conv by blast  
       subgoal by blast
+      subgoal by linarith
       subgoal by(auto simp: emb'_def)
       done
     subgoal
