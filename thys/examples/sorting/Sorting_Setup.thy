@@ -1444,6 +1444,14 @@ lemma sp_E45[simp]: "struct_preserving TR_cmp_swap"
   by (auto intro!: struct_preserving_upd_I)
 
 
+
+lemma myswap_TR_cmp_swap_refine:
+   "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
+       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (mop_list_swapN xs' l' h'))"
+  apply(rule myswap_refine)
+  by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero) 
+ 
+
 lemma mop_oarray_upd_refines:
   assumes "wfR'' TR"
     and "preserves_curr TR ''store''"
