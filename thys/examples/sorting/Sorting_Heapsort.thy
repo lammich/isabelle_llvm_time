@@ -2508,11 +2508,6 @@ lemma heapify_btu3_refine: "(l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Long
   }"
 
 
-lemma myswap_refine':
-   "l\<noteq>h \<Longrightarrow> (xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id
-       \<Longrightarrow> myswap xs l h \<le> \<Down> (\<langle>Id\<rangle>list_rel) (timerefine TR_cmp_swap (mop_list_swapN xs' l' h'))"
-  apply(rule myswap_refine)
-  by (auto simp: timerefineA_update_apply_same_cost   lift_acost_zero)
 
 lemma heapsort3_refine:
   fixes xs\<^sub>0 :: "'a list" 
@@ -2522,7 +2517,7 @@ lemma heapsort3_refine:
   supply SPECc2_refine'[refine]
   supply heapify_btu3_refine[refine]
   supply elegant[refine]
-  supply myswap_refine'[refine]
+  supply myswap_TR_cmp_swap_refine[refine]
   apply(refine_rcg bindT_refine_conc_time_my_inres MIf_refine monadic_WHILEIT_refine')
   apply refine_dref_type 
   apply(all \<open>(intro preserves_curr_other_updI wfR''_upd wfR''_TId preserves_curr_TId)?\<close>)
@@ -2806,7 +2801,7 @@ end
 
 *)
 
-
+(*
 global_interpretation heapsort_interp: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_ult "''icmp_ult''"  unat_assn
   defines (*heapsort_interp_mop_lchild_impl  = heapsort_interp.mop_lchild_impl 
       and heapsort_interp_mop_rchild_impl  = heapsort_interp.mop_rchild_impl *)
@@ -2824,6 +2819,6 @@ global_interpretation heapsort_interp: pure_sort_impl_context "(\<le>)" "(<)" ll
 
 export_llvm "heapsort_interp_heapsort_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* heapsort(uint64_t*, int64_t,int64_t)"
   file "../code/heapsort.ll"
-
+*)
 
 end
