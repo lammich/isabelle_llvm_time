@@ -7,6 +7,8 @@ imports
 begin
 
 
+lemma wfR''_Rsd_a[simp]: "wfR'' (Rsd_a x)"
+  unfolding Rsd_a_def by auto
 context weak_ordering begin
 
 
@@ -18,7 +20,7 @@ context weak_ordering begin
     lxs \<leftarrow> SPECc2 ''sub'' (-) h l; 
     if\<^sub>N SPECc2 ''icmp_slt'' (<) is_threshold lxs then doN {
       if\<^sub>N SPECc2 ''icmp_eq'' (=) d 0 then
-        heapsort2 xs l h
+        mop_call (heapsort2 xs l h)
       else doN {
         (xs,m)\<leftarrow>partition_pivot xs l h;
         d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
@@ -50,8 +52,6 @@ lemma heapsort_correct_h:
   apply sc_solve
   apply safe by auto
 
-lemma wfR''_Rsd_a[simp]: "wfR'' (Rsd_a x)"
-  unfolding Rsd_a_def by auto
 
   
 
@@ -59,23 +59,24 @@ thm heapsort_correct' partition_pivot_correct
 
 text \<open>Here we assemble a Timerefinement from @{term heapsort_TR} and @{term TR_pp}.\<close>
 
-(* TODO: find the right Tia43 *)
 definition "Tia43 \<equiv> TId(''eq'':=cost ''icmp_eq'' 1,
           ''lt'':=cost ''icmp_slt'' 1,
         ''partition'':=TR_pp ''partition'',
         ''slice_sort_p'':=
         cost ''call'' (enat 10)
-         + cost ''if'' (enat 24) \<^cancel>\<open>
-         + cost ''sub'' c
-         + cost ''cmpo_v_idx'' d
-         + cost ''mul'' e
-         + cost ''ofs_ptr'' f
-         + cost ''add'' g
-         + cost ''cmpo_idxs'' i
-         + cost ''udiv'' j
-         + cost ''add'' k
-         + cost ''icmp_slt'' m
-         + cost ''add'' n\<close>)"
+         + cost ''if'' (enat 24) 
+         + cost ''sub'' (enat 34)
+         + cost ''ofs_ptr'' (enat 20) 
+         + cost ''mul'' (enat 14) 
+         + cost ''cmpo_v_idx'' (enat 6)
+         + cost ''add'' (enat 42)
+         + cost ''cmpo_idxs'' (enat 4)
+         + cost ''udiv'' (enat 16)
+         + cost ''and'' (enat 6)
+         + cost ''icmp_slt'' (enat 21)
+         + cost ''list_swap'' (enat 1)
+         + cost ''load'' (enat 10)
+         + cost ''store'' (enat 10))"
  
 
 lemma cost_n_eq_TId_n: "cost n (1::enat) = TId n"
@@ -91,6 +92,112 @@ lemma pcTia43[simp]:
   "preserves_curr (Tia43) ''icmp_eq''"
   by(auto simp: Tia43_def preserves_curr_def cost_n_eq_TId_n) 
 
+
+lemma 
+  assumes "1 \<le> Discrete.log (h - l)" "1 \<le> h - l"
+  shows 
+    yeah_aux1: "x \<le> y \<Longrightarrow> (h - l) + x \<le> (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux2: "x \<le> y \<Longrightarrow> p * (h - l) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux3: "x \<le> y \<Longrightarrow> (h - (1+l)) + x \<le> (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux4: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow> p * (h - (1+l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux5: "x \<le> y \<Longrightarrow> (Discrete.log (h - l) * (h - (1+l))) + x \<le> (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux6: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow> p * (Discrete.log (h - l) * (h - (1+l))) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux13: "x \<le> y \<Longrightarrow> ((h - l) * Discrete.log (h - l)) + x \<le> (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux14: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow> p * ((h - l) * Discrete.log (h - l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux15: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow> (h - l) * (p *  Discrete.log (h - l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux7: "x \<le> y \<Longrightarrow> ((h - (1+l)) * Discrete.log (h - l)) + x \<le> (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux8: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow> p * ((h - (1+l)) * Discrete.log (h - l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux9: "x \<le> y \<Longrightarrow> (Discrete.log (h - l)) + x \<le> (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux10: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow> p * ( Discrete.log (h - l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux11: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow>(h - (1+l)) * ( p * Discrete.log (h - l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux12: "x \<le> y \<Longrightarrow> p>0 \<Longrightarrow>(h - l) * ( p * Discrete.log (h - l)) + x \<le> p * (h - l) * Discrete.log (h - l) + y"
+  and  yeah_aux_end: "x \<le> y \<Longrightarrow> q>0 \<Longrightarrow> q + x \<le> q * (h - l) * Discrete.log (h - l) + y"
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by simp 
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by simp 
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal apply(rule order.trans[where b="h-l"]) apply simp using assms by simp
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal apply simp apply(rule order.trans[where b="h-l"]) apply simp using assms by simp
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  subgoal
+    apply(rule add_mono)
+    subgoal using assms by auto
+    by simp
+  done
+
+definition "STOP = (0::nat)"
+lemma yeah_aux0: "a+(STOP::nat)\<le> b\<Longrightarrow> a \<le> b"
+  by simp
+
+lemma yeah_stop: "STOP \<le> 0"
+  unfolding STOP_def by simp
+
+lemmas yeah_aux = yeah_aux1 yeah_aux2 yeah_aux3 yeah_aux4 yeah_aux5 yeah_aux6
+      yeah_aux13 yeah_aux14 yeah_aux15
+      yeah_aux7 yeah_aux8
+       yeah_aux9 yeah_aux10 yeah_aux11 yeah_aux12 
+      yeah_aux_end
+
+method yeah_solver uses assms  = (simp only: Suc_eq_plus1_left,
+                    rule yeah_aux0,
+                    simp only: add.assoc,
+                    rule order.trans,
+                    (rule yeah_aux[OF assms])+,
+                    rule yeah_stop,
+                    (simp_all, linarith?))
 
 lemma yeah:
   assumes "Discrete.log (h - l) \<ge> 1" "h-l \<ge> 1"
@@ -115,39 +222,126 @@ lemma yeah:
   apply safe
   subgoal (*if*)  apply(simp add: add_mult_distrib2 add_mult_distrib 
               sc_solve_debug_def numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
     apply(rule order.trans)
-     apply(rule add_mono[where b="7 * (h - l) * Discrete.log (h - l)"])
-    subgoal using assms by simp
-     apply(rule add_mono[where b="7 * (h - l) * Discrete.log (h - l)"])
-    subgoal apply simp apply(rule order.trans[where b="h-l"]) apply simp using assms by simp
-     apply(rule add_mono[where b="3 * (h - l) * Discrete.log (h - l)" and d="4 * (h - l) * Discrete.log (h - l)"])
-    subgoal   using assms by simp
-    subgoal using assms by simp
-    by linarith
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
   subgoal (*call*) apply(simp add: add_mult_distrib2 add_mult_distrib 
               sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
     apply(rule order.trans)
-    apply(subst Suc_eq_plus1_left)
-     apply(subst Suc_eq_plus1_left)
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal apply simp apply(rule order.trans[where b="h-l"]) apply simp using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal apply simp apply(rule order.trans[where b="h-l"]) apply simp using assms by simp
-     apply(rule add_mono[where b="1 * (h - l) * Discrete.log (h - l)" and d="1 * (h - l) * Discrete.log (h - l)"])
-    subgoal apply simp apply(rule order.trans[where b="h-l"]) apply simp using assms by simp
-    subgoal   using assms by simp 
-    by linarith
-  sorry
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* sub *) apply(simp add: add_mult_distrib2 add_mult_distrib 
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''ofs_ptr'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''mul'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''cmpo_v_idx'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''add'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''cmpo_idxs'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''udiv'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''icmp_slt'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''and'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''store'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''load'' *) apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+    apply(simp only: Suc_eq_plus1_left)
+    apply(rule yeah_aux0)
+    apply(simp only: add.assoc)
+    apply(rule order.trans)
+     apply(rule yeah_aux[OF assms])+
+        apply(rule yeah_stop)
+    by (simp_all, linarith?)
+  subgoal (* ''list_swap'' *)
+      using assms apply(simp add: add_mult_distrib2 add_mult_distrib  add.assoc
+              sc_solve_debug_def  numeral_eq_enat plus_enat_simps one_enat_def times_enat_simps) 
+      done
+  done
    
   
 lemma yeah': (* i guess h-l must be \<ge> 2 *)
@@ -163,7 +357,7 @@ lemma yeah': (* i guess h-l must be \<ge> 2 *)
 lemma heapsort_correct'': 
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id; lxs=(h'-l'); h'-l'>1\<rbrakk> \<Longrightarrow> heapsort2 xs l h \<le>
       \<Down>Id (timerefine (Tia43) (slice_sort_specT (cost ''slice_sort_p'' (enat ((\<lambda>n. n * Discrete.log n) lxs))) (\<^bold><) xs' l' h'))"
-  apply(rule order.trans)
+ apply(rule order.trans)
    apply(rule heapsort_correct') apply auto [3] 
   unfolding slice_sort_spec_def slice_sort_specT_def
   apply(rule ASSERT_D3_leI)
@@ -171,7 +365,7 @@ lemma heapsort_correct'':
   apply(rule SPEC_leq_SPEC_I)
    apply simp 
   apply(rule yeah') apply simp
-  done
+  done 
 
 
 lemma
@@ -263,6 +457,7 @@ thm slice_sort_specT_def slice_sort_spec_def
   lemma introsort_aux4_refine: "introsort_aux4 xs l h d \<le> \<Down>Id (timerefine (Tia43) ((introsort_aux3 (\<lambda>n. n * Discrete.log n) xs l h d)))"
     unfolding introsort_aux4_def introsort_aux3_def 
     supply conc_Id[simp del]
+    supply [refine] = mop_call_refine
     apply (refine_rcg RECT'_refine_t bindT_refine_conc_time_my_inres SPECc2_refine' SPECc2_refine MIf_refine
             heapsort_correct'' partition_pivot_correct')
     apply refine_mono
@@ -315,7 +510,7 @@ lemma TR_sps_important2:
   assumes "TR ''slice_part_sorted'' = bla d (h - l) ''slice_part_sorted''"
   shows "timerefine TR (slice_part_sorted_spec xs l h) = (timerefine (bla d (h-l)) (slice_part_sorted_spec xs l h))"
   unfolding slice_part_sorted_spec_def
-  apply(cases "l \<le> h \<and> h \<le> length xs"; auto)
+  apply(cases "l < h \<and> h \<le> length xs"; auto)
   apply(simp only: SPEC_timerefine_conv)
   apply(rule SPEC_cong, simp)
   apply(rule ext)
@@ -499,7 +694,7 @@ lemma pullin_right:
     lxs \<leftarrow> SPECc2 ''sub'' (-) h l; 
     if\<^sub>N SPECc2 ''icmp_slt'' (<) is_threshold lxs then doN {
       if\<^sub>N SPECc2 ''icmp_eq'' (=) d 0 then
-        heapsort3 xs l h
+        mop_call (heapsort3 xs l h)
       else doN {
         (xs,m)\<leftarrow>partition_pivot2 xs l h;
         d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
@@ -523,7 +718,7 @@ lemma pc_TR_cmp_swap: "x\<noteq>''cmp_idxs'' \<Longrightarrow> x\<noteq>''cmpo_i
     unfolding introsort_aux4_def introsort_aux5_def 
     supply conc_Id[simp del]
     apply (refine_rcg RECT'_refine_t bindT_refine_conc_time_my_inres SPECc2_refine' MIf_refine
-            heapsort3_refine partition_pivot2_refines)
+            heapsort3_refine partition_pivot2_refines  mop_call_refine)
     apply refine_mono
     apply refine_dref_type
     apply (auto simp add: inres_SPECc2 intro!: pc_TR_cmp_swap) 
@@ -538,23 +733,8 @@ sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_a
   unfolding introsort_aux5_def PR_CONST_def
   apply (annot_snat_const "TYPE(size_t)")
   supply [[goals_limit = 1]]
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-     apply sepref_dbg_id
-  apply sepref_dbg_monadify
-     apply sepref_dbg_opt_init
-
-  using hn_RECT_wiewirshabenwollen
-
-      apply sepref_dbg_trans_keep
-
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_constraints 
-  oops
+  by sepref
   
-
   definition "introsort5 xs l h \<equiv> doN {
     ASSERT(l\<le>h);
     hml \<leftarrow> SPECc2 ''sub'' (-) h l;
@@ -567,12 +747,12 @@ sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_a
     } else RETURN xs
   }"  
 
-
+(*
 
   
 sepref_register introsort4
-sepref_def introsort_impl is "uncurry2 (PR_CONST introsort4)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
-  unfolding introsort4_def PR_CONST_def
+sepref_def introsort_impl is "uncurry2 (PR_CONST introsort5)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
+  unfolding introsort5_def PR_CONST_def
   apply (annot_snat_const "TYPE(size_t)")
   supply [intro!] = introsort_depth_limit_in_bounds_aux 
   by sepref
@@ -584,7 +764,8 @@ lemma introsort4_refine_ss_spec: "(PR_CONST introsort4, slice_sort_spec (\<^bold
 theorem introsort_impl_correct: "(uncurry2 introsort_impl, uncurry2 (slice_sort_spec (\<^bold><))) \<in> arr_assn\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"  
   using introsort_impl.refine[FCOMP introsort4_refine_ss_spec] .
   
-  
+  *)
+
 end
 
 
