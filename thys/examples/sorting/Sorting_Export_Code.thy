@@ -1,5 +1,5 @@
 theory Sorting_Export_Code
-imports Sorting_PDQ Sorting_Introsort Sorting_Strings
+imports (* Sorting_PDQ *) Sorting_Introsort Sorting_Strings
 begin
   
 text \<open>
@@ -9,11 +9,11 @@ text \<open>
 
 
  (* TODO: Move! *)
-lemmas [llvm_inline] = 
+(* lemmas [llvm_inline] = 
   array_swap_def word_log2_impl_def 
-
+*)
   
-global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_ult unat_assn
+global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_ult  "''icmp_ult''" unat_assn
   defines unat_sort_is_guarded_insert_impl = unat_sort.is_guarded_insert_impl
       and unat_sort_is_unguarded_insert_impl = unat_sort.is_unguarded_insert_impl
       and unat_sort_unguarded_insertion_sort_impl = unat_sort.unguarded_insertion_sort_impl
@@ -27,9 +27,10 @@ global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_
       and unat_sort_qs_partition_impl     = unat_sort.qs_partition_impl
       and unat_sort_partition_pivot_impl  = unat_sort.partition_pivot_impl 
       and unat_sort_introsort_aux_impl = unat_sort.introsort_aux_impl
-      and unat_sort_introsort_impl        = unat_sort.introsort_impl
       and unat_sort_move_median_to_first_impl = unat_sort.move_median_to_first_impl
-      
+(*      and unat_sort_introsort_impl        = unat_sort.introsort_impl *)
+
+ (*     
       and unat_sort_pdqsort_impl               = unat_sort.pdqsort_impl               
       and unat_sort_pdq_guarded_insort_impl    = unat_sort.pdq_guarded_insort_impl
       and unat_sort_pdq_unguarded_insort_impl  = unat_sort.pdq_unguarded_insort_impl
@@ -37,9 +38,16 @@ global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_
       (*and unat_sort_move_pivot_to_front_impl   = unat_sort.move_pivot_to_front_impl *)
       and unat_sort_partition_left_impl        = unat_sort.partition_left_impl
       and unat_sort_partition_right_impl       = unat_sort.partition_right_impl 
-      (*and unat_sort_shuffle_impl               = unat_sort.shuffle_impl*)
+      (*and unat_sort_shuffle_impl               = unat_sort.shuffle_impl*) *)
       
   by (rule unat_sort_impl_context)
+
+
+export_llvm "unat_sort_introsort_aux_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort_aux(uint64_t*, int64_t,int64_t,int64_t)"
+  file "../code/introsort.ll"
+
+
+\<^cancel>\<open>
 
 
 abbreviation "string_assn \<equiv> string_assn' TYPE(size_t) TYPE(8)"  
@@ -121,5 +129,6 @@ export_llvm
   file "../code/introsort.ll"
 
 
+\<close>
 
 end
