@@ -269,7 +269,6 @@ lemma hnr_vcg_aux2:
   apply(drule sep_conjD) apply (auto simp:  lift_acost_def time_credits_assn_def sep_algebra_simps)
   by (metis add.commute cost_ecost_add_minus_cancel lift_acost_def) 
 
-
 lemma hnr_vcgI: 
   assumes "\<And>F s cr M. \<lbrakk> m = REST M \<rbrakk>
           \<Longrightarrow> (\<exists>ra Ca. (llSTATE (\<Gamma>**F**$(lift_acost Ca)) (s,cr+(lift_acost Ca)) \<longrightarrow> (M ra \<ge> Some (lift_acost Ca) \<and>
@@ -297,8 +296,137 @@ lemma "RETURNT x = SPECT M \<longleftrightarrow> M = [x\<mapsto>0]"
 lemma ecost_le_zero: "(Ca::ecost) \<le> 0 \<longleftrightarrow> Ca=0"
   apply(cases Ca) by(auto simp: zero_acost_def less_eq_acost_def)
 
+lemma get_delta: "Ca \<le> (T::(_,enat)acost) \<Longrightarrow> \<exists>delta. T = delta + Ca"
+  apply(cases Ca; cases T)
+  apply(rule exI[where x="T - Ca"])
+  apply (auto simp: minus_acost_alt less_eq_acost_def) 
+  apply(rule ext)  
+  subgoal premises p for f g x
+    using p(1)[rule_format, of x]  
+    by (metis add.commute add_diff_cancel_enat less_eqE plus_eq_infty_iff_enat) 
+  done
+
+lemma entailsD: "a \<turnstile> b \<Longrightarrow> a h \<Longrightarrow> b h"
+  unfolding entails_def by auto
+
+lemma dollar_aux_conv: "($c) (aa, ba) = (aa=0 \<and> ba=c)"
+  unfolding time_credits_assn_def EXACT_def SND_def
+  by auto
+
+(* TODO: rework and structure this proof *)
+lemma ht_from_hnr: 
+  assumes "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))"
+  and "\<Phi>"
+shows " llvm_htriple ($(timerefineA E T) ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')"
+proof -
+
+  from  assms(1)[unfolded hn_refine_def]
+  have *: "\<And>F s cr. llSTATE (\<Gamma> \<and>* F) (s, cr) \<Longrightarrow> (\<exists>ra Ca. Some Ca \<le> (emb Q (timerefineA E T)) ra \<and> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr + Ca))"
+    using assms(2) apply (simp add: nofailT_timerefine)
+    unfolding SPEC_REST_emb'_conv[symmetric]
+    apply (simp add: SPEC_timerefine_conv)
+    unfolding SPEC_REST_emb'_conv by auto
+
+  show ?thesis
+    unfolding htriple_def
+    apply safe
+  proof -
+    fix F a b
+    assume "(($timerefineA E T \<and>* \<Gamma>) \<and>* F) (ll_\<alpha> (a, b))"
+    then have G:"($timerefineA E T ** (\<Gamma> ** F)) (ll_\<alpha> (a, b))"
+      by(simp add: sep_conj_aci)
+    obtain b' where  G':"(\<Gamma> ** F) (ll_\<alpha> (a, b'))" and b: "b= b'+ (timerefineA E T)"
+      using G[THEN sep_conjD] apply (simp add: dollar_aux_conv )
+      unfolding ll_\<alpha>_def lift_\<alpha>_cost_def
+      apply auto
+      using c_simps(5) by blast
+     from *[unfolded STATE_def,OF G'] obtain ra Ca where
+         i:  "Some Ca \<le> emb Q (timerefineA E T) ra" 
+        and  wp: "wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (a, b' + Ca)"
+       by auto
+     from i have Q: "Q ra" unfolding emb'_def by (auto split: if_splits)   
+     from i have "\<exists>delta. (timerefineA E T) = delta + Ca"
+       apply(intro get_delta) by(auto simp: emb'_def split: if_splits)
+     then obtain delta where tet: "(timerefineA E T) = delta + Ca" by blast
+
+     have b_alt: "b = (b' + Ca) + delta"
+       unfolding b tet 
+       by (simp add: add.commute c_simps(6))
 
 
+     show "wp c (\<lambda>r s'. ((((\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s) \<and>* \<Gamma>') \<and>* GC) \<and>* F) (ll_\<alpha> s')) (a, b)"
+       unfolding b_alt 
+       apply(rule wp_monoI)
+        apply(rule wp_time_mono)
+        apply(rule wp)
+       apply safe
+       apply auto
+       unfolding ll_\<alpha>_def lift_\<alpha>_cost_def
+       apply simp
+     proof -
+       fix r a cc'
+       assume l: "(\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (llvm_\<alpha> a, cc') "
+       have "((\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)\<and>* GC) ((llvm_\<alpha> a, cc')+(0,delta))"
+         apply(rule sep_conjI[where y="(0,delta)"])
+            apply (rule l)
+         subgoal unfolding GC_def SND_def by auto
+         subgoal apply (auto simp: sep_disj_prod_def ) 
+           using sep_disj_acost_def sep_disj_enat_def by blast
+         apply simp
+         done
+       then have k: "((\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)\<and>* GC) ((llvm_\<alpha> a, cc'+delta))"
+         by(simp)
+       then have k': "(R ra r ** (\<Gamma>' \<and>* GC \<and>* F)) ((llvm_\<alpha> a, cc'+delta))"
+         apply simp
+         by(simp add: sep_conj_aci)
+          
+
+       have R: "R ra r \<turnstile> (\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s)"
+         using Q
+         by (smt entails_def pure_true_conv sep.add.right_neutral sep_conj_commute)
+
+       show "((\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s) \<and>* (\<Gamma>' \<and>* GC \<and>* F)) (llvm_\<alpha> a, cc' + delta)"
+         apply(rule entailsD[rotated])
+          apply(rule k')  
+         apply(rule conj_entails_mono[OF R])
+         apply simp
+         done
+     qed
+   qed
+ qed
+
+
+lemma llvm_htriple_more_time: "a\<le>b \<Longrightarrow> llvm_htriple ($a ** F) c Q \<Longrightarrow> llvm_htriple ($b ** F) c Q"
+proof -
+  assume ll: "llvm_htriple ($a ** F) c Q"
+  assume p: "a\<le>b"
+  obtain c where "b=c+a"
+    using get_delta[OF p] by blast
+  then have *: "$b = ($a ** $c)"
+    by (simp add: add.commute time_credits_add)   
+  show ?thesis
+    unfolding *
+    unfolding htriple_def
+    apply safe
+    subgoal for F h1 h2
+      apply(rule wp_monoI)
+      apply(rule ll[unfolded htriple_def, rule_format, where F="$c ** F"])
+       apply(simp add: sep_conj_aci )
+      apply simp
+      subgoal premises p for r x 
+        apply(rule entailsD[rotated])
+         apply(rule p(2))
+        apply(rule conj_entails_mono)
+         apply simp
+        apply(simp only: sep_conj_assoc[symmetric])
+        apply(rule conj_entails_mono)
+        subgoal
+          by (metis consume_credits_fri_end_rule entails_eq_iff sep.add_ac(2))
+        subgoal by simp
+        done
+      done
+    done
+qed
 
 
 lemma hn_refineD:

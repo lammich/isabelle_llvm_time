@@ -1,43 +1,9 @@
 (* Obsolete version without unguarded-option! *)
 theory Sorting_Insertion_Sort
-  imports Sorting_Setup (* "HOL-Library.Function_Algebras" *)
-     (* "Imperative_HOL_Time.Asymptotics_1D" *)
+  imports Sorting_Setup 
+   "Imperative_HOL_Time.Asymptotics_1D"
   "../../nrest/NREST_Automation"
 begin
-
-
-(* TODO: problem when importing Asymptotics_1D
-typeclasses with (+) definition for functions!
-
-Imperative_HOL_Time.Asymptotics_1D \<rightarrow>
-Akra_Bazzi.Akra_Bazzi_Method \<rightarrow>
-Akra_Bazzi.Akra_Bazzi
-Akra_Bazzi.Akra_Bazzi_Real
-Akra_Bazzi.Akra_Bazzi_Asymptotics \<rightarrow>
-Akra_Bazzi.Akra_Bazzi.Akra_Bazzi_Library \<rightarrow>
-Akra_Bazzi.Landau_More
-Akra_Bazzi.Landau_Simprocs \<rightarrow>
-Akra_Bazzi.Landau_Real_Products \<rightarrow> HOL-Library.Function_Algebras
-
-*)
-
-(* TODO: solve *)
-
-lemma ht_from_hnr: "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))
-    \<Longrightarrow> \<Phi> \<Longrightarrow> llvm_htriple ($(timerefineA E T) ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')"
-  sorry          
-
-lemma llvm_htriple_more_time: "a\<le>b \<Longrightarrow> llvm_htriple ($a ** F) c Q \<Longrightarrow> llvm_htriple ($b ** F) c Q"
-proof -
-  assume "a\<le>b"
-  then obtain c where "b=a+c" sorry
-  then have *: "$b = ($a ** $c)" sorry
-  show ?thesis
-    unfolding * sorry    
-qed
-
-
-
 
 
 section \<open>Insertion Sort\<close>  
@@ -675,7 +641,7 @@ thm sepref_frame_merge_rules
   thm is_insert_impl.refine is_insert4_refine is_insert3_refine1 is_insert_correct
 
 text \<open>how to use FCOMP\<close>
-context
+\<^cancel>\<open>context
 begin
   
   lemma nrest_trel_comp: "nrest_trel A EA O nrest_trel B EB = nrest_trel (A O B) (pp EA EB)"
@@ -708,7 +674,7 @@ begin
   term is_insert_impl
 
 end
-
+\<close>
 
 \<^cancel>\<open>    
   sepref_register is_unguarded_insert3
@@ -1212,8 +1178,6 @@ definition in_sort_time :: "nat \<Rightarrow> (char list, nat) acost" where "in_
           (cost ''sub'' (  (h * (2 * h))) +
            (cost ''store'' (  (h * (2 * h))) +
             (cost ''ofs_ptr'' (  (5 * (h * h) + 2 * h)) + cost ''call'' ( 2* (1+ h)))))))))))"
-lemma pfar: "a=a' \<Longrightarrow> b=b' \<Longrightarrow> (a+b) = (a'+b')"
-  by simp
 
 lemma iii_le: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_final h)) (cost ''slice_sort'' 1)
     \<le> lift_acost (in_sort_time h)"
@@ -1229,43 +1193,42 @@ lemma iii_le: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_fin
   unfolding in_sort_time_def
   apply sc_solve_debug apply safe apply(all \<open>(auto simp: sc_solve_debug_def zero_enat_def; fail)?\<close>)
   done
-
-lemma iii: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_final h)) (cost ''slice_sort'' 1)
-    = lift_acost (in_sort_time h)"
-  supply [simp] = timerefineA_TId_eq timerefineA_upd lift_acost_cost add.assoc
-                  skalar_acost_propagate lift_acost_propagate timerefineA_propagate
-  apply(simp add: timerefineA_pp)
-  apply(simp add: E_final_def)
-  apply(simp add: insort_time_def)
-  apply(simp add: E_sort_one_more_def E_u_def)
-  apply(simp add: E2_def)
-  apply(simp add: E_insert4_def)
-  apply(simp add: add.left_commute cost_same_curr_add cost_same_curr_left_add)
-  unfolding in_sort_time_def
-  apply (auto intro!: pfar simp: one_enat_def numeral_eq_enat) sorry
-
-
+ 
 
 term "(insertion_sort_impl ai bia bi)"
 
 text \<open>the final Hoare Triple:\<close>
-
-thm aaah[unfolded slice_sort_spec_def SPEC_REST_emb'_conv, THEN ht_from_hnr, unfolded iii]
+ 
 
 
 lemmas pff = aaah[unfolded slice_sort_spec_def SPEC_REST_emb'_conv, THEN ht_from_hnr]
 
 thm llvm_htriple_more_time[OF iii_le pff, simplified, no_vars]
 
-lemma "bb \<le> bc \<and> bc \<le> length a \<Longrightarrow>
-llvm_htriple ($lift_acost (in_sort_time (bc - bb)) \<and>* hn_ctxt arr_assn a ai \<and>* hn_val snat_rel bb bia \<and>* hn_val snat_rel bc bi) (insertion_sort_impl ai bia bi)
- (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(length x = length a \<and> take bb x = take bb a \<and> drop bc x = drop bc a \<and> sort_spec (\<^bold><) (slice bb bc a) (slice bb bc x)) \<and>* arr_assn x r) s) \<and>*
-      hn_invalid arr_assn a ai \<and>* hn_val snat_rel bb bia \<and>* hn_val snat_rel bc bi)"
+lemma HT': "l \<le> h \<and> h \<le> length a \<Longrightarrow>
+llvm_htriple ($lift_acost (in_sort_time (h - l)) \<and>* hn_ctxt arr_assn a ai \<and>* hn_val snat_rel l bia \<and>* hn_val snat_rel h bi)
+             (insertion_sort_impl ai bia bi)
+ (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(length x = length a \<and> take l x = take l a \<and> drop h x = drop h a \<and> sort_spec (\<^bold><) (slice l h a) (slice l h x)) \<and>* arr_assn x r) s) \<and>*
+      hn_invalid arr_assn a ai \<and>* hn_val snat_rel l bia \<and>* hn_val snat_rel h bi)"
   apply(rule llvm_htriple_more_time)
    apply(rule iii_le)
   apply(rule pff) apply simp 
   done
 
+
+definition "slice_sorted xs xs' l h \<equiv> length xs' = length xs \<and> take l xs' = take l xs \<and> drop h xs' = drop h xs \<and> sort_spec (\<^bold><) (slice l h xs) (slice l h xs')"
+
+lemma HT: "l \<le> h \<and> h \<le> length xs \<Longrightarrow>
+llvm_htriple ($lift_acost (in_sort_time (h - l)) \<and>* hn_ctxt arr_assn xs xsi \<and>* hn_val snat_rel l li \<and>* hn_val snat_rel h hi)
+             (insertion_sort_impl xsi li hi)
+ (\<lambda>r. (EXS xs'. (\<up>(slice_sorted xs xs' l h ) \<and>* arr_assn xs' r)) )"
+  unfolding slice_sorted_def
+  apply(rule cons_post_rule) 
+   apply(rule HT')
+   apply simp
+  apply (auto simp add: invalid_assn_def hn_ctxt_def pure_part_def pure_def pred_lift_def)
+  by (simp add: pred_lift_extract_simps(2) sep.mult.left_commute)  
+  
 
 
 lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
@@ -1281,8 +1244,9 @@ lemma Sum_any_calc: "Sum_any (the_acost (in_sort_time x)) = 4 + (18 * (x * x) + 
   done
 
 
-lemma "(\<lambda>x. Sum_any (the_acost (in_sort_time x)) ) \<in> \<Theta>(\<lambda>n. n*n)"
-  unfolding Sum_any_calc oops (* need to import Imperative_HOL_Time.Asymptotics_1D *)
+lemma "(\<lambda>x. real (Sum_any (the_acost (in_sort_time x))) ) \<in> \<Theta>(\<lambda>n. (real n)*(real n))"
+  unfolding Sum_any_calc
+  by auto2
 
   thm hn_refine_result
 
@@ -1301,7 +1265,6 @@ global_interpretation insort_interp: pure_sort_impl_context "(\<le>)" "(<)" ll_i
   by (rule unat_sort_impl_context)
 
 (* declare insort_interp.is_insert_impl_def[llvm_inline] *)
-declare eoarray_nth_impl_def [llvm_inline]
 export_llvm "insort_interp_insertion_sort_impl :: 64 word ptr \<Rightarrow> _" file "../code/insort.ll"
 
 
