@@ -1,6 +1,7 @@
 section \<open>Additions to Separation Algebra Library\<close>
 theory Sep_Algebra_Add
-imports "Separation_Algebra.Sep_Tactics"
+  imports "Separation_Algebra.Sep_Tactics" 
+      "HOL-Library.Function_Algebras"  "HOL-Library.Product_Plus"
 begin
 
 no_notation pred_K ("\<langle>_\<rangle>")
@@ -37,11 +38,12 @@ end
 
 subsection \<open>Standard Instantiations\<close>
 
+thm plus_fun_def
+thm zero_fun_def
+
 instantiation "fun" :: (type,stronger_sep_algebra) stronger_sep_algebra
 begin
   definition "f1 ## f2 \<longleftrightarrow> (\<forall>x. f1 x ## f2 x)"
-  definition [simp]: "(f1 + f2) x = (f1 x + f2 x)"
-  definition [simp]: "0 x \<equiv> 0"
 
   instance
     apply standard
@@ -61,6 +63,12 @@ begin
     done  
   
 end
+
+lemma plus_fun_alt[simp]: "(f1 + f2) x = (f1 x + f2 x)"
+  by auto
+lemma zero_fun_alt[simp]: "0 x \<equiv> 0"
+  by auto
+
 
 instance "fun" :: (type,unique_zero_sep_algebra) unique_zero_sep_algebra
   apply standard
@@ -84,9 +92,11 @@ lemma sep_disj_fun_Zupd_eq[sep_algebra_simps]:
   
 lemma sep_disj_funD: "f##g \<Longrightarrow> f x ## g x" by (auto simp: sep_disj_fun_def) 
 
-lemma merge_fun_singleton: "fun_upd 0 i a + fun_upd 0 i b = fun_upd 0 i (a+b)" by auto
+lemma merge_fun_singleton: "fun_upd 0 i (a::'c::pre_sep_algebra) + fun_upd 0 i b = fun_upd 0 i (a+b)"
+  by auto
 
-lemma split_fun_upd_0: "fun_upd (a+b) i 0 = fun_upd a i 0 + fun_upd b i 0" by auto
+lemma split_fun_upd_0: "fun_upd (a+b) i (0::'c::pre_sep_algebra) = fun_upd a i 0 + fun_upd b i 0"
+  by auto
   
 
 instantiation option :: (stronger_sep_algebra) stronger_sep_algebra begin
@@ -129,8 +139,7 @@ end
 instantiation prod :: (stronger_sep_algebra, stronger_sep_algebra) stronger_sep_algebra
 begin
   definition "a##b \<longleftrightarrow> fst a ## fst b \<and> snd a ## snd b"
-  definition "a+b = (fst a + fst b, snd a + snd b)"  
-  definition "0 = (0,0)"
+
   
   instance
     apply standard
