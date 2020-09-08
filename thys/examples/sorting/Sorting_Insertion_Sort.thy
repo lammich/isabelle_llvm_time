@@ -1218,6 +1218,13 @@ llvm_htriple ($lift_acost (in_sort_time (h - l)) \<and>* hn_ctxt arr_assn a ai \
 
 definition "slice_sorted xs xs' l h \<equiv> length xs' = length xs \<and> take l xs' = take l xs \<and> drop h xs' = drop h xs \<and> sort_spec (\<^bold><) (slice l h xs) (slice l h xs')"
 
+lemma slice_sorted_complete: "slice_sorted xs xs' 0 (length xs) = (mset xs'=mset xs \<and> sorted_wrt_lt (\<^bold><) xs' )"
+  apply(simp add: slice_sorted_def sort_spec_def ) 
+  apply(rule)
+  subgoal using slice_complete by metis 
+  subgoal using slice_complete by (metis mset_eq_length order_eq_iff)
+  done
+
 lemma HT: "l \<le> h \<and> h \<le> length xs \<Longrightarrow>
 llvm_htriple ($lift_acost (in_sort_time (h - l)) \<and>* hn_ctxt arr_assn xs xsi \<and>* hn_val snat_rel l li \<and>* hn_val snat_rel h hi)
              (insertion_sort_impl xsi li hi)
@@ -1228,7 +1235,8 @@ llvm_htriple ($lift_acost (in_sort_time (h - l)) \<and>* hn_ctxt arr_assn xs xsi
    apply simp
   apply (auto simp add: invalid_assn_def hn_ctxt_def pure_part_def pure_def pred_lift_def)
   by (simp add: pred_lift_extract_simps(2) sep.mult.left_commute)  
-  
+
+
 
 
 lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
@@ -1247,6 +1255,13 @@ lemma Sum_any_calc: "Sum_any (the_acost (in_sort_time x)) = 4 + (18 * (x * x) + 
 lemma "(\<lambda>x. real (Sum_any (the_acost (in_sort_time x))) ) \<in> \<Theta>(\<lambda>n. (real n)*(real n))"
   unfolding Sum_any_calc
   by auto2
+
+lemma HT'': "llvm_htriple ($lift_acost (in_sort_time (length xs)) \<and>* hn_ctxt arr_assn xs xsi
+                             \<and>* hn_val snat_rel 0 li \<and>* hn_val snat_rel (length xs) hi)
+           (insertion_sort_impl xsi li hi) 
+            (\<lambda>r s. \<exists>x. (\<up>(mset x = mset xs \<and> sorted_wrt_lt (\<^bold><) x) \<and>* arr_assn x r) s)"
+  using HT[where l=0 and h="length xs" and xs=xs, unfolded slice_sorted_complete, simplified] 
+  by blast
 
   thm hn_refine_result
 
