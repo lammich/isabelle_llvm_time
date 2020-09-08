@@ -746,9 +746,6 @@ sepref_register
 lemma hn_word_NOT_aux: "cost ''sub'' 2 = cost ''sub'' 1 + cost ''sub'' 1"
   by (auto simp add: cost_same_curr_add) 
 
-lemma time_credits_add: "($A ** $B) = $(A+B)"   
-  by (simp add: EXACT_split SND_conj_conv sep_disj_acost_def sep_disj_enat_def time_credits_assn_def)  
-
 lemma lift_acost_add: "lift_acost t + lift_acost t' = lift_acost (t+t')"
   unfolding lift_acost_def by (cases t; cases t'; auto)
 

@@ -676,6 +676,9 @@ lemma "F \<turnstile> GC ** G \<Longrightarrow> $c ** F \<turnstile> GC ** G"
 lemma htriple_to_GC: "\<lbrakk> htriple \<alpha> P c Q \<rbrakk> \<Longrightarrow> htriple_gc GC \<alpha> P c Q"
   using htriple_to_gc[OF empty_ent_GC] .
   
+lemma time_credits_add: "($A ** $B) = $(A+B)"   
+  by (simp add: EXACT_split SND_conj_conv sep_disj_acost_def sep_disj_enat_def time_credits_assn_def)  
+
   
 
 (* For presentation *)
