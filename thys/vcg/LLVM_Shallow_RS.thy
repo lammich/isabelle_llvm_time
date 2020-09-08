@@ -1178,9 +1178,10 @@ definition "ABSTRACT c ty P s \<equiv> \<exists>F a. llSTATE (\<upharpoonleft>ty
 
 lemma ABSTRACT_pure: "is_pure A \<Longrightarrow> ABSTRACT c A P h \<longleftrightarrow> (\<exists>a. \<flat>\<^sub>pA a c \<and> P a)"
   unfolding ABSTRACT_def  
-  apply (cases h; auto simp: STATE_extract)
-  apply (auto simp: STATE_def dr_assn_pure_asm_prefix_def sep_conj_def pure_part_def ll_\<alpha>_def lift_\<alpha>_cost_def)
-  by (metis disjoint_zero_sym extract_pure_assn pred_lift_extract_simps(1) sep_add_zero_sym)
+  apply (cases h) 
+  apply (auto simp only: STATE_def dr_assn_pure_asm_prefix_def sep_conj_def
+                          pure_part_def ll_\<alpha>_def lift_\<alpha>_cost_def)
+  by (metis disjoint_zero_sym extract_pure_assn pred_lift_extract_simps(1) sep_add_zero_sym) 
   
 lemma ABSTRACT_erule[vcg_decomp_erules]:
   assumes "llSTATE P s"
