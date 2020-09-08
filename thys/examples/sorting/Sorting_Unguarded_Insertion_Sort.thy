@@ -410,7 +410,8 @@ lemma finite_sum_gtzero_nat_cost:
       
         
 
-    (* TODO: Move. Side-conditions? @Max *)          
+    (* TODO: Move. Side-conditions? @Max *)   
+    \<^cancel>\<open>
     lemma timerefine_comm_concfun:
       fixes C :: "('f, ('b, enat) acost) nrest"
       assumes "wfR'' E"
@@ -430,7 +431,7 @@ lemma finite_sum_gtzero_nat_cost:
       apply (subst timerefine_comm_concfun[symmetric])
       apply fact
       apply (rule timerefine_mono2[OF WF1])
-      by fact
+      by fact\<close>
       
         
     find_theorems pp fun_upd
@@ -439,6 +440,7 @@ lemma finite_sum_gtzero_nat_cost:
     abbreviation "TR_ii3 N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert N,  ''is_insert_g'' := cost_insert_guarded N))" (* @Max: what's a good format here? *)
 
     (* TODO: enable this! by fixing timerefine_comm_concfun *)
+  \<^cancel>\<open>
     lemma is_insert3_unguarded_correct'_right: 
       assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
       shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3 N) (is_insert_spec_unguarded N xs' i'))"
@@ -452,7 +454,7 @@ lemma finite_sum_gtzero_nat_cost:
         apply force+
         done
     qed
-
+\<close>
 
   
     lemma is_insert3_unguarded_correct': 
@@ -759,6 +761,7 @@ lemma finite_sum_gtzero_nat_cost:
     abbreviation "TR_ii3_guarded N \<equiv> pp TR_ii2 (TId(''is_insert'' := cost_insert N, ''is_insert_g'' := cost_insert_guarded N))" (* @Max: what's a good format here? *)
       
     (* TODO: enable this! by fixing timerefine_comm_concfun *)
+  \<^cancel>\<open>
     lemma is_insert3_guarded_correct'_right: 
       assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
       shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_ii3_guarded (i-l)) (is_insert_spec_guarded xs' i'))"
@@ -773,7 +776,7 @@ lemma finite_sum_gtzero_nat_cost:
         apply rprems
         apply force+
         done
-    qed
+    qed \<close>
 
     lemma is_insert3_guarded_correct': 
       assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h"
@@ -1180,6 +1183,7 @@ context weak_ordering begin
                      TId))"
 
   (* TODO: enable this kind of reasoning! by fixing timerefine_comm_concfun *)
+  \<^cancel>\<open>
   lemma is_insert3_sorts_one_more_right: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "i'<j'"
     shows "is_insert2_unguarded N xs i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_unguarded N xs' i' j'))"
@@ -1193,7 +1197,7 @@ context weak_ordering begin
       apply (simp add: idx_shift_rel_def)
       subgoal apply(simp add: norm_pp ) apply(intro wfR''_upd) by simp
       done
-  qed
+  qed \<close>
  
 lemma timerefine_mono3: 
   fixes R :: "_ \<Rightarrow> ('a, enat) acost"
@@ -1456,6 +1460,7 @@ context weak_ordering begin
     by (simp add: assms nrest_Rel_mono timerefine_R_mono_wfR'')
 
   (* TODO: enable this kind of reasoning! by fixing timerefine_comm_concfun *)
+  \<^cancel>\<open>
   lemma is_insert3_guarded_sorts_one_more_right: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "N\<ge>i-l"
     shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_guarded xs' i'))"
@@ -1483,7 +1488,7 @@ context weak_ordering begin
         apply sc_solve 
         using \<open>i' \<le> N\<close> by auto
       done
-  qed
+  qed\<close>
 
   thm timerefine_mono2 timerefine_R_mono_wfR''
 

@@ -579,30 +579,6 @@ lemma introsort_aux3_correct_flexible:
   apply(subst TR_sps_important[symmetric, where TR=TR, OF assms(3)])
   apply(rule introsort_aux3_correct) by fact+
 
-
-  \<^cancel>\<open>
-
-    proof -
-    
-(*      have "(xsi, slice l h xsi) \<in> slicep_rel l h"
-        unfolding slicep_rel_def apply auto
-        *)
-    
-      have A: "\<Down> (slice_rel xsi l h) (SPEC (\<lambda>xs'. mset xs' = mset (slice l h xsi) \<and> part_sorted_wrt (le_by_lt (\<^bold><)) 16 xs')  (\<lambda>_. cost ''slice_part_sorted'' 1))
-        \<le> slice_part_sorted_spec xsi l h"
-        apply (clarsimp simp: slice_part_sorted_spec_def pw_le_iff refine_pw_simps)
-        (* apply (auto simp: slice_rel_alt  slicep_rel_def) *)
-        sorry
-      
-      note introsort_aux3_refine[of xsi "slice l h xsi" l h tf d]
-      also note introsort_aux2_refine (* TODO: enable rules like nrest_Rel_mono here *)
-      also note introsort_aux1_correct
-      also note A
-      fin ally *) show ?thesis (*
-        apply (clarsimp simp: slicep_rel_def slice_part_sorted_spec_def)
-        apply (auto simp: pw_le_iff refine_pw_simps) *)
-        sorry
-    qed    \<close>
       
 (*
     text \<open>In the paper, we summarized steps 2 and 3. Here are the relevant lemmas: \<close>        
