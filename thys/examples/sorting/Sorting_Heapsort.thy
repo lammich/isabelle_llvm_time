@@ -1320,46 +1320,18 @@ definition sift_down3_cost :: "_ \<Rightarrow> ecost" where
 
 term Discrete.log
 
-lemma "l<h \<Longrightarrow> i' < h - l \<Longrightarrow> Suc (Discrete.log (h - Suc (Suc (l + i' * 2)))) \<le> Discrete.log (h - (l + i'))"
-    try
-    sorry
-
-lemma 
-  assumes "i' < h - l"
-    "i' < (h - l - 1) div 2"
-    "2 * i' + 1 < h"
-    "2 * i' + 2 < h"
-    "l + (i' * 2 + 1) < h \<and> l + (i' * 2 + 2) < h"
-    "l + (i' * 2 + 1) \<noteq> l + (i' * 2 + 2)"
-    "l + (i' * 2 + 2) \<le> h"
-    "l + i' \<le> h" 
-  shows 
-"l<h \<Longrightarrow> i' < h - l \<Longrightarrow> Suc (Discrete.log ( h - Suc ( (l + i' * 2)))) \<le> Discrete.log ( h - (l + i'))"
-proof -
-  have "h - Suc ( (l + i' * 2)) > 0" sorry 
-  then
-  have "Suc (Discrete.log ( h - Suc ( (l + i' * 2))))
-        = (Discrete.log ( 2 * (h - Suc ( (l + i' * 2)))))" 
-    by simp
-  also have "\<dots> = (Discrete.log ( 2 * h - (2*l + i' * 4+2)))"
-    apply(rule arg_cong[where f="Discrete.log"]) by auto 
-  also have "\<dots> \<le>  Discrete.log ( h - (l + i'))"
-  proof -
-    have "2 * h - (2*l + i' * 4+2) \<le> h - (l + i')"
-      apply auto
-      sorry
-    then show ?thesis by(rule log_mono[THEN monoD])
-  qed
-  finally show ?thesis .
-qed
-
 lemma "Suc (Discrete.log (6 - Suc (Suc (0 + 0 * 2)))) = f" apply (simp add: log.simps) oops
 lemma "Suc (Discrete.log (6 - 0)) = f" apply (simp add: log.simps) oops
 lemma "Discrete.log 8 = f" apply (simp add: log.simps) oops
 
 
-lemma E_sd3_l_True_mono: "x\<le>y \<Longrightarrow> E_sd3_l x True \<le> E_sd3_l y True"
-  sorry
+lemma E_sd3_l_True_mono: "x\<le>y \<Longrightarrow> lift_acost (E_sd3_l x True) \<le> lift_acost (E_sd3_l y True)"
+  unfolding E_sd3_l_def
+  unfolding Let_def
+  apply (auto simp: norm_cost)
+  apply sc_solve apply safe apply auto
+  done
+    
 lemma E_sd3_l_dontknow_mono: "x\<le>y \<Longrightarrow> lift_acost (E_sd3_l x t) \<le> lift_acost (E_sd3_l y True)"
   unfolding E_sd3_l_def
   apply(cases t) 
@@ -1483,7 +1455,7 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         apply(simp add: add.assoc lift_acost_zero lift_acost_diff_to_the_front lift_acost_diff_to_the_right lift_acost_diff_to_the_right_Some)
         apply(simp only: add.commute add.left_commute)
         apply(rule add_mono) 
-        subgoal premises prems apply (rule lift_acost_mono) apply(rule E_sd3_l_True_mono) by simp
+        subgoal premises prems apply (rule E_sd3_l_True_mono)  by simp
         subgoal premises prems
           apply sc_solve_debug apply safe   by (all \<open>(auto simp: one_enat_def numeral_eq_enat sc_solve_debug_def;fail)?\<close>)
         done
@@ -1500,7 +1472,7 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
           apply(simp only: add.commute add.left_commute)
           apply(simp add: add.assoc)
           apply(rule add_mono)
-          subgoal apply (rule lift_acost_mono) apply(rule E_sd3_l_True_mono) by simp  
+          subgoal apply (rule E_sd3_l_True_mono) by simp  
           apply sc_solve by auto
         done
       subgoal by simp
@@ -1509,7 +1481,7 @@ lemma sift_down3_refine_time: "sift_down3 i (xs:: 'a list) \<le>\<^sub>n (SPEC (
         apply(simp add: add.assoc lift_acost_zero lift_acost_diff_to_the_front lift_acost_diff_to_the_right lift_acost_diff_to_the_right_Some)
         apply(simp only: add.commute add.left_commute)
         apply(rule add_mono)
-        subgoal apply (rule lift_acost_mono) apply(rule E_sd3_l_True_mono) by simp
+        subgoal apply (rule E_sd3_l_True_mono) by simp
         apply sc_solve by auto
       subgoal by simp
       done 
