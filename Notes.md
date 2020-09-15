@@ -1,3 +1,40 @@
+# Treffen 15.9.20
+
+## nächstes treffen, freitag 18.9.2020
+
+##  Aufschreiben
+
+- ETAPS: 15. Oktober
+- ITP'21: 1. Feb
+
+## TODOs:
+    
+### Max:
+    - introsort aufräumen und commiten
+    - lokales boost problem debuggen
+   - letzte sorries identifizieren und beheben    
+    
+### Peter
+  - benchmark cpp code anpassen
+  - generalisierung ueber size_t (siehe TODO in discrete_log)    
+  
+## TODO: Strings? 
+  string-compare haengt von maximaler stringlaenge in array ab.
+
+  
+## idee: "compares zählen"
+- compare_impl ohne definition einführen.
+- HT über compare_impl axiomatisieren.
+
+const "compare_impl :: 'a => 'a => '1 word llM"
+
+-> export_llvm: call compare_impl (external function)
+
+Interpretation von impl-locale mit dieser compare-funktion, hnr-lemma dafuer axiomatisch
+
+
+
+
 # Donnerstag 6.8.20
 
 # Plan
