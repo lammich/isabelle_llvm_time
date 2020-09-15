@@ -1,5 +1,5 @@
 theory Sorting_Export_Code
-imports (* Sorting_PDQ *) Sorting_Introsort Sorting_Strings
+imports (* Sorting_PDQ *) Sorting_Introsort (* Sorting_Strings *)
 begin
   
 text \<open>
@@ -28,7 +28,7 @@ global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_
       and unat_sort_partition_pivot_impl  = unat_sort.partition_pivot_impl 
       and unat_sort_introsort_aux_impl = unat_sort.introsort_aux_impl
       and unat_sort_move_median_to_first_impl = unat_sort.move_median_to_first_impl
-(*      and unat_sort_introsort_impl        = unat_sort.introsort_impl *)
+      and unat_sort_introsort_impl        = unat_sort.introsort_impl
 
  (*     
       and unat_sort_pdqsort_impl               = unat_sort.pdqsort_impl               
@@ -42,8 +42,13 @@ global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_
       
   by (rule unat_sort_impl_context)
 
-
-export_llvm "unat_sort_introsort_aux_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort_aux(uint64_t*, int64_t,int64_t,int64_t)"
+lemmas [llvm_inline] = unat_sort.introsort_aux_impl_def 
+                      unat_sort.final_insertion_sort_impl_def
+                      unat_sort.guarded_insertion_sort_impl_def
+                      unat_sort.unguarded_insertion_sort_impl_def
+                      unat_sort.is_guarded_insert_impl_def
+                      unat_sort.is_unguarded_insert_impl_def
+export_llvm "unat_sort_introsort_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort(uint64_t*, int64_t,int64_t)"
   file "../code/introsort.ll"
 
 

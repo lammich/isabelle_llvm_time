@@ -2,9 +2,12 @@ section \<open>Introsort (roughly libstdc++ version)\<close>
 theory Sorting_Introsort
 imports 
   Sorting_Final_insertion_Sort Sorting_Heapsort Sorting_Log2
+   "Imperative_HOL_Time.Asymptotics_1D"
+   "HOL-Real_Asymp.Real_Asymp"
   Sorting_Quicksort_Partition
  (* Sorting_Strings *)
 begin
+
 
 
 lemma wfR''_Rsd_a[simp]: "wfR'' (Rsd_a x)"
@@ -531,11 +534,7 @@ lemma introsort_aux4_correct_flexible:
     ASSERT(l\<le>h);
     hml \<leftarrow> SPECc2 ''sub'' (-) h l;
     if\<^sub>N SPECc2 ''icmp_slt'' (<) 1 hml then doN {
-      loghml \<leftarrow> SPECc1 ''log'' Discrete.log hml; \<^cancel>\<open> TODO: need to specify cost for log computation
-                                                          already here, the running time of 
-                                                          our current implementation depends on the
-                                                          word size of the inputs l and h.
-                                                           \<close>
+      loghml \<leftarrow> mop_call (SPECT [Discrete.log hml \<mapsto> log2_iter_cost hml]);
       d \<leftarrow> SPECc2 ''mul'' (*) loghml 2;
       xs \<leftarrow> introsort_aux4 xs l h d;
       xs \<leftarrow> final_insertion_sort2 xs l h;
@@ -554,7 +553,7 @@ lemmas final_insertion_sort2_correct_flexible = final_insertion_sort2_correct
 thm introsort_aux4_correct_flexible
 thm final_insertion_sort2_correct_flexible
 
-abbreviation "TR_is d s == TId(''prepare_cost'':=cost ''log'' 1+cost ''mul'' 1,
+abbreviation "TR_is d s == TId(''prepare_cost'':=log2_iter_cost s+cost ''call'' 1 +cost ''mul'' 1,
             ''lt'':=cost ''icmp_slt'' 1,''slice_sort'' := fi2_cost s, 
             ''slice_part_sorted'':= bla d s ''slice_part_sorted'')"
 
@@ -589,8 +588,9 @@ lemma SPECc1_alt: "SPECc1 name aop = ( (\<lambda>a. consume (RETURNT (aop a)) (c
   lemma introsort4_refine: "introsort4 xs l h \<le> \<Down>Id (timerefine (TR_is (Discrete.log (h-l)*2) (h-l)) (introsort3 xs l h))"
     unfolding introsort4_def introsort3_def 
     supply conc_Id[simp del]
-    apply(subst (3) SPECc2_alt)
-    apply(subst SPECc1_alt)  
+    apply(subst (3) SPECc2_alt) 
+    unfolding mop_call_def
+    apply(subst consume_RETURNT[symmetric])
     apply normalize_blocks
     apply (refine_rcg SPECc2_refine' SPECc2_refine bindT_refine_conc_time_my_inres MIf_refine
                 introsort_aux4_correct_flexible final_insertion_sort2_correct_flexible
@@ -714,7 +714,8 @@ lemma pc_TR_cmp_swap: "x\<noteq>''cmp_idxs'' \<Longrightarrow> x\<noteq>''cmpo_i
   by auto
 
 
-  lemma introsort_aux5_refine: "introsort_aux5 xs l h d \<le> \<Down>Id (timerefine (TR_cmp_swap) ((introsort_aux4 xs l h d)))"
+lemma introsort_aux5_refine: "(xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (h,h')\<in>Id \<Longrightarrow> (d,d')\<in>Id 
+    \<Longrightarrow> introsort_aux5 xs l h d \<le> \<Down>Id (timerefine (TR_cmp_swap) ((introsort_aux4 xs' l' h' d')))"
     unfolding introsort_aux4_def introsort_aux5_def 
     supply conc_Id[simp del]
     apply (refine_rcg RECT'_refine_t bindT_refine_conc_time_my_inres SPECc2_refine' MIf_refine
@@ -734,12 +735,13 @@ sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_a
   apply (annot_snat_const "TYPE(size_t)")
   supply [[goals_limit = 1]]
   by sepref
-  
+
+
   definition "introsort5 xs l h \<equiv> doN {
     ASSERT(l\<le>h);
     hml \<leftarrow> SPECc2 ''sub'' (-) h l;
     if\<^sub>N SPECc2 ''icmp_slt'' (<) 1 hml then doN {
-      loghml \<leftarrow> SPECT [Discrete.log hml \<mapsto> word_log22_cost hml];
+      loghml \<leftarrow> mop_call (log2_iter hml);
       d \<leftarrow> SPECc2 ''mul'' (*) loghml 2;
       xs \<leftarrow> introsort_aux5 xs l h d;
       xs \<leftarrow> final_insertion_sort3 xs l h;
@@ -747,17 +749,53 @@ sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_a
     } else RETURN xs
   }"  
 
-(*
 
-  
-sepref_register introsort4
+
+  lemma introsort5_refine: "introsort5 xs l h \<le> \<Down>Id (timerefine (TR_cmp_swap) ((introsort4 xs l h )))"
+    unfolding introsort4_def introsort5_def 
+    supply conc_Id[simp del]
+    apply (refine_rcg bindT_refine_conc_time_my_inres SPECc2_refine' MIf_refine
+            introsort_aux5_refine final_insertion_sort3_refines
+              log2_iter_refine_TR_cmp_swap mop_call_refine )
+    apply refine_dref_type
+    apply (auto simp add: inres_SPECc2 intro!: pc_TR_cmp_swap) 
+    done
+ 
+  thm sepref_fr_rules
+
+lemma mop_call_same_result:
+  fixes m :: "(_,(_,enat) acost)nrest"
+  shows "RETURN x \<le> mop_call m \<Longrightarrow> RETURN x \<le> m"
+  unfolding mop_call_def consume_def RETURNT_def
+  apply(auto split: if_splits nrest.splits simp: le_fun_def)
+  subgoal for x2 apply(cases "x2 x") apply auto 
+    by (simp add: ecost_nneg)
+  done
+
+lemma AAA: (* TODO: Move depth-computation into own (inline) function *)
+  assumes "hml < max_snat N" "RETURNTecost xb \<le> mop_call (log2_iter hml)" "1<N" shows "xb * 2 < max_snat N"
+proof -
+  from order_trans[OF mop_call_same_result[OF assms(2)] log2_iter_refine]
+  have xb: "xb = Discrete.log hml"
+    unfolding  RETURNT_def
+    by (auto split: if_splits simp: le_fun_def)
+
+  show ?thesis
+    unfolding xb
+    apply(rule introsort_depth_limit_in_bounds_aux)
+    using assms by auto
+qed
+ 
+
+
+sepref_register introsort5
 sepref_def introsort_impl is "uncurry2 (PR_CONST introsort5)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
   unfolding introsort5_def PR_CONST_def
   apply (annot_snat_const "TYPE(size_t)")
-  supply [intro!] = introsort_depth_limit_in_bounds_aux 
+  supply [intro!] = AAA 
   by sepref
 
-  
+  (*
 lemma introsort4_refine_ss_spec: "(PR_CONST introsort4, slice_sort_spec (\<^bold><))\<in>Id\<rightarrow>Id\<rightarrow>Id\<rightarrow>\<langle>Id\<rangle>nres_rel"  
   using introsort4_correct by (auto intro: nres_relI)
   
@@ -765,6 +803,210 @@ theorem introsort_impl_correct: "(uncurry2 introsort_impl, uncurry2 (slice_sort_
   using introsort_impl.refine[FCOMP introsort4_refine_ss_spec] .
   
   *)
+
+                                   
+thm introsort5_refine introsort4_refine introsort3_correct
+
+schematic_goal introsort5_correct:
+  "introsort5 xs l h \<le> \<Down> Id (timerefine ?TR (slice_sort_spec (\<^bold><) xs l h))"
+  apply(rule order.trans)
+  apply(rule introsort5_refine)
+  apply (rule nrest_Rel_mono)
+  
+  apply(rule order.trans)
+  apply(rule timerefine_mono2) apply(rule wfR''E)
+   apply(rule introsort4_refine)
+                       
+  apply(rule order.trans)
+  apply(rule timerefine_mono2) apply(rule wfR''E)
+  apply (rule nrest_Rel_mono)
+  apply(rule timerefine_mono2) apply(rule wfR''_TR_is)
+   apply(rule introsort3_correct)
+
+  apply(simp add: conc_Id)
+  apply (subst timerefine_iter2)  
+    apply(rule wfR''E)
+   apply(rule wfR''_TR_is)
+
+  apply (subst timerefine_iter2)  
+  apply(rule wfR''_ppI)
+    apply(rule wfR''E)
+    apply(rule wfR''_TR_is)
+  subgoal apply auto done
+  apply(rule order.refl)
+  done 
+
+
+concrete_definition introsort5_TR is introsort5_correct uses "_ \<le> \<Down> Id (timerefine \<hole> _) "
+print_theorems
+
+thm introsort5_TR.refine
+lemma argh_foo: "(timerefine (introsort5_TR l h) (slice_sort_spec (\<^bold><) xs l h))
+    = slice_sort_specT (introsort5_TR l h ''slice_sort'') (\<^bold><) xs l h"
+  unfolding slice_sort_spec_def slice_sort_specT_def
+  apply(cases "l \<le> h \<and> h \<le> length xs")
+   apply(auto simp: SPEC_timerefine_conv)
+  apply(rule SPEC_cong) apply simp
+  by (auto simp: timerefineA_cost)
+
+
+thm introsort5_TR.refine[unfolded argh]
+
+lemma leq_sc_l_TERMINATE_special:
+  "P \<Longrightarrow> leq_sidecon (cost n x) 0 0 0 0 (cost n x + 0) P"
+   
+  unfolding leq_sidecon_def by (simp add: cost_zero)
+
+lemma leq_sc_l_DONE_special:
+  "leq_sidecon 0 l 0 0 0 (bs3+0) P \<Longrightarrow> leq_sidecon (cost n x) l 0 0 0 ((cost n x + bs3) + 0) P"
+   
+  unfolding leq_sidecon_def apply (simp add: cost_zero)
+  apply(rule add_mono) by auto
+
+lemma leq_sc_l_NEXT_ROW_special:
+  "leq_sidecon (cost n x) 0 ls 0 0 bs P \<Longrightarrow> leq_sidecon 0 ((cost n x)+ls) 0 0 0 bs P"
+  unfolding leq_sidecon_def by (simp add: cost_zero) 
+
+
+schematic_goal ub_introsort5: "timerefineA (introsort5_TR l h) (cost ''slice_sort'' 1) \<le> ?x"
+  unfolding introsort5_TR_def introsort3_cost_def
+  apply(simp add: norm_pp norm_cost )
+  apply(subst timerefineA_propagate, (auto intro!: wfR''_upd)[1])+ 
+  apply(simp add: norm_pp norm_cost )
+  unfolding log2_iter_cost_def TR_is_insert3_def bla_def Tia43_def introsort_aux_cost_def
+      cost_insert_guarded_def cost_is_insert_guarded_step_def
+      cost_insert_def cost_is_insert_step_def move_median_to_first_cost_def
+  apply(simp add: norm_pp norm_cost )
+  apply(subst timerefineA_propagate, (auto intro!: wfR''_upd)[1])+ 
+  apply(simp add: norm_pp norm_cost )
+  unfolding cmpo_v_idx2'_cost_def cmp_idxs2'_cost_def myswap_cost_def cmpo_idxs2'_cost_def
+  apply(simp add: norm_pp norm_cost )
+  apply(simp add: add.commute add.left_commute)
+  apply(simp add: cost_same_curr_left_add cost_same_curr_add) 
+  apply(simp add: add.assoc add.commute add.left_commute)
+  apply(simp add: cost_same_curr_left_add cost_same_curr_add) 
+  apply(simp add: add.assoc add.commute add.left_commute)
+  
+  apply ( (simp only: add.assoc)?; rule leq_sc_init, (simp only: add.assoc)?)
+  apply ( ((rule leq_sc_l_SUCC leq_sc_l_FAIL )+)?,
+            ((rule leq_sc_l_DONE_special, rule leq_sc_l_NEXT_ROW_special)
+              | (rule  leq_sc_l_TERMINATE_special))  )+ 
+  by simp
+
+
+concrete_definition introsort5_acost is ub_introsort5 uses "_ \<le> \<hole>"
+print_theorems
+
+schematic_goal iii: "introsort5_acost x y = lift_acost ?y"
+  unfolding introsort5_acost_def
+  apply(simp add: numeral_eq_enat one_enat_def)
+  unfolding lift_acost_cost[symmetric]  lift_acost_propagate[symmetric]
+  apply(rule refl)
+  done
+concrete_definition introsort5_cost is iii uses "_ = lift_acost \<hole>"
+print_theorems
+  
+
+lemmas introsort_rule' = hn_refine_result[OF introsort_impl.refine[to_hnr], unfolded PR_CONST_def APP_def, OF 
+      introsort5_TR.refine ]
+lemma intro_rule: "hn_refine (hn_ctxt arr_assn a ai \<and>* hn_val snat_rel ba bia \<and>* hn_val snat_rel b bi)
+       (introsort_impl ai bia bi)
+       (hn_invalid arr_assn a ai \<and>* hn_val snat_rel ba bia \<and>* hn_val snat_rel b bi) (hr_comp arr_assn Id)
+ (timerefine (introsort5_TR ba b) (slice_sort_spec (\<^bold><) a ba b))"
+  apply(rule introsort_rule')
+  apply(rule attains_sup_sv) by simp
+
+lemmas pff = intro_rule[unfolded slice_sort_spec_def SPEC_REST_emb'_conv,  THEN ht_from_hnr]
+
+thm llvm_htriple_more_time[OF introsort5_acost.refine pff, unfolded introsort5_cost.refine  ]
+
+
+
+lemma Sum_any_cost2: "Sum_any (the_acost (cost n x)) = x"
+  unfolding cost_def by (simp add: zero_acost_def)
+
+definition "Padad a b = (a=b)"
+
+thm introsort5_cost_def[no_vars]
+
+definition "introsort_cost3 s \<equiv>
+cost ''mul'' (Suc (s * Discrete.log s * 14)) +
+(cost ''ofs_ptr'' (1241 + (108 * (s * Discrete.log s) + 68 * s)) +
+ (cost ''add'' (48 * (s * Discrete.log s) + (21 + (s + Discrete.log s))) +
+  (cost ''store'' (612 + (34 * s + 54 * (s * Discrete.log s))) +
+   (cost ''sub'' (35 * s + (596 + 44 * (s * Discrete.log s))) +
+    (cost ''load'' (629 + (34 * s + 54 * (s * Discrete.log s))) +
+     (cost ''if'' (40 * (s * Discrete.log s) + (633 + (Discrete.log s + 20 * s))) +
+      (cost lt_curr_name (306 + (17 * s + 20 * (s * Discrete.log s))) +
+       (cost ''and'' (s * Discrete.log s * 6) +
+        (cost ''icmp_slt'' (20 + (2 * s + (25 * (s * Discrete.log s) + Discrete.log s))) +
+         (cost ''udiv'' (Suc (18 * (s * Discrete.log s) + Discrete.log s)) +
+          (cost ''call'' (343 + (22 * (s * Discrete.log s) + (19 * s + Discrete.log s))) + (cost ''icmp_eq'' (289 + (s + Discrete.log s * 2 * s)) + cost ''icmp_sle'' (Suc 0)))))))))))))" 
+ 
+lemma 35: "introsort_cost3 (h-l) = introsort5_cost l h" 
+  unfolding introsort_cost3_def introsort5_cost_def by (auto simp: algebra_simps)
+
+
+lemma "ba \<le> b \<and> b \<le> length a \<Longrightarrow>
+llvm_htriple ($lift_acost (introsort_cost3 (b-ba)) \<and>* hn_ctxt arr_assn a ai \<and>* hn_val snat_rel ba bia \<and>* hn_val snat_rel b bi) (introsort_impl ai bia bi)
+ (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(length x = length a \<and> take ba x = take ba a \<and> drop b x = drop b a \<and> sort_spec (\<^bold><) (slice ba b a) (slice ba b x)) \<and>* hr_comp arr_assn Id x r) s) \<and>*
+      hn_invalid arr_assn a ai \<and>* hn_val snat_rel ba bia \<and>* hn_val snat_rel b bi)"
+  apply(rule llvm_htriple_more_time[OF introsort5_acost.refine pff, unfolded introsort5_cost.refine 35[symmetric] ])
+  by simp
+
+lemma PadadI: "Padad a a"
+  unfolding Padad_def
+  by simp
+
+schematic_goal Sum_any_calc: "Sum_any (the_acost (introsort_cost3 s)) = ?x"
+  unfolding Padad_def[symmetric]
+  unfolding introsort_cost3_def 
+  apply(simp add: the_acost_propagate add.assoc) 
+  apply(subst Sum_any.distrib;  ( auto simp only: Sum_any_cost 
+          intro!: finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero))+
+  apply(rule PadadI)
+  done
+
+
+end 
+
+(* TODO: there is a problem with auto2 in a context *)
+concrete_definition blubb is sort_impl_context.Sum_any_calc uses "_ = \<hole>"
+
+lemma "blubb n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * Discrete.log n)"
+  unfolding blubb_def
+  apply (simp add: algebra_simps)
+  done
+
+(* by Manuel Eberl *)
+lemma dlog[asym_bound]:  "(\<lambda>x. real (Discrete.log x)) \<in> \<Theta>(\<lambda>x. ln (real x))"
+proof -
+  have "(\<lambda>x. real (Discrete.log x))  \<in> \<Theta>(\<lambda>n. real (nat \<lfloor>log 2 (real n)\<rfloor>))"
+    by (intro bigthetaI_cong eventually_mono[OF eventually_gt_at_top[of 0]])
+       (auto simp: Discrete.log_altdef)
+  also have "(\<lambda>n. real (nat \<lfloor>log 2 (real n)\<rfloor>)) \<in> \<Theta>(\<lambda>x. ln (real x))"
+    by real_asymp
+  finally show ?thesis .
+qed
+ 
+
+lemma "(\<lambda>n. real (n* Discrete.log n)) \<in> \<Theta>(\<lambda>n. (real n)* (ln (real n)))"
+  apply auto2
+  done
+
+lemma "(\<lambda>x. real (x + Suc (x * 14) + 10) ) \<in> \<Theta>(\<lambda>n. (real n))"
+  unfolding Suc_eq_plus1_left
+  apply simp
+  apply auto2 done
+
+lemma "(\<lambda>x. real (blubb x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
+  unfolding blubb_def
+  unfolding Suc_eq_plus1_left
+  apply simp
+  by auto2
+
+
+thm Sum_any.distrib
 
 end
 
@@ -873,5 +1115,5 @@ end
 *)
 
 
-end
+
 

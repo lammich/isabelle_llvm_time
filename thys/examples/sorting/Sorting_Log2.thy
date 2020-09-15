@@ -3,6 +3,142 @@ imports Sorting_Setup
 begin
 
 
+
+section \<open>Log2 by iterated division by 2\<close>
+
+thm Discrete.log.simps
+
+definition log2_iter :: "nat \<Rightarrow> (nat,_) nrest"
+  where "log2_iter n\<^sub>0 \<equiv> RECT' (\<lambda>log_iter n. do {
+     if\<^sub>N SPECc2 ''icmp_slt'' (<) n 2 then
+       RETURNT 0
+     else doN {
+       n' \<leftarrow> SPECc2 ''udiv'' (div) n 2;
+       r \<leftarrow> log_iter n';
+       ASSERT (r+1 \<le> n);
+       SPECc2 ''add'' (+) r 1
+     }
+   }) n\<^sub>0"
+
+abbreviation "log2_iter_body_cost n \<equiv> n *m (cost ''icmp_slt'' 1 + cost ''call'' 1 + cost ''if'' 1 + cost ''udiv'' 1 + cost ''add'' 1)"
+definition "log2_iter_cost n \<equiv> log2_iter_body_cost (enat (Discrete.log n + 1))"
+
+
+lemma minus_0_absorb_acost: "x - (0::(_,enat)acost) = x"
+  apply(cases x)
+  by(auto simp: minus_acost_alt zero_acost_def) 
+
+lemma log2_iter_refine_aux: "n\<ge>2 \<Longrightarrow> Suc (Discrete.log n - Suc 0) = Discrete.log n" 
+  using log_rec by auto  
+
+
+definition "mop_log x = SPECT [Discrete.log x \<mapsto> cost ''log'' 1]"
+
+lemma log2_iter_refine:
+  shows "log2_iter x \<le> SPECT [Discrete.log x \<mapsto> log2_iter_cost x]"
+  unfolding log2_iter_def
+        unfolding log2_iter_cost_def
+  apply(cases "x>0")
+  subgoal
+    apply -
+    apply(induct rule: log_induct)
+    subgoal 
+      apply(subst RECT'_unfold)
+       apply refine_mono
+      apply(rule gwp_specifies_I)
+      unfolding SPECc2_def
+
+      apply (refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET)
+      subgoal apply (auto simp: norm_cost) apply sc_solve by(auto simp:  one_enat_def)
+      subgoal by auto
+      done
+    subgoal
+      apply(subst RECT'_unfold)
+       apply refine_mono
+      apply(rule gwp_specifies_I)
+      unfolding SPECc2_def
+
+      apply (refine_vcg \<open>-\<close>)
+      subgoal by simp
+      subgoal premises prems 
+        apply(rule prems(2)[THEN gwp_specifies_rev_I, THEN gwp_conseq4])
+        apply (refine_vcg \<open>-\<close>)
+        apply(auto split: if_splits)
+         apply(auto simp: norm_cost minus_0_absorb_acost)
+        subgoal apply(subst log2_iter_refine_aux) using prems(1) by auto
+        subgoal apply sc_solve apply (auto simp: one_enat_def)
+          apply(subst log2_iter_refine_aux) using prems(1) by auto
+        subgoal apply(subst log2_iter_refine_aux) using prems(1)
+          apply auto
+          by (metis leD less_2_cases_iff log_exp2_le nat_le_linear neq0_conv pow_mono_leq_imp_lt)
+        done
+      done
+    done
+  subgoal
+    apply(subst RECT'_unfold)
+     apply refine_mono
+    apply(rule gwp_specifies_I)
+    unfolding SPECc2_def
+
+    apply (refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET)
+    subgoal apply (auto simp: norm_cost) apply sc_solve by(auto simp: one_enat_def)
+    subgoal by auto
+    done
+  done
+
+ 
+lemma (in sort_impl_context) log2_iter_refine_TR_cmp_swap: 
+ "(x,x')\<in>Id \<Longrightarrow> log2_iter x \<le> \<Down> nat_rel (timerefine TR_cmp_swap (SPECT [Discrete.log x' \<mapsto> log2_iter_cost x']))"
+  apply(rule order.trans)
+   apply(rule log2_iter_refine)
+  unfolding log2_iter_cost_def
+  by (auto simp: timerefine_SPECT_map le_fun_def norm_cost) 
+ 
+
+  
+
+lemma log2_iter_correct: "log2_iter x \<le> \<Down>Id (timerefine (TId(''log'':=log2_iter_cost x)) (mop_log x))"
+  apply(rule order_trans)
+  apply(rule log2_iter_refine)
+  by(auto simp: mop_log_def timerefine_SPECT_map le_fun_def norm_cost)
+
+
+(* TODO: @Peter integrate this type parameter into sort_impl_context and adapt
+            all other functions *)
+experiment
+begin
+
+sepref_register log2_iter
+context
+  fixes wordlen :: "'l::len2 itself"
+  assumes [simp]: "LENGTH('l) \<ge> 4"
+begin
+
+lemma [simp]: "2 \<in> snats LENGTH('l)"
+  sorry
+lemma [simp]: "2 < max_snat LENGTH('l)"
+  sorry
+
+find_in_thms "''icmp_slt''" in sepref_fr_rules
+
+
+abbreviation "arb_size_assn \<equiv> snat_assn' TYPE('l)"
+
+sepref_def log2_iter_impl is "log2_iter"
+    :: "arb_size_assn\<^sup>k \<rightarrow>\<^sub>a arb_size_assn"
+  unfolding log2_iter_def PR_CONST_def
+  apply (annot_snat_const "TYPE('l::len2)")
+  by sepref
+end
+end
+  
+
+sepref_def log2_iter_impl is "log2_iter"
+    :: "size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
+  unfolding log2_iter_def PR_CONST_def
+  apply (annot_snat_const "TYPE(size_t)")
+  by sepref
+
 section \<open>Count Leading Zeroes and Log2\<close>
 (* TODO: Define semantics of llvm.ctlz intrinsic! *)
 
@@ -71,7 +207,7 @@ lemma word_clz'_fits_snat: "word_clz' (x::'a::len2 word) < max_snat LENGTH('a)"
 abbreviation "word_clz2_body_cost \<equiv> cost ''icmp_slt'' 1 + cost ''add'' 1 
                   + cost ''call'' 1 + cost ''if'' 1 + cost ''shl'' 1"
 
-abbreviation "word_clz2_cost w \<equiv>  (enat (1+size w)) *m word_clz2_body_cost"
+abbreviation "word_clz2_cost sw \<equiv>  (enat (1+sw)) *m word_clz2_body_cost"
 
 (* TODO: move, DUP *)
 lemma finite_sum_gtzero_nat_cost:
@@ -85,7 +221,7 @@ lemma costmult_0_nat:
   shows "(0::nat) *m x = 0"
   by(auto simp: costmult_def zero_acost_def)
 
-lemma word_clz2_refine: "word_clz2 x\<^sub>0 \<le> SPECT [word_clz' x\<^sub>0\<mapsto> word_clz2_cost x\<^sub>0]"
+lemma word_clz2_refine: "word_clz2 x\<^sub>0 \<le> SPECT [word_clz' x\<^sub>0\<mapsto> word_clz2_cost (size x\<^sub>0)]"
   apply(rule order_trans[where y="SPECT [word_clz' x\<^sub>0\<mapsto> (enat (1+word_clz' x\<^sub>0)) *m word_clz2_body_cost]"])
   subgoal
     unfolding word_clz2_def
@@ -150,25 +286,9 @@ sepref_def word_clz'_impl is word_clz2 :: "(word_assn' TYPE('b::len2))\<^sup>k \
 
 export_llvm "word_clz'_impl :: 64 word \<Rightarrow> 64 word llM" 
 
-sepref_register word_clz word_clz'
-
-(* @Max: Was ist die Spezifikation mit Zeit hier?
-    wie muss word_clz_alt aussehen?
-*)
-
-lemmas [sepref_fr_rules] = word_clz'_impl.refine[FCOMP word_clz2_refine']
-
-lemma word_clz_alt: "word_clz x = (if\<^sub>N SPECc2 ''ll_icmp_eq'' (=) x 0 then RETURNT (size x) else SPECT [word_clz' x\<^sub>0\<mapsto> word_clz2_cost x\<^sub>0])"
-  unfolding word_clz'_def by (auto simp: word_size)
-
-  
-    
-sepref_def word_clz_impl 
-  is "RETURN o word_clz" :: "[\<lambda>_. LENGTH('a)>2]\<^sub>a (word_assn' TYPE('a::len2))\<^sup>k \<rightarrow> snat_assn' TYPE('a)"  
-  unfolding word_clz_alt
-  by sepref
-  
-export_llvm "word_clz_impl :: 64 word \<Rightarrow> _"   
+sepref_register word_clz'
+ 
+   
 
 
 lemma word_clz_nonzero_max': "x\<noteq>0 \<Longrightarrow> word_clz (x::'a::len2 word) \<le> LENGTH('a) - Suc 0"
@@ -181,17 +301,17 @@ lemma "x - 0 = (x::(_,enat) acost)"
   by(auto simp: zero_acost_def minus_acost_alt)
 
 definition word_log22 where
-  "word_log22 w = doN {
-    w' \<leftarrow> SPECc2 ''sub'' (-) (size w) 1;
+  "word_log22 (w::'a::len2 word) = doN {
+    w' \<leftarrow> SPECc2 ''sub'' (-) (snat_const TYPE('a::len2) (size w)) 1;
     wclz \<leftarrow> word_clz2 w;
     w'' \<leftarrow> SPECc2 ''sub'' (-) w' wclz;
     RETURN w''
     }"
-abbreviation "word_log22_cost w \<equiv> word_clz2_cost w + cost ''sub'' 2"
+abbreviation "word_log22_cost sw \<equiv> word_clz2_cost sw + cost ''sub'' 2"
 
 lemma word_log22_correct:
   assumes "w>0" "LENGTH('a::len2)>2"
-  shows "word_log22 w \<le> SPECT [word_log2 w \<mapsto> word_log22_cost w]"
+  shows "word_log22 w \<le> SPECT [word_log2 w \<mapsto> word_log22_cost (size w)]"
   unfolding word_log22_def
   unfolding SPECc2_def
   apply(rule gwp_specifies_I)
@@ -202,17 +322,27 @@ lemma word_log22_correct:
   apply(simp add: norm_cost needname_minus_absorb) 
   apply sc_solve by auto
 
-
+(*
 
 sepref_def word_log2_impl is 
   "word_log22" :: "[\<lambda>x. x>0 \<and> LENGTH('a)>2]\<^sub>a (word_assn' TYPE('a::len2))\<^sup>k \<rightarrow> snat_assn' TYPE('a)"
-  unfolding word_log22_def word_size 
+  unfolding word_log22_def word_size PR_CONST_def
   apply (annot_snat_const "TYPE('a)")
   supply [simp] = word_clz_nonzero_max'
+  apply sepref_dbg_preproc
+  apply sepref_dbg_cons_init
+  apply sepref_dbg_id
+  apply sepref_dbg_monadify
+  apply sepref_dbg_opt_init
+  apply sepref_dbg_trans_keep
+  apply sepref_dbg_opt
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_constraints
   by sepref  (* TODO: sepref *)
 
 export_llvm "word_log2_impl :: 64 word \<Rightarrow> _"
-
+*)
 subsection \<open>Connection with \<^const>\<open>Discrete.log\<close>\<close>
 
 lemma discrete_log_ltI: (* TODO: Check how precise this bound is! *)
@@ -328,6 +458,26 @@ lemma word_log2_refine_snat: "(word_log2, Discrete.log) \<in> snat_rel' TYPE('a:
   by (fastforce simp: snat_rel_def snat.rel_def in_br_conv snat_eq_unat)
 
 
+term size_t
+(*
+
+definition "mop_log n = SPECT [Discrete.log n \<mapsto> cost ''log'' 1]"
+
+                                     
+abbreviation "word_log22_cost' tt \<equiv> (enat (1+len_of tt)) *m word_clz2_body_cost + cost ''sub'' 2"
+
+lemma "word_log22_cost' (TYPE('a::len2)) = word_log22_cost (size (w::'a::len2 word))"
+  by (simp add: word_size)
+
+definition "TR_log ws = TId(''log'':= word_log22_cost ws)"
+
+definition "mop_log_alt ws n = SPECT [Discrete.log n \<mapsto> word_log22_cost ws]"
+
+
+lemma "mop_log_alt ws n \<le> \<Down>Id (timerefine (TR_log ws) (mop_log n))"
+  unfolding mop_log_def mop_log_alt_def TR_log_def
+  apply simp
+
 
 lemma word_log22_correct':
   assumes "w>0" "LENGTH('a::len2)>2"
@@ -340,5 +490,6 @@ sepref_register word_log22
  (* TODO *)
 lemmas discrete_log_unat_hnr[sepref_fr_rules] = word_log2_impl.refine[FCOMP word_log2_refine_unat]
 lemmas discrete_log_snat_hnr[sepref_fr_rules] = word_log2_impl.refine[FCOMP word_log2_refine_snat]
+*)
 
 end

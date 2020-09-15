@@ -597,7 +597,7 @@ context sort_impl_context begin
     by auto 
 
  
-  sepref_register final_insertion_sort2  
+  sepref_register final_insertion_sort3  
   sepref_def final_insertion_sort_impl is "uncurry2 (PR_CONST final_insertion_sort3)" 
     :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
     unfolding final_insertion_sort3_def PR_CONST_def

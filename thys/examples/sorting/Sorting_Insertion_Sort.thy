@@ -1251,10 +1251,31 @@ lemma Sum_any_calc: "Sum_any (the_acost (in_sort_time x)) = 4 + (18 * (x * x) + 
           intro!: finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero)+ 
   done
 
+lemma "finite {y. the_acost (in_sort_time x) y \<noteq> 0}"
+  sorry
 
 lemma "(\<lambda>x. real (Sum_any (the_acost (in_sort_time x))) ) \<in> \<Theta>(\<lambda>n. (real n)*(real n))"
   unfolding Sum_any_calc
   by auto2
+
+lemma "\<And>x. x\<ge>c1 \<Longrightarrow> Sum_any (the_acost (in_sort_time x)) \<le> c2 * (x*Discrete.log x + LENGTH('v::len))
+      \<and> c1 \<le> 2^30 \<and> c2 \<le> 2^30"
+  oops
+
+
+(*
+
+*  define theta'' mit constanten c1 und c2
+* sanity check , thetha'' \<Longrightarrow> theta
+
+\<rightarrow> damit ist die spezifikation von unten passend
+\<rightarrow> 
+
+zusätzlich, c1 und c2 abschätzen \<rightarrow> gibt un
+
+- literatur recherche für O Landau Symbolen für finite machines
+
+*)
 
 lemma HT'': "llvm_htriple ($lift_acost (in_sort_time (length xs)) \<and>* hn_ctxt arr_assn xs xsi
                              \<and>* hn_val snat_rel 0 li \<and>* hn_val snat_rel (length xs) hi)
@@ -1262,6 +1283,46 @@ lemma HT'': "llvm_htriple ($lift_acost (in_sort_time (length xs)) \<and>* hn_ctx
             (\<lambda>r s. \<exists>x. (\<up>(mset x = mset xs \<and> sorted_wrt_lt (\<^bold><) x) \<and>* arr_assn x r) s)"
   using HT[where l=0 and h="length xs" and xs=xs, unfolded slice_sorted_complete, simplified] 
   by blast
+
+
+
+abbreviation "in_sort_cost lxs \<equiv> lift_acost (in_sort_time lxs)"
+
+lemma "finite {y. the_acost (in_sort_cost x) y \<noteq> 0}"
+      "\<And>y. the_acost (in_sort_cost x) y < \<infinity>"
+    "(\<lambda>x. real (the_enat (Sum_any (the_acost (in_sort_cost x)))) ) \<in> \<Theta>(\<lambda>n. (real n)*(real n))"
+  sorry         
+
+term "\<Theta>\<^sub>2(\<lambda>(n,w). w*(real n)*(real n))"
+
+lemma HT''': 
+  "llvm_htriple
+    ($in_sort_cost (length xs) \<and>* arr_assn xs xsi \<and>* snat_assn 0 li \<and>* snat_assn (length xs) hi)
+      (insertion_sort_impl xsi li hi) 
+    (\<lambda>r s. \<exists>x. (\<up>(mset x = mset xs \<and> sorted_wrt_lt (\<^bold><) x) \<and>* arr_assn x r) s)"
+  using HT'' unfolding hn_ctxt_def 
+  by blast
+
+
+definition theta' where "theta' f = {g. (\<lambda>x. real (the_enat (Sum_any (the_acost (g x)))) )\<in>\<Theta>(f)
+             \<and> (\<forall>x. finite {y. the_acost (g x) y \<noteq> 0})
+             \<and> (\<forall>x y. the_acost (in_sort_cost x) y < \<infinity>)}"
+
+definition "O'' c1 c2 g =  {f. \<forall>n\<ge>c1. f n \<le> c2 * g n}"
+
+lemma "O'' c1 c2 g \<subseteq> O(g)"
+  sorry
+
+lemma "\<exists>g\<in>theta'' (c1 LENGTH('b::len2)) (c2 LENGTH('b::len2))
+                       (\<lambda>n. (real n)*(real n) + real LENGTH('b::len2)). 
+    \<forall>xs li hi. 
+    llvm_htriple
+    ($g (length xs) \<and>* arr_assn xs xsi \<and>* snat_assn 0 li \<and>* snat_assn (length xs) (hi::'b::len2 word))
+      (insertion_sort_impl_a xsi li hi) 
+    (\<lambda>r s. \<exists>x. (\<up>(mset x = mset xs \<and> sorted_wrt_lt (\<^bold><) x) \<and>* arr_assn x r) s)"
+  oops
+
+
 
   thm hn_refine_result
 
