@@ -27,7 +27,7 @@ export STR_DATA="random random-dup-10 random-boolean organ-pipe sorted equal   a
 
 ########################## END CONFIG SECTION ##################
 
-
+mkdir -p log
 export LOGFILE="log/sortbench-$(date -Iseconds).log"
 
 echo "Writing log to $LOGFILE"
@@ -85,16 +85,16 @@ function run_int_gcc() {
 for i in $INT_DATA; do
   run_int_isa $i
   run_int_std $i
-  run_pdq_int_isa $i
-  run_pdq_int_std $i
+#   run_pdq_int_isa $i
+#   run_pdq_int_std $i
 #   run_int_gcc $i
 done
 
-for i in $STR_DATA; do
-  run_str_isa $i
-  run_str_std $i
-  run_pdq_str_isa $i
-  run_pdq_str_std $i
-done
+# for i in $STR_DATA; do
+#   run_str_isa $i
+#   run_str_std $i
+#   run_pdq_str_isa $i
+#   run_pdq_str_std $i
+# done
 
 
