@@ -712,14 +712,25 @@ lemma pw_acost_ref_iff:
   apply (simp add: pw_acost_le_iff refine_pw_simps)
   by blast
 
-  definition "BLA = undefined"
+  
+  lemma aux_attains_sup:
+  fixes M :: "_ \<rightharpoonup> ecost" 
+  assumes "attains_sup (SPECT M) (SPECT M') RR"
+  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
+  assumes "Some cr \<le> M r"
+  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
+    using   assms(1)[unfolded attains_sup_def, rule_format, of M M'] assms(2) assms(3)
+  using  aux[of M RR M']
+  by fastforce
+
+
 
   lemma hnr_comp:
     assumes R: "\<And>b1 c1. P b1 \<Longrightarrow> hn_refine (R1 b1 c1 ** \<Gamma>) (c c1) (R1p b1 c1 ** \<Gamma>') (R b1 c1) (b b1)"
     assumes S: "\<And>a1 b1. \<lbrakk>Q a1; (b1,a1)\<in>R1'\<rbrakk> \<Longrightarrow> (b b1,a a1)\<in>\<langle>R' a1\<rangle>nrest_rel"
     assumes PQ: "\<And>a1 b1. \<lbrakk>Q a1; (b1,a1)\<in>R1'\<rbrakk> \<Longrightarrow> P b1"
     assumes Q: "Q a1"
-    assumes SC: "\<And>a1. BLA (R' a1) (a a1)" (* TODO maybe more be more precise here*)
+    assumes SC: "\<And>b1. attains_sup (b b1) (a a1) (R' a1)" (* TODO maybe more be more precise here*)
     shows "hn_refine 
       (hr_comp R1 R1' a1 c1 ** \<Gamma>) 
       (c c1)
@@ -728,32 +739,76 @@ lemma pw_acost_ref_iff:
       (a a1)"
   proof -
 
-    note [vcg_rules] = R[THEN hn_refineD, of _ _ c1]
+    note f[vcg_rules] = R[THEN hn_refineD, of _ _ c1]
     
-    have [simp]: "nofailT (b x)" if  "nofailT (a a1)" "(x, a1) \<in> R1'" for x
+    have tbx[simp]: "nofailT (b x)" if  "nofailT (a a1)" "(x, a1) \<in> R1'" for x
       using that Q S nrest_rel_def pw_acost_ref_iff by fastforce
-    
-    show ?thesis      sorry (*
-      unfolding hn_refine_alt
-      unfolding hr_comp_def hn_rel_def hrr_comp_def
+
+    have exM: "\<exists>Mb. b x = SPECT Mb" if  "a a1 = SPECT Ma" "(x, a1) \<in> R1'" for x Ma
+      unfolding nofailT_def  using nofail'' tbx that(1) that(2) by fastforce  
+
+    show ?thesis      
+      unfolding hn_refine_def
+
+      unfolding hr_comp_def   hrr_comp_def
       apply (cases "non_dep2 R"; simp)
       subgoal premises prems
         apply (auto simp: sep_algebra_simps)
-        using PQ[OF Q] 
-        supply [simp] = non_dep2_simp[OF prems]
-        apply vcg
-        apply (frule S[OF Q])
-        apply (erule (2) hnr_comp_aux)
-        by vcg_try_solve
-      subgoal  
+        unfolding STATE_def apply (auto simp: sep_algebra_simps pred_lift_extract_simps)
+        subgoal premises p2 for F s cr M b1
+          using exM[OF p2(1) p2(2)]   apply auto
+          subgoal premises p3 for Mb
+            using f[simplified sep_conj_assoc, OF  PQ[OF Q], OF p2(2) p3(1) p2(3) ]
+            apply safe
+            subgoal premises p4 for rb C
+              supply pf = S[OF Q p2(2), THEN nrest_relD, unfolded p2(1) p3(1), simplified]
+              using aux_attains_sup[OF SC[of b1 ,unfolded p2(1) p3(1)] pf p4(1)] 
+              apply auto
+              subgoal premises p5 for ra
+              apply(rule exI[where x=ra])
+                apply(rule exI[where x=C])
+                apply safe 
+                subgoal using p5(2) p4(1) by simp
+                subgoal apply(rule wp_monoI[OF p4(2)])
+                  apply(rule exI[where x=b1])
+                  using p2(2) apply simp
+                  apply(rule exI[where x=rb])
+                  using p5(1)  by (simp add:  non_dep2_simp[OF prems])
+                done
+              done
+            done
+          done
+        done
+      subgoal premises prems
         apply (auto simp: sep_algebra_simps)
-        using PQ[OF Q]
-        apply vcg
-        apply (frule S[OF Q])
-        apply (erule (2) hnr_comp_aux)
-        by vcg_try_solve
-        
-      done *)
+        unfolding STATE_def apply (auto simp: sep_algebra_simps pred_lift_extract_simps)
+        subgoal premises p2 for F s cr M b1
+          using exM[OF p2(1) p2(2)]   apply auto
+          subgoal premises p3 for Mb
+            using f[simplified sep_conj_assoc, OF  PQ[OF Q], OF p2(2) p3(1) p2(3) ]
+            apply safe
+            subgoal premises p4 for rb C
+              supply pf = S[OF Q p2(2), THEN nrest_relD, unfolded p2(1) p3(1), simplified]
+              using aux_attains_sup[OF SC[of b1 ,unfolded p2(1) p3(1)] pf p4(1)] 
+              apply auto
+              subgoal premises p5 for ra
+              apply(rule exI[where x=ra])
+                apply(rule exI[where x=C])
+                apply safe 
+                subgoal using p5(2) p4(1) by simp
+                subgoal apply(rule wp_monoI[OF p4(2)])
+                  apply(rule exI[where x=b1])
+                  using p2(2) apply simp
+                  apply(rule exI[where x=b1])
+                  using p2(2) apply simp
+                  apply(rule exI[where x=rb])
+                  using p5(1)  by simp
+                done
+              done
+            done
+          done
+        done        
+      done
   qed
   
 
@@ -762,7 +817,7 @@ lemma pw_acost_ref_iff:
     assumes S: "\<And>a1 b1. \<lbrakk>Q a1; (b1,a1)\<in>R1'\<rbrakk> \<Longrightarrow> (b$b1,a$a1)\<in>\<langle>R' a1\<rangle>nrest_rel"
     assumes PQ: "\<And>a1 b1. \<lbrakk>Q a1; (b1,a1)\<in>R1'\<rbrakk> \<Longrightarrow> P b1"
     assumes Q: "Q a1"
-    assumes SC: "\<And>a1. BLA (R' a1) (a a1)"
+    assumes SC: "\<And>b1. attains_sup (b b1) (a a1) (R' a1)"
     shows "hn_refine 
       (hr_comp R1 R1' a1 c1) 
       (c c1)
@@ -776,7 +831,7 @@ lemma pw_acost_ref_iff:
   lemma hfcomp:
     assumes A: "(f,g) \<in> [P]\<^sub>a\<^sub>d RR' \<rightarrow> S"
     assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nrest_rel)"
-    assumes SC: "\<And>a1. BLA (U a1) (h a1)"
+    assumes SC: "\<And>b1 a1. attains_sup (g b1) (h a1) (U a1)"
     shows "(f,h) \<in> [\<lambda>a. Q a \<and> (\<forall>a'. (a',a)\<in>T \<longrightarrow> P a')]\<^sub>a\<^sub>d 
       hrp_comp RR' T \<rightarrow> hrr_comp T S U"
     using assms  
@@ -965,23 +1020,24 @@ lemma pw_acost_ref_iff:
   lemma hfref_compI_PRE_aux:
     assumes A: "(f,g) \<in> [P]\<^sub>a\<^sub>d RR' \<rightarrow> S"
     assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nrest_rel)"
-    assumes SC: "\<And>a1. BLA (U a1) (h a1)"
+    assumes SC: "\<And>a1 b1. attains_sup (g b1) (h a1) (U a1)"
     shows "(f,h) \<in> [comp_PRE T Q (\<lambda>_. P) (\<lambda>_. True)]\<^sub>a\<^sub>d 
       hrp_comp RR' T \<rightarrow> hrr_comp T S U"
     apply (rule hfref_weaken_pre[OF _ hfcomp[OF A B]])
     using SC
     by (auto simp: comp_PRE_def)
 
-definition "SC f = f"
+  definition "SC_attains_sup f = f"
+
   lemma hfref_compI_PRE:
     assumes A: "(f,g) \<in> [P]\<^sub>a\<^sub>d RR' \<rightarrow> S"
     assumes B: "(g,h) \<in> [Q]\<^sub>f\<^sub>d T \<rightarrow> (\<lambda>x. \<langle>U x\<rangle>nrest_rel)"
-    assumes SC: "SC (\<forall>a1. BLA (U a1) (h a1))"
+    assumes SC: "SC_attains_sup (\<forall>a1 b1. attains_sup (g b1) (h a1) (U a1))"
     shows "(f,h) \<in> [comp_PRE T Q (\<lambda>x y. P y) (\<lambda>x. nofailT (h x))]\<^sub>a\<^sub>d 
       hrp_comp RR' T \<rightarrow> hrr_comp T S U"
     using hfref_compI_PRE_aux[OF A B, THEN hfref_weaken_pre_nofail]  
     apply (rule hfref_weaken_pre[rotated])
-    using SC[unfolded SC_def]
+    using SC[unfolded SC_attains_sup_def]
     apply (auto simp: comp_PRE_def)
     done
 
