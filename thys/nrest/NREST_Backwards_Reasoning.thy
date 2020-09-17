@@ -89,26 +89,46 @@ lemma minus_cost_antimono:
   done
 
 
-  term "R\<noteq>{} \<Longrightarrow> (SUP r\<in>R. mt - r) \<le> mt - Sup R" 
+term "R\<noteq>{} \<Longrightarrow> (SUP r\<in>R. mt - r) \<le> mt - Sup R" 
 
-lemma minus_cost_contiuous2: "\<forall>x\<in>X. t \<le> minus_cost q x \<Longrightarrow> t \<le> minus_cost q (Sup X)"  
-  unfolding minus_cost_def apply(auto simp: everywhereNone   less_eq_option_None_is_None' split: option.splits if_splits)
+lemma Option_these_non_empty_if_Sup_Some: "Sup X = Some t \<Longrightarrow> Option.these X \<noteq> {}"
+  by (simp add: SupD these_empty_eq)
+
+lemma ASSN_enat:
+  shows "X\<noteq>{} \<Longrightarrow> \<forall>x\<in>X. t \<le> q - (x::enat) \<Longrightarrow> t \<le> q - (Sup X)"  
+  unfolding Sup_enat_def apply auto
+  apply(cases q) apply auto
+  by (metis antisym cancel_comm_monoid_add_class.diff_cancel drm_class.diff_left_mono finite_enat_bounded idiff_enat_enat linear zero_enat_def zero_le)
+ 
+lemma Sup_option_these: "Sup X = Some b \<Longrightarrow> Sup (Option.these X) = (b::'a::complete_lattice)" 
+    by (metis SupD Sup_option_def option.sel)   
+
+lemma minus_cost_contiuous2:
+  fixes t :: "'a::{complete_lattice,minus,drm} option" 
+  shows "\<forall>x\<in>X. t \<le> minus_cost q x \<Longrightarrow> t \<le> minus_cost q (Sup X)"  
+  unfolding minus_cost_def
+  apply(auto simp: everywhereNone   less_eq_option_None_is_None' split: option.splits if_splits)
      apply(simp add: top_option_def[symmetric]) 
   subgoal by (metis Sup_bot_conv(1) Sup_empty empty_Sup option.distinct(1) option.exhaust)
-  subgoal 
+  subgoal for b c
     apply(cases t)
      apply(auto simp add: f)  
-      subgoal premises prems
-      apply(cases "Sup X \<in> X")
-      subgoal 
-        thm prems(1)[rule_format, THEN conjunct1, rule_format]
-        apply(rule prems(1)[rule_format, THEN conjunct1, rule_format, where x="Sup X"]) using prems(2,3,4) by simp_all
-      subgoal 
-        using prems(1)[rule_format, THEN conjunct2, rule_format, simplified]
-          prems(2,3,4,5) prems(1)[rule_format, THEN conjunct1, rule_format]
-        sorry          
-      done (* NEED TO ADD SOME restriction on the type class HERE *)
-    done
+  proof (goal_cases)
+    case prems: (1 a)
+  
+    from prems(1)[rule_format, rule_format, of _ _ c, simplified]
+    have "\<And>x B. \<lbrakk>x \<in> X; x = Some B\<rbrakk> \<Longrightarrow> a \<le> c - B" by auto
+
+    then have **: "\<forall>B\<in>Option.these X. a \<le> c - B" unfolding Ball_def in_these_eq by blast
+
+    have *: "Option.these X \<noteq> {}"
+      using prems apply(simp add: Option_these_non_empty_if_Sup_Some) done
+
+    show ?case unfolding Sup_option_these[symmetric, OF prems(4)]
+      apply(rule minus_continuousSup)
+      apply(rule *)
+      by(rule **)
+  qed 
   subgoal  
     by (metis Sup_le_iff Sup_option_def in_these_eq option.sel option.simps(3))  
   done 

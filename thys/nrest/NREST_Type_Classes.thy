@@ -72,12 +72,27 @@ instance
   done
 end
 
-  
-class drm = minus + plus + ord + Inf +
+
+lemma diff_left_mono_enat:
+   "b \<le> (c::enat)   \<Longrightarrow> a - c \<le> a - b"  
+  apply(cases a; cases b; cases c) by(auto simp: minus_acost_alt less_eq_acost_def diff_left_mono )
+
+
+class drm = minus + plus + ord + Inf + Sup +
   assumes diff_right_mono: "a \<le> b \<Longrightarrow> a - c \<le> b - c"
-  and diff_left_mono: "x2b \<le> x2   \<Longrightarrow> x2a - x2 \<le> x2a - x2b"  
+  and diff_left_mono: "\<And>a b c. b \<le> c   \<Longrightarrow> a - c \<le> a - b"  
+    (* TODO: investigate what those mean *)
   and minus_continuousInf: "R\<noteq>{} \<Longrightarrow> (INF r\<in>R. r - mt) \<le> Inf R - mt"
+  and minus_continuousSup: "\<And>X t q. X\<noteq>{} \<Longrightarrow> \<forall>x\<in>X. t \<le> q - (x::'a) \<Longrightarrow> t \<le> q - (Sup X)" 
   and plus_left_mono: "a \<le> b \<Longrightarrow> c + a \<le> c + b"
+
+
+lemma ASSN_enat:
+  shows "X\<noteq>{} \<Longrightarrow> \<forall>x\<in>X. t \<le> q - (x::enat) \<Longrightarrow> t \<le> q - (Sup X)"  
+  unfolding Sup_enat_def apply auto
+  apply(cases q) apply auto
+  by (metis antisym cancel_comm_monoid_add_class.diff_cancel diff_left_mono_enat
+          finite_enat_bounded idiff_enat_enat linear zero_enat_def zero_le)
 
 instance enat :: drm
   apply standard
@@ -86,6 +101,7 @@ instance enat :: drm
   subgoal for R mt
     unfolding Inf_enat_def apply auto  
     by (metis (full_types) INF_lower Inf_enat_def LeastI_ex equals0D imageI) 
+  subgoal apply(rule ASSN_enat) by auto
   subgoal for a b c apply(cases a; cases b; cases c) by auto
   done
 
@@ -114,6 +130,15 @@ instance
      defer apply(rule minus_continuousInf) subgoal using prems by auto 
     apply (rule Inf_mono) apply auto
     by (metis acost.case_eq_if acost.sel order_mono_setup.refl)
+  subgoal for X t q
+    unfolding less_eq_acost_def minus_acost_alt Sup_acost_def
+    apply(cases t) apply(cases q)
+    apply simp
+    apply clarsimp
+    apply(rule minus_continuousSup)
+    subgoal by blast
+    subgoal by (simp add: acost.case_eq_if)
+    done
   subgoal for x apply(cases x) by (auto simp: less_eq_acost_def zero_acost_def needname_nonneg)
   subgoal for x apply(cases x) by (auto simp: less_eq_acost_def times_acost_def zero_acost_def)
   subgoal for x apply(cases x) by (auto simp: less_eq_acost_def times_acost_def zero_acost_def)
