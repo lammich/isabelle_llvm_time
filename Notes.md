@@ -1,3 +1,92 @@
+
+# Treffen 18.9.20
+
+## nächstes Treffen:
+- dienstag 29.9. 10uhr UK Time
+
+## Milestone `introsort O(n log n) sorry free` erreicht
+
+## TODO:
+
+### Max:
+- use FCOMP where possible
+- develop OT_intros
+- aufräumen
+- tobias fragen, TACAS oder ESOP
+- Paper anfangen.
+    
+### Peter 
+- generalize over 64 bit
+
+
+## Ideas:
+- Further use cases
+  - PDQ (aufwands einschätzung: 1 woche(?) oder als Studenten Projekt?!) 
+  - sortiert partitionen wenn zu klein direkt mit insertionsort O(n * threshold)
+  - Laufzeit argument: keine tiefe `d`, sondern zählt schlechte partition, wenn zuviele -> heapsort
+  - KMP, binary search (?)
+  - Edmonds Karp (?)
+- bessere automatisierung
+  - z.b. Zeiten berechnen lassen
+  - 
+- generell Konstanten verstecken, Benutzer soll sie nicht angeben müssen
+- integrate timerefine in hnr
+- technical question NRES  und NRESTkombinieren, NRES in NREST einbetten
+
+- KMP als stress test
+
+- diff zwischen introsort  von llvm-time und llvm
+   - TODO: gleiche `[inline]` struktur
+
+## Struktur Paper
+### Motivation
+- Knuth's dream comes true
+- Knuth style Laufzeit analyse (hat er auch verschiedene OP codes / currencies)
+- jetzt möglich durch ITP unterstützung (Isabelle hilft beim verstecken der konstanten)
+   
+### Fragen
+- warum several currencies?
+    - wie erleichtern die Refinement-Beweise
+- warum fine grained currencies?
+    - Wieviele compares? Nachträgliche abschätzung von einzelnen Operationen
+- unterschiedliche reale kosten von unterschiedlichen op codes, (NEIN: auf llvm ebene zu weit von der maschine weg) 
+
+
+    
+### contributions:
+0. NREST: Refinement mit several currencies (theory+infrastructure)
+0. llvm mit Kosten modell (minimale änderungen durch allgemeines wp arbeitet mit separation_algebras, und struktur der llvm framework, separation von speicher und zeit kosten, modularität, TimeCredits sind separation algebra)
+0. first verified *running time analysis* of real algorithm down to competitive executablecode 
+    - most complex verified running time analyses (Gueneau: incremental cycle detection in OCaml and Coq, Chargueraud&Pottier: UnionFind in Ocaml and Coq (Port by Löwenberg: SML and Isabelle), PL&MH: edmonds-karp in SML and Isabelle) we add introsort LLVM and Isabelle 
+0. automatisierung (? :) )
+      - llvm automatisierung  
+      - nres(t) automatisierung
+      - neue zeit spezifische automatisierungen
+
+0. Was haben wir mehr bewiesen als ITP'20 Paper?
+  - Laufzeitargument. Algorithmus 'korrekt' zusammengesetzt. Ohne Laufzeitargument einfach, z.B. heapsort nie aufzurufen, aber Algorithmus ist immernoch korrekt. Da in Praxis (und unserer Testsuite) heapsort eigentlich nie aufgerufen wird, muss das noch nichtmal auffallen)
+
+### Related work: 
+- Laufzeit von Sortieralgorithmen
+   - Manuel Eberl: (asymptotic) average case von quicksort (needs probabilistic reasoning)
+- Verified Software Tool Chain, do they have anything about time?(https://vst.cs.princeton.edu/)
+- AKS : PRIME in P (in HOL4)
+- Compcert (time preserving compilation) Carbonneaux 
+    
+### Evaluation (reale laufzeit):
+- gleiches diagramm wie im Paper, mit boost und mit llvm-origig introsort  
+      
+### Future Work:
+- Space (low hanging ?!) 
+- parallel ?!
+- probabilistic?
+  - lift NREST to probabilistic?
+  - use case: average case analysis
+  - hash sets, hash collisions approximieren ?!
+- WCET down to machine code. cache, BranchPred, ...
+    
+    
+
 # Treffen 15.9.20
 
 ## nächstes treffen, freitag 18.9.2020
