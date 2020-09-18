@@ -121,6 +121,18 @@ in
       end)
 end     
 \<close>
-    
+
+subsection \<open>Integrate Eisbach into ML\<close>
+
+ML \<open>
+  structure More_Eisbach_Basic = struct
+    fun apply_method_noargs name ctxt =
+      NO_CONTEXT_TACTIC ctxt (Method_Closure.apply_method ctxt name [] [] [] ctxt [])
+      |> SELECT_GOAL;
+  end
+  
+  open More_Eisbach_Basic
+\<close>
+
     
 end

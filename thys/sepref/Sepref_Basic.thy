@@ -8,6 +8,7 @@ imports
   "Lib/Structured_Apply"
   "../nrest/NREST_Main"
   Sepref_Id_Op
+  "../lib/More_Refine_Util"
 begin
 
 no_notation i_ANNOT (infixr ":::\<^sub>i" 10)

@@ -1,6 +1,6 @@
 section \<open>Refinement Rule Management\<close>
 theory Sepref_Rules
-imports Sepref_Basic Sepref_Constraints 
+  imports Sepref_Basic Sepref_Constraints 
 begin
   text \<open>This theory contains tools for managing the refinement rules used by Sepref\<close>
 
@@ -587,23 +587,24 @@ proof -
   qed      
 qed  
 
+named_theorems OT_intros
 
 
-lemma OT_return: "one_time (RETURNT x)"
+lemma OT_return[OT_intros]: "one_time (RETURNT x)"
   unfolding one_time_def by auto
   
-lemma OT_consume: "one_time m \<Longrightarrow> one_time (consume m c)"  
+lemma OT_consume[OT_intros]: "one_time m \<Longrightarrow> one_time (consume m c)"  
   unfolding one_time_def consume_def
   by (auto split: nrest.splits; blast)
   
-lemma OT_assert: "one_time (ASSERT \<Phi>)"  
+lemma OT_assert[OT_intros]: "one_time (ASSERT \<Phi>)"  
   unfolding one_time_def 
   by (cases \<Phi>) auto
   
 lemma OT_fail: "one_time FAILT"
   unfolding one_time_def by auto
 
-lemma OT_spec: "one_time (SPEC P (\<lambda>_. c))"
+lemma OT_spec[OT_intros]: "one_time (SPEC P (\<lambda>_. c))"
   unfolding one_time_def SPEC_def by auto
   
     
@@ -1199,7 +1200,29 @@ lemma pw_acost_ref_iff:
     "hfsynth_ID_R (fst (hf_pres R k)) \<equiv> hfsynth_ID_R R"
     by (auto intro!: eq_reflection)
 
-    
+
+
+(* TODO: Move *)
+lemma SC_attains_supI: "C \<Longrightarrow> SC_attains_sup C" 
+  unfolding SC_attains_sup_def by simp
+
+method solve_attains_sup = (intro allI SC_attains_supI, 
+                (   (rule attains_sup_sv, tagged_solver; fail)
+                  | (rule one_time_attains_sup, intro OT_intros; fail)
+                    ))
+
+thm OT_intros
+
+lemma "SC_attains_sup (attains_sup A B Id)"
+  apply solve_attains_sup done
+
+lemma "single_valued C \<Longrightarrow> SC_attains_sup (attains_sup A B C)"
+  apply solve_attains_sup done
+
+lemma "SC_attains_sup (attains_sup A (RETURNT x) R)"
+  apply solve_attains_sup done
+
+
   ML \<open>
 
     signature SEPREF_RULES = sig
@@ -2090,9 +2113,17 @@ lemma pw_acost_ref_iff:
         |> Conv.fconv_rule Thm.eta_conversion
         |> check_result_if_cfg ctxt
 
+      val solve_attains_sup_tac =
+        More_Eisbach_Basic.apply_method_noargs @{method solve_attains_sup}
+
+      fun solve_attains_sup ctxt thm =
+        More_Refine_Util.prove_prems true ctxt thm 
+            ([SOME solve_attains_sup_tac])
+
       (* hfref O fref *)
       fun compose_hf ctxt A B =
           (@{thm hfref_compI_PRE} OF [A,B])
+        |> solve_attains_sup ctxt
         |> norm_fcomp_rule ctxt
         |> simplify_precond_if_cfg ctxt
         |> Conv.fconv_rule Thm.eta_conversion
@@ -2195,6 +2226,7 @@ thm hn_refine_def[no_vars]
   term id_assn
   assume B: "(uncurry m, uncurry m') \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel" 
 
+  text \<open>@{method solve_attains_sup}\<close>
 
   thm A[FCOMP B]
 end
