@@ -441,12 +441,124 @@ lemma pp_fun_upd: "pp A (B(a:=b))
   apply(rule ext) by simp 
 
 
+term case_nrest 
+thm case_nrest_def
+term map_nrest   
 
-lemma timerefineA_pp: "\<And>E1 E2. timerefineA (pp E1 E2) R = timerefineA E1 (timerefineA E2 R)"  
-  sorry
+lemma timerefine_timerefineA:
+  "timerefine R m =
+         case_nrest FAILi 
+            (\<lambda>M. REST (\<lambda>r. (case_option None
+                                 (\<lambda>cm. Some (timerefineA R cm)) (M r)))) m"
+  unfolding timerefine_def timerefineA_def by simp
 
-lemma pp_assoc: "pp A (pp B C) = pp (pp A B) C"
-  sorry
+
+lemma wfR''_ppI_aux: "(\<And>s. finite {b. f s b \<noteq> 0}) \<Longrightarrow> {s. Sum_any (f s) \<noteq> (0::enat)} = {s. (\<exists>b. f s b \<noteq> 0)}"
+  apply auto  
+  subgoal using Sum_any.not_neutral_obtains_not_neutral by blast
+  subgoal  
+    by (simp add: Sum_any.expand_set) 
+  done
+
+thm Sum_any.not_neutral_obtains_not_neutral
+
+lemma wfR''_ppI_aux2: "(a::enat) * b \<noteq> 0 \<longleftrightarrow> a \<noteq> 0 \<and> b \<noteq> 0"
+  by auto
+
+lemma wfR''D: "wfR'' R \<Longrightarrow> finite {s. the_acost (R s) f \<noteq> 0}"
+  by (auto simp: wfR''_def)
+
+lemma 
+  wfR_finite_crossprod2:
+  fixes Mc :: "('a, enat) acost"
+  assumes "wfR'' R1"  "wfR'' R2"
+  shows "finite ({a. \<exists>b. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0} \<times> {b. \<exists>a. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0})"
+proof -
+
+  have **: "{a. \<exists>b. the_acost Mc a \<noteq> 0 \<and> the_acost (R2 a) b \<noteq> 0 \<and> the_acost (R1 b) cc \<noteq> 0}
+      \<subseteq> (\<Union>b\<in>{b. the_acost (R1 b) cc \<noteq> 0}. {a. the_acost Mc a \<noteq> 0 \<and> the_acost (R2 a) b \<noteq> 0 })"
+    by auto 
+  show ?thesis 
+    apply(rule finite_cartesian_product)
+    subgoal 
+      apply(subst wfR''_ppI_aux2)
+      apply(subst wfR''_ppI_aux2)
+      apply(rule finite_subset[OF **])
+      apply(rule finite_Union)
+      subgoal apply(rule finite_imageI) using assms(1)[THEN wfR''D] by simp
+      subgoal apply auto subgoal for b apply(rule finite_subset[where B="{s. the_acost (R2 s) b \<noteq> 0}"])
+        using assms(2)[THEN wfR''D] by auto
+      done
+    done
+    subgoal 
+      apply(subst wfR''_ppI_aux2)
+      apply(subst wfR''_ppI_aux2)   
+      apply(rule finite_subset[where B="{b. the_acost (R1 b) cc \<noteq> 0}"])
+      subgoal by auto
+      subgoal using  assms(1)[THEN wfR''D] by simp 
+      done
+    done
+  qed 
+
+lemma
+  fixes R1 :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR'' R1" "wfR'' R2"
+  shows timerefineA_iter2: "timerefineA R1 (timerefineA R2 c) =  timerefineA (pp R1 R2) c"
+  unfolding timerefineA_def pp_def
+  apply (auto simp: le_fun_def pp_def split: option.splits) apply (rule ext)
+  apply(subst Sum_any_right_distrib)
+  subgoal apply(rule wfR''_finite_mult_left[of R1]) using assms by simp_all
+  subgoal for cc
+    apply (subst Sum_any.swap[where C="{a. \<exists>b. the_acost c a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0} \<times> {b. \<exists>a. the_acost c a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0}"])
+    subgoal      
+      apply(rule wfR_finite_crossprod2) using assms by auto
+    subgoal by simp 
+    apply(subst Sum_any_left_distrib)
+    subgoal apply(rule wfR_finite_mult_left2) using assms by simp 
+    apply(rule Sum_any.cong)
+    by (meson mult.assoc)
+  done 
+
+
+lemma pp_assoc:
+  fixes A :: "'d \<Rightarrow> ('b, enat) acost"
+  assumes A: "wfR'' A"
+  assumes B: "wfR'' B"
+  shows "pp A (pp B C) = pp (pp A B) C"
+  unfolding pp_def 
+  apply(rule ext)
+  apply simp
+  apply(rule ext) 
+  apply(subst Sum_any_left_distrib)
+  subgoal for a c aa 
+    apply(rule finite_subset[where B="{s. the_acost (B s) aa  \<noteq> 0}"])
+    using assms(2)[THEN wfR''D] by auto 
+  apply(subst Sum_any_right_distrib)
+  subgoal for a c aa 
+    apply(rule finite_subset[where B="{s. the_acost (A s) c  \<noteq> 0}"])
+    using assms(1)[THEN wfR''D] by auto 
+  subgoal for a c
+    apply(subst Sum_any.swap)
+      prefer 2 apply(rule subset_refl)
+     apply(rule finite_cartesian_product)
+    subgoal 
+      apply(rule finite_subset[where B="{b. the_acost (A b) c \<noteq> 0}"])
+      subgoal apply auto done
+      using assms(1)[THEN wfR''D] by blast
+    subgoal 
+      apply(subst wfR''_ppI_aux2)
+      apply(subst wfR''_ppI_aux2)
+      apply(rule finite_subset[where B="(\<Union>b\<in>{b. the_acost (A b) c \<noteq> 0}. {d. the_acost (C a) d \<noteq> 0 \<and> the_acost (B d) b \<noteq> 0 })"])
+      subgoal by auto
+      apply(rule finite_Union)
+      subgoal apply(rule finite_imageI) using assms(1)[THEN wfR''D] by simp
+      subgoal apply auto subgoal for b apply(rule finite_subset[where B="{s. the_acost (B s) b \<noteq> 0}"])
+        using assms(2)[THEN wfR''D] by auto 
+      done
+    done
+  apply (simp add: mult.assoc)
+  done
+  done
 
 
 lemma Sum_any_mono:
@@ -530,54 +642,8 @@ lemma timerefine_mono2:
   qed 
   thm wfR''_def
 
-lemma wfR''_ppI_aux: "(\<And>s. finite {b. f s b \<noteq> 0}) \<Longrightarrow> {s. Sum_any (f s) \<noteq> (0::enat)} = {s. (\<exists>b. f s b \<noteq> 0)}"
-  apply auto  
-  subgoal using Sum_any.not_neutral_obtains_not_neutral by blast
-  subgoal  
-    by (simp add: Sum_any.expand_set) 
-  done
-
-thm Sum_any.not_neutral_obtains_not_neutral
-
-lemma wfR''_ppI_aux2: "(a::enat) * b \<noteq> 0 \<longleftrightarrow> a \<noteq> 0 \<and> b \<noteq> 0"
-  by auto
 
   
-
-lemma wfR''D: "wfR'' R \<Longrightarrow> finite {s. the_acost (R s) f \<noteq> 0}"
-  by (auto simp: wfR''_def)
-
-lemma 
-  wfR_finite_crossprod2:
-  fixes Mc :: "('a, enat) acost"
-  assumes "wfR'' R1"  "wfR'' R2"
-  shows "finite ({a. \<exists>b. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0} \<times> {b. \<exists>a. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0})"
-proof -
-
-  have **: "{a. \<exists>b. the_acost Mc a \<noteq> 0 \<and> the_acost (R2 a) b \<noteq> 0 \<and> the_acost (R1 b) cc \<noteq> 0}
-      \<subseteq> (\<Union>b\<in>{b. the_acost (R1 b) cc \<noteq> 0}. {a. the_acost Mc a \<noteq> 0 \<and> the_acost (R2 a) b \<noteq> 0 })"
-    by auto 
-  show ?thesis 
-    apply(rule finite_cartesian_product)
-    subgoal 
-      apply(subst wfR''_ppI_aux2)
-      apply(subst wfR''_ppI_aux2)
-      apply(rule finite_subset[OF **])
-      apply(rule finite_Union)
-      subgoal apply(rule finite_imageI) using assms(1)[THEN wfR''D] by simp
-      subgoal apply auto subgoal for b apply(rule finite_subset[where B="{s. the_acost (R2 s) b \<noteq> 0}"])
-        using assms(2)[THEN wfR''D] by auto
-      done
-    done
-    subgoal 
-      apply(subst wfR''_ppI_aux2)
-      apply(subst wfR''_ppI_aux2)   
-      apply(rule finite_subset[where B="{b. the_acost (R1 b) cc \<noteq> 0}"])
-      subgoal by auto
-      subgoal using  assms(1)[THEN wfR''D] by simp 
-      done
-    done
-  qed 
 
 lemma pf: "(x, z) \<in> (R O S) \<longleftrightarrow> (\<exists>y. (x, y) \<in> R \<and> (y,z) \<in> S)"
   by auto
@@ -633,28 +699,15 @@ proof -
     done
 qed
 
+
 lemma
   fixes R1 :: "_ \<Rightarrow> ('a, enat) acost"
   assumes "wfR'' R1" "wfR'' R2"
   shows timerefine_iter2: "timerefine R1 (timerefine R2 c) =  timerefine (pp R1 R2) c"
-  unfolding timerefine_def 
-  apply(cases c)
-  subgoal by simp 
-  apply (auto simp: le_fun_def pp_def split: option.splits) apply (rule ext)
-  apply (auto simp: le_fun_def pp_def split: option.splits)
-  apply(subst Sum_any_right_distrib)
-  subgoal apply(rule wfR''_finite_mult_left[of R1]) using assms by simp_all
-  apply (rule ext)
-  subgoal for mc r Mc cc
-    apply (subst Sum_any.swap[where C="{a. \<exists>b. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0} \<times> {b. \<exists>a. the_acost Mc a * (the_acost (R2 a) b * the_acost (R1 b) cc) \<noteq> 0}"])
-    subgoal      
-      apply(rule wfR_finite_crossprod2) using assms by auto
-    subgoal by simp 
-    apply(subst Sum_any_left_distrib)
-    subgoal apply(rule wfR_finite_mult_left2) using assms by simp 
-    apply(rule Sum_any.cong)
-    by (meson mult.assoc)
-  done 
+  unfolding timerefine_timerefineA
+  apply(subst timerefineA_iter2[OF assms, symmetric])
+  by (auto split: nrest.splits option.splits)
+
 
 
 lemma

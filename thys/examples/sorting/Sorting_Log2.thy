@@ -105,7 +105,7 @@ lemma log2_iter_correct: "log2_iter x \<le> \<Down>Id (timerefine (TId(''log'':=
 
 (* TODO: @Peter integrate this type parameter into sort_impl_context and adapt
             all other functions *)
-experiment
+(*experiment
 begin
 
 sepref_register log2_iter
@@ -130,7 +130,7 @@ sepref_def log2_iter_impl is "log2_iter"
   apply (annot_snat_const "TYPE('l::len2)")
   by sepref
 end
-end
+end *)
   
 
 sepref_def log2_iter_impl is "log2_iter"

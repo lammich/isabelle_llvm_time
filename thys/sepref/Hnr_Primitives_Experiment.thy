@@ -669,6 +669,9 @@ lemma norm_array_assn[fcomp_norm_simps]:
   using pure_array_assn_alt[OF assms[THEN CONSTRAINT_D]] by simp
     
 
+lemma one_time_bind_ASSERT: "(\<Phi> \<Longrightarrow> one_time m) \<Longrightarrow> one_time (do {_ \<leftarrow> ASSERT \<Phi>; m })"
+  apply(cases \<Phi>) by (auto simp: OT_fail)
+
 context
   fixes A :: "'a  \<Rightarrow> 'b:: llvm_rep \<Rightarrow> assn"
   assumes [fcomp_norm_simps]: "CONSTRAINT is_pure A"
@@ -678,7 +681,12 @@ begin
   (* TODO: solve side condition in FCOMP automatically
   lemmas hnr_array_nth[sepref_fr_rules] = hnr_raw_array_nth[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def] *)
   lemma hnr_array_nth[sepref_fr_rules]: "(uncurry array_nth, uncurry mop_array_nth) \<in> (array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A"
-    sorry   
+    apply(rule hnr_raw_array_nth[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def])
+    unfolding SC_attains_sup_def mop_array_nth_def
+    apply safe
+    apply(rule one_time_attains_sup)
+    apply simp
+    by(intro OT_consume OT_return one_time_bind_ASSERT) 
   
 end  
 

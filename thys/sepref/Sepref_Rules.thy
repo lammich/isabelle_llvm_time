@@ -2190,10 +2190,10 @@ notepad
 begin
 thm hn_refine_def[no_vars]
   fix c :: "nat \<Rightarrow> nat \<Rightarrow> nat llM"  and m m'
-  have A: "(uncurry c,uncurry m) \<in> id_assn\<^sup>k *\<^sub>a id_assn\<^sup>d \<rightarrow>\<^sub>a id_assn" sorry
+  assume A: "(uncurry c,uncurry m) \<in> id_assn\<^sup>k *\<^sub>a id_assn\<^sup>d \<rightarrow>\<^sub>a id_assn" 
 
   term id_assn
-  have B: "(uncurry m, uncurry m') \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel" sorry
+  assume B: "(uncurry m, uncurry m') \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel" 
 
 
   thm A[FCOMP B]

@@ -26,7 +26,9 @@ lemma
 
 lemma conc_fun_spec_ne_FAIL[simp]: "\<Down>R (SPECT M) \<noteq> FAILT" by (simp add: conc_fun_RES)   
 
+text \<open>a counter example\<close>
 notepad begin
+  \<^cancel>\<open>
   fix m m' :: "bool \<Rightarrow> ( (string,enat) acost) option" and R co x
   assume m: "m = [ True \<mapsto> acostC ((\<lambda>_. 0)(''a'':=2,''b'':=2)) ]"
   
@@ -47,7 +49,7 @@ notepad begin
     unfolding i m by simp
   have "\<exists>x'. (x, x') \<in> R \<and> (\<exists>c'\<ge>co. m' x' = Some c')" 
     sorry
-
+\<close>
 end
     
 
@@ -886,6 +888,178 @@ lemma timerefine_conc_fun_ge2:
     apply simp
   apply(rule wfR_finite_mult_left2 )
   using assms by simp
+
+
+thm timerefine'_def
+term wfR
+lemma timerefine_conc_fun_le2:
+  assumes "continuous E"
+  shows "timerefine' E (\<Down> R C) = \<Down>R (timerefine' E C)"
+  unfolding timerefine'_def conc_fun_def 
+  apply(auto split: nrest.splits option.splits simp: fun_eq_iff)
+  subgoal 
+    by (smt Sup_bot_conv(1) bot_option_def mem_Collect_eq) 
+  subgoal premises p for x2 x2a x2b x x2c
+  proof -
+    have "Sup {x2b a |a. (x, a) \<in> R} = Sup {map_option E (x2 a) |a. (x, a) \<in> R}"
+      apply(rule arg_cong[where f=Sup])
+      using p(3)[rule_format] p(4)
+      apply auto
+      subgoal by (smt map_option_eq_Some option.exhaust) 
+      subgoal by (metis not_None_eq option.simps(8) option.simps(9)) 
+      done
+    also have "\<dots> = map_option E (Sup {x2 a |a. (x, a) \<in> R})" 
+      apply(subst continuous_map_option[OF assms, THEN continuousD] )
+      apply(rule arg_cong[where f=Sup])
+      by auto
+    also have "\<dots> = map_option E (Some x2c)"
+      using p(2)[rule_format, of x, unfolded p(4)] by simp
+    also have "\<dots> = Some (E x2c)" by simp
+    finally show "Some (E x2c) = Sup {x2b a |a. (x, a) \<in> R}"  by simp
+  qed
+  done 
+
+thm timerefine'_def
+thm timerefine_alt3
+thm wfR''_def
+
+
+definition continuous2 :: "_ \<Rightarrow> ('a::{Sup} \<Rightarrow> 'b::{Sup}) \<Rightarrow> bool"  where
+  "continuous2 P f \<longleftrightarrow> (\<forall>A. P A \<longrightarrow> Sup (f ` A) = f (Sup A) )"
+
+ 
+definition "attains_sup' m m' RR \<equiv> 
+  \<forall>r M' M. m=SPECT M \<longrightarrow> m'=SPECT M' \<longrightarrow> r\<in>dom M \<longrightarrow> (\<exists>a. (r,a)\<in>RR) \<longrightarrow> Sup {M' a| a. (r,a)\<in>RR} \<in> {M' a| a. (r,a)\<in>RR}"  
+
+
+lemma  
+  fixes A :: "enat set"
+  shows "Sup A  \<in> A \<Longrightarrow> Sup ( (\<lambda>a. a * c) ` A) \<in> (\<lambda>a. a * c) ` A"   
+  by (metis enat_mult_cont imageI)  
+
+
+lemma  
+  fixes A :: "_ set"
+  fixes f :: "_ \<Rightarrow> enat"
+  assumes "A\<noteq>{}" "mono f" "Sup A  \<in> A"
+  shows " Sup ( f ` A) \<in> f ` A"    
+    oops
+
+
+lemma plus_continuous_if_attains_sup:
+  fixes x y h
+  defines "g \<equiv> \<lambda>f::_\<Rightarrow>enat. f x + f y"
+  assumes "Sup A \<in> A"
+  shows "g (Sup A) = (SUP f\<in>A. g f)"
+  unfolding assms
+  apply(rule antisym)
+  subgoal 
+    apply(rule Sup_upper)
+    using assms(2) by blast
+  subgoal     
+    by (simp add: enat_add_cont')
+  done
+
+lemma plus_continuous_if_attains_sup':
+  fixes x y h
+  defines "g \<equiv> \<lambda>f::_\<Rightarrow>enat. f x + h f y"
+  assumes "Sup A \<in> A" and
+    h_mono: "\<And>f f' y. f\<le>f' \<Longrightarrow> h f y \<le> h f' y"
+  shows "g (Sup A) = (SUP f\<in>A. g f)"
+  unfolding assms
+  apply(rule antisym)
+  subgoal 
+    apply(rule Sup_upper)
+    using assms(2) by blast
+  subgoal     
+    apply(auto intro!: Sup_least add_mono Sup_upper)
+    apply(rule h_mono) apply(intro Sup_upper) .
+  done
+
+
+
+lemma 
+  fixes S
+  defines "g \<equiv> \<lambda>f::_\<Rightarrow>enat. sum f S"
+  assumes "Sup A \<in> A"
+  shows "finite S \<Longrightarrow> g (Sup A) = (SUP f\<in>A. g f)"
+  unfolding assms
+  apply(induct S rule: finite_induct)
+  subgoal using assms(2) apply auto
+    using SUP_bot_conv(1) by fastforce
+  subgoal using assms(2) apply simp
+    apply(subst plus_continuous_if_attains_sup'[symmetric, OF assms(2)])
+    subgoal apply(rule sum_mono) by (simp add: le_fun_def)
+    by simp
+  done 
+
+(*
+lemma
+  fixes R :: "'a \<Rightarrow> ('b, enat) acost"
+  assumes "wfR'' R"
+  shows "continuous2 (\<lambda>cm. finite {x. the_acost cm x \<noteq> 0})
+           ( \<lambda>cm.  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
+  unfolding continuous2_def
+  apply clarsimp
+  sorry
+
+lemma continuous_if_wfR'':
+  fixes R :: "'a \<Rightarrow> ('b, enat) acost"
+  assumes "wfR'' R"
+  shows "continuous ( \<lambda>cm.  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
+  apply(rule continuousI)
+proof -
+  fix A :: "('a, enat) acost set"
+  have "Sup A \<in> A" sorry
+  have "\<And>ac. the_acost (Sup A) ac = (SUP a\<in>A. (the_acost a ac))"
+    unfolding Sup_acost_def by simp 
+  have pf: "\<And>g a. (SUP f\<in>A. the_acost f a) * g = (SUP f\<in>A. the_acost f a * g)" 
+    by (simp add: enat_mult_cont')  
+  
+  show "acostC (\<lambda>cc. \<Sum>ac. the_acost (Sup A) ac * the_acost (R ac) cc) 
+        = (SUP cm\<in>A. acostC (\<lambda>cc. \<Sum>ac. the_acost cm ac * the_acost (R ac) cc))"
+    unfolding Sup_acost_def
+    apply simp  
+    apply(subst pf)
+    sorry
+qed
+  (* TODO: investigate *)
+  oops
+
+thm timerefine_conc_fun_le2[OF continuous_if_wfR'', unfolded timerefine_alt4[symmetric]]
+
+
+
+
+lemma timerefine_conc_fun_le2:
+  assumes "continuous E"
+  shows "timerefine' E (\<Down> R C) = \<Down>R (timerefine' E C)"
+  unfolding timerefine'_def conc_fun_def 
+  apply(auto split: nrest.splits option.splits simp: fun_eq_iff)
+  subgoal 
+    by (smt Sup_bot_conv(1) bot_option_def mem_Collect_eq) 
+  subgoal premises p for x2 x2a x2b x x2c
+  proof -
+    have "Sup {x2b a |a. (x, a) \<in> R} = Sup {map_option E (x2 a) |a. (x, a) \<in> R}"
+      apply(rule arg_cong[where f=Sup])
+      using p(3)[rule_format] p(4)
+      apply auto
+      subgoal by (smt map_option_eq_Some option.exhaust) 
+      subgoal by (metis not_None_eq option.simps(8) option.simps(9)) 
+      done
+    also have "\<dots> = map_option E (Sup {x2 a |a. (x, a) \<in> R})" 
+      apply(subst continuous_map_option[OF assms, THEN continuousD] )
+      apply(rule arg_cong[where f=Sup])
+      by auto
+    also have "\<dots> = map_option E (Some x2c)"
+      using p(2)[rule_format, of x, unfolded p(4)] by simp
+    also have "\<dots> = Some (E x2c)" by simp
+    finally show "Some (E x2c) = Sup {x2b a |a. (x, a) \<in> R}"  by simp
+  qed
+  done 
+
+*)
+
 
 lemma timerefine_conc_fun_ge:
   fixes C :: "('f, ('b, enat) acost) nrest"

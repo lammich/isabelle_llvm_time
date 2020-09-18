@@ -1010,7 +1010,10 @@ lemma insertion_sort_correct: "(uncurry2 insertion_sort, uncurry2 (slice_sort_sp
    apply(rule timerefine_mono2) apply(rule wfR''_E_sort_one_more)  apply (rule insertion_sort_whole_correct)
   apply (subst timerefine_iter2) apply(rule wfR_E2) apply(rule wfR''_E_sort_one_more)
   apply (auto simp: pw_acost_le_iff refine_pw_simps slice_rel_def in_br_conv SPEC_def )
-  unfolding E_final_def apply(subst timerefineA_pp) by(simp add: timerefineA_upd)
+  unfolding E_final_def apply(subst timerefineA_iter2[symmetric]) 
+  subgoal apply(rule wfR''_ppI) by auto
+  subgoal by auto
+  by(simp add: timerefineA_upd)
   
   
 end  
@@ -1124,20 +1127,14 @@ lemma insertion_sort'_correct: "(uncurry2 insertion_sort', uncurry2 (slice_sort_
 
   apply (subst timerefine_iter2) apply(rule wfR_E2) apply(rule wfR''_E_sort_one_more)
   apply(rule order.trans)
-(*
-  apply(rule timerefine_conc_fun_le) (* I think this does not work! *)
-  apply (subst timerefine_iter) subgoal sorry subgoal sorry
-  apply (auto simp: pw_acost_le_iff refine_pw_simps slice_rel_def in_br_conv SPEC_def )
-  unfolding E_final_def apply(subst timerefineA_pp) apply(simp add: timerefineA_upd)
-      apply(simp only: pp_assoc)
-  done *)
-
    apply(rule timerefine_mono2) apply(rule wfR''E4)
    apply(rule timerefine_conc_fun_ge2) apply(rule wfR''_ppI) apply(rule wfR_E2) apply(rule wfR''_E_sort_one_more)
   apply (subst timerefine_iter2) apply(rule wfR''E4) apply(rule wfR''_ppI) apply(rule wfR_E2) apply(rule wfR''_E_sort_one_more)
   apply simp
   apply (subst (2) timerefine_iter2[symmetric]) apply(intro wfR''_ppI wfR_E2 wfR''E4 wfR''_E_sort_one_more) apply(rule wfE_final)
-  apply(simp only: pp_assoc)
+  apply(subst pp_assoc)
+  subgoal by (intro wfR''E4)  
+  subgoal by (intro wfR_E2)
   apply(rule timerefine_mono2) apply(intro wfR''_ppI wfR_E2 wfR''E4 wfR''_E_sort_one_more)
   apply (auto simp: pw_acost_le_iff refine_pw_simps slice_rel_def in_br_conv SPEC_def )
   unfolding E_final_def by (simp add: timerefineA_upd)
@@ -1183,7 +1180,15 @@ lemma iii_le: "timerefineA (pp (pp (pp E_insert4 E2) (E_sort_one_more h)) (E_fin
     \<le> lift_acost (in_sort_time h)"
   supply [simp] = timerefineA_TId_eq timerefineA_upd lift_acost_cost add.assoc
                   skalar_acost_propagate lift_acost_propagate timerefineA_propagate
-  apply(simp add: timerefineA_pp)
+  apply(subst timerefineA_iter2[symmetric]) 
+  subgoal apply(intro wfR''_ppI) by auto
+  subgoal by auto
+  apply(subst timerefineA_iter2[symmetric]) 
+  subgoal apply(intro wfR''_ppI) by auto
+  subgoal by auto
+  apply(subst timerefineA_iter2[symmetric]) 
+  subgoal by auto
+  subgoal by auto
   apply(simp add: E_final_def)
   apply(simp add: insort_time_def)
   apply(simp add: E_sort_one_more_def E_u_def)
@@ -1251,6 +1256,7 @@ lemma Sum_any_calc: "Sum_any (the_acost (in_sort_time x)) = 4 + (18 * (x * x) + 
           intro!: finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero)+ 
   done
 
+(*
 lemma "finite {y. the_acost (in_sort_time x) y \<noteq> 0}"
   sorry
 
@@ -1263,7 +1269,6 @@ lemma "\<And>x. x\<ge>c1 \<Longrightarrow> Sum_any (the_acost (in_sort_time x)) 
   oops
 
 
-(*
 
 *  define theta'' mit constanten c1 und c2
 * sanity check , thetha'' \<Longrightarrow> theta
@@ -1285,7 +1290,7 @@ lemma HT'': "llvm_htriple ($lift_acost (in_sort_time (length xs)) \<and>* hn_ctx
   by blast
 
 
-
+(* TODO: tidy up 
 abbreviation "in_sort_cost lxs \<equiv> lift_acost (in_sort_time lxs)"
 
 lemma "finite {y. the_acost (in_sort_cost x) y \<noteq> 0}"
@@ -1321,7 +1326,7 @@ lemma "\<exists>g\<in>theta'' (c1 LENGTH('b::len2)) (c2 LENGTH('b::len2))
       (insertion_sort_impl_a xsi li hi) 
     (\<lambda>r s. \<exists>x. (\<up>(mset x = mset xs \<and> sorted_wrt_lt (\<^bold><) x) \<and>* arr_assn x r) s)"
   oops
-
+*)
 
 
   thm hn_refine_result

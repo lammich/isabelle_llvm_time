@@ -404,7 +404,7 @@ begin
   
   notepad  (* TODO: cleanup *)
   begin
-   
+    \<^cancel>\<open>
   
     assume MONO: "\<And>x. M.mono_body (\<lambda>fa. F (\<lambda>x. ll_call (fa x)) x)"
     
@@ -416,7 +416,7 @@ begin
       apply(rewrite REC'_unfold[OF DEF MONO])
       apply(rewrite REC'_unfold[OF DEF MONO])
       unfolding F ll_call_def sorry
-  
+  \<close>
   end
 
   subsubsection \<open>While-Combinator\<close>

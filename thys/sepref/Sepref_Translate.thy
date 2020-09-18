@@ -438,7 +438,11 @@ method_setup sepref_bounds = \<open>SIMPLE_METHOD_NOPARAM' (Sepref_Translate.bou
 
 
 subsubsection \<open>Basic Setup\<close>
-              
+
+(* TODO: Move *)
+lemma entails_intro_GC: "A \<turnstile> A \<and>* GC"   
+  by (metis (no_types, hide_lams) empty_ent_GC entails_mp entails_refl sep.mult_commute sep_conj_empty') 
+
 lemma hn_pass[sepref_fr_rules]:
   shows "hn_refine (hn_ctxt P x x') (return x') (hn_invalid P x x') P (PASS$x)"
   apply rule
@@ -448,7 +452,11 @@ lemma hn_pass[sepref_fr_rules]:
   unfolding pred_lift_def pure_part_def
   apply auto
   subgoal using mod_starD by fastforce
-  subgoal sorry
+  subgoal
+    apply(rule entailsD[OF  ])
+     prefer 2 apply assumption
+    apply(simp only: sep_conj_assoc[symmetric])
+    by(rule entails_intro_GC)
   done (* TODO: REFACTOR *)
 
 (*lemma hn_pass_pure[sepref_fr_rules]:
@@ -631,12 +639,31 @@ subsection "Import of Parametricity Theorems"
 lemma pure_hn_refineI:
   assumes "Q \<longrightarrow> (c,a)\<in>R"
   shows "hn_refine (\<up>Q) (return c) (\<up>Q) (pure R) (RETURN a)"
-  unfolding hn_refine_def pure_def using assms sorry
+  unfolding hn_refine_def pure_def using assms
+  apply auto
+  subgoal apply(rule exI[where x=0]) by (auto simp: wp_return)
+  subgoal apply(rule exI[where x=0])
+    
+    apply (auto simp: sep_algebra_simps wp_return STATE_def)
+    
+    apply(rule entailsD[OF  ])
+     prefer 2 apply assumption
+    apply(simp only: sep_conj_assoc[symmetric])
+    by(rule entails_intro_GC)
+  done
 
 lemma pure_hn_refineI_no_asm:
   assumes "(c,a)\<in>R"
   shows "hn_refine \<box> (return c) \<box> (pure R) (RETURN a)"
-  unfolding hn_refine_def pure_def using assms sorry
+  unfolding hn_refine_def pure_def using assms 
+  apply auto
+  apply(rule exI[where x=0])    
+  apply (auto simp: sep_algebra_simps wp_return STATE_def)
+  subgoal premises p
+    apply(rule entailsD[OF _   ]) 
+     prefer 2 apply(rule p(2))
+    by(rule entails_intro_GC)
+  done
 
 lemma import_param_0:
   "(P\<Longrightarrow>Q) \<equiv> Trueprop (PROTECT P \<longrightarrow> Q)"

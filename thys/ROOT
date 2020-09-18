@@ -1,10 +1,12 @@
-session Isabelle_LLVM = Refine_Monadic +
+session Isabelle_LLVM = "HOL-Analysis" +
   options [browser_info]
   
   sessions
     "Refine_Imperative_HOL"
     "Word_Lib"
     "Separation_Algebra"
+    "Imperative_HOL_Time"
+    "HOL-Real_Asymp"
   directories
     basic
     "basic/kernel"
@@ -14,18 +16,28 @@ session Isabelle_LLVM = Refine_Monadic +
     "examples/sorting"
     lib
     sepref
+    nrest
+    cost
     "sepref/IICF"
     "sepref/IICF/Impl"
     "sepref/IICF/Impl/Heaps"
     "sepref/IICF/Intf"
     "sepref/Lib"
     vcg
+(*
+  theories
+    "ds/LLVM_DS_NArray"
 
   theories
     "sepref/IICF/IICF"  
-    
+    *)
   theories
     "examples/sorting/Sorting_Export_Code"
+    "examples/sorting/Sorting_Heapsort"
+    "examples/sorting/Sorting_Final_insertion_Sort"
+    "examples/sorting/Sorting_Insertion_Sort"
+(*
     "examples/Bin_Search"
     "examples/KMP"
     "examples/LLVM_Examples"
+*)
