@@ -132,12 +132,15 @@ sepref_def log2_iter_impl is "log2_iter"
 end
 end *)
   
+context size_t_context
+begin  
 
-sepref_def log2_iter_impl is "log2_iter"
-    :: "size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
-  unfolding log2_iter_def PR_CONST_def
-  apply (annot_snat_const "TYPE(size_t)")
-  by sepref
+  sepref_def log2_iter_impl is "log2_iter"
+      :: "size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
+    unfolding log2_iter_def PR_CONST_def
+    apply (annot_snat_const "TYPE('size_t)")
+    by sepref
+end
 
 section \<open>Count Leading Zeroes and Log2\<close>
 (* TODO: Define semantics of llvm.ctlz intrinsic! *)

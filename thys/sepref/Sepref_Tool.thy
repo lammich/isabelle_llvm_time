@@ -262,6 +262,10 @@ method_setup sepref_dbg_trans_step = \<open>SIMPLE_METHOD_NOPARAM' Sepref_Transl
 method_setup sepref_dbg_trans_step_keep = \<open>SIMPLE_METHOD_NOPARAM' Sepref_Translate.trans_step_keep_tac\<close>
   \<open>Sepref debug: Translation step, keep unsolved subgoals\<close>
 
+method_setup sepref_dbg_trans_step_nos = \<open>SIMPLE_METHOD_NOPARAM' Sepref_Translate.trans_step_nos_tac\<close>
+  \<open>Sepref debug: Translation step, don't try to solve emerging subgoals\<close>
+  
+  
 method_setup sepref_dbg_side = \<open>SIMPLE_METHOD_NOPARAM' (fn ctxt => REPEAT_ALL_NEW_FWD (Sepref_Translate.side_cond_dispatch_tac false (K no_tac) ctxt))\<close>
 method_setup sepref_dbg_side_unfold = \<open>SIMPLE_METHOD_NOPARAM' (Sepref_Translate.side_unfold_tac)\<close>
 method_setup sepref_dbg_side_keep = \<open>SIMPLE_METHOD_NOPARAM' (fn ctxt => REPEAT_ALL_NEW_FWD (Sepref_Translate.side_cond_dispatch_tac true (K no_tac) ctxt))\<close>

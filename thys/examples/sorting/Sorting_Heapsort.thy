@@ -2202,21 +2202,22 @@ context heap_context begin
 
 end
 
+context size_t_context begin
 
 sepref_register mop_lchild3 mop_rchild3 mop_has_rchild3 mop_has_lchild3 mop_geth3  mop_seth3  
 sepref_def mop_lchild_impl [llvm_inline] is "uncurry mop_lchild3" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
-  unfolding mop_lchild3_def apply (annot_snat_const "TYPE (size_t)")
+  unfolding mop_lchild3_def apply (annot_snat_const "TYPE ('size_t)")
   by sepref
 
 sepref_def mop_rchild_impl [llvm_inline] is "uncurry mop_rchild3" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
-  unfolding mop_rchild3_def apply (annot_snat_const "TYPE (size_t)")
+  unfolding mop_rchild3_def apply (annot_snat_const "TYPE ('size_t)")
   by sepref
 
 sepref_def has_lchild_impl [llvm_inline] is "uncurry2 mop_has_lchild3" :: "[\<lambda>((l,h),i). l\<le>h]\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow> bool1_assn"
-  unfolding mop_has_lchild3_def apply (annot_snat_const "TYPE (size_t)") by sepref
+  unfolding mop_has_lchild3_def apply (annot_snat_const "TYPE ('size_t)") by sepref
 
 sepref_def has_rchild_impl [llvm_inline] is "uncurry2 mop_has_rchild3" :: "[\<lambda>((l,h),i). l<h]\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow> bool1_assn"
-  unfolding mop_has_rchild3_def apply (annot_snat_const "TYPE (size_t)") by sepref 
+  unfolding mop_has_rchild3_def apply (annot_snat_const "TYPE ('size_t)") by sepref 
 
 sepref_def mop_geth_impl [llvm_inline] is "uncurry3 mop_geth3" 
   (*:: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (eoarray_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a elem_assn \<times>\<^sub>a eoarray_assn elem_assn" *)
@@ -2231,6 +2232,7 @@ sepref_def mop_seth_impl [llvm_inline] is "uncurry4 mop_seth3"
   unfolding mop_oarray_upd_def[symmetric] thm mop_oarray_extract_def[symmetric]
   by sepref
    
+end
 
 context sort_impl_context begin
 
@@ -2519,26 +2521,16 @@ sepref_def sift_down_impl [llvm_inline] is "uncurry3 (PR_CONST sift_down5)" :: "
 sepref_register "heapify_btu3"
 sepref_def heapify_btu_impl [llvm_inline] is "uncurry2 (PR_CONST (heapify_btu3))" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a (array_assn elem_assn)"
   unfolding heapify_btu3_def PR_CONST_def
-  apply (annot_snat_const "TYPE (size_t)")
+  apply (annot_snat_const "TYPE ('size_t)")
   supply [[goals_limit = 1]]
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-    apply sepref_dbg_id  
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-      apply sepref_dbg_trans
-
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_constraints 
+  apply sepref
   done
   
 sepref_register "heapsort3"
 sepref_def heapsort_impl is "uncurry2 (PR_CONST (heapsort3))" :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a (array_assn elem_assn)"
   unfolding heapsort3_def unfolding myswap_def PR_CONST_def
   apply (rewrite at "sift_down5 _ _ \<hole> _" fold_COPY)
-  apply (annot_snat_const "TYPE (size_t)")
+  apply (annot_snat_const "TYPE ('size_t)")
   by sepref
 
 lemmas heapsort_hnr[sepref_fr_rules] = heapsort_impl.refine[unfolded heapsort1.refine[OF weak_ordering_axioms,symmetric]]  

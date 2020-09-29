@@ -732,7 +732,7 @@ lemma introsort_aux5_refine: "(xs,xs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<
 sepref_register introsort_aux5
 sepref_def introsort_aux_impl is "uncurry3 (PR_CONST introsort_aux5)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
   unfolding introsort_aux5_def PR_CONST_def
-  apply (annot_snat_const "TYPE(size_t)")
+  apply (annot_snat_const "TYPE('size_t)")
   supply [[goals_limit = 1]]
   by sepref
 
@@ -791,7 +791,7 @@ qed
 sepref_register introsort5
 sepref_def introsort_impl is "uncurry2 (PR_CONST introsort5)" :: "(arr_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn"
   unfolding introsort5_def PR_CONST_def
-  apply (annot_snat_const "TYPE(size_t)")
+  apply (annot_snat_const "TYPE('size_t)")
   supply [intro!] = AAA 
   by sepref
 

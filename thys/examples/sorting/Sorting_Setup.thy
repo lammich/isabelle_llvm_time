@@ -363,14 +363,47 @@ begin
 end  
 *)  
 
+locale size_t_context = 
+  fixes size_t :: "'size_t::len2 itself" 
+  assumes SIZE_T: "8\<le>LENGTH('size_t)"
+begin
+  lemma size_t_le_maxI[simp]:
+    assumes "n<128"  
+    shows "n<max_snat LENGTH('size_t)"
+  proof -
+    from SIZE_T have "7 \<le> LENGTH('size_t)-1"
+      using SIZE_T
+      by simp
+    hence "2^7 \<le> max_snat LENGTH('size_t)"  
+      unfolding max_snat_def
+      by (simp add: numeral_2_eq_2)
+    with assms show ?thesis by simp       
+  qed  
+
+  lemma size_t_le_maxI'[simp]:
+    fixes n :: nat
+    assumes "n<128"  
+    shows "n<2^(LENGTH('size_t)-Suc 0)"
+    using size_t_le_maxI assms
+    unfolding max_snat_def by simp
+    
+  
+  abbreviation "size_assn \<equiv> snat_assn' TYPE('size_t)"
+  
+end
+
+
 (* TODO: Move *)
 term array_assn
-locale sort_impl_context = weak_ordering +  
-  fixes lt_impl :: "'ai::llvm_rep \<Rightarrow> 'ai \<Rightarrow> 1 word llM"
+locale sort_impl_context = size_t_context size_t + weak_ordering
+  for size_t :: "'size_t::len2 itself" +
+  fixes
+        lt_impl :: "'ai::llvm_rep \<Rightarrow> 'ai \<Rightarrow> 1 word llM"
     and lt_curr_name :: string
     and elem_assn :: "'a \<Rightarrow> 'ai \<Rightarrow> assn"
   assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn lt_curr_name (\<^bold><))"
   assumes lt_curr_name_no_clash: "lt_curr_name \<noteq> ''eo_extract''" "lt_curr_name \<noteq> ''eo_set''" 
+  assumes size_t_min: "8 \<le> LENGTH('size_t)"
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
@@ -379,6 +412,7 @@ begin
 
   abbreviation "arr_assn \<equiv> array_assn elem_assn"
 
+  
   definition "cmpo_idxs2 xs\<^sub>0 i j \<equiv> doN {
     ASSERT (i \<noteq> j);
     (vi,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 i;
@@ -725,6 +759,7 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
 end
 
 locale pure_sort_impl_context = sort_impl_context +
+  constrains size_t :: "'size_t::len2 itself" 
   assumes pureA[safe_constraint_rules]: "CONSTRAINT is_pure elem_assn"
   notes [sepref_frame_free_rules] = mk_free_is_pure[OF CONSTRAINT_D[OF pureA]]
 begin
@@ -815,18 +850,18 @@ end
 *)
 (* TODO: Refine lemmas to support more general size datatypes! *)
   
-type_synonym size_t = "64"
-abbreviation "size_assn \<equiv> snat_assn' TYPE(size_t)"
   
 
 thm hn_unat_ops(13)
-lemma unat_sort_impl_context: "pure_sort_impl_context (\<le>) (<) ll_icmp_ult ''icmp_ult'' unat_assn"
+lemma unat_sort_impl_context: "8 \<le> LENGTH('size_t) \<Longrightarrow> pure_sort_impl_context TYPE('size_t::len2) (\<le>) (<) ll_icmp_ult ''icmp_ult'' unat_assn"
   apply intro_locales
+  subgoal apply unfold_locales .
   apply (rule linwo)
   apply unfold_locales
     apply rule 
     apply (rule hn_unat_ops[unfolded PR_CONST_def]) 
     apply simp
+  apply simp
   apply simp
   apply (solve_constraint)
   done

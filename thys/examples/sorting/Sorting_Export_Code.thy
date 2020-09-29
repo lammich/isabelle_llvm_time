@@ -13,7 +13,7 @@ text \<open>
   array_swap_def word_log2_impl_def 
 *)
   
-global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_ult  "''icmp_ult''" unat_assn
+global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" "TYPE(64)" ll_icmp_ult  "''icmp_ult''" unat_assn
   defines unat_sort_is_guarded_insert_impl = unat_sort.is_guarded_insert_impl
       and unat_sort_is_unguarded_insert_impl = unat_sort.is_unguarded_insert_impl
       and unat_sort_unguarded_insertion_sort_impl = unat_sort.unguarded_insertion_sort_impl
@@ -40,7 +40,8 @@ global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" ll_icmp_
       and unat_sort_partition_right_impl       = unat_sort.partition_right_impl 
       (*and unat_sort_shuffle_impl               = unat_sort.shuffle_impl*) *)
       
-  by (rule unat_sort_impl_context)
+  apply (rule unat_sort_impl_context)
+  by simp
 
 lemmas [llvm_inline] = unat_sort.introsort_aux_impl_def 
                       unat_sort.final_insertion_sort_impl_def

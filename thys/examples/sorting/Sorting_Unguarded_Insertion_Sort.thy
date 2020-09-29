@@ -862,7 +862,7 @@ context sort_impl_context begin
   sepref_def is_unguarded_insert_impl is "uncurry (PR_CONST (is_insert_unguarded4 N))" 
     :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
     unfolding is_insert_unguarded4_def PR_CONST_def
-    apply (annot_snat_const "TYPE(size_t)")
+    apply (annot_snat_const "TYPE('size_t)")
     by sepref
     
 
@@ -922,7 +922,7 @@ context sort_impl_context begin
   sepref_def is_guarded_insert_impl is "uncurry2 (PR_CONST (is_insert_guarded4))" 
     :: "(array_assn elem_assn)\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a array_assn elem_assn"
     unfolding is_insert_guarded4_def PR_CONST_def
-    apply (annot_snat_const "TYPE(size_t)")
+    apply (annot_snat_const "TYPE('size_t)")
     by sepref 
     
 end    
@@ -1308,7 +1308,7 @@ context sort_impl_context begin
   sepref_def unguarded_insertion_sort_impl is "uncurry2 (PR_CONST (gen_insertion_sort_unguarded3 N))" 
     :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn elem_assn"
     unfolding gen_insertion_sort_unguarded3_def PR_CONST_def
-    apply (annot_snat_const "TYPE(size_t)")
+    apply (annot_snat_const "TYPE('size_t)")
     by sepref 
     
 end    
@@ -1643,7 +1643,7 @@ context sort_impl_context begin
   sepref_def guarded_insertion_sort_impl is "uncurry3 (PR_CONST (gen_insertion_sort_guarded3))" 
     :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (array_assn elem_assn)\<^sup>d \<rightarrow>\<^sub>a array_assn elem_assn"
     unfolding gen_insertion_sort_guarded3_def PR_CONST_def
-    apply (annot_snat_const "TYPE(size_t)")
+    apply (annot_snat_const "TYPE('size_t)")
     by sepref    
 
 end 

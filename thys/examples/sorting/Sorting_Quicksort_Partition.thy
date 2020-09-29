@@ -753,7 +753,7 @@ sepref_register ungrd_qsp_next_l_spec ungrd_qsp_next_h_spec  qsp_next_h2 qsp_nex
 (* TODO: We can get rid of the length xs restriction: the stopper element will always lie within <h, which is size_t representable! *)
 sepref_definition qsp_next_l_impl [llvm_inline] is "uncurry3 (PR_CONST qsp_next_l2)" :: "(arr_assn)\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
   unfolding qsp_next_l2_def PR_CONST_def                            
-  apply (annot_snat_const "TYPE(size_t)")
+  apply (annot_snat_const "TYPE('size_t)")
   apply sepref 
   done
 
@@ -763,7 +763,7 @@ declare  qsp_next_l_impl.refine[sepref_fr_rules]
   
 sepref_definition qsp_next_h_impl [llvm_inline] is "uncurry3 (PR_CONST qsp_next_h2)" :: "(arr_assn)\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a size_assn"
   unfolding qsp_next_h2_def PR_CONST_def
-  apply (annot_snat_const "TYPE(size_t)")
+  apply (annot_snat_const "TYPE('size_t)")
   by sepref
 
 declare qsp_next_h_impl.refine[sepref_fr_rules]
@@ -851,7 +851,7 @@ lemma qs_partition2_refines:
 sepref_register qs_partition2 
 sepref_def qs_partition_impl (*[llvm_inline]*) is "uncurry3 (PR_CONST qs_partition2)" :: "size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k *\<^sub>a (arr_assn)\<^sup>d \<rightarrow>\<^sub>a arr_assn \<times>\<^sub>a size_assn"
   unfolding qs_partition2_def myswap_def PR_CONST_def
-  apply (annot_snat_const "TYPE(size_t)")
+  apply (annot_snat_const "TYPE('size_t)")
   supply [dest] = slice_eq_mset_eq_length 
   apply sepref 
   done
@@ -900,23 +900,24 @@ lemma partition_pivot2_refines:
   supply conc_Id[simp del]
   apply (auto simp: cost_n_leq_TId_n intro: struct_preservingI)
   done
+
+lemma partition_pivot_bounds_aux1: "\<lbrakk>\<not> b < ba; \<forall>d. b = ba + d \<longrightarrow> 4 \<le> d;
+        (ac, ba + (b - ba) div 2) \<in> snat_rel' TYPE('size_t) \<rbrakk>
+       \<Longrightarrow> Suc ba < max_snat LENGTH('size_t)"  
+  apply sepref_dbg_side_bounds
+  by presburger
+      
+lemma partition_pivot_bounds_aux2: "\<lbrakk> \<not> b < ba; \<forall>d. b = ba + d \<longrightarrow> 4 \<le> d \<rbrakk> \<Longrightarrow> Suc 0 \<le> b"  
+  by presburger
+       
   
 
 sepref_register partition_pivot2  
 sepref_def partition_pivot_impl [llvm_inline] is "uncurry2 (PR_CONST partition_pivot2)" :: "arr_assn\<^sup>d *\<^sub>a size_assn\<^sup>k *\<^sub>a size_assn\<^sup>k \<rightarrow>\<^sub>a arr_assn \<times>\<^sub>a size_assn"
   unfolding partition_pivot2_def PR_CONST_def    
-  apply (annot_snat_const "TYPE(size_t)")
-  apply sepref_dbg_preproc
-     apply sepref_dbg_cons_init
-    apply sepref_dbg_id  
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-      apply sepref_dbg_trans_keep
-
-  apply sepref_dbg_opt
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_cons_solve
-  apply sepref_dbg_constraints 
+  supply [simp] = nat_diff_split_asm partition_pivot_bounds_aux1 partition_pivot_bounds_aux2
+  apply (annot_snat_const "TYPE('size_t)")
+  apply sepref
   done
 
 

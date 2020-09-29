@@ -363,6 +363,9 @@ structure Sepref_Translate = struct
       In debug mode, it returns a sequence of the unsolved side conditions of
       each applicable rule.
     *)
+    
+    datatype side_mode = DBG_TRY_SIDE | DBG_NO_SIDE | NORMAL
+    
     fun gen_trans_op_tac dbg ctxt = let
       val fr_rl_net = sepref_fr_rules.get ctxt |> Tactic.build_net
       val fr_rl_tac = 
@@ -385,11 +388,14 @@ structure Sepref_Translate = struct
       val side_tac = REPEAT_ALL_NEW_FWD (side_cond_dispatch_tac false (K no_tac) ctxt)
 
       val fr_tac = 
-        if dbg then (* Present all possibilities with (partially resolved) side conditions *)
-          fr_rl_tac THEN_ALL_NEW_FWD (TRY o side_tac)
-        else (* Choose first rule that solves all side conditions *)
-          DETERM o SOLVED' (fr_rl_tac THEN_ALL_NEW_FWD (SOLVED' side_tac))
-
+        case dbg of
+          DBG_TRY_SIDE => (* Present all possibilities with (partially resolved) side conditions *)
+            fr_rl_tac THEN_ALL_NEW_FWD (TRY o side_tac)
+        | DBG_NO_SIDE => (* Don't try to solve side conditions *)
+            fr_rl_tac
+        | NORMAL => (* Choose first rule that solves all side conditions *)
+            DETERM o SOLVED' (fr_rl_tac THEN_ALL_NEW_FWD (SOLVED' side_tac))
+        
     in
       PHASES' [
         ("Align goal",Sepref_Frame.align_goal_tac, 0),
@@ -398,17 +404,18 @@ structure Sepref_Translate = struct
         ("Recover pure",Sepref_Frame.recover_pure_tac, ~1),
         (* hn-refine goal with stripped precondition *)
         ("Apply rule",K fr_tac,~1)
-      ] (flag_phases_ctrl ctxt dbg) ctxt
+      ] (flag_phases_ctrl ctxt (dbg <> NORMAL)) ctxt
     end
 
     (* Translate combinator, operator, or side condition. *)
-    fun gen_trans_step_tac dbg ctxt = side_cond_dispatch_tac dbg
+    fun gen_trans_step_tac dbg ctxt = side_cond_dispatch_tac (dbg <> NORMAL)
       ( Sepref_Frame.norm_goal_pre_tac ctxt 
         THEN' (trans_comb_tac ctxt ORELSE' gen_trans_op_tac dbg ctxt))
       ctxt
 
-    val trans_step_tac = gen_trans_step_tac false  
-    val trans_step_keep_tac = gen_trans_step_tac true
+    val trans_step_tac = gen_trans_step_tac NORMAL  
+    val trans_step_keep_tac = gen_trans_step_tac DBG_TRY_SIDE
+    val trans_step_nos_tac = gen_trans_step_tac DBG_NO_SIDE
 
     fun gen_trans_tac dbg ctxt = 
       PHASES' [
