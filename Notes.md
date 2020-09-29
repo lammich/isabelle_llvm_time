@@ -1,3 +1,67 @@
+# 29.09.20
+
+## Relevanz für TACAS:
+
+```
+O(N·log(N)), where N = std::distance(first, last) comparisons on average.
+(until C++11)
+
+O(N·log(N)), where N = std::distance(first, last) comparisons.
+(since C++11)
+```
+https://en.cppreference.com/w/cpp/algorithm/sort
+```
+*Theoretical papers* with clear relevance for *tool construction and analysis* as well as tool descriptions and case studies with a conceptual message are all encouraged.
+```
+https://etaps.org/2021/tacas
+
+```
+analytical techniques for real-time, hybrid, or stochastic systems;
+```
+    
+Einhalten des C++11 Standards, auch der Spezifikation fuer Laufzeit -> Komplettierung von ITP'20
+
+Beweisen, das 'tools' keine "Laufzeit-Ueberraschungen" fuer spezielle worst-case Eingaben bereithalten
+- geeignet auch fuer unerwartete Eingabeverteilungen (zB. viele RAT-lemmas)
+- schutz gegen DoS (im introsort paper) 
+
+Hier: "klein anfangen", mit Basisbausteinen (eg stdlib. sorting)
+
+## Contributions:
+- Frontend: Waehrungen mit Refinement
+- Backend: LLVM semantics with cost model
+- Tooling: Sepref um beide zu verbinden
+- Case-Study: introsort
+
+## Art des Papers: Delta Paper vs Overview Paper?
+
+## Struktur: Top-Down
+- Reason: eigentliche Contribution: NREST+currencies
+
+1. Introduction (1 page)
+2. NREST mit Währungen (4 pages) {MAX}
+-> Worked example warum Waehrungen das Leben einfacher machen (Delta zu ITP'19 paper mit locales)
+-> Waehrungen um nur bestimmte Aspekte abzuschaetzen, siehe C++ (#comparisons)
+-> running example?
+3. LLVM semantics with cost model + basic layer tooling (4pages) {PETER}
+-> fast keine Probleme beim Erweitern -> gut engineered
+-> semantic und wp leicht erweiterbar (concept: time credits)
+-> new issues: functioncalls/control flow und tuples
+  --> Bsp warum man Tupel ignorieren kann (LLVM optimiert die meisten davon eh weg)
+4. Automatic Refinement (short) (1pages)
+-> new issue: sup_attains {MAX}
+5. Case Study: Intro (1page) {MAX}
+6. Benchmarks (<1 page) {PETER}
+7. Conclusions (1page)
+
+16 pages llncs, excl references
+
+## Fragen:
+- wie funktioniert estimation of WCET in der praxis?
+- wie funktioniert Sicherstellung von Freiheit von SideChannel Attacken in der Praxis
+
+# Future Work
+- Synthesize constant Time algorithms (-> auf der ebene von Sepref, so wie frees die eingefügt werden)
 
 # Treffen 18.9.20
 
