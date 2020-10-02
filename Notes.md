@@ -1,3 +1,26 @@
+# Treffen 2.10.
+
+## Zeitplan TACAS Paper
+
+- Thursday 8.10 12:00 : First Draft (Section 2, *3* ,4, 5, intro+conclusion in bullet points)
+- read complete paper + give feedback
+- meet Thursday 8.10. ~14uhr UKTime
+- Draft: Intro+Conclusion:  9.10
+- Tuesday 13.10. Second Draft (Intro+Conclusion, all in page limit)
+- cosmetics / feinschliff
+- Thursday 15.10: Deadline
+
+## Project Ideas
+- dynamic arrays (problem with frees) -> TODO: prove them on NREST or Basic Layer
+  -> array copy auf nres layer
+  -> dynamic array auf nres layer
+  
+  
+## TODOS
+### Max
+- ideas to issues
+- prove hnr_shift_money
+
 # 29.09.20
 
 ## Relevanz für TACAS:
