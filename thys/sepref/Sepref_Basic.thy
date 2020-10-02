@@ -430,6 +430,165 @@ proof -
 qed
 
 
+
+
+lemma hn_refine_consume_return:
+  "hn_refine \<Gamma> c \<Gamma>' R m =
+  nofailT m \<longrightarrow>
+  (\<forall>F s cr . 
+      llSTATE (\<Gamma> \<and>* F) (s,cr) \<longrightarrow> 
+      (\<exists>ra Ca. consume (RETURNT ra) Ca \<le> m
+        \<and> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr+Ca)
+      )
+  )"
+  unfolding hn_refine_def
+  apply auto 
+  apply(cases m)
+   apply auto
+  subgoal premises p for F x cr x2
+    using p(2)[rule_format, OF p(1)]
+    apply safe
+    subgoal for ra Ca
+      apply(rule exI[where x=ra])
+      apply(rule exI[where x=Ca])
+      unfolding consume_def RETURNT_def apply simp
+      by (auto simp: le_fun_def)
+    done
+  done
+
+lemma hn_refine_pay_aux: "NREST.consume m t = SPECT M
+  \<Longrightarrow> \<exists>M'. m = SPECT M' \<and> M = (map_option ((+) t) \<circ> M')"
+  unfolding consume_def apply(cases m) by auto
+
+
+lemma hnr_vcg_aux4:
+  "P (s, cr) \<Longrightarrow> ($Ca \<and>* P) (s, cr + Ca)"
+  apply(rule sep_conjI[where x="(0,Ca)"])
+     apply (simp_all add: time_credits_assn_def sep_disj_prod_def sep_algebra_simps)
+  by (auto simp add: sep_disj_acost_def sep_disj_enat_def sep_algebra_simps)
+
+lemma hnr_vcg_aux3:
+  "($Ca \<and>* P) (s, cr) \<Longrightarrow> \<exists>cr'. P (s, cr') \<and> cr=cr'+Ca"
+  apply(erule sep_conjE)
+  by (auto simp: time_credits_assn_def SND_def add.commute) 
+
+lemma hn_refine_payday_aux2:
+  fixes t:: ecost
+  shows "Some Ca \<le> m \<Longrightarrow> Some (Ca + t) \<le> map_option ((+) t) m"
+  apply(cases m) 
+  by( auto simp add: add.commute add_mono)
+
+lemma hn_refine_payday_aux3:
+  fixes t:: ecost
+  shows "Some Ca \<le> map_option ((+) t) m \<Longrightarrow> Ca \<ge> t \<and>  Some (Ca - t) \<le> m "
+  apply(cases m) apply auto
+  oops
+
+lemma hn_refine_payday:
+  fixes m :: " ('d, (char list, enat) acost) nrest"
+  shows "hn_refine ($t \<and>* \<Gamma>) c \<Gamma>' R m \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R (consume m t)"
+  unfolding hn_refine_def
+  apply auto
+  subgoal apply(cases m) by auto
+  subgoal premises p for F s cr M
+    using p(1)[THEN hn_refine_pay_aux]
+    apply safe
+    subgoal premises p2 for M'
+      using p(3)[rule_format, where s=s and cr="cr+t" and M=M', OF p2(1), unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def,
+              simplified, OF p(2)[ unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def, simplified, THEN hnr_vcg_aux4[where P="(\<Gamma> \<and>* F)"]]]
+      apply safe
+      subgoal for ra Ca
+        apply(rule exI[where x="ra"])
+        apply(rule exI[where x="Ca+t"])
+        unfolding STATE_def  ll_\<alpha>_def lift_\<alpha>_cost_def
+        by (simp add: hn_refine_payday_aux2 add.assoc add.commute add.left_commute)
+      done
+    done
+  done
+
+lemma
+  fixes t:: nat
+  shows "Some Ca \<le> map_option ((+) t) m
+    \<Longrightarrow> Some (Ca - t) \<le> m"
+  by(cases m, auto)
+
+lemma
+  fixes t:: enat
+  shows "Some Ca \<le> map_option ((+) t) m
+    \<Longrightarrow> Some (Ca - t) \<le> m"
+  apply(cases m, auto)
+  subgoal for a
+    apply(cases t; cases Ca; cases a)
+           apply auto
+    oops
+
+lemma hn_refine_payday_reverse_aux1:
+  "Ca \<le> (lift_acost t) + (Ca - (lift_acost t))"
+  apply(cases t; cases Ca)
+  unfolding lift_acost_def minus_acost_alt less_eq_acost_def 
+  apply auto
+  by (metis add.commute add_diff_assoc_enat linear needname_cancle) 
+  
+
+lemma hn_refine_payday_reverse_aux2:
+  shows "Some Ca \<le> map_option ((+) (lift_acost t)) m
+    \<Longrightarrow> Some (Ca - (lift_acost t)) \<le> m"
+  apply(cases m, auto)
+  unfolding less_eq_acost_def lift_acost_def
+  apply(cases Ca; cases t) apply simp
+  by (metis (mono_tags, lifting) acost.sel add_diff_cancel_enat comp_apply drm_class.diff_right_mono enat.distinct(2) the_acost_propagate)
+  
+
+
+lemma hn_refine_payday_reverse:
+  fixes m :: " ('d, (char list, enat) acost) nrest"
+  shows "hn_refine \<Gamma> c \<Gamma>' R (consume m (lift_acost t)) \<Longrightarrow> hn_refine ($(lift_acost t) \<and>* \<Gamma>) c \<Gamma>' R m"
+  unfolding hn_refine_def
+  apply auto
+  subgoal apply(cases m) by (auto simp: nofailT_consume)
+  subgoal premises p for F s cr M
+    using p(2)[unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def, simplified, THEN hnr_vcg_aux3]
+    apply safe
+    subgoal premises p2 for cr'
+      using p(3)[rule_format, where s=s and cr="cr'" and M="(map_option ((+) (lift_acost t)) \<circ> M)", unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def,
+          simplified, OF _ p2(1)]
+      apply (simp add: consume_def)
+      apply safe
+      subgoal for ra Ca
+        apply(rule exI[where x="ra"])
+        apply(rule exI[where x="Ca-(lift_acost t)"])
+        apply(frule hn_refine_payday_reverse_aux2)
+        apply simp
+        using p2(2)
+        unfolding STATE_def  ll_\<alpha>_def lift_\<alpha>_cost_def
+        apply (auto simp add: hn_refine_payday_aux2 add.assoc add.commute add.left_commute)
+        using  get_delta[OF hn_refine_payday_reverse_aux1, of t Ca]
+        apply safe
+        subgoal premises p for delta
+          using p(2)[THEN wp_time_mono, where d=delta]
+          apply(subst p(5))
+          apply(rule wp_monoI)
+           apply (simp add: add.assoc add.commute add.left_commute)
+          apply auto
+          subgoal premises p2 for r a cc' 
+            apply (rule entailsD)
+             defer 
+             apply(rule  p2(2)[THEN hnr_vcg_aux4[where P="(\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)" and Ca=delta and s="llvm_\<alpha> a" and cr=cc']])
+            apply(rule entails_trans)
+             apply(rule conj_entails_mono)
+              apply(rule entails_GC)
+             apply(rule entails_refl)
+            apply (rule ENTAILSD)
+            apply fri 
+            done
+          done
+        done
+      done
+    done
+  done
+
+
+
 lemma hn_refineD:
   assumes "hn_refine \<Gamma> c \<Gamma>' R m"
   assumes "m = REST M" "(\<Gamma> \<and>* F) (ll_\<alpha> (s,cr))"
