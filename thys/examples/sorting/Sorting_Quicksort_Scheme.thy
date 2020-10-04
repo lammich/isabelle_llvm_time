@@ -687,14 +687,13 @@ lemma introsort_aux3_correct_flexible:
       ASSERT(l\<le>h);
       hml \<leftarrow> SPECc2 ''sub'' (-) h l;
       if\<^sub>N SPECc2 ''lt'' (<) 1 hml then doN {
-        consume (RETURN ()) (cost ''prepare_cost'' 1);
         xs \<leftarrow> slice_part_sorted_spec xs l h;
         xs \<leftarrow> final_sort_spec xs l h;
         RETURN xs
       } else RETURN xs
     }"  
 
-definition "introsort3_cost = cost ''prepare_cost'' 1 + cost ''sub'' 1 + cost ''lt'' 1 + cost ''if'' 1
+definition "introsort3_cost =  cost ''sub'' 1 + cost ''lt'' 1 + cost ''if'' 1
                                + cost ''slice_sort'' 1 +  cost ''slice_part_sorted'' (1::enat)"
     
     
