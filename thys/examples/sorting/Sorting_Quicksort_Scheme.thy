@@ -18,23 +18,22 @@ begin
 definition introsort_aux1 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "introsort_aux1 tf xs d \<equiv> RECT' (\<lambda>introsort_aux1 (xs,d). doN {
       ASSERT (xs \<noteq> []);
       lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''list_length'' 1];
-      b \<leftarrow> SPECc2 ''lt'' (<) is_threshold (length xs);
-      MIf b (doN {
-        b2 \<leftarrow> SPECc2 ''eq'' (=) d 0;
-        MIf b2 (
+      if\<^sub>N SPECc2 ''lt'' (<) is_threshold (length xs) then doN {
+        if\<^sub>N SPECc2 ''eq'' (=) d 0 then
           mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (tf (length xs)))))
-        )( doN {
+        else doN {
           (xs1,xs2)\<leftarrow>partition1_spec xs;
           d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
           xs1 \<leftarrow> introsort_aux1 (xs1,d');
           xs2 \<leftarrow> introsort_aux1 (xs2,d');
           SPECc2 ''list_append'' (@) xs1 xs2
-        })
+        }
       }
-      ) (
-        RETURN xs )
+      else
+        RETURN xs 
     }) (xs,d)"
-    
+
+
     lemma slice_strict_LT_imp_LE: "slice_LT (\<^bold><) xs ys \<Longrightarrow> slice_LT (le_by_lt (\<^bold><)) xs ys"  
       apply (erule slice_LT_mono)
       by (meson le_by_lt_def wo_less_asym)
@@ -376,27 +375,23 @@ definition "slice_sort_specT T lt xs\<^sub>0 l h \<equiv> doN {
   }"
       
     definition introsort_aux3 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "introsort_aux3 tf xs l h d 
-    \<equiv> RECT' (\<lambda>introsort_aux (xs,l,h,d). doN {
+    \<equiv>  RECT' (\<lambda>introsort_aux (xs,l,h,d). doN {
         ASSERT (l\<le>h);
         lxs \<leftarrow> SPECc2 ''sub'' (-) h l;
-        b \<leftarrow> SPECc2 ''lt'' (<) is_threshold lxs;
-        MIf b (doN {
-          b2 \<leftarrow> SPECc2 ''eq'' (=) d 0;
-          MIf b2 (
+        if\<^sub>N SPECc2 ''lt'' (<) is_threshold lxs then doN {
+          if\<^sub>N SPECc2 ''eq'' (=) d 0 then
             mop_call (slice_sort_specT (cost ''slice_sort_p'' (enat (tf lxs))) (\<^bold><) xs l h)
-          )( doN {
+          else doN {
             (xs,m)\<leftarrow>partition3_spec xs l h;
             d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
             xs \<leftarrow> introsort_aux (xs,l,m,d');
             xs \<leftarrow> introsort_aux (xs,m,h,d');
             RETURN xs
-          })
+          }
         }
-        ) (
-          RETURN xs )
+        else
+          RETURN xs 
       }) (xs,l,h,d)"
-
-
 
 
 corollary my_slice_sort_spec_refine_sort':
