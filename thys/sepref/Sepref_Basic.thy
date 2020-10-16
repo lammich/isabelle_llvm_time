@@ -197,6 +197,20 @@ term "$$n"
 lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
   by(auto simp: STATE_def)
 
+(* For presentation in paper *)  
+lemma "hn_refine \<Gamma> c \<Gamma>' R m = (
+  nofailT m \<longrightarrow>
+  (\<forall>F s cr M. m = REST M \<longrightarrow>
+      (\<Gamma> \<and>* F) (llvm_\<alpha> s,cr) \<longrightarrow> 
+      (\<exists>ra Ca. M ra \<ge> Some Ca
+        \<and> wp c (\<lambda>r (s',cr'). (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (llvm_\<alpha> s',cr')) (s, cr+Ca)
+      )
+  ))"
+  unfolding hn_refine_def STATE_alt lift_\<alpha>_cost_def ll_\<alpha>_def
+  apply (simp split: prod.splits)
+  by (smt case_prodD case_prodI2 wp_monoI)
+  
+  
 
 
 lemma hn_refine_extract_pre_val: 

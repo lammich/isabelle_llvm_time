@@ -188,6 +188,17 @@ begin
   definition "ll_icmp_ule \<equiv> op_lift_cmp ''icmp_ule'' (\<le>)"
   definition "ll_icmp_ult \<equiv> op_lift_cmp ''icmp_ult'' (<)"
 
+  
+  (* For presentation in paper *)
+  lemma "ll_add a b = doM {
+      consume (cost ''add'' 1);
+      return (a+b)
+    }"
+    unfolding ll_add_def op_lift_arith2'_def op_lift_arith2_def
+    apply simp
+    by (metis lint_word_inv word_to_lint_plus)
+    
+  
   text \<open>Note: There are no pointer compare instructions in LLVM. 
     To compare pointers in LLVM, they have to be casted to integers first.
     However, our abstract memory model cannot assign a bit-width to pointers.

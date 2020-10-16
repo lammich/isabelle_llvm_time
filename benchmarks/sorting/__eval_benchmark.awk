@@ -197,11 +197,13 @@ function output_pgf_abs () {
 
   print "@ introsort"
 
-#   pr_res_pgf_abs("isa-uint64 (server)","red","uint64","S","isabelle::sort");
-#   pr_res_pgf_abs("std-uint64 (server)","red","uint64","S","std::sort");
-#
-#   pr_res_pgf_abs("isa-uint64 (laptop)","green","uint64","L","isabelle::sort");
-#   pr_res_pgf_abs("std-uint64 (laptop)","green","uint64","L","std::sort");
+  pr_res_pgf_abs("isa-uint64 (server)","red","uint64","S","isabelle::sort");
+  pr_res_pgf_abs("std-uint64 (server)","red","uint64","S","std::sort");
+
+  pr_res_pgf_abs("isa-uint64 (laptop)","green","uint64","L","isabelle::sort");
+  pr_res_pgf_abs("std-uint64 (laptop)","green","uint64","L","std::sort");
+
+
 #
 #   pr_res_pgf_abs("isa-string (server)","blue",  "llstring","S","isabelle::sort");
 #   pr_res_pgf_abs("std-string (server)","blue",  "llstring","S","std::sort");
@@ -210,13 +212,13 @@ function output_pgf_abs () {
 #   pr_res_pgf_abs("std-string (laptop)","black","llstring","L","std::sort");
 
 
-  print "@ pdqsort"
+#   print "@ pdqsort"
 
 #   pr_res_pgf_abs("isa-uint64 (server)","red","uint64","S","isabelle::pdqsort");
 #   pr_res_pgf_abs("std-uint64 (server)","red","uint64","S","boost::pdqsort");
 
-  pr_res_pgf_abs("isa-uint64 (laptop)","green","uint64","L","isabelle::pdqsort");
-  pr_res_pgf_abs("std-uint64 (laptop)","green","uint64","L","boost::pdqsort");
+#   pr_res_pgf_abs("isa-uint64 (laptop)","green","uint64","L","isabelle::pdqsort");
+#   pr_res_pgf_abs("std-uint64 (laptop)","green","uint64","L","boost::pdqsort");
 
 #   pr_res_pgf_abs("isa-string (server)","blue",   "llstring","S","isabelle::pdqsort");
 #   pr_res_pgf_abs("std-string (server)","blue",   "llstring","S","boost::pdqsort");
@@ -303,7 +305,7 @@ function check_divergs() {
     for (distr in results) {
       for (type in results[distr]) {
         check_diverg(distr,type,m,"std::sort","isabelle::sort");
-        check_diverg(distr,type,m,"boost::pdqsort","isabelle::pdqsort");
+        # check_diverg(distr,type,m,"boost::pdqsort","isabelle::pdqsort");
       }
     }
   }
@@ -311,10 +313,10 @@ function check_divergs() {
 
 
 END {
- # check_divergs()
+#  check_divergs()
 
 #  output_pgf()
- output_pgf_abs()
+  output_pgf_abs()
 
 }
 

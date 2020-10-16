@@ -6,6 +6,8 @@
 
 # Defaults
 
+export DO_BENCHMARK="./do_benchmark_notime"
+
 export NITER=10   # Number of iterations
 export NIELEM=100000000 # Number of integer elements
 export NSELEM=10000000 # Number of string elements
@@ -32,14 +34,14 @@ export LOGFILE="log/sortbench-$(date -Iseconds).log"
 
 echo "Writing log to $LOGFILE"
 
-echo "# Sorting benchmark" | tee "$LOGFILE"
+echo "# Sorting benchmark ($DO_BENCHMARK)" | tee "$LOGFILE"
 
 ( echo -n "# "; date ) | tee -a "$LOGFILE"
 
 ( echo -n "# "; uname -a ) | tee -a "$LOGFILE"
 
 function run() {
-  ( ./do_benchmark $@ || echo "\n***ERROR $?" ) 2>&1 | tee -a "$LOGFILE"
+  ( $DO_BENCHMARK $@ || echo "\n***ERROR $?" ) 2>&1 | tee -a "$LOGFILE"
   echo | tee -a "$LOGFILE"
 }
 
