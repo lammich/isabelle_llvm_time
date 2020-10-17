@@ -1,12 +1,13 @@
 *~
-papers
 dist.tgz
+dist.tar
+thys.txt
 mkdist.sh
 mkhtml.sh
 html
+html.in
 TODO
-others
+notes
 .distignore
-thys-2018
 .git
 

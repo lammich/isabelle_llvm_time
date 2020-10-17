@@ -1,4 +1,4 @@
-session Isabelle_LLVM = "HOL-Analysis" +
+session Isabelle_LLVM_Time = "HOL-Analysis" +
   options [browser_info]
   
   sessions
@@ -33,9 +33,11 @@ session Isabelle_LLVM = "HOL-Analysis" +
     *)
   theories
     "examples/sorting/Sorting_Export_Code"
+(*    
     "examples/sorting/Sorting_Heapsort"
     "examples/sorting/Sorting_Final_insertion_Sort"
     "examples/sorting/Sorting_Insertion_Sort"
+*)    
 (*
     "examples/Bin_Search"
     "examples/KMP"
