@@ -685,6 +685,9 @@ lemma time_credits_add: "($A ** $B) = $(A+B)"
 lemma "($c) (s,c') \<longleftrightarrow> s=0 \<and> c'=c"
   unfolding time_credits_assn_def by (simp add: sep_algebra_simps SND_def) (* TODO: Lemmas for SND! *)
   
+lemma "($c) a \<longleftrightarrow> a=(0,c)"  
+  unfolding time_credits_assn_def by (cases a) (simp add: sep_algebra_simps SND_def)
+    
 definition "lift_\<alpha>_cost \<alpha> \<equiv> \<lambda>(s,c). (\<alpha> s,c)"  
 
 
@@ -750,7 +753,12 @@ section \<open>experiment: Hoare-triple without Time\<close>
   lemma wpn_alt: "wpn m Q s = wp m (FST o Q) (s,0)"
     unfolding wp_def wpn_def mwp_def
     by (auto split: mres.split simp: zero_enat_def FST_def)
-  
+
+  lemma wpn_alt': "wpn m Q s = wp m (\<lambda>r (s,c). Q r s \<and> c=0) (s,0)"
+    unfolding wp_def wpn_def mwp_def
+    by (auto split: mres.split simp: zero_enat_def FST_def)
+    
+      
   interpretation notime: generic_wp wpn  
     apply unfold_locales 
     unfolding wpn_def fun_eq_iff inf_fun_def inf_bool_def mwp_def

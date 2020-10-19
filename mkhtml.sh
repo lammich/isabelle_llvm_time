@@ -27,43 +27,28 @@ done
 
 
 if $REBUILD; then
-  cd papers/ITP2019
-  ./make.sh
-  cd talk
-  make
-  cd $BASEDIR
-
-  cd papers/2019_Rennes_Talk
-  make
-  cd $BASEDIR
-
-  cd thys
-  isabelle build -v -d '$AFP' -D .
-  cd $BASEDIR
-
+  isabelle build -v -D thys -d contrib/Imperative_HOL_Time
   ./mkdist.sh
 fi
 
 
 rm -rf html
 mkdir -p html
+cp -a html.in/* html/
 
 ISABELLE_BROWSER_INFO=$(isabelle getenv ISABELLE_BROWSER_INFO | sed -re 's/.*=//')
 
-cp -a $ISABELLE_BROWSER_INFO/Unsorted/Isabelle_LLVM html/
+cp -a $ISABELLE_BROWSER_INFO/Unsorted/Isabelle_LLVM_Time html/
 cp index.md html/
 cp dist.tgz html/
 cp LICENSE html/
 cp etc/logo/logo_200.png html/
-cp papers/ITP2019/main.pdf html/paper_ITP2019.pdf
-cp papers/ITP2019/talk/pres.pdf html/slides_ITP2019.pdf
-cp papers/2019_Rennes_Talk/pres.pdf html/rennes2019.pdf
 
-pandoc -V pagetitle="Isabelle LLVM" -s index.md > html/index.html
+pandoc -V pagetitle="Isabelle LLVM with Time" -s index.md > html/index.html
 
 
 if $UPLOAD; then
-  LOCAL_DEST=~/devel/www21-lammich/isabelle_llvm
+  LOCAL_DEST=~/devel/www21-lammich/isabelle_llvm_time
   rm -rf $LOCAL_DEST
   cp -a html $LOCAL_DEST
   cd $LOCAL_DEST
