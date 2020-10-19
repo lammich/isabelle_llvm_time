@@ -167,9 +167,8 @@ qed
 
 definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (length xs,d) )"
 
-
   lemma introsort_aux1_correct':
-    assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c"
+    assumes tf_suplinear: "\<And>a b. tf a + tf b \<le> tf (a+b)"
       and "xs \<noteq> []"
     shows 
    "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost' tf (xs, d))"
@@ -228,8 +227,8 @@ definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (l
             apply(rule introsort_aux1_aux) by auto
           subgoal (* ''slice_sort_p'' *) unfolding sc_solve_debug_def
             apply (simp add: one_enat_def)
-            apply(rule tf_suplinear)
-            by (metis add.commute length_append less_or_eq_imp_le mset_append mset_eq_length) 
+            apply(drule lengths_sums_if_msets_do) apply simp apply(subst add.commute)
+            by(rule tf_suplinear) 
           subgoal  (* if *)
             unfolding sc_solve_debug_def
             apply(drule lengths_sums_if_msets_do)
@@ -281,13 +280,13 @@ definition "introsort_aux_cost' tf  = (\<lambda>(xs,d). introsort_aux_cost tf (l
     done
 
   lemma introsort_aux1_correct:
-    assumes tf_suplinear: "\<And>a b c. a+b\<le>c \<Longrightarrow> tf a + tf b \<le> tf c"
+    assumes tf_suplinear: "\<And>a b. tf a + tf b \<le> tf (a+b)"
       and "xs \<noteq> []" "lxs = length xs"
     shows 
    "introsort_aux1 tf xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost tf (lxs, d))"
     unfolding assms(3)
-    apply(rule  introsort_aux1_correct'[OF assms(1,2), unfolded introsort_aux_cost'_def, simplified])
-    by simp
+    by (rule  introsort_aux1_correct'[where tf=tf, OF assms(1,2), unfolded introsort_aux_cost'_def, simplified])
+
 
       
     definition "partition2_spec xs \<equiv> doN { 
@@ -392,6 +391,13 @@ definition "slice_sort_specT T lt xs\<^sub>0 l h \<equiv> doN {
         else
           RETURN xs 
       }) (xs,l,h,d)"
+
+
+definition "introsort_aux3d th xs l h \<equiv>
+  doN {
+    d \<leftarrow> SPECT [Discrete.log (h-l) * 2 \<mapsto> cost ''depth'' 1];
+    introsort_aux3 th xs l h d
+  }"
 
 
 corollary my_slice_sort_spec_refine_sort':
@@ -507,8 +513,7 @@ lemma
 
 
 lemma introsort_aux3_correct:
-  assumes tf_mono: "\<And>x y. x \<le> y \<Longrightarrow> tf x \<le> tf y"
-    and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"   
+  assumes tf_sums: "\<And>a b. tf a + tf b \<le> tf (a+b)"   
   shows 
     "introsort_aux3 tf xsi l h d \<le> \<Down>Id (timerefine TR_i_aux (timerefine (TId(''slice_part_sorted'':=introsort_aux_cost tf (h-l,d))) (slice_part_sorted_spec xsi l h)))"
   apply(subst timerefine_iter2)
@@ -566,12 +571,11 @@ lemma TR_sps_important:
 
 
 lemma introsort_aux3_correct_flexible:
-  assumes tf_mono: "\<And>x y. x \<le> y \<Longrightarrow> tf x \<le> tf y"
-    and   tf_sums: "\<And>a b c. a + b \<le> c \<Longrightarrow> tf a + tf b \<le> tf c"
+  assumes  tf_sums: "\<And>a b. tf a + tf b \<le> tf (a+b)"
    and  "TR ''slice_part_sorted'' = timerefineA TR_i_aux (introsort_aux_cost tf (h-l,d))"
   shows 
     "introsort_aux3 tf xsi l h d \<le> \<Down>Id (timerefine TR (slice_part_sorted_spec xsi l h))"
-  apply(subst TR_sps_important[symmetric, where TR=TR, OF assms(3)])
+  apply(subst TR_sps_important[symmetric, where TR=TR, OF assms(2)])
   apply(rule introsort_aux3_correct) by fact+
 
       
