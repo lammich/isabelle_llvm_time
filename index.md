@@ -40,7 +40,7 @@ It is based on the [Isabelle/HOL](https://isabelle.in.tum.de) theorem prover.
   To re-check the proofs, run
 
       cd thys 
-      isabelle build -D.
+      isabelle build -D . -d ../contrib/Imperative_HOL_Time/
 
   Here, <code>isabelle</isabelle> must refer to <code>/your/path/to/Isabelle2020/bin/isabelle</code> from your Isabelle installation.
   This will invoke Isabelle to check all proofs and re-generate the exported code.
