@@ -137,5 +137,36 @@ lemma "cost ''a'' 1 + cost ''b'' (1::enat) + cost ''b'' 1 + cost ''a'' 2  + cost
   apply simp
   oops
 
+subsection \<open>Setup for simplifying a cost expression by finding an upper bound\<close>
+
+lemma leq_sc_l_TERMINATE_special:
+  "P \<Longrightarrow> leq_sidecon (cost n x) 0 0 0 0 (cost n x + 0) P"   
+  unfolding leq_sidecon_def by (simp add: cost_zero)
+
+lemma leq_sc_l_DONE_special:
+  "leq_sidecon 0 l 0 0 0 (bs3+0) P \<Longrightarrow> leq_sidecon (cost n x) l 0 0 0 ((cost n x + bs3) + 0) P"   
+  unfolding leq_sidecon_def apply (simp add: cost_zero)
+  apply(rule add_mono) by auto
+
+lemma leq_sc_l_NEXT_ROW_special:
+  "leq_sidecon (cost n x) 0 ls 0 0 bs P \<Longrightarrow> leq_sidecon 0 ((cost n x)+ls) 0 0 0 bs P"
+  unfolding leq_sidecon_def by (simp add: cost_zero) 
+
+method sc_solve_upperbound = ( ( (simp only: add.assoc)?; rule leq_sc_init, (simp only: add.assoc)?),
+        ( ((rule leq_sc_l_SUCC leq_sc_l_FAIL )+)?,
+            ((rule leq_sc_l_DONE_special, rule leq_sc_l_NEXT_ROW_special)
+              | (rule  leq_sc_l_TERMINATE_special))  )+ 
+    )
+
+subsubsection \<open>example\<close>
+
+schematic_goal "cost ''a'' (1::enat) + cost ''b'' 2  + cost ''b'' 2  + cost ''b'' 5 \<le> ?x" 
+  apply sc_solve_upperbound
+  by simp
+
+
+
+
+
 
 end

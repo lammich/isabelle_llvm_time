@@ -2130,7 +2130,6 @@ qed
 definition heapsort_TR
   where "heapsort_TR l h = pp (Rsd_a (h-l)) (TId(''slice_sort'':=heapsort_time l h))"
 
-
 lemma wfR''_Rsd_a[simp]: "wfR'' (Rsd_a x)"
   unfolding Rsd_a_def by auto
  

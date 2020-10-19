@@ -165,6 +165,13 @@ lemma le_acost_ASSERTI:
 lemma consume_RETURNT: "consume (RETURNT x) T = SPECT [x \<mapsto> T]"
   by(auto simp: RETURNT_def consume_def)
 
+
+
+lemma le_acost_ASSERTI_otherdir:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M') \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M')"
+  by(auto simp: pw_acost_le_iff refine_pw_simps)
+
   lemma gwp_specifies_acr_I: 
     fixes m :: "(_,(_,enat) acost) nrest"
     shows "(\<Phi> \<Longrightarrow> gwp m [x \<mapsto> T] \<ge> Some 0) \<Longrightarrow> (m \<le> doN { ASSERT \<Phi>; consume (RETURNT x) T })"
@@ -362,7 +369,16 @@ lemma inres_SPECc2: "inres (SPECc2 n op a b) t \<longleftrightarrow> (op a b = t
 lemma SPECc2_alt: "SPECc2 name aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) (cost name 1)))"
   unfolding SPECc2_def consume_def by(auto simp: RETURNT_def intro!: ext)
 
+lemma SPECc1_alt: "SPECc1 name aop = ( (\<lambda>a. consume (RETURNT (aop a)) (cost name 1)))"
+  unfolding SPECc1_def consume_def by(auto simp: RETURNT_def intro!: ext)
 
+
+lemma gwp_SPECc2:
+  assumes "Some (t + cost c 1) \<le> Q (op a b)"
+  shows "Some t \<le> gwp (SPECc2 c op a b) Q"
+  unfolding SPECc2_def 
+  apply(refine_vcg \<open>-\<close>)
+  using assms by auto
 
 
 lemma SPECc2_refine':
