@@ -371,80 +371,6 @@ lemma heapsort_correct'':
   done 
 
 
-lemma
-  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
-  assumes "x \<le> timerefine R y"
-    "R \<le> R'" "wfR'' R'"
-  shows "x \<le> timerefine R' y"
-  apply(rule order.trans)
-   apply(rule assms)
-  apply(rule timerefine_R_mono_wfR'') 
-   apply fact+ done
-
-lemma
-  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
-  shows "R' \<le> sup R' R"
-  by simp
-
-
-lemma wfR''_supI:
-  fixes R:: "'b \<Rightarrow> ('c, enat) acost"
-  shows "wfR'' R \<Longrightarrow> wfR'' R' \<Longrightarrow> wfR'' (sup R R')"
-  unfolding wfR''_def
-  apply auto
-  subgoal premises prems for f
-    apply(rule finite_subset[where B="{s. the_acost (R s) f \<noteq> 0 \<or> the_acost (R' s) f \<noteq> 0}"])
-    subgoal apply auto  
-      by (simp add: sup_acost_def)    
-    subgoal
-      using prems[rule_format, of f]  
-      using finite_Collect_disjI by fastforce   
-    done
-  done
-
-lemma timerefine_supI:
-  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
-  assumes "x \<le> timerefine R y"
-    "R \<le> R'" "wfR'' R'" "wfR'' R"
-  shows "x \<le> timerefine (sup R' R) y"
-  apply(rule order.trans)
-   apply(rule assms)
-  apply(rule timerefine_R_mono_wfR'') 
-  apply(rule wfR''_supI)
-   apply fact+ apply(rule sup_ge2) done
-
-
-lemma
-  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
-  shows "sup TId R = R"
-  apply(rule ext)
-  apply simp
-  subgoal for x apply(cases "R x") unfolding TId_def sup_acost_def apply simp 
-    apply(rule ext) apply auto
-    oops
-
-
-lemma
-  fixes R :: "_ \<Rightarrow> ('b, enat) acost"
-  shows "sup (R(m:=x)) TId = (sup R TId)(m:=sup x (acostC (\<lambda>y. (if m=y then 1 else 0))))"
-  unfolding TId_def  by auto
-lemma
-  fixes R :: "_ \<Rightarrow> ('b, enat) acost"
-  shows "sup (R(m:=x)) TId = (sup R TId)(m:=sup x (acostC (\<lambda>y. (if m=y then 1 else 0))))"
-  unfolding TId_def  by auto
-
-lemma pullin_left:
-  fixes R :: "_ \<Rightarrow> ('b, enat) acost"
-  shows "sup (R(m:=x)) R' = (sup R R')(m:=sup x (R' m))"
-  apply(rule ext) by auto
-
-
-lemma "sup (TId(''a'':=cost ''n'' (2::enat))) (TId(''a'':=cost ''n'' 3, ''b'':=cost ''b'' 3)) = g"
-  apply(auto simp: pullin_left)
-  oops
-
-
-
 thm partition_pivot_correct_flexible 
 lemma partition_pivot_correct':
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id\<rbrakk> 
@@ -454,8 +380,6 @@ lemma partition_pivot_correct':
   apply (auto )
   done
 
-
-thm slice_sort_specT_def slice_sort_spec_def
 
   lemma introsort_aux4_refine: "introsort_aux4 xs l h d \<le> \<Down>Id (timerefine (Tia43) ((introsort_aux3 (\<lambda>n. n * Discrete.log n) xs l h d)))"
     unfolding introsort_aux4_def introsort_aux3_def 
@@ -480,6 +404,9 @@ lemma nlogn_sums:
   subgoal using log_mono[THEN monoD] by simp
   apply(subst add_mult_distrib[symmetric])
   by simp
+lemma nlogn_superlinear: 
+  "a * Discrete.log a + b * Discrete.log b \<le> (a+b) * Discrete.log (a+b)"
+  apply(rule nlogn_sums) by simp
  
 thm introsort_aux3_correct 
 
@@ -511,7 +438,6 @@ lemma introsort_aux4_correct: "introsort_aux4 xs l h d \<le> \<Down> Id (timeref
    apply simp apply(rule timerefine_mono2)
   apply simp
    apply(rule introsort_aux3_correct)
-  subgoal apply(intro nlogn_mono) by simp
   subgoal apply(intro nlogn_sums) by simp
   apply (simp add: timerefine_iter2)
   apply(subst timerefine_iter2)
@@ -735,11 +661,6 @@ thm partition_pivot2_refines heapsort3_refine
 lemma TR_sup_Tid: "sup TId TId = TId"
   by simp
 
-
-lemma pullin_right:
-  fixes R :: "_ \<Rightarrow> ('b, enat) acost"
-  shows "sup R' (R(m:=x)) = (sup R' R)(m:=sup (R' m) x)"
-  apply(rule ext) by auto
 
 
   definition introsort_aux5 :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list, ecost) nrest"
@@ -1058,61 +979,6 @@ lemma "(\<lambda>x. real (introsort_cost3_all x)) \<in> \<Theta>(\<lambda>n. (re
   by auto2
 
 
-locale sort_impl_context' =  weak_ordering +
-  fixes
-        lt_impl :: "'ai::llvm_rep \<Rightarrow> 'ai \<Rightarrow> 1 word llM"
-    and lt_curr_name :: string
-    and elem_assn :: "'a \<Rightarrow> 'ai \<Rightarrow> assn"
-  assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn lt_curr_name (\<^bold><))"
-  assumes lt_curr_name_no_clash: "lt_curr_name \<noteq> ''eo_extract''" "lt_curr_name \<noteq> ''eo_set''" 
-
-
-context sort_impl_context
-begin
-  sublocale sort_impl_context'
-    apply standard using lt_impl lt_curr_name_no_clash by auto
-end
-
-
-lemma
-  fixes size_t :: "'size_t::len2 itself"
-  fixes less_eq less
-  shows
- "sort_impl_context' less_eq less lt_impl lt_curr_name elem_assn
-  \<Longrightarrow> size_t_context TYPE('size_t) \<Longrightarrow> 
-sort_impl_context TYPE('size_t) less_eq less lt_impl lt_curr_name elem_assn"
-  apply standard
-  unfolding weak_ordering_def  size_t_context_def sort_impl_context'_def sort_impl_context'_axioms_def 
-  by auto 
-
-thm sort_impl_context.final_hoare_triple[no_vars]
-
-definition "is_flattend_in_Theta f g =
-      (    (\<forall>n. finite {s. the_acost (f n) s \<noteq> 0} )
-         \<and> (\<forall>n. \<forall>c. the_acost (f n) c < \<infinity>)
-         \<and> (\<forall>n. (\<lambda>x. real (the_enat (Sum_any (the_acost (f n))))) \<in> \<Theta>(g) )
-        )"
-
-lemma 
-  fixes size_t :: "'size_t::len2 itself"
-  fixes less_eq less
-  assumes "sort_impl_context' less_eq less lt_impl lt_curr_name elem_assn"
-  shows "\<exists>f.
-       is_flattend_in_Theta f (\<lambda>n. (real n)*(ln (real n))) \<and>
-      size_t_context TYPE('size_t) \<longrightarrow>
-     llvm_htriple ($(f (b - ba)) \<and>* hn_ctxt (array_assn elem_assn) a ai \<and>* hn_val snat_rel ba bia \<and>* hn_val snat_rel b bi) (sort_impl_context.introsort_impl lt_impl ai bia bi)
-     (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(length x = length a \<and> take ba x = take ba a \<and> drop b x = drop b a \<and> sort_spec less (slice ba b a) (slice ba b x)) \<and>* hr_comp (array_assn elem_assn) Id x r) s) \<and>*
-          hn_invalid (array_assn elem_assn) a ai \<and>* hn_val snat_rel ba bia \<and>* hn_val snat_rel b bi)"
-  
-
-
-thm Sum_any.distrib
-
-
-
-
-end
-
 
 (*
 context parameterized_weak_ordering begin
@@ -1219,4 +1085,4 @@ end
 
 
 
-
+end
