@@ -3,6 +3,64 @@ imports NREST NREST_Type_Classes NREST_Backwards_Reasoning Time_Refinement Data_
 begin
 
 
+
+  
+  (* TODO: Move, better name *)                     
+  lemma timerefine_R_cf_mono:
+    fixes R :: "_ \<Rightarrow> (_, enat) acost"
+    assumes "wfR'' R'"
+    shows "R\<le>R' \<Longrightarrow> \<Down> S (timerefine R c) \<le> \<Down> S (timerefine R' c)"
+    by (simp add: assms nrest_Rel_mono timerefine_R_mono_wfR'')
+
+lemma timerefine_mono_both: 
+  fixes R :: "_ \<Rightarrow> ('c, 'd::{complete_lattice,nonneg,mult_zero,ordered_semiring}) acost"
+  assumes "wfR'' R'"
+    and "R\<le>R'"
+  shows "c\<le>c' \<Longrightarrow> timerefine R c \<le> timerefine R' c'"
+  apply(cases c) apply simp
+  apply(cases c') apply (auto simp: less_eq_acost_def timerefine_def split: nrest.splits option.splits simp: le_fun_def)
+  subgoal  by (metis le_some_optE) 
+  proof (goal_cases)
+    case (1 x2 x2a x x2b x2c xa)
+    then have l: "\<And>ac. the_acost x2b ac \<le>  the_acost x2c ac"
+      apply(cases x2b; cases x2c) unfolding less_eq_acost_def  
+      apply auto
+      by (metis acost.sel less_eq_acost_def less_eq_option_Some)
+    show ?case
+      apply(rule Sum_any_mono)
+      subgoal using l apply(rule ordered_semiring_class.mult_mono)
+        subgoal using assms(2) unfolding le_fun_def
+          by (simp add: the_acost_mono)
+        subgoal by (simp add: needname_nonneg)
+        subgoal
+          by (simp add: needname_nonneg)
+        done
+      apply(rule wfR_finite_mult_left2) by fact
+  qed 
+
+
+lemma fun_upd_parallel_I: "f\<le>f' \<Longrightarrow> y\<le>y' \<Longrightarrow> f(x:=y) \<le> f'(x:=y')"
+  unfolding fun_upd_def le_fun_def  
+  by auto
+
+(* TODO: Move *)
+lemma timerefine_mono3: 
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "wfR'' R"
+  shows "c\<le>c' \<Longrightarrow> R=R' \<Longrightarrow> timerefine R c \<le> timerefine R' c'"
+  apply simp
+  apply(rule timerefine_mono2)
+  using assms by auto
+
+
+
+(* TODO: move*)
+lemma nrest_le_formatI:
+  fixes a :: "(_,(_,enat)acost) nrest"
+  shows  "a \<le> \<Down>Id (timerefine TId b) \<Longrightarrow> a \<le> b"
+  by (auto simp add: timerefine_id)
+
+
 (* TODO: Move *)
 lemma top_acost_absorbs: "top + (x::(_,enat)acost) = top"
   apply(cases x) by (auto simp: top_acost_def plus_acost_alt top_enat_def)

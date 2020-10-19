@@ -4,15 +4,6 @@ imports Sorting_Quicksort_Scheme Sorting_Unguarded_Insertion_Sort
 begin
 
 
-
-(* TODO: move*)
-lemma nrest_le_formatI:
-  fixes a :: "(_,(_,enat)acost) nrest"
-  shows  "a \<le> \<Down>Id (timerefine TId b) \<Longrightarrow> a \<le> b"
-  by (auto simp add: timerefine_id)
-
-
-
 context weak_ordering begin
 
 subsection \<open>final_insertion_sort\<close>
@@ -350,7 +341,7 @@ subsubsection \<open>reasoning about stopper elements\<close>
         + unguarded_insort_cost lxs
       "
 
-  subsubsection \<open>Correctness Theorem\<close>
+subsubsection \<open>Correctness Theorem\<close>
 
   lemma final_insertion_sort_correct: 
     "\<lbrakk>part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs; 1 < length xs; lxs=length xs\<rbrakk> 
