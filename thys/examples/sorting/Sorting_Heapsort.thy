@@ -2808,7 +2808,7 @@ definition "heapsort3_allcost n = 12 + 187 * n  + 82 * (n * Discrete.log n)"
 
 
 lemma heapsort3_allcost_simplified:
-  "heapsort3_allcost' n = 12 + 187 * n  + 82 * n * Discrete.log n"
+  "heapsort3_allcost n = 12 + 187 * n  + 82 * n * Discrete.log n"
   unfolding heapsort3_allcost_def
   by simp
 
