@@ -165,6 +165,13 @@ schematic_goal "cost ''a'' (1::enat) + cost ''b'' 2  + cost ''b'' 2  + cost ''b'
   by simp
 
 
+subsection \<open>Lemma Collections for Normalizing Resource Functions and Exchange Rates\<close>
+
+lemmas norm_cost = costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost
+              the_acost_propagate timerefineA_cost lift_acost_zero timerefineA_propagate TId_apply
+              timerefineA_cost_apply_costmult
+
+lemmas norm_pp = pp_TId_absorbs_right pp_TId_absorbs_left pp_fun_upd
 
 
 

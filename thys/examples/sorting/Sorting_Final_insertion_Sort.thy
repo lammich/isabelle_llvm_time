@@ -1,8 +1,22 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
 section \<open>Final Insertion Sort\<close>
 theory Sorting_Final_insertion_Sort
 imports Sorting_Quicksort_Scheme Sorting_Unguarded_Insertion_Sort
 begin
 
+paragraph \<open>Summary\<close>
+text \<open>This theory implements an algorithm final insertion sort, that
+  assumes a list that is almost-sorted @{term part_sorted_wrt} and returns
+  a sorted list in linear time.\<close>
+
+paragraph \<open>Main Theorems/Definitions\<close>
+text \<open>
+\<^item> final_insertion_sort: the abstract algorithm that models final insertion sort
+\<^item> final_insertion_sort_correct: final insertion sort, sorts an almost-sorted list
+      in time fi_cost, which is linear in the length of the list
+\<^item> final_insertion_sort_impl: the synthesized algorithm
+\<close>
 
 context weak_ordering begin
 

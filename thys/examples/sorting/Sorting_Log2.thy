@@ -1,12 +1,21 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
+section \<open>Algorithms to calculate the logarithm of base 2\<close>
 theory Sorting_Log2
 imports Sorting_Setup
 begin
 
 
+paragraph \<open>Summary\<close>
+text \<open>This theory two algorithms for calculating the logarithm for base 2.
+    The first algorithm repeatedly divides by 2 until 0 is reached. This algorithm
+    is linear in the log n.
+    The second algorithm calculates the number of leading zeros. That algorithm thus has running
+    time depending on the word size.
+    We use the first algorithm for our further developments\<close>
 
-section \<open>Log2 by iterated division by 2\<close>
 
-thm Discrete.log.simps
+subsection \<open>Log2 by iterated division by 2\<close>
 
 definition log2_iter :: "nat \<Rightarrow> (nat,_) nrest"
   where "log2_iter n\<^sub>0 \<equiv> RECT' (\<lambda>log_iter n. do {
@@ -142,10 +151,10 @@ begin
     by sepref
 end
 
-section \<open>Count Leading Zeroes and Log2\<close>
+subsection \<open>Count Leading Zeroes and Log2\<close>
 (* TODO: Define semantics of llvm.ctlz intrinsic! *)
 
-subsection \<open>Explicit Implementation by Loop\<close>
+subsubsection \<open>Explicit Implementation by Loop\<close>
 
 definition word_clz' :: "'a::len word \<Rightarrow> nat" where
   "word_clz' x \<equiv> if x=0 then 0 else word_clz x"
@@ -346,7 +355,7 @@ sepref_def word_log2_impl is
 
 export_llvm "word_log2_impl :: 64 word \<Rightarrow> _"
 *)
-subsection \<open>Connection with \<^const>\<open>Discrete.log\<close>\<close>
+subsubsection \<open>Connection with \<^const>\<open>Discrete.log\<close>\<close>
 
 lemma discrete_log_ltI: (* TODO: Check how precise this bound is! *)
   assumes "n\<noteq>0" "N\<noteq>0" "n<2^N"
@@ -461,38 +470,5 @@ lemma word_log2_refine_snat: "(word_log2, Discrete.log) \<in> snat_rel' TYPE('a:
   by (fastforce simp: snat_rel_def snat.rel_def in_br_conv snat_eq_unat)
 
 
-term size_t
-(*
-
-definition "mop_log n = SPECT [Discrete.log n \<mapsto> cost ''log'' 1]"
-
-                                     
-abbreviation "word_log22_cost' tt \<equiv> (enat (1+len_of tt)) *m word_clz2_body_cost + cost ''sub'' 2"
-
-lemma "word_log22_cost' (TYPE('a::len2)) = word_log22_cost (size (w::'a::len2 word))"
-  by (simp add: word_size)
-
-definition "TR_log ws = TId(''log'':= word_log22_cost ws)"
-
-definition "mop_log_alt ws n = SPECT [Discrete.log n \<mapsto> word_log22_cost ws]"
-
-
-lemma "mop_log_alt ws n \<le> \<Down>Id (timerefine (TR_log ws) (mop_log n))"
-  unfolding mop_log_def mop_log_alt_def TR_log_def
-  apply simp
-
-
-lemma word_log22_correct':
-  assumes "w>0" "LENGTH('a::len2)>2"
-  shows "word_log22 w \<le> SPECT [Discrete.log (unat w) \<mapsto> word_log22_cost w]"
-  apply(rule order_trans[OF word_log22_correct[OF assms]])
-  by (auto simp: le_fun_def word_log2_is_discrete_log)
-
-sepref_register word_log22
-
- (* TODO *)
-lemmas discrete_log_unat_hnr[sepref_fr_rules] = word_log2_impl.refine[FCOMP word_log2_refine_unat]
-lemmas discrete_log_snat_hnr[sepref_fr_rules] = word_log2_impl.refine[FCOMP word_log2_refine_snat]
-*)
 
 end

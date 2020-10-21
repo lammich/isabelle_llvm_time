@@ -1,12 +1,25 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
 section \<open>Unguarded Insertion Sort\<close>
 theory Sorting_Unguarded_Insertion_Sort
 imports Sorting_Setup Sorting_Partially_Sorted
 begin
 
+paragraph \<open>Summary\<close>
+text \<open>This theory implements insertion sort by repeated calls of the insert operation.
+  There are two versions: guarded and unguarded. The unguarded version of insert
+  and insertion sort assumes that any element has a stopper element at most N steps to the left.\<close>
 
-    (* TODO: Move. DUP! *)
-    lemma if_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
-      by auto        
+paragraph \<open>Main Theorems/Definitions\<close>
+text \<open>
+\<^item> has_stopper N: element i has a stopper element at most N steps to the left of the element.
+\<^item> is_insert_(un)guarded: the abstract insertion algorithm
+\<^item> is_insert_(un)guarded3_sorts_one_more: the third refinement of the insertion algorithm
+    sorts one more element, that's the specification needed when proving insertion sort correct
+\<^item> insertion_sort_(un)guarded: the abstract insertionsort algorithms
+\<^item> insertion_sort_(un)guarded_correct: correctness theorem
+\<^item> (un)guarded_insertion_sort_impl: the synthesized LLVM programs
+\<close>
 
 
 subsection \<open>Auxiliary lemmas for option arrays\<close>
@@ -44,15 +57,12 @@ context weak_ordering begin
     \<Longrightarrow> mop_cmpo_v_idx T xs v i \<le> \<Down> bool_rel (timerefine TId (mop_cmpo_v_idx T xs' v' i'))"
     supply [simp del] = conc_Id
     by (auto intro!: refine0 simp: idx_shift_rel_def slice_rel_def in_br_conv slice_nth algebra_simps)
-end  
+
 
 
 
 subsection \<open>is_insert_unguarded\<close>
-
-  context weak_ordering begin
-
-  
+   
     definition "is_insert_spec_aux xs i xs' \<equiv> 
       \<exists>i'\<le>i.
         i<length xs
@@ -172,7 +182,7 @@ lemma is_insert_unguarded_correct: "is_insert_unguarded N xs i
     unfolding SPECc2_def
     unfolding has_stopper_def
     apply(rule gwp_specifies_I)
-    apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
+    apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET If_le_rule)
     subgoal
       apply(auto simp:  wfR2_def the_acost_zero_app) 
       unfolding cost_is_insert_step_def
@@ -512,7 +522,7 @@ subsubsection \<open>Correctness Lemma\<close>
       unfolding SPEC_def
       unfolding SPECc2_def
       apply(rule gwp_specifies_I)
-      apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
+      apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET If_le_rule)
       subgoal
         apply(auto simp:  wfR2_def the_acost_zero_app) 
         unfolding cost_is_insert_guarded_step_def
@@ -1132,7 +1142,7 @@ subsection \<open>insertion_sort_unguarded\<close>
     
     unfolding SPEC_REST_emb'_conv SPECc2_def
     apply(rule gwp_specifies_I)
-    apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
+    apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET If_le_rule)
       subgoal
         apply(auto simp:  wfR2_def the_acost_zero_app) 
         unfolding cost_is_insert_step_def
@@ -1215,7 +1225,7 @@ subsection \<open>insertion_sort_unguarded2\<close>
 
 subsubsection \<open>Refinement Lemma\<close>
 
-  lemma is_insert3_sorts_one_more: 
+  lemma is_insert_unguarded3_sorts_one_more: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "i'<j'"
     shows "is_insert_unguarded2 N xs i
      \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_unguarded N xs' i' j'))"
@@ -1252,7 +1262,7 @@ lemma sp_TR_is_insert3[simp]:"struct_preserving (TR_is_insert3 N)"
       \<Longrightarrow> insertion_sort_unguarded2 N ii ji xsi 
         \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_is_insert3 N) (insertion_sort_unguarded N i j xs))"
     unfolding insertion_sort_unguarded2_def insertion_sort_unguarded_def monadic_WHILEIET_def
-    apply (refine_rcg is_insert3_sorts_one_more monadic_WHILEIT_refine'
+    apply (refine_rcg is_insert_unguarded3_sorts_one_more monadic_WHILEIT_refine'
                     bindT_refine_conc_time_my_inres SPECc2_refine')
     supply [refine_dref_RELATES] = RELATESI[of "slice_rel xsi l h \<times>\<^sub>r idx_shift_rel l"] 
                                     RELATESI[of "idx_shift_rel l"] 
@@ -1406,7 +1416,7 @@ subsection \<open>insertion_sort_guarded\<close>
     
     unfolding SPEC_REST_emb'_conv SPECc2_def
     apply(rule gwp_specifies_I)
-    apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET if_rule)
+    apply (refine_vcg \<open>simp\<close> rules: gwp_monadic_WHILEIET If_le_rule)
       subgoal
         apply(auto simp:  wfR2_def the_acost_zero_app) 
         unfolding cost_is_insert_step_def
@@ -1516,7 +1526,7 @@ lemma cost_insert_mono: "a \<le> b \<Longrightarrow> cost_insert a \<le> cost_in
 
 subsubsection \<open>Refinement Lemma\<close>
 
-  lemma is_insert3_guarded_sorts_one_more: 
+  lemma is_insert_guarded3_sorts_one_more: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "N\<ge>i-l"
     shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_guarded xs' i'))"
     using assms apply -
@@ -1552,7 +1562,7 @@ subsubsection \<open>Refinement Lemma\<close>
     "\<lbrakk> (xsi,xs) \<in> slicep_rel l h; (ii,i)\<in>idx_shift_rel l; (ji,j)\<in>idx_shift_rel l; j\<le>N \<rbrakk> 
       \<Longrightarrow> insertion_sort_guarded2 l ii ji xsi \<le>\<Down>(slice_rel xsi l h) (timerefine (TR_is_insert3 N) (insertion_sort_guarded i j xs))"
     unfolding insertion_sort_guarded2_def insertion_sort_guarded_def monadic_WHILEIET_def
-    apply (refine_rcg is_insert3_guarded_sorts_one_more monadic_WHILEIT_refine' bindT_refine_conc_time_my_inres SPECc2_refine')
+    apply (refine_rcg is_insert_guarded3_sorts_one_more monadic_WHILEIT_refine' bindT_refine_conc_time_my_inres SPECc2_refine')
     supply [refine_dref_RELATES] = 
       RELATESI[of "slice_rel xsi l h \<times>\<^sub>r idx_shift_rel l"] RELATESI[of "idx_shift_rel l"]
     apply refine_dref_type

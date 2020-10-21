@@ -27,8 +27,10 @@ thys/examples/sorting/Sorting_Quicksort_Partition.thy
 thys/examples/sorting/Sorting_Quicksort_Scheme.thy
 thys/examples/sorting/Sorting_Setup.thy
 thys/examples/sorting/Sorting_Unguarded_Insertion_Sort.thy
+thys/examples/sorting/Sorting_Results.thy
 thys/lib/Basic_Imports.thy
 thys/lib/Basic_VCG.thy
+thys/lib/More_Asymptotics.thy
 thys/lib/Bits_Natural.thy
 thys/lib/Defer_Slot.thy
 thys/lib/Definition_Utils.thy

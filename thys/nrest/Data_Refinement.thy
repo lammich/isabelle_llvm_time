@@ -111,6 +111,7 @@ lemma nrest_Rel_mono:
   by (smt complete_lattice_class.Sup_mono mem_Collect_eq)   
 
 
+declare nrest_Rel_mono[trans]
 
 
 lemma pw_conc_nofail[refine_pw_simps]: 

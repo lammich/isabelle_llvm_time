@@ -1,26 +1,45 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
+section \<open>Introsort and its first Phase\<close>
 theory Sorting_Quicksort_Scheme
 imports Sorting_Setup Sorting_Partially_Sorted
 begin
 
+
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces the abstract quicksort-like first phase of the introsort algorithm.
+  Also the abstract algorithm for introsort is introduced and proved correct.
+    \<close>
   
+paragraph \<open>Main Theorems/Definitions\<close>
+text \<open>
+\<^item> introsort_aux1: gives the abstract algorithm for the first phase
+\<^item> introsort_aux_cost: specifies the cost of that algorithm
+\<^item> introsort_aux1_correct': proves correctness
+\<^item> introsort3: abstract introsort algorithm
+\<^item> introsort3_correct: proves its correctness 
+\<close>
 
-
+subsection \<open>introsort_aux1\<close>
 
 
   abbreviation "is_threshold \<equiv> 16::nat"
 
   context weak_ordering begin
 
-    definition "partition1_spec xs \<equiv> doN { 
-      ASSERT (length xs \<ge> 4); 
-      SPEC (\<lambda>(xs1,xs2). mset xs = mset xs1 + mset xs2 \<and> xs1\<noteq>[] \<and> xs2\<noteq>[] \<and> slice_LT (\<^bold>\<le>) xs1 xs2) (\<lambda>_. cost ''partition'' (enat (length xs)))
-    }"
-definition introsort_aux1 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "introsort_aux1 \<mu> xs d \<equiv> RECT' (\<lambda>introsort_aux1 (xs,d). doN {
+  definition "partition1_spec xs \<equiv> doN { 
+    ASSERT (length xs \<ge> 4); 
+    SPEC (\<lambda>(xs1,xs2). mset xs = mset xs1 + mset xs2 \<and> xs1\<noteq>[] \<and> xs2\<noteq>[] \<and> slice_LT (\<^bold>\<le>) xs1 xs2)
+         (\<lambda>_. cost ''partition_c'' (enat (length xs)))
+  }"
+
+  definition introsort_aux1 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where
+    "introsort_aux1 \<mu> xs d \<equiv> RECT' (\<lambda>introsort_aux1 (xs,d). doN {
       ASSERT (xs \<noteq> []);
       lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''list_length'' 1];
       if\<^sub>N SPECc2 ''lt'' (<) is_threshold (length xs) then doN {
         if\<^sub>N SPECc2 ''eq'' (=) d 0 then
-          mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (\<mu> (length xs)))))
+          mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''sort_c'' (enat (\<mu> (length xs)))))
         else doN {
           (xs1,xs2)\<leftarrow>partition1_spec xs;
           d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
@@ -44,73 +63,13 @@ definition introsort_aux_cost :: "_ \<Rightarrow> nat * nat \<Rightarrow> (char 
   where "introsort_aux_cost \<mu> = (\<lambda>(lxs, d). lift_acost (
         ((d+1)*lxs) *m (cost ''if'' 2 + cost ''eq'' 1 + cost ''lt'' 1 + cost ''call'' 1
                     + cost ''list_length'' 1 + cost ''sub'' 1 + cost ''list_append'' 1) 
-            + cost ''slice_sort_p'' (\<mu> (lxs)) + cost ''partition'' (d*(lxs))
+            + cost ''sort_c'' (\<mu> (lxs)) + cost ''partition_c'' (d*(lxs))
          )
         )"
  
 
-lemma haha: "b>0 \<Longrightarrow> Suc (Suc (4 * 2 ^ (b - Suc 0) - Suc (Suc 0))) \<le> 2 * 2 ^ b"
-proof -
-  assume "b>0"
-  then obtain b' where b: "b=b'+1"  
-    by (metis Groups.add_ac(2) Suc_eq_plus1_left Suc_pred)  
-  have ge2: "4 * (2::nat) ^ (b') \<ge> 2" by auto
-  have "Suc (Suc (4 * 2 ^ (b - Suc 0) - Suc (Suc 0)))
-      = Suc (Suc (4 * 2 ^ (b') - Suc (Suc 0)))" using b by simp
-  also have "\<dots> =  2 + (4*2^b' - 2)" by presburger
-  also have "\<dots> = 4*2^b'" using ge2 by auto
-  also have "\<dots> = 2*2^(b'+1)" by simp
-  also have "\<dots> = 2*2^(b)" using b by simp
-  finally
-    show ?thesis by simp
-  qed
 
-lemma ha: "b>0 \<Longrightarrow> Suc (Suc (8 * 2 ^ (b - Suc 0) - Suc (Suc 0))) \<le> 4 * 2 ^ b"
-proof -
-  assume "b>0"
-  then obtain b' where b: "b=b'+1"  
-    by (metis Groups.add_ac(2) Suc_eq_plus1_left Suc_pred)  
-  have ge2: "4 * (2::nat) ^ (b') \<ge> 2" by auto
-  have "Suc (Suc (4 * 2 ^ (b - Suc 0) - Suc (Suc 0)))
-      = Suc (Suc (4 * 2 ^ (b') - Suc (Suc 0)))" using b by simp
-  also have "\<dots> =  2 + (4*2^b' - 2)" by presburger
-  also have "\<dots> = 4*2^b'" using ge2 by auto
-  also have "\<dots> = 2*2^(b'+1)" by simp
-  also have "\<dots> = 2*2^(b)" using b by simp
-  finally
-    show ?thesis by simp
-  qed
- 
-
-lemma argh: "b>0 \<Longrightarrow> 4 * 2 ^ (b - Suc 0) - Suc 0 \<le> 2 * 2 ^ b - Suc 0"
-proof -
-  assume "b>0"
-  then obtain b' where b: "b=b'+1"  
-    by (metis Groups.add_ac(2) Suc_eq_plus1_left Suc_pred)  
-  then have "4 * 2 ^ (b - Suc 0) - Suc 0 = 4 * 2 ^ ((b'+1) - Suc 0) - Suc 0 "
-    by auto
-  also have "\<dots> = 2 * (2*2^b') - Suc 0" apply simp done
-  also have "\<dots> = 2 * (2^(b'+1)) - Suc 0" apply simp done
-  also have "\<dots> = 2 * 2 ^ b - Suc 0" using b apply simp done
-  finally show ?thesis by simp
-qed
-
-lemma argh2: "b>0 \<Longrightarrow> Suc (4 * 2 ^ (b - Suc 0) - Suc (Suc 0)) \<le> 2 * 2 ^ b - Suc 0"
-proof -
-  assume "b>0"
-  then obtain b' where b: "b=b'+1"  
-    by (metis Groups.add_ac(2) Suc_eq_plus1_left Suc_pred)  
-  then have "Suc (4 * 2 ^ (b - Suc 0) - Suc (Suc 0)) = Suc (4 * 2 ^ ((b'+1) - Suc 0) - Suc (Suc 0) )"
-    by auto
-  also have "\<dots> = Suc (2 * (2*2^b') - Suc (Suc 0))" apply simp done
-  also have "\<dots> = (2 * (2*2^b') - Suc 0)" apply(subst Suc_diff_Suc) apply auto
-    by (simp add: Suc_lessI)
-  also have "\<dots> = 2 * (2^(b'+1)) - Suc 0" apply simp done
-  also have "\<dots> = 2 * 2 ^ b - Suc 0" using b apply simp done
-  finally show ?thesis by simp
-qed
-
-lemma z: "b>0 \<Longrightarrow> (b - Suc 0) * A + (b - Suc 0) * B + (B + A) = b*(A+B)"
+lemma introsort_aux1_aux5: "b>0 \<Longrightarrow> (b - Suc 0) * A + (b - Suc 0) * B + (B + A) = b*(A+B)"
 proof -
   assume "b>0"
   then obtain b' where b: "b=b'+1"  
@@ -125,26 +84,17 @@ qed
 lemma lengths_sums_if_msets_do: "mset a = mset b + mset c \<Longrightarrow> length a = length b + length c"
     by (metis add.commute length_append less_or_eq_imp_le mset_append mset_eq_length)  
 
-lemma zz: "Suc 0 \<le> 4 * 2 ^ b - Suc (Suc 0)"
-proof -
-  show ?thesis 
-    apply(rule add_le_imp_le_diff)  apply simp
-    apply(rule order.trans[where b="4 * 2 ^ 0"])
-     apply simp
-    apply  simp
-    done      
-qed
-
-
 lemma 
   introsort_aux1_aux:
   "b>0 \<Longrightarrow> lxs+lys>(16::nat) \<Longrightarrow> Suc ((b - Suc 0) * lxs + (b - Suc 0) * lys) \<le> b * (lxs + lys)"
-  by (smt One_nat_def Suc_leI add.commute add_le_cancel_left less_imp_le_nat local.z neq0_conv not_numeral_le_zero plus_1_eq_Suc)
+  by (smt One_nat_def Suc_leI add.commute add_le_cancel_left less_imp_le_nat
+          introsort_aux1_aux5 neq0_conv not_numeral_le_zero plus_1_eq_Suc)
   
 lemma 
   introsort_aux1_aux2:
   "b>0 \<Longrightarrow> lxs+lys>(16::nat) \<Longrightarrow> Suc ((b - Suc 0) * lys + (b - Suc 0) * lxs) \<le> b * (lxs + lys)"
-  by (smt One_nat_def Suc_leI add.commute add_le_cancel_left less_imp_le_nat local.z neq0_conv not_numeral_le_zero plus_1_eq_Suc)
+  by (smt One_nat_def Suc_leI add.commute add_le_cancel_left less_imp_le_nat
+          introsort_aux1_aux5 neq0_conv not_numeral_le_zero plus_1_eq_Suc)
   
 lemma 
   introsort_aux1_aux4:
@@ -164,6 +114,7 @@ proof -
   finally show ?thesis .
 qed
 
+subsubsection \<open>Correctness Theorem\<close>
 
 definition "introsort_aux_cost' \<mu>  = (\<lambda>(xs,d). introsort_aux_cost \<mu> (length xs,d) )"
 
@@ -171,33 +122,36 @@ definition "introsort_aux_cost' \<mu>  = (\<lambda>(xs,d). introsort_aux_cost \<
     assumes tf_suplinear: "\<And>a b. \<mu> a + \<mu> b \<le> \<mu> (a+b)"
       and "xs \<noteq> []"
     shows 
-   "introsort_aux1 \<mu> xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost' \<mu> (xs, d))"
-    
-      unfolding introsort_aux1_def partition1_spec_def sort_spec_def
- 
+   "introsort_aux1 \<mu> xs d
+     \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs')
+               (\<lambda>_. introsort_aux_cost' \<mu> (xs, d))"
 
-      apply (rule RECT'_rule_arb[where V="measure (\<lambda>(xs,d). d+1)" and pre="\<lambda>xss (xs',d). length xs' > 0 \<and> xss=xs'"])
-      apply refine_mono
-        apply (all \<open>(auto intro: sorted_wrt_imp_part_sorted part_sorted_wrt_init; fail)?\<close>)
-      subgoal using  assms by simp
+    unfolding introsort_aux1_def partition1_spec_def sort_spec_def
 
-      unfolding SPEC_REST_emb'_conv SPECc2_alt
-      subgoal premises prems for f xss x
+
+    apply (rule RECT'_rule_arb[where V="measure (\<lambda>(xs,d). d+1)" 
+                                  and pre="\<lambda>xss (xs',d). length xs' > 0 \<and> xss=xs'"])
+       apply refine_mono
+      apply (all \<open>(auto intro: sorted_wrt_imp_part_sorted part_sorted_wrt_init; fail)?\<close>)
+    subgoal using  assms by simp
+
+    unfolding SPEC_REST_emb'_conv SPECc2_alt
+    subgoal premises prems for f xss x
       apply(rule gwp_specifies_I) 
-        apply(refine_vcg \<open>-\<close> rules: prems(1)[THEN gwp_specifies_rev_I, THEN gwp_conseq_0])
-        thm prems(1)[THEN gwp_specifies_rev_I, THEN gwp_conseq_0]
-        using  prems(2)
+      apply(refine_vcg \<open>-\<close> rules: prems(1)[THEN gwp_specifies_rev_I, THEN gwp_conseq_0])
+      thm prems(1)[THEN gwp_specifies_rev_I, THEN gwp_conseq_0]
+      using  prems(2)
       subgoal unfolding emb'_def apply auto
         subgoal  by (simp add: sorted_wrt_imp_part_sorted)
         subgoal unfolding introsort_aux_cost_def introsort_aux_cost'_def
-            apply (simp add: norm_cost lift_acost_propagate lift_acost_cost)
+          apply (simp add: norm_cost lift_acost_propagate lift_acost_cost)
           apply sc_solve by (auto simp: one_enat_def)
         done
-            apply simp apply simp
-          apply simp apply simp
+             apply simp apply simp
+           apply simp apply simp
       subgoal
         apply (auto simp add: emb'_def handy_if_lemma)
-        
+
         subgoal  using prems(2) by simp  
         subgoal 
           apply (rule part_sorted_concatI; assumption?) 
@@ -218,14 +172,14 @@ definition "introsort_aux_cost' \<mu>  = (\<lambda>(xs,d). introsort_aux_cost \<
           subgoal (* partition *)
             unfolding sc_solve_debug_def
             apply(drule lengths_sums_if_msets_do)
-            apply auto apply(simp only: z) apply simp done
+            apply auto apply(simp only: introsort_aux1_aux5) apply simp done
           subgoal (* sub *)
             unfolding sc_solve_debug_def
             apply(drule lengths_sums_if_msets_do)
             using p(2)
             apply (simp add: one_enat_def  )
             apply(rule introsort_aux1_aux) by auto
-          subgoal (* ''slice_sort_p'' *) unfolding sc_solve_debug_def
+          subgoal (* ''sort_c'' *) unfolding sc_solve_debug_def
             apply (simp add: one_enat_def)
             apply(drule lengths_sums_if_msets_do) apply simp apply(subst add.commute)
             by(rule tf_suplinear) 
@@ -283,18 +237,27 @@ definition "introsort_aux_cost' \<mu>  = (\<lambda>(xs,d). introsort_aux_cost \<
     assumes tf_suplinear: "\<And>a b. \<mu> a + \<mu> b \<le> \<mu> (a+b)"
       and "xs \<noteq> []" "lxs = length xs"
     shows 
-   "introsort_aux1 \<mu> xs d \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs') (\<lambda>_. introsort_aux_cost \<mu> (lxs, d))"
+      "introsort_aux1 \<mu> xs d
+         \<le> SPEC (\<lambda>xs'. mset xs' = mset xs \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold xs')
+                 (\<lambda>_. introsort_aux_cost \<mu> (lxs, d))"
     unfolding assms(3)
     by (rule  introsort_aux1_correct'[where \<mu>=\<mu>, OF assms(1,2), unfolded introsort_aux_cost'_def, simplified])
 
 
+subsection \<open>introsort_aux2\<close>
       
     definition "partition2_spec xs \<equiv> doN { 
       ASSERT (length xs \<ge> 4); 
-      SPEC (\<lambda>(xs',i). mset xs' = mset xs \<and> 0<i \<and> i<length xs \<and> slice_LT (\<^bold>\<le>) (take i xs') (drop i xs')) (\<lambda>_. cost ''partition'' (enat (length xs)))
+      SPEC (\<lambda>(xs',i). mset xs' = mset xs \<and> 0<i \<and> i<length xs \<and> slice_LT (\<^bold>\<le>) (take i xs') (drop i xs'))
+             (\<lambda>_. cost ''partition_c'' (enat (length xs)))
     }"
-      
-    lemma partition2_spec_refine: "(xs,xs')\<in>Id \<Longrightarrow> partition2_spec xs \<le>\<Down>(br (\<lambda>(xs,i). (take i xs, drop i xs)) (\<lambda>(xs,i). 0<i \<and> i<length xs)) (timerefine TId (partition1_spec xs'))"
+
+    lemma partition2_spec_refine:
+      assumes "(xs,xs')\<in>Id" 
+      shows "partition2_spec xs
+             \<le>  \<Down>(br (\<lambda>(xs,i). (take i xs, drop i xs)) (\<lambda>(xs,i). 0<i \<and> i<length xs))
+                     (timerefine TId (partition1_spec xs'))"
+      using assms
       unfolding partition1_spec_def partition2_spec_def
       apply (intro refine0 SPEC_both_refine)
        apply (auto dest: mset_eq_length simp: in_br_conv simp flip: mset_append)
@@ -304,26 +267,27 @@ definition "introsort_aux_cost' \<mu>  = (\<lambda>(xs,d). introsort_aux_cost \<
         using mset_eq_length by force
       done
       
-    definition introsort_aux2 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "introsort_aux2 \<mu> xs d \<equiv> RECT' (\<lambda>introsort_aux (xs,d). doN {
+  definition introsort_aux2 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where
+    "introsort_aux2 \<mu> xs d \<equiv> RECT' (\<lambda>introsort_aux (xs,d). doN {
       lxs \<leftarrow> SPECT [length xs \<mapsto> cost ''list_length'' 1];
-      b \<leftarrow> SPECc2 ''lt'' (<) is_threshold lxs;
-      MIf b (doN {
-        b2 \<leftarrow> SPECc2 ''eq'' (=) d 0;
-        MIf b2 (
-          mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''slice_sort_p'' (enat (\<mu> (length xs)))))
-        )( doN {
+      if\<^sub>N SPECc2 ''lt'' (<) is_threshold lxs then
+        if\<^sub>N SPECc2 ''eq'' (=) d 0 then
+          mop_call (SPEC (sort_spec (\<^bold><) xs) (\<lambda>_. cost ''sort_c'' (enat (\<mu> (length xs)))))
+        else doN {
           (xs,m)\<leftarrow>partition2_spec xs;
           ASSERT (m\<le>length xs);
           d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
           xs1 \<leftarrow> introsort_aux (take m xs,d');
           xs2 \<leftarrow> introsort_aux (drop m xs,d');
           SPECc2 ''list_append'' (@) xs1 xs2
-        })
-      }
-      ) (
-        RETURN xs )
+        }      
+      else
+        RETURN xs 
     }) (xs,d)"
-                                                                                       
+
+
+subsubsection \<open>Refinement Theorem\<close>
+
     lemma introsort_aux2_refine: "introsort_aux2 \<mu> xs d \<le>\<Down>Id (timerefine TId (introsort_aux1 \<mu> xs d))"  
       unfolding introsort_aux2_def introsort_aux1_def
       apply (refine_rcg mop_call_refine partition2_spec_refine SPEC_both_refine MIf_refine SPECc2_refine RECT'_refine_t bindT_refine_conc_time_my_inres)
@@ -332,10 +296,11 @@ definition "introsort_aux_cost' \<mu>  = (\<lambda>(xs,d). introsort_aux_cost \<
       apply (auto simp: in_br_conv cost_n_leq_TId_n)
       done
       
+subsection \<open>introsort_aux3\<close>
     
     definition "partition3_spec xs l h \<equiv> doN { 
       ASSERT (h-l\<ge>4 \<and> h\<le>length xs); 
-      SPEC (\<lambda>(xs',i). slice_eq_mset l h xs' xs \<and> l<i \<and> i<h \<and> slice_LT (\<^bold>\<le>) (slice l i xs') (slice i h xs')) (\<lambda>_. cost ''partition'' (enat (h-l)))
+      SPEC (\<lambda>(xs',i). slice_eq_mset l h xs' xs \<and> l<i \<and> i<h \<and> slice_LT (\<^bold>\<le>) (slice l i xs') (slice i h xs')) (\<lambda>_. cost ''partition_c'' (enat (h-l)))
     }"
  
 abbreviation "TR_i_aux \<equiv> (TId(''list_append'':=0,''list_length'':=cost ''sub'' 1))"
@@ -367,19 +332,13 @@ abbreviation "TR_i_aux \<equiv> (TId(''list_append'':=0,''list_length'':=cost ''
         by (smt less_or_eq_imp_le less_trans slice_eq_mset_alt slice_eq_mset_def slice_in_slice_rel slice_rel_alt)
       done
 
-definition "slice_sort_specT T lt xs\<^sub>0 l h \<equiv> doN {
-    ASSERT (l\<le>h \<and> h\<le>length xs\<^sub>0);
-    SPEC (\<lambda>xs. length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0 \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec lt (Misc.slice l h xs\<^sub>0) (Misc.slice l h xs))
-         (\<lambda>_. T)
-  }"
-      
     definition introsort_aux3 :: "(nat \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> ('a list,_) nrest" where "introsort_aux3 \<mu> xs l h d 
     \<equiv>  RECT' (\<lambda>introsort_aux (xs,l,h,d). doN {
         ASSERT (l\<le>h);
         lxs \<leftarrow> SPECc2 ''sub'' (-) h l;
         if\<^sub>N SPECc2 ''lt'' (<) is_threshold lxs then doN {
           if\<^sub>N SPECc2 ''eq'' (=) d 0 then
-            mop_call (slice_sort_specT (cost ''slice_sort_p'' (enat (\<mu> lxs))) (\<^bold><) xs l h)
+            mop_call (slice_sort_specT (cost ''sort_c'' (enat (\<mu> lxs))) (\<^bold><) xs l h)
           else doN {
             (xs,m)\<leftarrow>partition3_spec xs l h;
             d' \<leftarrow> SPECc2 ''sub'' (-) d 1;
@@ -413,6 +372,9 @@ corollary my_slice_sort_spec_refine_sort':
     apply(rule exI[where x="slice l h x"]) apply (auto simp: eq_outside_range_def slicep_rel_def)
     using assms by blast
   done  
+
+
+subsubsection \<open>Refinement Theorem\<close>
 
 lemma introsort_aux3_refine: "(xsi,xs)\<in>slicep_rel l h
        \<Longrightarrow> introsort_aux3 \<mu> xsi l h d \<le> \<Down>(slice_rel xsi l h) (timerefine TR_i_aux (introsort_aux2 \<mu> xs d))"  
@@ -494,35 +456,23 @@ lemma spss_eq2: "timerefine R (slice_part_sorted_specT T xs l h) = slice_part_so
   by(cases "l < h \<and> h \<le> length xs", auto simp add: SPEC_timerefine_conv)
 
 
-    term introsort_aux_cost
-
-declare nrest_Rel_mono[trans]
-
 
 definition introsort_aux_cost2 :: "_ \<Rightarrow> 'a list * nat \<Rightarrow> (char list, enat) acost"
   where "introsort_aux_cost2 \<mu> = (\<lambda>(xs, d). lift_acost (
         cost ''if'' (2^(d+1)-1) + cost ''eq'' (2^(d+1)-1) + cost ''if'' (2^(d+1)-1)
          + cost ''lt'' (2^(d+1)-1) + cost ''call'' ((2^(d+1)-1)) 
         + cost ''sub'' (2^(d+1)-1)  
-        +   cost ''slice_sort_p'' (\<mu> (length xs)) + cost ''partition'' (d*(length xs))
+        +   cost ''sort_c'' (\<mu> (length xs)) + cost ''partition_c'' (d*(length xs))
          )
         )"
 
 lemma wfR''TR_i_aux[simp]: "wfR'' TR_i_aux"
   by (auto intro!: wfR''_upd)
 
-lemma costmult_zero_is_zero_enat[simp]: "(x::enat) *m 0 = 0"
-  unfolding costmult_def zero_acost_def by auto
 
 
 
-
-
-lemma 
-  SPEC_leq_SPEC_I_strong:
-  "A \<le> A' \<Longrightarrow> (\<And>x. A' x \<Longrightarrow> B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
-  apply(auto simp: SPEC_def)
-  by (simp add: le_fun_def)  
+subsubsection \<open>Correctness Theorem\<close>
 
 
 lemma introsort_aux3_correct:
@@ -566,8 +516,6 @@ lemma introsort_aux3_correct:
   done
 
 
-lemmas norm_tr = timerefineA_update_apply_same_cost' timerefineA_update_cost timerefineA_cost
-
 lemma TR_sps_important:
   assumes "TR ''slice_part_sorted'' = timerefineA TR_i_aux (introsort_aux_cost \<mu> (h-l,d))"
   shows "(timerefine TR_i_aux (timerefine (TId(''slice_part_sorted'':=introsort_aux_cost \<mu> (h-l,d))) (slice_part_sorted_spec xsi l h)))
@@ -577,7 +525,7 @@ lemma TR_sps_important:
   apply(simp only: SPEC_timerefine_conv)
   apply(rule SPEC_cong, simp)
   apply(rule ext)
-  apply(simp add: norm_tr)
+  apply(simp add: norm_cost)
   apply(subst assms(1))
   apply simp
   done
@@ -591,109 +539,8 @@ lemma introsort_aux3_correct_flexible:
   apply(subst TR_sps_important[symmetric, where TR=TR, OF assms(2)])
   apply(rule introsort_aux3_correct) by fact+
 
-      
-(*
-    text \<open>In the paper, we summarized steps 2 and 3. Here are the relevant lemmas: \<close>        
-    lemma partition3_spec_alt: "partition3_spec xs l h = \<Down>(slice_rel xs l h \<times>\<^sub>r Id) (doN { ASSERT (l\<le>h \<and> h\<le>length xs); (xs\<^sub>1,xs\<^sub>2) \<leftarrow> partition1_spec (slice l h xs); RETURN (xs\<^sub>1@xs\<^sub>2, l+length xs\<^sub>1) })"  
-      unfolding partition3_spec_def partition1_spec_def
-      apply (auto simp: pw_eq_iff refine_pw_simps)
-      apply (auto simp: slice_eq_mset_def slice_rel_def in_br_conv)
-      subgoal
-        by (smt Sorting_Misc.slice_len diff_is_0_eq leD le_add_diff_inverse less_imp_le_nat less_le_trans list.size(3) mset_append slice_append)
-      subgoal by (metis mset_append)
-      subgoal
-        by (metis Misc.slice_len add_le_cancel_left drop_all drop_append_miracle leI le_add_diff_inverse)
-      subgoal
-        by (metis Misc.slice_def add_diff_cancel_left' append_assoc append_eq_conv_conj drop_slice drop_take drop_take_drop_unsplit)
-      done
-
-    corollary partition3_spec_alt': "partition3_spec xs l h = \<Down>({((xsi',m),(xs\<^sub>1,xs\<^sub>2)). (xsi',xs\<^sub>1@xs\<^sub>2)\<in>slice_rel xs l h \<and> m=l + length xs\<^sub>1 }) (doN { ASSERT (l\<le>h \<and> h\<le>length xs); partition1_spec (slice l h xs)})"  
-      unfolding partition3_spec_alt
-      apply (auto simp: pw_eq_iff refine_pw_simps)
-      done
-      
-    corollary partition3_spec_direct_refine: "\<lbrakk> h-l\<ge>4; (xsi,xs)\<in>slicep_rel l h \<rbrakk> \<Longrightarrow> partition3_spec xsi l h \<le> \<Down>({((xsi',m),(xs\<^sub>1,xs\<^sub>2)). (xsi',xs\<^sub>1@xs\<^sub>2)\<in>slice_rel xsi l h \<and> m=l + length xs\<^sub>1 }) (partition1_spec xs)"  
-      unfolding partition3_spec_alt'
-      apply (auto simp: pw_le_iff refine_pw_simps)
-      apply (auto simp: slicep_rel_def)
-      done
-      
-          
-    lemma slice_part_sorted_spec_alt: "slice_part_sorted_spec xsi l h = \<Down> (slice_rel xsi l h) (doN { ASSERT(l\<le>h \<and> h\<le>length xsi); SPEC (\<lambda>xs'. mset xs' = mset (slice l h xsi) \<and> part_sorted_wrt (le_by_lt (\<^bold><)) 16 xs') })"
-      apply (clarsimp simp: slice_part_sorted_spec_def pw_eq_iff refine_pw_simps)
-      apply (auto simp: slice_rel_alt  slicep_rel_def eq_outside_rane_lenD)
-      done
-
-    (* Extracted this subgoal to present it in paper *)      
-    lemma introsort_aux3_direct_refine_aux1': "(xs', xs\<^sub>1 @ xs\<^sub>2) \<in> slice_rel xs l h \<Longrightarrow> xs\<^sub>1 = slice l (l + length xs\<^sub>1) xs'"
-      apply (clarsimp simp: slice_rel_def in_br_conv)
-      by (metis Misc.slice_def add_diff_cancel_left' append.assoc append_eq_conv_conj append_take_drop_id)
-      
-    lemma introsort_aux3_direct_refine_aux1: "\<lbrakk>(xsi', xs\<^sub>1 @ xs\<^sub>2) \<in> slice_rel xsi l' h'\<rbrakk> \<Longrightarrow> (xsi', xs\<^sub>1) \<in> slicep_rel l' (l' + length xs\<^sub>1)"  
-      apply (simp add: slicep_rel_def introsort_aux3_direct_refine_aux1')
-      apply (auto simp: slice_rel_alt slicep_rel_def)
-      by (metis Misc.slice_len ab_semigroup_add_class.add_ac(1) le_add1 length_append ordered_cancel_comm_monoid_diff_class.add_diff_inverse)
-    
-    lemma introsort_aux3_direct_refine: "(xsi,xs)\<in>slicep_rel l h \<Longrightarrow> introsort_aux3 xsi l h d \<le> \<Down>(slice_rel xsi l h) (introsort_aux1 xs d)"  
-      unfolding introsort_aux3_def introsort_aux1_def
-      
-      supply [refine del] = RECT_refine
-      
-      supply recref = RECT_dep_refine[where 
-          R="\<lambda>_. {((xsi::'a list, l, h, di::nat), (xs, d)). (xsi, xs) \<in> slicep_rel l h \<and> di=d}" and
-          S="\<lambda>_ (xsi::'a list, l, h, di::nat). slice_rel xsi l h" and
-          arb\<^sub>0 = "()"
-          ]
-
-      apply (refine_rcg 
-        recref
-        slice_sort_spec_refine_sort'
-        partition3_spec_direct_refine
-        ; (rule refl)?
-        )
-
-      subgoal by auto
-      subgoal by auto
-      subgoal by (auto simp: slicep_rel_def)
-      subgoal by (auto simp: slicep_rel_def)
-      subgoal by auto
-      subgoal by auto
-      subgoal by auto
-      subgoal by auto
-      subgoal by auto
-      subgoal by auto
-      subgoal by auto
-      apply (rprems)
-      subgoal by (clarsimp simp: introsort_aux3_direct_refine_aux1)
-      apply rprems  
-      subgoal
-        apply (auto simp: slice_rel_alt slicep_rel_def)
-        subgoal by (metis Misc.slice_def drop_append_miracle drop_slice eq_outside_range_def)
-        subgoal by (metis Nat.add_diff_assoc Sorting_Misc.slice_len add_diff_cancel_left' add_le_cancel_left diff_add_zero diff_is_0_eq length_append)
-        subgoal by (simp add: eq_outside_rane_lenD)
-        done
-      subgoal
-        apply (clarsimp simp: slice_rel_alt idx_shift_rel_def)
-        apply (rule conjI)
-        subgoal
-          apply (rule slicep_rel_append)
-          apply (subst slicep_rel_eq_outside_range; assumption?) 
-          by auto 
-        subgoal 
-          apply (drule (1) eq_outside_range_gen_trans[OF _ _ refl refl])
-          apply (erule (1) eq_outside_range_gen_trans)
-          apply (auto simp: max_def algebra_simps slicep_rel_def split: if_splits)
-          done 
-        done
-      subgoal by (auto simp: slice_rel_alt eq_outside_range_triv slicep_rel_def)
-      done
-      
-      *)
-      
-      
-      
-      
-      
+           
+subsection \<open>introsort3\<close>
     
     definition "final_sort_spec xs l h \<equiv> doN {
       ASSERT (h-l>1 \<and> part_sorted_wrt (le_by_lt (\<^bold><)) is_threshold (slice l h xs));
@@ -714,8 +561,7 @@ definition "introsort3_cost =  cost ''sub'' 1 + cost ''lt'' 1 + cost ''if'' 1
                                + cost ''slice_sort'' 1 +  cost ''slice_part_sorted'' (1::enat)"
     
     
-lemma if_rule2: "(c \<Longrightarrow> Some x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then a else None)"
-  by auto
+subsubsection \<open>Correctness Theorem\<close>
 
 lemma introsort3_correct: "introsort3 xs l h \<le> \<Down>Id (timerefine (TId(''slice_sort'':=introsort3_cost)) (slice_sort_spec (\<^bold><) xs l h))"
   apply (cases "l\<le>h \<and> h\<le>length xs")
@@ -727,7 +573,7 @@ lemma introsort3_correct: "introsort3 xs l h \<le> \<Down>Id (timerefine (TId(''
       unfolding SPEC_REST_emb'_conv SPECc2_def
       apply(rule gwp_specifies_I) 
       apply(refine_vcg \<open>-\<close> rules: )
-      subgoal unfolding emb'_def apply(rule if_rule2)
+      subgoal unfolding emb'_def apply(rule If_le_Some_rule2)
          apply (auto simp: introsort3_cost_def timerefineA_update_apply_same_cost' add.commute)
         subgoal apply sc_solve  apply safe by auto  
         by (auto elim: eq_outside_range_gen_trans[of _ _ l h _ l h l h, simplified])

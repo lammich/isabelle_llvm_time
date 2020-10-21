@@ -1,5 +1,5 @@
 theory Sorting_Export_Code
-imports (* Sorting_PDQ *) Sorting_Introsort (* Sorting_Strings *)
+imports (* Sorting_PDQ *) Sorting_Introsort (* Sorting_Strings *) Sorting_Results
 begin
   
 text \<open>

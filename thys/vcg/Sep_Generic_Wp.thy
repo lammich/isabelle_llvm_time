@@ -552,10 +552,6 @@ section \<open>Setup for mres-Monad\<close>
     apply(cases a) by auto
   lemma enat_aux1: "c - enat (a + b) + enat (a + b) = c \<Longrightarrow> c - enat a + enat a = c"
     apply(cases c) by auto
-
-    
-  typ cost  
-  type_synonym ecost = "(string,enat) acost"
     
   definition le_cost_ecost :: "cost \<Rightarrow> ecost \<Rightarrow> bool" 
     where "le_cost_ecost cc ca \<equiv> \<forall>x. enat (the_acost cc x) \<le> (the_acost ca x)"
@@ -668,6 +664,11 @@ lemma "$0 = \<box>" oops
   
 lemma empty_ent_GC: "\<box>\<turnstile>GC" unfolding GC_def time_credits_assn_def
   by (auto simp: entails_def SND_def sep_algebra_simps) 
+
+
+lemma dollar_aux_conv: "($c) (aa, ba) = (aa=0 \<and> ba=c)"
+  unfolding time_credits_assn_def EXACT_def SND_def
+  by auto
 
 
 lemma "F \<turnstile> GC ** G \<Longrightarrow> $c ** F \<turnstile> GC ** G"

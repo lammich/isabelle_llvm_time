@@ -1,105 +1,16 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
+section \<open>Arrays and Option Arrays\<close>
 theory Hnr_Primitives_Experiment
 imports Sepref "../ds/LLVM_DS_Dflt"
 begin
   hide_const (open) LLVM_DS_Array.array_assn
 
-experiment
-begin
 
-lemma aux_abs_help:
-  fixes M :: "_ \<rightharpoonup> ecost" 
-  assumes "\<Up> RR (SPECT M) \<le>  (SPECT M')"
-  shows "\<forall>r\<in>dom M. (\<exists>r'. (r,r')\<in>RR) \<and> (\<forall>r'. (r,r')\<in>RR \<longrightarrow> M r \<le> M' r')"
-  using assms
-  (* with single_valued RR *)
-  apply (auto simp: abs_fun_RES split: if_splits simp: le_fun_def) 
-  subgoal premises prems for r y r'
-    using prems(2)[rule_format, of r'] prems(3,4)  
-    by (metis (mono_tags, lifting) Sup_le_iff mem_Collect_eq)  
-  done
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces monadic operations on lists and lists with explicit ownership.
+    Then it defines data strucutres for arrays and arrays with explicit ownership.\<close>
 
-lemma aux_abs:
-  fixes M :: "_ \<rightharpoonup> ecost" 
-  assumes "\<Up> RR (SPECT M) \<le>  (SPECT M')"
-  shows "\<forall>r\<in>dom M. \<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
-  using aux_abs_help[OF assms] by blast
-
-lemma aux_abs':
-  fixes M :: "_ \<rightharpoonup> ecost" 
-  assumes "\<Up> RR (SPECT M) \<le> (SPECT M')"
-  assumes "Some cr \<le> M r"
-  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
-  using assms aux_abs[of RR M M']
-  by fastforce
-
-
-
-
-lemma aux:
-  fixes M :: "_ \<rightharpoonup> ecost"
-  assumes "single_valued RR"
-  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
-  shows "\<forall>r\<in>dom M. \<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
-  using assms
-  (* with single_valued RR *)
-  apply (auto simp: conc_fun_RES)
-  by (smt Sup_Some cSup_eq_maximum dual_order.refl le_fun_def le_some_optE mem_Collect_eq sv_the)
-  
-lemma aux':
-  fixes M :: "_ \<rightharpoonup> ecost"
-  assumes "single_valued RR"
-  assumes "SPECT M \<le> \<Down> RR (SPECT M')"
-  assumes "Some cr \<le> M r"
-  shows "\<exists>r'. (r,r')\<in>RR \<and> M r \<le> M' r'"
-  using assms aux[of RR M M']
-  by fastforce
-  
-  lemma hn_refine_result':
-  assumes R: "hn_refine P c Q R m"
-  assumes LE: "\<Up>RR m\<le>m'" 
-  shows "hn_refine P c Q (hr_comp R RR) m'"
-  unfolding hn_refine_def
-  apply clarify
-  using LE apply (cases m; simp)
-  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
-  apply (elim exE conjE)
-  apply (drule (1) aux_abs')
-  apply (elim exE conjE)
-  
-  apply (intro exI conjI)
-  apply (rule order_trans, assumption+)  
-
-  apply (erule wp_post_cons)
-  unfolding hr_comp_def
-  apply (rule ENTAILSD)
-  apply fri
-  done
-
-
-lemma hn_refine_result:
-  assumes R: "hn_refine P c Q R m"
-  assumes LE: "m\<le>\<Down>RR m'"
-  assumes SV: "single_valued RR"
-  shows "hn_refine P c Q (hr_comp R RR) m'"
-  unfolding hn_refine_def
-  apply clarify
-  using LE apply (cases m; simp)
-  apply (frule (1) R[unfolded hn_refine_def, rule_format, rotated], simp)
-  apply (elim exE conjE)
-  apply (drule (1) aux'[OF SV])
-  apply (elim exE conjE)
-  
-  apply (intro exI conjI)
-  apply (rule order_trans, assumption+)  
-
-  apply (erule wp_post_cons)
-  unfolding hr_comp_def
-  apply (rule ENTAILSD)
-  apply fri
-  done
-
-end
-   
 
   abbreviation "raw_array_assn \<equiv> \<upharpoonleft>LLVM_DS_NArray.narray_assn"
 
@@ -163,9 +74,9 @@ lemma hnr_mop_vcgI[htriple_vcg_intros]:
 lemmas hnr_mop_vcgI_nopre[htriple_vcg_intros] = hnr_mop_vcgI[where \<Phi>=True, simplified]  
 
 
-section \<open>List Operations\<close>
+subsection \<open>List Operations\<close>
 
-subsection \<open>Monadic List Operations\<close>
+subsubsection \<open>Monadic List Operations\<close>
 
 context
   fixes  T :: "(nat \<times> nat) \<Rightarrow> (char list, enat) acost"
@@ -240,7 +151,7 @@ lemma refine_mop_list_init_raw:
 
 
 
-subsection \<open>Monadic Option List Operations\<close>
+subsubsection \<open>Monadic Option List Operations\<close>
 
 context
   fixes  T :: "(nat \<times> unit) \<Rightarrow> (char list, enat) acost"
@@ -284,7 +195,7 @@ lemma param_mop_olist_new:
   by simp 
 
 
-subsection \<open>Array Operation costs\<close>
+subsubsection \<open>Array Operation costs\<close>
 
 abbreviation "mop_array_nth_cost \<equiv> (cost ''load'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))"
 abbreviation "mop_array_upd_cost \<equiv> (cost ''store'' (Suc 0)+cost ''ofs_ptr'' (Suc 0))"
@@ -340,14 +251,6 @@ lemma hnr_eoarray_nth: "hn_refine
   by vcg 
 \<comment> \<open>thm hnr_eoarray_nth[sepref_fr_rules] (* BEWARE: needs $ for APP *) \<close>
 
-
-
-(* hn_refine
-   (hn_ctxt (eoarray_assn ?A) ?a ?ai \<and>* hn_val snat_rel ?b ?bi)
-   (eo_extract_impl $ ?ai $ ?bi)
-   (hn_invalid (eoarray_assn ?A) ?a ?ai \<and>* hn_val snat_rel ?b ?bi)
- (?A \<times>\<^sub>a eoarray_assn ?A) (mop_eo_extract $ ?a $ ?b) *)
-term eoarray_assn
 
 lemma hnr_eoarray_nth'[sepref_fr_rules]: "(uncurry eoarray_nth_impl, uncurry mop_oarray_extract)
        \<in> (eoarray_assn A)\<^sup>d *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a\<^sub>d (\<lambda>x (ai, _). A \<times>\<^sub>a cnc_assn (\<lambda>x. x = ai) (eoarray_assn A))"
@@ -419,8 +322,7 @@ lemma FREE_eoarray_assn[sepref_frame_free_rules]:
   apply vcg_step
   apply vcg_step
   apply vcg_step
-  sorry
-  
+  sorry  
 *)  
   
   
@@ -580,6 +482,8 @@ qed
     apply (simp add: refine_pw_simps)
     unfolding hn_ctxt_def invalid_assn_def pure_def
     by vcg'
+
+
 
 subsection \<open>Array\<close>
 

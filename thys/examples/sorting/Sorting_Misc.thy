@@ -1,8 +1,17 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
+section \<open>Additional Basic Theorems for Verifying Sorting Algorithms\<close>
 theory Sorting_Misc
 imports "../../sepref/Sepref" "../../sepref/Hnr_Primitives_Experiment" "HOL-Library.Discrete"
 begin
-  hide_const (open) pi Word.slice
-  term SPECc2
+hide_const (open) pi Word.slice
+
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces additional NREST Rules for Loops, refinement relations for refining
+    slices of lists, and some guarded specifications of operations on nats.\<close>
+
+
+subsection \<open>Additional NREST Rules for Loops\<close>
 \<^cancel>\<open>
 lemma WHILEIT_unfold': "WHILEIT I b c s = doN { ASSERT (I s); if b s then doN { s\<leftarrow>c s; WHILEIT I b c s } else RETURN s }"
   apply (rewrite in "\<hole>=_" WHILEIT_unfold)
@@ -132,6 +141,7 @@ lemma split_ifI: "\<lbrakk> b\<Longrightarrow>P; \<not>b\<Longrightarrow>Q \<rbr
     done
 
 
+subsection \<open>Refinement Relations for Slices of Lists\<close>
 
   
 lemma sorted_lelI:
@@ -501,6 +511,7 @@ lemma slice_eq_mset_alt:
   
   
   
+subsection \<open>Setup concerned with word length\<close>
   
   
 (* TODO: Move *)
@@ -559,7 +570,10 @@ lemma size_refine[sepref_fr_rules]: "LENGTH('a)>2 \<Longrightarrow> (return o (\
   apply vcg'
   by (simp add: size_fits_snat_aux snat_eq_unat(1) unat_of_nat_eq)
   
-  
+
+
+subsection \<open>Monadic Operations on nats\<close>
+
 (* TODO: Move *)  
 (* Assertion-guarded operations on nats, which are going to be refined to bounded numbers *)
     named_theorems mop_nat_defs

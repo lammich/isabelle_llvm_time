@@ -1,7 +1,36 @@
 theory NREST_Main                                                  
 imports NREST NREST_Type_Classes NREST_Backwards_Reasoning Time_Refinement Data_Refinement
 begin
+        
 
+(* TODO: move *)
+lemma TId_apply: "TId x = cost x 1"
+  by (auto simp add: cost_def TId_def zero_acost_def)
+
+
+
+
+(* TODO: move *)
+lemma RETURNT_eq_RETURNT_iff[simp]: "RETURNT x \<le> RETURNT y \<longleftrightarrow> x=y"
+  by (auto simp: RETURNT_def le_fun_def split: if_splits) 
+
+(* TODO: move *)
+
+lemma If_le_rule: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> (~c \<Longrightarrow> x \<le> b) \<Longrightarrow> x \<le> (if c then a else b)"
+  by auto
+
+lemma If_le_Some_rule2: "(c \<Longrightarrow> x \<le> a) \<Longrightarrow> c \<Longrightarrow> Some x \<le> (if c then Some a else None)"
+  by auto
+
+
+lemma costmult_zero_is_zero_enat[simp]: "(x::enat) *m 0 = 0"
+  unfolding costmult_def zero_acost_def by auto
+
+lemma 
+  SPEC_leq_SPEC_I_strong:
+  "A \<le> A' \<Longrightarrow> (\<And>x. A' x \<Longrightarrow> B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
+  apply(auto simp: SPEC_def)
+  by (simp add: le_fun_def)  
 
 
   
@@ -417,6 +446,11 @@ subsection \<open>Shortcuts for specifications of operations\<close>
   definition "SPECc1 name aop == (\<lambda>a. SPECT ( [(aop a)\<mapsto>(cost name 1)]))"
   definition "SPECc2 name aop == ( (\<lambda>a b. SPECT ( [(aop a b)\<mapsto>(cost name 1)])))"
 
+
+lemma RETURNT_eq_SPECc2_iff[simp]: "RETURNTecost v \<le> SPECc2 n f a b
+      \<longleftrightarrow> (f a b = v)"
+  unfolding SPECc2_def apply (auto simp: pw_acost_le_iff refine_pw_simps)
+  using zero_enat_def by(auto simp: )  
 
 
 

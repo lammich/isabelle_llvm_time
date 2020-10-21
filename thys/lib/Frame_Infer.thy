@@ -44,6 +44,8 @@ lemma entails_eq_iff: "A=B \<longleftrightarrow> (A\<turnstile>B) \<and> (B\<tur
 lemma entails_eqI: "\<lbrakk> A\<turnstile>B; B\<turnstile>A \<rbrakk> \<Longrightarrow> A=B" by (simp add: entails_eq_iff)
 
   
+lemma entailsD: "a \<turnstile> b \<Longrightarrow> a h \<Longrightarrow> b h"
+  unfolding entails_def by auto
   
   
 definition "is_sep_red P' Q' P Q \<longleftrightarrow> (\<forall>Ps Qs. (P'**Ps\<turnstile>Q'**Qs) \<longrightarrow> (P**Ps\<turnstile>Q**Qs))"

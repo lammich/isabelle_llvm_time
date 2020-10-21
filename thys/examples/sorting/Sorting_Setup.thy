@@ -1,3 +1,6 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
+section \<open>Sorting Setup\<close>
 theory Sorting_Setup
   imports "../../sepref/Hnr_Primitives_Experiment" Sorting_Misc "../../nrest/Refine_Heuristics"
   "../../nrest/NREST_Automation"
@@ -5,27 +8,21 @@ begin
   hide_const (open) Word.slice
 
 
+paragraph \<open>Summary\<close>
+text \<open>This theory sets up reasoning infrastructur and basic operations used in the verification of
+  sorting algorithms.\<close>
 
-(* TODO: move *)
-lemma TId_apply: "TId x = cost x 1"
-  by (auto simp add: cost_def TId_def zero_acost_def)
-
-lemmas norm_cost = costmult_add_distrib costmult_cost lift_acost_propagate lift_acost_cost
-              the_acost_propagate timerefineA_cost lift_acost_zero timerefineA_propagate TId_apply
-              timerefineA_cost_apply_costmult
-
-lemmas norm_pp = pp_TId_absorbs_right pp_TId_absorbs_left pp_fun_upd
-
+paragraph \<open>Main Theorems/Definitions\<close>
+text \<open>
+\<^item> mop_cmpo_idxs, mop_cmp_idxs, mop_cmpo_idx_v, mop_cmp_v_idx, mop_cmpo_v_idx:
+    specifications for compare operations on arrays and option arrays
+\<^item> myswap: algorithm for swapping elements on array using option arrays internatlly.
+\<^item> TR_cmp_swap: exchange rate that exchanges from using the mops above and myswap 
+    to using implementations that only use LLVM instructions. 
+\<close>
 
 
-(* TODO: move *)
-lemma [simp]: "RETURNTecost v \<le> SPECc2 n f a b
-      \<longleftrightarrow> (f a b = v)"
-  unfolding SPECc2_def apply (auto simp: pw_acost_le_iff refine_pw_simps)
-  using zero_enat_def by(auto simp: )  
-
-lemma [simp]: "RETURNTecost x \<le> RETURNTecost y \<longleftrightarrow> x=y"
-  by (auto simp: pw_acost_le_iff refine_pw_simps) 
+subsection \<open>Weakordering Locales\<close>
 
 definition "le_by_lt lt a b \<equiv> \<not>lt b a"  
 definition "lt_by_le le a b \<equiv> le a b \<and> \<not>le b a"
@@ -165,6 +162,9 @@ proof -
     
 qed
 
+subsection \<open>Specification of Sorting Algorithms\<close>
+
+
 lemma sorted_sorted_wrt_lt: "sorted = sorted_wrt_lt ((<)::_::linorder \<Rightarrow>_)"
   apply (intro ext) unfolding sorted_sorted_wrt by simp
 
@@ -175,6 +175,15 @@ definition "slice_sort_spec lt xs\<^sub>0 l h \<equiv> doN {
     SPEC (\<lambda>xs. length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0 \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec lt (Misc.slice l h xs\<^sub>0) (Misc.slice l h xs))
          (\<lambda>_. cost ''slice_sort'' 1)
   }"
+
+
+definition "slice_sort_specT T lt xs\<^sub>0 l h \<equiv> doN {
+    ASSERT (l\<le>h \<and> h\<le>length xs\<^sub>0);
+    SPEC (\<lambda>xs. length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0 \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec lt (Misc.slice l h xs\<^sub>0) (Misc.slice l h xs))
+         (\<lambda>_. T)
+  }"
+      
+
 
 lemma slice_sort_spec_refine_sort: "\<lbrakk>(xsi,xs) \<in> slice_rel xs\<^sub>0 l h; l'=l; h'=h\<rbrakk> \<Longrightarrow> slice_sort_spec lt xsi l h \<le>\<Down>(slice_rel xs\<^sub>0 l' h') (SPEC (sort_spec lt xs)  (\<lambda>_. cost ''slice_sort'' (1::enat)))"
   unfolding slice_sort_spec_def sort_spec_def
@@ -216,6 +225,7 @@ text \<open> Sorting a permutation of a list amounts to sorting the list! \<clos
 lemma sort_spec_permute: "\<lbrakk>mset xs' = mset xs; sort_spec lt xs' ys\<rbrakk> \<Longrightarrow> sort_spec lt xs ys"
   unfolding sort_spec_def by auto
 
+subsection \<open>Specification of Compare Operations on Arrays\<close>
 
 context weak_ordering begin  
 
@@ -339,8 +349,6 @@ end
      
 definition "refines_relp A name op Rimpl \<equiv> (uncurry Rimpl,uncurry (PR_CONST (SPECc2 name op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
 
-term "GEN_ALGO Rimpl (refines_relp A R)"
-
 lemma gen_refines_relpD: "GEN_ALGO Rimpl (refines_relp A name op) \<Longrightarrow> (uncurry Rimpl,uncurry (PR_CONST (SPECc2 name op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
   by (simp add: GEN_ALGO_def refines_relp_def)
 
@@ -362,6 +370,9 @@ begin
 
 end  
 *)  
+
+
+subsection \<open>Locale for Specifying the Word Length\<close>
 
 locale size_t_context = 
   fixes size_t :: "'size_t::len2 itself" 
@@ -393,6 +404,8 @@ begin
 end
 
 
+subsection \<open>Locale for assuming an implementation of the compare operation\<close>
+
 (* TODO: Move *)
 term array_assn
 locale sort_impl_context = size_t_context size_t + weak_ordering
@@ -411,6 +424,9 @@ locale sort_impl_context = size_t_context size_t + weak_ordering
 begin
 
   abbreviation "arr_assn \<equiv> array_assn elem_assn"
+
+
+subsubsection \<open>Implementing the Array-Compare Operations\<close>
 
   
   definition "cmpo_idxs2 xs\<^sub>0 i j \<equiv> doN {
@@ -720,11 +736,7 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
     done
 
 
-
-
-
-
-
+subsubsection \<open>Synthesizing LLVM Code for the Array-Compare Operations\<close>
 
 
   sepref_def cmpo_idxs_impl [llvm_inline] is "uncurry2 (PR_CONST cmpo_idxs2')" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
@@ -1233,6 +1245,7 @@ begin
 end
 \<close>
 
+subsection \<open>Random Access Iterator\<close>
 text \<open>The compare function takes an external parameter.\<close>  
 
 term mop_eo_set
@@ -1417,7 +1430,7 @@ abbreviation (in weak_ordering) "mop_cmp_idxsF \<equiv> mop_cmp_idxs top"
 
 
 
-subsubsection \<open>implement swap\<close>
+subsubsection \<open>Implementing Swap\<close>
 
 
 definition myswap where "myswap xs l h =
@@ -1466,7 +1479,7 @@ lemma myswap_refine:
   done
 
 
-subsection \<open>A Timerefinement that refines compare and swap operations to executable ones\<close>
+subsection \<open>An Exchange Rate that refines compare and swap operations to executable ones\<close>
 
 context sort_impl_context
 begin

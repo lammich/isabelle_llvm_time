@@ -1,24 +1,40 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
 section \<open>Introsort (roughly libstdc++ version)\<close>
 theory Sorting_Introsort
 imports 
   Sorting_Final_insertion_Sort Sorting_Heapsort Sorting_Log2
-   "Imperative_HOL_Time.Asymptotics_1D"
-   "HOL-Real_Asymp.Real_Asymp"
   Sorting_Quicksort_Partition
+  "../../lib/More_Asymptotics"
 begin
 
-(* by Manuel Eberl *)
-lemma dlog[asym_bound]:  "(\<lambda>x. real (Discrete.log x)) \<in> \<Theta>(\<lambda>x. ln (real x))"
-proof -
-  have "(\<lambda>x. real (Discrete.log x))  \<in> \<Theta>(\<lambda>n. real (nat \<lfloor>log 2 (real n)\<rfloor>))"
-    by (intro bigthetaI_cong eventually_mono[OF eventually_gt_at_top[of 0]])
-       (auto simp: Discrete.log_altdef)
-  also have "(\<lambda>n. real (nat \<lfloor>log 2 (real n)\<rfloor>)) \<in> \<Theta>(\<lambda>x. ln (real x))"
-    by real_asymp
-  finally show ?thesis .
-qed
-
 context weak_ordering begin
+paragraph \<open>Summary\<close>
+text \<open>This theory refines @{term introsort_aux3} and @{term introsort3} down to LLVM code.
+  It uses @{term heapsort2} and @{term partition_pivot} to implement the first phase of
+    introsort in introsort_aux.
+  Furthermore it uses @{term final_insertion_sort2} to implement the second phase.
+  Finally LLVM code is synthesize with the Sepref tool.\<close>
+
+paragraph \<open>Main Theorems/Definitions\<close>
+text \<open>
+\<^item> introsort_aux4 introsort4: refinements of abstract algorithms already using heapsort2 and
+    partition_pivot
+\<^item> upperbound_heapsort_cost: theorem upperbounding heapsort's cost, and exchanging between 
+    algorithm specific ''slice_sort'' coin and operation specific ''sort_c'' coin
+\<^item> heapsort_correct'': the correctness theorem for heapsort to be used during refinement of
+    introsort_aux4
+\<^item> introsort5_correct: the final correctness theorem for introsort5, collapsing the cost into a
+    new constant introsort5_acost, which is then simplified to introsort_cost3
+\<^item> introsort_impl: the LLVM program synthesized from introsort5
+\<^item> final_hoare_triple: is the Hoare triple extracted for introsort_impl
+\<^item> introsort3_allcost_simplified, introsort3_allcost_nlogn : the final cost bound of introsort_impl
+    is displayed simplified to inspect the constants, and proved to be in \<Theta>(n log n); Note that,
+    while we prove the bound to be in \<Theta>, it still is only an upper bound, as the Hoare triple
+    only allows for upper bounds [excess time credits are garbage collected (@{term GC})].  
+\<close>
+
+
 
 subsection \<open>introsort_aux4 -- using heapsort and partitioner\<close>
 
@@ -64,8 +80,8 @@ text \<open>Here we assemble a Timerefinement from @{term heapsort_TR} and @{ter
 
 definition "Tia43 \<equiv> TId(''eq'':=cost ''icmp_eq'' 1,
           ''lt'':=cost ''icmp_slt'' 1,
-        ''partition'':=TR_pp ''partition'',
-        ''slice_sort_p'':=
+        ''partition_c'':=TR_pp ''partition_c'',
+        ''sort_c'':=
         cost ''call'' (enat 10)
          + cost ''if'' (enat 24) 
          + cost ''sub'' (enat 34)
@@ -161,7 +177,7 @@ lemma upperbound_heapsort_cost':
   shows 
   "timerefineA (heapsort_TR l h)  (cost ''slice_sort'' 1)
       \<le> timerefineA (Tia43)
-       (cost ''slice_sort_p'' (enat ((h-l) * Discrete.log (h-l))))"
+       (cost ''sort_c'' (enat ((h-l) * Discrete.log (h-l))))"
   unfolding Tia43_def
     unfolding heapsort_TR_def  singleton_heap_context.sift_down3_cost_def heapsort_time_def
   unfolding pp_fun_upd pp_TId_absorbs_right 
@@ -227,7 +243,7 @@ lemma upperbound_heapsort_cost: (* i guess h-l must be \<ge> 2 *)
   shows 
   "(h-l)>1 \<Longrightarrow> timerefineA (heapsort_TR l h)  (cost ''slice_sort'' 1)
       \<le> timerefineA (Tia43)
-       (cost ''slice_sort_p'' (enat ((h-l) * Discrete.log (h-l))))"
+       (cost ''sort_c'' (enat ((h-l) * Discrete.log (h-l))))"
   apply(rule upperbound_heapsort_cost')
   apply auto  
   using Discrete.log.simps by auto  
@@ -236,7 +252,7 @@ paragraph \<open>Prepare correctness theorem\<close>
 
 lemma heapsort_correct'': 
   "\<lbrakk>(xs,xs')\<in>Id; (l,l')\<in>Id; (h,h')\<in>Id; lxs=(h'-l'); h'-l'>1\<rbrakk> \<Longrightarrow> heapsort2 xs l h \<le>
-      \<Down>Id (timerefine (Tia43) (slice_sort_specT (cost ''slice_sort_p'' (enat ((\<lambda>n. n * Discrete.log n) lxs))) (\<^bold><) xs' l' h'))"
+      \<Down>Id (timerefine (Tia43) (slice_sort_specT (cost ''sort_c'' (enat ((\<lambda>n. n * Discrete.log n) lxs))) (\<^bold><) xs' l' h'))"
  apply(rule order.trans)
    apply(rule heapsort_correct') apply auto [3] 
   unfolding slice_sort_spec_def slice_sort_specT_def
@@ -315,7 +331,8 @@ lemma pc_E_isa4[simp]:
     
 subsubsection \<open>Correctness Lemma for introsort_aux4\<close>
 
-lemma introsort_aux4_correct: "introsort_aux4 xs l h d \<le> \<Down> Id (timerefine (E_isa4 d (h-l)) (slice_part_sorted_spec xs l h))"
+lemma introsort_aux4_correct:
+  "introsort_aux4 xs l h d \<le> \<Down> Id (timerefine (E_isa4 d (h-l)) (slice_part_sorted_spec xs l h))"
   apply(rule order.trans)
    apply(rule introsort_aux4_refine)
   apply(rule order.trans)
@@ -332,12 +349,6 @@ lemma introsort_aux4_correct: "introsort_aux4 xs l h d \<le> \<Down> Id (timeref
   subgoal by auto
   unfolding E_isa4_def apply simp
   done
-
-definition (in -) "norm_cost_tag a b = (a=b)"
-
-lemma (in -) norm_cost_tagI: "norm_cost_tag a a"
-  unfolding norm_cost_tag_def
-  by simp
 
 
 schematic_goal introsort_aux4_cost_for_slice_part_sorted: "E_isa4 d lxs ''slice_part_sorted'' = ?G"
@@ -367,7 +378,8 @@ lemma introsort_aux4d_correct:
   apply(cases "l < h \<and> h \<le> length xs", auto)
   unfolding SPEC_REST_emb'_conv
   apply(rule gwp_specifies_I)
-  supply insort4 = introsort_aux4_correct[unfolded spss_eq1 spss_eq2, unfolded slice_part_sorted_specT_def SPEC_REST_emb'_conv, simplified,
+  supply insort4 = introsort_aux4_correct[unfolded spss_eq1 spss_eq2,
+          unfolded slice_part_sorted_specT_def SPEC_REST_emb'_conv, simplified,
           THEN le_acost_ASSERTI_otherdir, THEN gwp_specifies_rev_I, THEN gwp_conseq_0]
   apply(refine_vcg \<open>-\<close> rules: gwp_SPECc2 insort4)
    apply(auto simp: Some_eq_emb'_conv emb_le_Some_conv )
@@ -382,9 +394,9 @@ lemma TR_sps_important2:
   apply(simp only: SPEC_timerefine_conv)
   apply(rule SPEC_cong, simp)
   apply(rule ext)
-  apply(simp add: norm_tr)
+  apply(simp add: norm_cost)
   apply(subst assms(1))
-  apply simp
+  apply(simp add: norm_cost)
   done
 
 lemma introsort_aux4d_correct_flexible:
@@ -429,7 +441,8 @@ lemma sp_TR_is[simp]:
   by (auto intro!: struct_preserving_upd_I) 
 
 
-lemma introsort4_refine: "introsort4 xs l h \<le> \<Down>Id (timerefine (TR_is (Discrete.log (h-l)*2) (h-l)) (introsort3 xs l h))"
+lemma introsort4_refine:
+  "introsort4 xs l h \<le> \<Down>Id (timerefine (TR_is (Discrete.log (h-l)*2) (h-l)) (introsort3 xs l h))"
   unfolding introsort4_def introsort3_def 
   supply conc_Id[simp del]
   apply (refine_rcg SPECc2_refine' SPECc2_refine bindT_refine_conc_time_my_inres MIf_refine
@@ -452,7 +465,8 @@ next
   moreover have "Discrete.log (n) < max_snat (N-1)"
     apply (rule discrete_log_ltI)
     using assms apply (auto simp: max_snat_def)
-    by (smt Suc_diff_Suc leI le_less_trans n_less_equal_power_2 nat_power_less_imp_less not_less_eq numeral_2_eq_2 numeral_2_eq_2 zero_order(3))
+    by (smt Suc_diff_Suc leI le_less_trans n_less_equal_power_2 nat_power_less_imp_less
+            not_less_eq numeral_2_eq_2 numeral_2_eq_2 zero_order(3))
   ultimately show ?thesis .
 qed  
   
@@ -668,7 +682,7 @@ text \<open>We define the finite part of the cost expression:\<close>
 concrete_definition introsort5_cost is lift_introsort5_acost uses "_ = lift_acost \<hole>"
 
 
-text \<open>We display the final cost expression::\<close>
+text \<open>We display the final fine-grained cost expression:\<close>
 definition "introsort_cost3 s \<equiv>
 cost ''mul'' (Suc (s * Discrete.log s * 14)) +
 (cost ''ofs_ptr'' (1241 + (108 * (s * Discrete.log s) + 68 * s)) +
@@ -720,27 +734,26 @@ lemma Sum_any_cost2: "Sum_any (the_acost (cost n x)) = x"
 
 subsection \<open>The final Hoare Triple\<close>
 
-abbreviation "slice_sort_aux xs\<^sub>0 xs l h \<equiv> (length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0
-                    \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec (\<^bold><) (slice l h xs\<^sub>0) (slice l h xs))"
-
-lemma final_hoare_triple:
+lemma introsort_final_hoare_triple:
   assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
   shows "llvm_htriple ($introsort_impl_cost (h-l) \<and>* hn_ctxt arr_assn xs\<^sub>0 p
            \<and>* hn_val snat_rel l l' \<and>* hn_val snat_rel h h')
         (introsort_impl p l' h')
-      (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>(slice_sort_aux xs\<^sub>0 xs l h) \<and>* hr_comp arr_assn Id xs r) s)
+      (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>(slice_sort_aux xs\<^sub>0 xs l h) \<and>* arr_assn xs r) s)
            \<and>* hn_invalid arr_assn xs\<^sub>0 p \<and>* hn_val snat_rel l l' \<and>* hn_val snat_rel h h')"
   unfolding introsort_impl_cost_def
   using assms
   by (rule llvm_htriple_more_time[OF introsort5_acost.refine introsort_ht,
-                unfolded introsort5_cost.refine introsort_cost3_eq_introsort_cost5[symmetric] ])
+                unfolded introsort5_cost.refine introsort_cost3_eq_introsort_cost5[symmetric]
+                          hr_comp_Id2])
 
 
 
 text \<open>Calculate the cost for all currencies:\<close>
 
-schematic_goal Sum_any_calc: "Sum_any (the_acost (introsort_cost3 s)) = ?x"
+schematic_goal Sum_any_calc: "project_all (introsort_impl_cost s) = ?x"
   unfolding norm_cost_tag_def[symmetric]
+  apply(subst project_all_is_Sumany_if_lifted[OF introsort_impl_cost_def])
   unfolding introsort_cost3_def 
   apply(simp add: the_acost_propagate add.assoc) 
   apply(subst Sum_any.distrib;  ( auto simp only: Sum_any_cost 
@@ -751,7 +764,8 @@ schematic_goal Sum_any_calc: "Sum_any (the_acost (introsort_cost3 s)) = ?x"
 text \<open>Give the result a name:\<close>
 concrete_definition (in -) introsort3_allcost is sort_impl_context.Sum_any_calc uses "_ = \<hole>"
 
-lemma "introsort3_allcost n = Sum_any (the_acost (introsort_cost3 n))"  
+lemma introsort3_allcost_is_projected_introsort_impl_cost:
+  "introsort3_allcost n = project_all (introsort_impl_cost n)"  
   apply(subst introsort3_allcost.refine[OF sort_impl_context_axioms, symmetric])
   by simp
 
@@ -759,7 +773,8 @@ end
 
 text \<open>The cost of introsort expanded:\<close>
 
-lemma "introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * Discrete.log n)"
+lemma introsort3_allcost_simplified:
+  "introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * Discrete.log n)"
   unfolding introsort3_allcost_def
   apply (simp add: algebra_simps)
   done
@@ -767,10 +782,9 @@ lemma "introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * 
 
 text \<open>The asymptotic behaviour of introsort's cost:\<close>
 
-lemma "(\<lambda>x. real (introsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
-  unfolding introsort3_allcost_def
-  unfolding Suc_eq_plus1_left
-  apply simp
+lemma introsort3_allcost_nlogn:
+  "(\<lambda>x. real (introsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
+  unfolding introsort3_allcost_simplified
   by auto2
 
 

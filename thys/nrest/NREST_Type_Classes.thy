@@ -51,6 +51,55 @@ lemma needname_adjoint: "a + b \<le> c \<Longrightarrow> a \<le> c - b"
   using add_leD2 le_diff_if_add_le by blast
 
 end
+
+(*
+class resource = complete_lattice + monoid_add
+begin
+
+definition minus :: "'a \<Rightarrow> 'a \<Rightarrow> 'a" where
+  "minus a b = Sup {c. c + b \<le> a  }"
+
+lemma "minus top a = top"
+  unfolding minus_def 
+  apply(rule antisym)
+   apply simp
+  apply(rule Sup_upper)
+  by simp
+
+lemma "minus a (b + c) = minus (minus a b) c"
+  unfolding minus_def
+  apply(rule antisym)
+  subgoal
+   apply (rule Sup_upper)
+   apply auto
+    apply (rule Sup_upper)
+    apply auto
+    sorry
+  subgoal 
+    apply(rule Sup_upper)
+    apply auto
+    sorry
+
+    oops
+
+lemma "\<lbrakk>a + b \<le> c;   b \<le> c \<rbrakk> \<Longrightarrow>  a \<le> minus c b"
+  unfolding minus_def apply(rule Sup_upper)
+  apply simp
+  done
+
+lemma " a + b \<le> c\<Longrightarrow>  b \<le> c"
+  sorry
+
+lemma " \<lbrakk>t1 \<le> minus b a; aa \<le> minus (minus b a) t1; a \<le> b\<rbrakk> \<Longrightarrow> t1 + a \<le> b"
+  unfolding minus_def
+  sorry
+    
+
+
+end
+*)
+
+
 instance enat :: needname
   apply standard
       apply(fact enat_1)
@@ -85,6 +134,11 @@ class drm = minus + plus + ord + Inf + Sup +
   and minus_continuousInf: "R\<noteq>{} \<Longrightarrow> (INF r\<in>R. r - mt) \<le> Inf R - mt"
   and minus_continuousSup: "\<And>X t q. X\<noteq>{} \<Longrightarrow> \<forall>x\<in>X. t \<le> q - (x::'a) \<Longrightarrow> t \<le> q - (Sup X)" 
   and plus_left_mono: "a \<le> b \<Longrightarrow> c + a \<le> c + b"
+
+
+
+
+
 
 
 lemma ASSN_enat:

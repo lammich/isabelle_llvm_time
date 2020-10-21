@@ -1,15 +1,28 @@
+\<^marker>\<open>creator "Peter Lammich"\<close>
+\<^marker>\<open>contributor "Maximilian P. L. Haslbeck"\<close>
 section \<open>Basic Definitions\<close>
 theory Sepref_Basic
 imports 
   "../ds/LLVM_DS_NArray"
   "HOL-Eisbach.Eisbach"
-  (* Refine_Monadic_Add *)
   "Lib/Sepref_Misc"
   "Lib/Structured_Apply"
   "../nrest/NREST_Main"
   Sepref_Id_Op
   "../lib/More_Refine_Util"
 begin
+
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces the synthesishn predicate and basic rules for it.\<close>
+
+
+paragraph \<open>Main Theorems/Definitions\<close>
+text \<open>
+\<^item> hn_refine: the synthesise predicate hnr
+\<^item> hnr_bind: the hnr rule for @{term bindT}
+\<^item> ht_from_hnr: with this rule one can extract a Hoare Triple from a hnr with special form: the
+    running time may not depend on the result but only on the input parameters.
+\<close>
 
 no_notation i_ANNOT (infixr ":::\<^sub>i" 10)
 no_notation CONST_INTF (infixr "::\<^sub>i" 10)
@@ -172,17 +185,12 @@ lemma Range_of_constraint_conv[simp]: "Range (A\<inter>UNIV\<times>C) = Range A 
 
 subsection \<open>Heap-Nres Refinement Calculus\<close>
 
+subsubsection \<open>Definition of hnr\<close>
+
 text {* Predicate that expresses refinement. Given a heap
   @{text "\<Gamma>"}, program @{text "c"} produces a heap @{text "\<Gamma>'"} and
   a concrete result that is related with predicate @{text "R"} to some
   abstract result from @{text "m"}*}
-  
-definition "hn_refine' \<Gamma> c \<Gamma>' R m \<equiv> nofailT m \<longrightarrow>
-  llvm_htriple \<Gamma> c (\<lambda>r. \<Gamma>' ** (EXS x. R x r ** \<up>(RETURNT x \<le> m)))"
-
-
-thm hn_refine'_def[unfolded htriple_def wp_alt ll_\<alpha>_def lift_\<alpha>_cost_def, no_vars, simplified]
-thm wp_alt
 
 definition "hn_refine \<Gamma> c \<Gamma>' R m \<equiv>
   nofailT m \<longrightarrow>
@@ -192,7 +200,6 @@ definition "hn_refine \<Gamma> c \<Gamma>' R m \<equiv>
         \<and> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr+Ca)
       )
   )"
-term "$$n"
 
 lemma STATE_alt: "STATE \<alpha> P = (\<lambda>s. P (\<alpha> s))"
   by(auto simp: STATE_def)
@@ -208,10 +215,9 @@ lemma "hn_refine \<Gamma> c \<Gamma>' R m = (
   ))"
   unfolding hn_refine_def STATE_alt lift_\<alpha>_cost_def ll_\<alpha>_def
   apply (simp split: prod.splits)
-  by (smt case_prodD case_prodI2 wp_monoI)
-  
-  
+  by (smt case_prodD case_prodI2 wp_monoI)  
 
+subsubsection \<open>Hnr Rules\<close>
 
 lemma hn_refine_extract_pre_val: 
   "hn_refine (hn_val S xa xc ** \<Gamma>) c \<Gamma>' R m \<longleftrightarrow> ((xc,xa)\<in>S \<longrightarrow> hn_refine \<Gamma> c \<Gamma>' R m)"
@@ -303,147 +309,6 @@ lemma hnr_vcgI:
   done
 
 
-(* TODO: Move *)
-
-lemma "RETURNT x = SPECT M \<longleftrightarrow> M = [x\<mapsto>0]"
-  by(auto simp: RETURNT_def)
-
-lemma ecost_le_zero: "(Ca::ecost) \<le> 0 \<longleftrightarrow> Ca=0"
-  apply(cases Ca) by(auto simp: zero_acost_def less_eq_acost_def)
-
-lemma get_delta: "Ca \<le> (T::(_,enat)acost) \<Longrightarrow> \<exists>delta. T = delta + Ca"
-  apply(cases Ca; cases T)
-  apply(rule exI[where x="T - Ca"])
-  apply (auto simp: minus_acost_alt less_eq_acost_def) 
-  apply(rule ext)  
-  subgoal premises p for f g x
-    using p(1)[rule_format, of x]  
-    by (metis add.commute add_diff_cancel_enat less_eqE plus_eq_infty_iff_enat) 
-  done
-
-lemma entailsD: "a \<turnstile> b \<Longrightarrow> a h \<Longrightarrow> b h"
-  unfolding entails_def by auto
-
-lemma dollar_aux_conv: "($c) (aa, ba) = (aa=0 \<and> ba=c)"
-  unfolding time_credits_assn_def EXACT_def SND_def
-  by auto
-
-(* TODO: rework and structure this proof *)
-lemma ht_from_hnr: 
-  assumes "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))"
-  and "\<Phi>"
-shows " llvm_htriple ($(timerefineA E T) ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')"
-proof -
-
-  from  assms(1)[unfolded hn_refine_def]
-  have *: "\<And>F s cr. llSTATE (\<Gamma> \<and>* F) (s, cr) \<Longrightarrow> (\<exists>ra Ca. Some Ca \<le> (emb Q (timerefineA E T)) ra \<and> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr + Ca))"
-    using assms(2) apply (simp add: nofailT_timerefine)
-    unfolding SPEC_REST_emb'_conv[symmetric]
-    apply (simp add: SPEC_timerefine_conv)
-    unfolding SPEC_REST_emb'_conv by auto
-
-  show ?thesis
-    unfolding htriple_def
-    apply safe
-  proof -
-    fix F a b
-    assume "(($timerefineA E T \<and>* \<Gamma>) \<and>* F) (ll_\<alpha> (a, b))"
-    then have G:"($timerefineA E T ** (\<Gamma> ** F)) (ll_\<alpha> (a, b))"
-      by(simp add: sep_conj_aci)
-    obtain b' where  G':"(\<Gamma> ** F) (ll_\<alpha> (a, b'))" and b: "b= b'+ (timerefineA E T)"
-      using G[THEN sep_conjD] apply (simp add: dollar_aux_conv )
-      unfolding ll_\<alpha>_def lift_\<alpha>_cost_def
-      apply auto
-      using c_simps(5) by blast
-     from *[unfolded STATE_def,OF G'] obtain ra Ca where
-         i:  "Some Ca \<le> emb Q (timerefineA E T) ra" 
-        and  wp: "wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (a, b' + Ca)"
-       by auto
-     from i have Q: "Q ra" unfolding emb'_def by (auto split: if_splits)   
-     from i have "\<exists>delta. (timerefineA E T) = delta + Ca"
-       apply(intro get_delta) by(auto simp: emb'_def split: if_splits)
-     then obtain delta where tet: "(timerefineA E T) = delta + Ca" by blast
-
-     have b_alt: "b = (b' + Ca) + delta"
-       unfolding b tet 
-       by (simp add: add.commute c_simps(6))
-
-
-     show "wp c (\<lambda>r s'. ((((\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s) \<and>* \<Gamma>') \<and>* GC) \<and>* F) (ll_\<alpha> s')) (a, b)"
-       unfolding b_alt 
-       apply(rule wp_monoI)
-        apply(rule wp_time_mono)
-        apply(rule wp)
-       apply safe
-       apply auto
-       unfolding ll_\<alpha>_def lift_\<alpha>_cost_def
-       apply simp
-     proof -
-       fix r a cc'
-       assume l: "(\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (llvm_\<alpha> a, cc') "
-       have "((\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)\<and>* GC) ((llvm_\<alpha> a, cc')+(0,delta))"
-         apply(rule sep_conjI[where y="(0,delta)"])
-            apply (rule l)
-         subgoal unfolding GC_def SND_def by auto
-         subgoal apply (auto simp: sep_disj_prod_def ) 
-           using sep_disj_acost_def sep_disj_enat_def by blast
-         apply simp
-         done
-       then have k: "((\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)\<and>* GC) ((llvm_\<alpha> a, cc'+delta))"
-         by(simp)
-       then have k': "(R ra r ** (\<Gamma>' \<and>* GC \<and>* F)) ((llvm_\<alpha> a, cc'+delta))"
-         apply simp
-         by(simp add: sep_conj_aci)
-          
-
-       have R: "R ra r \<turnstile> (\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s)"
-         using Q
-         by (smt entails_def pure_true_conv sep.add.right_neutral sep_conj_commute)
-
-       show "((\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s) \<and>* (\<Gamma>' \<and>* GC \<and>* F)) (llvm_\<alpha> a, cc' + delta)"
-         apply(rule entailsD[rotated])
-          apply(rule k')  
-         apply(rule conj_entails_mono[OF R])
-         apply simp
-         done
-     qed
-   qed
- qed
-
-
-lemma llvm_htriple_more_time: "a\<le>b \<Longrightarrow> llvm_htriple ($a ** F) c Q \<Longrightarrow> llvm_htriple ($b ** F) c Q"
-proof -
-  assume ll: "llvm_htriple ($a ** F) c Q"
-  assume p: "a\<le>b"
-  obtain c where "b=c+a"
-    using get_delta[OF p] by blast
-  then have *: "$b = ($a ** $c)"
-    by (simp add: add.commute time_credits_add)   
-  show ?thesis
-    unfolding *
-    unfolding htriple_def
-    apply safe
-    subgoal for F h1 h2
-      apply(rule wp_monoI)
-      apply(rule ll[unfolded htriple_def, rule_format, where F="$c ** F"])
-       apply(simp add: sep_conj_aci )
-      apply simp
-      subgoal premises p for r x 
-        apply(rule entailsD[rotated])
-         apply(rule p(2))
-        apply(rule conj_entails_mono)
-         apply simp
-        apply(simp only: sep_conj_assoc[symmetric])
-        apply(rule conj_entails_mono)
-        subgoal
-          by (metis consume_credits_fri_end_rule entails_eq_iff sep.add_ac(2))
-        subgoal by simp
-        done
-      done
-    done
-qed
-
-
 
 
 lemma hn_refine_consume_return:
@@ -469,138 +334,6 @@ lemma hn_refine_consume_return:
       by (auto simp: le_fun_def)
     done
   done
-
-lemma hn_refine_pay_aux: "NREST.consume m t = SPECT M
-  \<Longrightarrow> \<exists>M'. m = SPECT M' \<and> M = (map_option ((+) t) \<circ> M')"
-  unfolding consume_def apply(cases m) by auto
-
-
-lemma hnr_vcg_aux4:
-  "P (s, cr) \<Longrightarrow> ($Ca \<and>* P) (s, cr + Ca)"
-  apply(rule sep_conjI[where x="(0,Ca)"])
-     apply (simp_all add: time_credits_assn_def sep_disj_prod_def sep_algebra_simps)
-  by (auto simp add: sep_disj_acost_def sep_disj_enat_def sep_algebra_simps)
-
-lemma hnr_vcg_aux3:
-  "($Ca \<and>* P) (s, cr) \<Longrightarrow> \<exists>cr'. P (s, cr') \<and> cr=cr'+Ca"
-  apply(erule sep_conjE)
-  by (auto simp: time_credits_assn_def SND_def add.commute) 
-
-lemma hn_refine_payday_aux2:
-  fixes t:: ecost
-  shows "Some Ca \<le> m \<Longrightarrow> Some (Ca + t) \<le> map_option ((+) t) m"
-  apply(cases m) 
-  by( auto simp add: add.commute add_mono)
-
-lemma hn_refine_payday_aux3:
-  fixes t:: ecost
-  shows "Some Ca \<le> map_option ((+) t) m \<Longrightarrow> Ca \<ge> t \<and>  Some (Ca - t) \<le> m "
-  apply(cases m) apply auto
-  oops
-
-lemma hn_refine_payday:
-  fixes m :: " ('d, (char list, enat) acost) nrest"
-  shows "hn_refine ($t \<and>* \<Gamma>) c \<Gamma>' R m \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R (consume m t)"
-  unfolding hn_refine_def
-  apply auto
-  subgoal apply(cases m) by auto
-  subgoal premises p for F s cr M
-    using p(1)[THEN hn_refine_pay_aux]
-    apply safe
-    subgoal premises p2 for M'
-      using p(3)[rule_format, where s=s and cr="cr+t" and M=M', OF p2(1), unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def,
-              simplified, OF p(2)[ unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def, simplified, THEN hnr_vcg_aux4[where P="(\<Gamma> \<and>* F)"]]]
-      apply safe
-      subgoal for ra Ca
-        apply(rule exI[where x="ra"])
-        apply(rule exI[where x="Ca+t"])
-        unfolding STATE_def  ll_\<alpha>_def lift_\<alpha>_cost_def
-        by (simp add: hn_refine_payday_aux2 add.assoc add.commute add.left_commute)
-      done
-    done
-  done
-
-lemma
-  fixes t:: nat
-  shows "Some Ca \<le> map_option ((+) t) m
-    \<Longrightarrow> Some (Ca - t) \<le> m"
-  by(cases m, auto)
-
-lemma
-  fixes t:: enat
-  shows "Some Ca \<le> map_option ((+) t) m
-    \<Longrightarrow> Some (Ca - t) \<le> m"
-  apply(cases m, auto)
-  subgoal for a
-    apply(cases t; cases Ca; cases a)
-           apply auto
-    oops
-
-lemma hn_refine_payday_reverse_aux1:
-  "Ca \<le> (lift_acost t) + (Ca - (lift_acost t))"
-  apply(cases t; cases Ca)
-  unfolding lift_acost_def minus_acost_alt less_eq_acost_def 
-  apply auto
-  by (metis add.commute add_diff_assoc_enat linear needname_cancle) 
-  
-
-lemma hn_refine_payday_reverse_aux2:
-  shows "Some Ca \<le> map_option ((+) (lift_acost t)) m
-    \<Longrightarrow> Some (Ca - (lift_acost t)) \<le> m"
-  apply(cases m, auto)
-  unfolding less_eq_acost_def lift_acost_def
-  apply(cases Ca; cases t) apply simp
-  by (metis (mono_tags, lifting) acost.sel add_diff_cancel_enat comp_apply drm_class.diff_right_mono enat.distinct(2) the_acost_propagate)
-  
-
-
-lemma hn_refine_payday_reverse:
-  fixes m :: " ('d, (char list, enat) acost) nrest"
-  shows "hn_refine \<Gamma> c \<Gamma>' R (consume m (lift_acost t)) \<Longrightarrow> hn_refine ($(lift_acost t) \<and>* \<Gamma>) c \<Gamma>' R m"
-  unfolding hn_refine_def
-  apply auto
-  subgoal apply(cases m) by (auto simp: nofailT_consume)
-  subgoal premises p for F s cr M
-    using p(2)[unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def, simplified, THEN hnr_vcg_aux3]
-    apply safe
-    subgoal premises p2 for cr'
-      using p(3)[rule_format, where s=s and cr="cr'" and M="(map_option ((+) (lift_acost t)) \<circ> M)", unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def,
-          simplified, OF _ p2(1)]
-      apply (simp add: consume_def)
-      apply safe
-      subgoal for ra Ca
-        apply(rule exI[where x="ra"])
-        apply(rule exI[where x="Ca-(lift_acost t)"])
-        apply(frule hn_refine_payday_reverse_aux2)
-        apply simp
-        using p2(2)
-        unfolding STATE_def  ll_\<alpha>_def lift_\<alpha>_cost_def
-        apply (auto simp add: hn_refine_payday_aux2 add.assoc add.commute add.left_commute)
-        using  get_delta[OF hn_refine_payday_reverse_aux1, of t Ca]
-        apply safe
-        subgoal premises p for delta
-          using p(2)[THEN wp_time_mono, where d=delta]
-          apply(subst p(5))
-          apply(rule wp_monoI)
-           apply (simp add: add.assoc add.commute add.left_commute)
-          apply auto
-          subgoal premises p2 for r a cc' 
-            apply (rule entailsD)
-             defer 
-             apply(rule  p2(2)[THEN hnr_vcg_aux4[where P="(\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)" and Ca=delta and s="llvm_\<alpha> a" and cr=cc']])
-            apply(rule entails_trans)
-             apply(rule conj_entails_mono)
-              apply(rule entails_GC)
-             apply(rule entails_refl)
-            apply (rule ENTAILSD)
-            apply fri 
-            done
-          done
-        done
-      done
-    done
-  done
-
 
 
 lemma hn_refineD:
@@ -1126,7 +859,259 @@ proof -
     by vcg
     
 qed  
+
+
+
+subsubsection \<open>Extracting a Hoare Triple from a HNR rule\<close>
+
+(* TODO: rework and structure this proof *)
+lemma ht_from_hnr: 
+  assumes "hn_refine \<Gamma> c \<Gamma>' R (timerefine E (do {_ \<leftarrow> ASSERT \<Phi>; SPECT (emb Q T) }))"
+  and "\<Phi>"
+shows " llvm_htriple ($(timerefineA E T) ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')"
+proof -
+
+  from  assms(1)[unfolded hn_refine_def]
+  have *: "\<And>F s cr. llSTATE (\<Gamma> \<and>* F) (s, cr) \<Longrightarrow> (\<exists>ra Ca. Some Ca \<le> (emb Q (timerefineA E T)) ra \<and> wp c (\<lambda>r. llSTATE (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)) (s, cr + Ca))"
+    using assms(2) apply (simp add: nofailT_timerefine)
+    unfolding SPEC_REST_emb'_conv[symmetric]
+    apply (simp add: SPEC_timerefine_conv)
+    unfolding SPEC_REST_emb'_conv by auto
+
+  show ?thesis
+    unfolding htriple_def
+    apply safe
+  proof -
+    fix F a b
+    assume "(($timerefineA E T \<and>* \<Gamma>) \<and>* F) (ll_\<alpha> (a, b))"
+    then have G:"($timerefineA E T ** (\<Gamma> ** F)) (ll_\<alpha> (a, b))"
+      by(simp add: sep_conj_aci)
+    obtain b' where  G':"(\<Gamma> ** F) (ll_\<alpha> (a, b'))" and b: "b= b'+ (timerefineA E T)"
+      using G[THEN sep_conjD] apply (simp add: dollar_aux_conv )
+      unfolding ll_\<alpha>_def lift_\<alpha>_cost_def
+      apply auto
+      using c_simps(5) by blast
+     from *[unfolded STATE_def,OF G'] obtain ra Ca where
+         i:  "Some Ca \<le> emb Q (timerefineA E T) ra" 
+        and  wp: "wp c (\<lambda>r s. (\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (a, b' + Ca)"
+       by auto
+     from i have Q: "Q ra" unfolding emb'_def by (auto split: if_splits)   
+     from i have "\<exists>delta. (timerefineA E T) = delta + Ca"
+       apply(intro get_delta) by(auto simp: emb'_def split: if_splits)
+     then obtain delta where tet: "(timerefineA E T) = delta + Ca" by blast
+
+     have b_alt: "b = (b' + Ca) + delta"
+       unfolding b tet 
+       by (simp add: add.commute c_simps(6))
+
+
+     show "wp c (\<lambda>r s'. ((((\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s) \<and>* \<Gamma>') \<and>* GC) \<and>* F) (ll_\<alpha> s')) (a, b)"
+       unfolding b_alt 
+       apply(rule wp_monoI)
+        apply(rule wp_time_mono)
+        apply(rule wp)
+       apply safe
+       apply auto
+       unfolding ll_\<alpha>_def lift_\<alpha>_cost_def
+       apply simp
+     proof -
+       fix r a cc'
+       assume l: "(\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC) (llvm_\<alpha> a, cc') "
+       have "((\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)\<and>* GC) ((llvm_\<alpha> a, cc')+(0,delta))"
+         apply(rule sep_conjI[where y="(0,delta)"])
+            apply (rule l)
+         subgoal unfolding GC_def SND_def by auto
+         subgoal apply (auto simp: sep_disj_prod_def ) 
+           using sep_disj_acost_def sep_disj_enat_def by blast
+         apply simp
+         done
+       then have k: "((\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)\<and>* GC) ((llvm_\<alpha> a, cc'+delta))"
+         by(simp)
+       then have k': "(R ra r ** (\<Gamma>' \<and>* GC \<and>* F)) ((llvm_\<alpha> a, cc'+delta))"
+         apply simp
+         by(simp add: sep_conj_aci)
+          
+
+       have R: "R ra r \<turnstile> (\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s)"
+         using Q
+         by (smt entails_def pure_true_conv sep.add.right_neutral sep_conj_commute)
+
+       show "((\<lambda>s. \<exists>x. (\<up>Q x \<and>* R x r) s) \<and>* (\<Gamma>' \<and>* GC \<and>* F)) (llvm_\<alpha> a, cc' + delta)"
+         apply(rule entailsD[rotated])
+          apply(rule k')  
+         apply(rule conj_entails_mono[OF R])
+         apply simp
+         done
+     qed
+   qed
+ qed
+
+
+lemma llvm_htriple_more_time: "a\<le>b \<Longrightarrow> llvm_htriple ($a ** F) c Q \<Longrightarrow> llvm_htriple ($b ** F) c Q"
+proof -
+  assume ll: "llvm_htriple ($a ** F) c Q"
+  assume p: "a\<le>b"
+  obtain c where "b=c+a"
+    using get_delta[OF p] by blast
+  then have *: "$b = ($a ** $c)"
+    by (simp add: add.commute time_credits_add)   
+  show ?thesis
+    unfolding *
+    unfolding htriple_def
+    apply safe
+    subgoal for F h1 h2
+      apply(rule wp_monoI)
+      apply(rule ll[unfolded htriple_def, rule_format, where F="$c ** F"])
+       apply(simp add: sep_conj_aci )
+      apply simp
+      subgoal premises p for r x 
+        apply(rule entailsD[rotated])
+         apply(rule p(2))
+        apply(rule conj_entails_mono)
+         apply simp
+        apply(simp only: sep_conj_assoc[symmetric])
+        apply(rule conj_entails_mono)
+        subgoal
+          by (metis consume_credits_fri_end_rule entails_eq_iff sep.add_ac(2))
+        subgoal by simp
+        done
+      done
+    done
+qed
+
+
+
+
+subsubsection \<open>Payday: move Time Credits between Heap and Monadic Costs\<close>
+
+text \<open>In the following we prove two rules that allow to move time credits in an hnr rule between
+       the pre-heap and the advertised costs in the abstract algorithm. \<close>
+
+lemma hn_refine_pay_aux: "NREST.consume m t = SPECT M
+  \<Longrightarrow> \<exists>M'. m = SPECT M' \<and> M = (map_option ((+) t) \<circ> M')"
+  unfolding consume_def apply(cases m) by auto
+
+
+lemma hnr_vcg_aux4:
+  "P (s, cr) \<Longrightarrow> ($Ca \<and>* P) (s, cr + Ca)"
+  apply(rule sep_conjI[where x="(0,Ca)"])
+     apply (simp_all add: time_credits_assn_def sep_disj_prod_def sep_algebra_simps)
+  by (auto simp add: sep_disj_acost_def sep_disj_enat_def sep_algebra_simps)
+
+lemma hnr_vcg_aux3:
+  "($Ca \<and>* P) (s, cr) \<Longrightarrow> \<exists>cr'. P (s, cr') \<and> cr=cr'+Ca"
+  apply(erule sep_conjE)
+  by (auto simp: time_credits_assn_def SND_def add.commute) 
+
+lemma hn_refine_payday_aux2:
+  fixes t:: ecost
+  shows "Some Ca \<le> m \<Longrightarrow> Some (Ca + t) \<le> map_option ((+) t) m"
+  apply(cases m) 
+  by( auto simp add: add.commute add_mono)
+
+lemma hn_refine_payday_aux3:
+  fixes t:: ecost
+  shows "Some Ca \<le> map_option ((+) t) m \<Longrightarrow> Ca \<ge> t \<and>  Some (Ca - t) \<le> m "
+  apply(cases m) apply auto
+  oops
+
+text \<open>Time Credits can always be pushed from the Heap to the advertised costs.\<close>
+
+lemma hn_refine_payday:
+  fixes m :: " ('d, (char list, enat) acost) nrest"
+  shows "hn_refine ($t \<and>* \<Gamma>) c \<Gamma>' R m \<Longrightarrow> hn_refine \<Gamma> c \<Gamma>' R (consume m t)"
+  unfolding hn_refine_def
+  apply auto
+  subgoal apply(cases m) by auto
+  subgoal premises p for F s cr M
+    using p(1)[THEN hn_refine_pay_aux]
+    apply safe
+    subgoal premises p2 for M'
+      using p(3)[rule_format, where s=s and cr="cr+t" and M=M', OF p2(1), unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def,
+              simplified, OF p(2)[ unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def, simplified, THEN hnr_vcg_aux4[where P="(\<Gamma> \<and>* F)"]]]
+      apply safe
+      subgoal for ra Ca
+        apply(rule exI[where x="ra"])
+        apply(rule exI[where x="Ca+t"])
+        unfolding STATE_def  ll_\<alpha>_def lift_\<alpha>_cost_def
+        by (simp add: hn_refine_payday_aux2 add.assoc add.commute add.left_commute)
+      done
+    done
+  done
+
+lemma
+  fixes t:: nat
+  shows "Some Ca \<le> map_option ((+) t) m
+    \<Longrightarrow> Some (Ca - t) \<le> m"
+  by(cases m, auto)
+
+lemma hn_refine_payday_reverse_aux1:
+  "Ca \<le> (lift_acost t) + (Ca - (lift_acost t))"
+  apply(cases t; cases Ca)
+  unfolding lift_acost_def minus_acost_alt less_eq_acost_def 
+  apply auto
+  by (metis add.commute add_diff_assoc_enat linear needname_cancle) 
   
+
+lemma hn_refine_payday_reverse_aux2:
+  shows "Some Ca \<le> map_option ((+) (lift_acost t)) m
+    \<Longrightarrow> Some (Ca - (lift_acost t)) \<le> m"
+  apply(cases m, auto)
+  unfolding less_eq_acost_def lift_acost_def
+  apply(cases Ca; cases t) apply simp
+  by (metis (mono_tags, lifting) acost.sel add_diff_cancel_enat comp_apply drm_class.diff_right_mono enat.distinct(2) the_acost_propagate)
+  
+
+text \<open>Time credits can be pulled from the advertised costs to the Heap if it is finite.\<close>
+
+lemma hn_refine_payday_reverse:
+  fixes m :: " ('d, (char list, enat) acost) nrest"
+  shows "hn_refine \<Gamma> c \<Gamma>' R (consume m (lift_acost t)) \<Longrightarrow> hn_refine ($(lift_acost t) \<and>* \<Gamma>) c \<Gamma>' R m"
+  unfolding hn_refine_def
+  apply auto
+  subgoal apply(cases m) by (auto simp: nofailT_consume)
+  subgoal premises p for F s cr M
+    using p(2)[unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def, simplified, THEN hnr_vcg_aux3]
+    apply safe
+    subgoal premises p2 for cr'
+      using p(3)[rule_format, where s=s and cr="cr'" and M="(map_option ((+) (lift_acost t)) \<circ> M)", unfolded ll_\<alpha>_def lift_\<alpha>_cost_def STATE_def,
+          simplified, OF _ p2(1)]
+      apply (simp add: consume_def)
+      apply safe
+      subgoal for ra Ca
+        apply(rule exI[where x="ra"])
+        apply(rule exI[where x="Ca-(lift_acost t)"])
+        apply(frule hn_refine_payday_reverse_aux2)
+        apply simp
+        using p2(2)
+        unfolding STATE_def  ll_\<alpha>_def lift_\<alpha>_cost_def
+        apply (auto simp add: hn_refine_payday_aux2 add.assoc add.commute add.left_commute)
+        using  get_delta[OF hn_refine_payday_reverse_aux1, of t Ca]
+        apply safe
+        subgoal premises p for delta
+          using p(2)[THEN wp_time_mono, where d=delta]
+          apply(subst p(5))
+          apply(rule wp_monoI)
+           apply (simp add: add.assoc add.commute add.left_commute)
+          apply auto
+          subgoal premises p2 for r a cc' 
+            apply (rule entailsD)
+             defer 
+             apply(rule  p2(2)[THEN hnr_vcg_aux4[where P="(\<Gamma>' \<and>* R ra r \<and>* F \<and>* GC)" and Ca=delta and s="llvm_\<alpha> a" and cr=cc']])
+            apply(rule entails_trans)
+             apply(rule conj_entails_mono)
+              apply(rule entails_GC)
+             apply(rule entails_refl)
+            apply (rule ENTAILSD)
+            apply fri 
+            done
+          done
+        done
+      done
+    done
+  done
+
+
 
 subsection \<open>ML-Level Utilities\<close>
 ML \<open>
