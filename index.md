@@ -13,11 +13,15 @@ It is based on the [Isabelle/HOL](https://isabelle.in.tum.de) theorem prover.
   Here are some default starting points for browsing the theories
 
 #### Introsort Case Study
+  [Final Results](Isabelle_LLVM_Time/Sorting_Results.html)
   [Introsort](Isabelle_LLVM_Time/Sorting_Introsort.html)
 
 #### Isabelle-LLVM
   [Shallow Embedding of LLVM Semantics](Isabelle_LLVM_Time/LLVM_Shallow.html)
 
+
+#### Nondeterministic Result Monad with Resources
+  [NREST](Isabelle_LLVM_Time/NREST.html)
 
 ## Prerequisites
   * To compile the LLVM code: Working installation of [LLVM](http://releases.llvm.org/) version >= 6.0.0.

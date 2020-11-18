@@ -1,289 +1,23 @@
+\<^marker>\<open>creator "Maximilian P. L. Haslbeck"\<close>
+\<^marker>\<open>contributor "Peter Lammich"\<close>
+section "NREST"
 theory NREST
   imports
- "HOL-Library.Extended_Nat" "Refine_Monadic.RefineG_Domain"  Refine_Monadic.Refine_Misc  
-  "HOL-Library.Monad_Syntax"   "HOL-Library.Groups_Big_Fun"
-  Complex_Main 
-
-(* "HOL-Library.Function_Algebras" *)
- "../cost/Abstract_Cost"
-
+    NREST_Misc
 begin
 
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces NREST, the nondeterministc result monad with time.
+  Historically it contains time in its name, but actually it works for any resource type,
+  which is a type that is a complete lattice and a monoid.\<close>
 
-declare [[coercion_enabled = false]]
 
+subsection \<open>Definition of the NREST type\<close>
 
-section "Auxiliaries"
-
-subsection "Auxiliaries for option"
-
-lemma less_eq_option_None_is_None': "x \<le> None \<longleftrightarrow> x = None" by(auto simp: less_eq_option_None_is_None)
-
-lemma everywhereNone: "(\<forall>x\<in>X. x = None) \<longleftrightarrow> X = {} \<or> X = {None}"
-  by auto
-
-subsection "Auxiliaries for enat"
-
-
-lemma helper: "x2 \<le> x2a \<Longrightarrow> \<not> x2 < a \<Longrightarrow> \<not> x2a < a \<Longrightarrow>  x2 - (a::enat) \<le> x2a - a"
-  apply(cases x2; cases x2a) apply auto apply(cases a) by auto
-
-lemma helper2: "x2b \<le> x2 \<Longrightarrow> \<not> x2a < x2  \<Longrightarrow> \<not> x2a < x2b \<Longrightarrow> x2a - (x2::enat) \<le> x2a - x2b"
-  apply(cases x2; cases x2a) apply auto apply(cases x2b) by auto
-
-lemma Sup_finite_enat: "Sup X = Some (enat a) \<Longrightarrow> Some (enat a) \<in> X"
-  by (auto simp: Sup_option_def Sup_enat_def these_empty_eq Max_eq_iff in_these_eq split: if_splits)
-
-lemma Sup_enat_less2: " Sup X = \<infinity> \<Longrightarrow> (\<exists>x\<in>X. enat t < x)"
-  unfolding  Sup_enat_def using    finite_enat_bounded linear 
-  apply(auto split: if_splits)  
-   apply (smt Max_in empty_iff enat_ord_code(4))
-  by (smt not_less)  
-
-
-lemma [simp]: "t \<le> Some (\<infinity>::enat)"
-  by (cases t, auto)
-
-subsection "Auxiliary (for Sup and Inf)"
-
-
-
-lemma aux11: "f`X={y} \<longleftrightarrow> (X\<noteq>{} \<and> (\<forall>x\<in>X. f x = y))" by auto
- 
-lemma aux2: "(\<lambda>f. f x) ` {[x \<mapsto> t1] |x t1. M x = Some t1} = {None} \<longleftrightarrow> (M x = None \<and> M\<noteq>Map.empty)"
-  apply (cases "M x"; auto simp: aux11)
-  by force
-
-lemma aux3: "(\<lambda>f. f x) ` {[x \<mapsto> t1] |x t1. M x = Some t1} = {Some t1 | t1. M x = Some t1} \<union> ({None | y. y\<noteq>x \<and> M y \<noteq> None })"
-  by (fastforce split: if_splits simp: image_iff) 
-
-lemma Sup_pointwise_eq_fun: "(SUP f\<in>{[x \<mapsto> t1] |x t1. M x = Some t1}. f x) = M x"
-  unfolding Sup_option_def  
-  apply (simp add: aux2) 
-  apply (auto simp: aux3)
-  by (metis (mono_tags, lifting) Some_image_these_eq Sup_least in_these_eq mem_Collect_eq sup_absorb1 these_image_Some_eq)
-
-
-lemma SUP_eq_None_iff: "(SUP f\<in>X. f x) = None \<longleftrightarrow> X={} \<or> (\<forall>f\<in>X. f x = None)"
-  by (smt SUP_bot_conv(2) SUP_empty Sup_empty empty_Sup)
-
-lemma SUP_eq_Some_iff: "(SUP f\<in>X. f x) = Some t \<longleftrightarrow> (\<exists>f\<in>X. f x \<noteq> None) \<and> (t=Sup {t' | f t'. f\<in>X \<and> f x = Some t' })"
-  apply auto
-  subgoal 
-    by (smt Sup_bot_conv(1) Sup_empty Sup_option_def Sup_pointwise_eq_fun imageE option.distinct(1))
-  subgoal 
-    unfolding Sup_option_def
-    apply (clarsimp split: if_splits)
-    apply (fo_rule arg_cong)
-    apply (auto simp: Option.these_def)
-    apply (metis (mono_tags, lifting) image_iff mem_Collect_eq option.sel)
-    apply (metis (mono_tags, lifting) image_iff mem_Collect_eq option.sel)
-    done
-  subgoal 
-    unfolding Sup_option_def
-    apply (clarsimp split: if_splits; safe)
-    subgoal by (force simp: image_iff)
-    apply (fo_rule arg_cong)
-    apply (auto simp: Option.these_def)
-    apply (metis (mono_tags, lifting) image_iff mem_Collect_eq option.sel)
-    done
-  done  
-
-
-
-lemma Sup_enat_less: "X \<noteq> {} \<Longrightarrow> enat t \<le> Sup X \<longleftrightarrow> (\<exists>x\<in>X. enat t \<le> x)"
-  apply rule
-  subgoal 
-  by (metis Max_in Sup_enat_def finite_enat_bounded linear) 
-  subgoal apply auto
-    by (simp add: Sup_upper2)
-  done
-
-
-(* 
-  This is how implication can be phrased with an Inf operation.
-  Generalization from boolean to enat can be explained this way.
- *)
-
-lemma fixes Q P  shows
-    "Inf { P x \<le> Q x |x. True}  \<longleftrightarrow> P \<le> Q" unfolding le_fun_def by simp
-
-
-subsection \<open>continuous\<close>
-term sup_continuous  
-
-text \<open>That might by Scott continuity;
-      
-     https://en.wikipedia.org/wiki/Scott_continuity \<close>
-
-
-text \<open>There is scott_continuous in Complete_Non_Orders.Fixed_Points\<close>
-
-definition continuous :: "('a::{Sup} \<Rightarrow> 'b::{Sup}) \<Rightarrow> bool"  where
-  "continuous f \<longleftrightarrow> (\<forall>A. Sup (f ` A) = f (Sup A) )"
-
-definition continuousInf :: "('a::{Inf} \<Rightarrow> 'b::{Inf}) \<Rightarrow> bool"  where
-  "continuousInf f \<longleftrightarrow> (\<forall>A. A\<noteq>{} \<longrightarrow> Inf (f ` A) = f (Inf A) )"
-
-
-term sup_continuous
-thm continuous_at_Sup_mono
-
-lemma "continuous (f::'a::{complete_lattice}\<Rightarrow>'b::{complete_lattice})
-         \<longleftrightarrow> (\<forall>A. Inf (f ` A) = f (Inf A) )" (* wrong conjecture *) oops
-  
-lemma continuousI: "(\<And>A. f (Sup A) = Sup (f ` A)) \<Longrightarrow> continuous f" by (auto simp: continuous_def)
-lemma continuousD: "continuous f \<Longrightarrow> f (Sup A) = Sup (f ` A)" by (auto simp: continuous_def)
-
-
-lemma continuousInfI: "(\<And>A. A\<noteq>{} \<Longrightarrow> f (Inf A) = Inf (f ` A)) \<Longrightarrow> continuousInf f" by (auto simp: continuousInf_def)
-lemma continuousInfD: "continuousInf f \<Longrightarrow> A\<noteq>{} \<Longrightarrow> f (Inf A) = Inf (f ` A)" by (auto simp: continuousInf_def)
-
-
-lemma continuous_Domain: "continuous Domain"
-  apply(rule continuousI) by (fact Domain_Union)
-
-lemma continuous_Range: "continuous Range"
-  apply(rule continuousI) by (fact Range_Union)
-  
-
-
-subsubsection \<open>combinations are continuous\<close>
-
-
-lemma continuous_app: "continuous (\<lambda>f. f x)"
-  apply(rule continuousI)
-  by simp
-
-
-lemma 
-  continuous_fun:
-  assumes *: "continuous f" shows "continuous  (\<lambda>X x. (f (X x)))"
-  apply(rule continuousI)
-  unfolding Sup_fun_def  apply(rule ext) 
-  apply(subst continuousD[OF *]) apply(subst image_image) apply(subst image_image) ..
-
-
-
-lemma 
-  continuousInf_fun:
-  assumes *: "continuousInf f" shows "continuousInf  (\<lambda>X x. (f (X x)))"
-  apply(rule continuousInfI)
-  unfolding Inf_fun_def  apply(rule ext) 
-  apply(subst continuousInfD[OF *]) subgoal apply simp done
-    apply(subst image_image) apply(subst image_image) ..
-
-
-lemma SupD: "Sup A = Some f \<Longrightarrow> A \<noteq> {} \<and> A\<noteq>{None}"
-  unfolding Sup_option_def by auto
-
-
-lemma ffF: "Option.these (case_option None (\<lambda>e. Some (f e)) ` A)
-        = f `(Option.these A)"
-  unfolding Option.these_def apply (auto split: option.splits)
-   apply force   
-  using image_iff by fastforce 
-
-lemma zzz: "Option.these A \<noteq> {}
- \<Longrightarrow> Sup ( (\<lambda>x. case x of None \<Rightarrow> None | Some e \<Rightarrow> Some (f e)) ` A)
-        = Some (Sup ( f ` Option.these A))"
-  apply(subst Sup_option_def)
-  apply simp
-  apply safe
-  subgoal  
-    by simp  
-  subgoal  
-    by (metis SupD aux11 empty_Sup in_these_eq option.simps(5))  
-  subgoal apply(subst ffF) by simp 
-  done
-
-
-lemma assumes "continuous f"
-  shows "continuous (case_option None (Some o f))" (* TODO: generalize to adding top/bottom element *)
-  apply(rule continuousI)
-  apply(auto split: option.splits)
-  subgoal unfolding Sup_option_def by (auto split: if_splits)
-proof -
-  fix A   and a :: "'a::{complete_lattice}"
-  assume a: "Sup A = Some a"
-  with SupD have A: "A \<noteq> {} \<and> A \<noteq> {None}" by auto
-
-  then have a': "a= Sup (Option.these A)"  
-    by (metis Sup_option_def a option.inject)
-
-  from A have oA: "Option.these A \<noteq> {}" unfolding Option.these_def by auto
-
-  have *: "\<And>x. Some (f x) = (Some o f) x" by simp
-  have "(SUP x\<in>A. case x of None \<Rightarrow> None | Some x \<Rightarrow> (Some \<circ> f) x)
-        = (SUP x\<in>A. case x of None \<Rightarrow> None | Some s \<Rightarrow> Some (f s))"
-    by(simp only: *) 
-  also have "\<dots> = Some (SUP s\<in>(Option.these A). (f s))"
-   using oA zzz by metis 
-        
-  also have "(SUP s\<in>(Option.these A). (f s)) = f a"
-    using a' assms(1)[THEN continuousD] by metis 
-
-  finally show "Some (f a) = (SUP x\<in>A. case x of None \<Rightarrow> None | Some x \<Rightarrow> (Some \<circ> f) x)"  by simp
-qed  
-  
-text \<open>a shorter proof\<close>
-
-lemma my_these_def: "Option.these M = {f. Some f \<in> M}"
-  unfolding  Option.these_def by (auto intro: rev_image_eqI)  
-
-lemma option_Some_image: 
-    "A \<noteq> {} \<Longrightarrow> A \<noteq> {None} \<Longrightarrow> case_option None (Some \<circ> f) ` A \<noteq> {None}" 
-  by (metis (mono_tags, hide_lams) comp_apply empty_iff everywhereNone
-                  imageI in_these_eq option.exhaust option.simps(5) these_insert_None)
-
-lemma continuous_option: (* or generally, adding a bottom element *)
-  assumes *: "continuous f"
-  shows "continuous (case_option None (Some o f))"
-  apply(rule continuousI)
-  unfolding Sup_option_def[unfolded my_these_def] 
-  apply (simp add: option_Some_image)
-  apply (simp add:  continuousD[OF *])
-  apply rule+
-  apply(rule arg_cong[where f=Sup]) 
-    by  (auto split: option.splits  intro: rev_image_eqI)   
-
-lemma continuous_option': 
-  assumes *: "continuous f"
-  shows "continuous (case_option None (\<lambda>x. Some (f x)))"
-  using continuous_option[OF *, unfolded comp_def]  .
-
-
-lemma continuousInf_option: (* or generally, adding a bottom element *)
-  assumes *: "continuousInf f"
-  shows "continuousInf (case_option None (\<lambda>x. Some (f x)))"
-  apply(rule continuousInfI)
-  unfolding Inf_option_def[unfolded my_these_def] 
-  apply (simp add: option_Some_image )
-  apply safe
-  subgoal by force
-  subgoal by(auto split: option.splits) 
-  subgoal apply(subst continuousInfD[OF *]) subgoal  
-    by (metis Collect_empty_eq Inf_lower \<open>\<And>A. Inf A = (if None \<in> A then None else Some (Inf {f. Some f \<in> A}))\<close> le_some_optE)  
-    apply(rule arg_cong[where f=Inf]) 
-    by  (auto split: option.splits  intro: rev_image_eqI)  
-  done
-
-
-abbreviation (input) "SUPREMUM S f \<equiv> Sup (f ` S)" 
-
-definition myminus where "myminus x y = (if x=\<infinity> \<and> y=\<infinity> then 0 else x - y)"
-lemma "(a::enat) + x \<ge> b  \<longleftrightarrow> x \<ge> myminus b a "
-  unfolding myminus_def
-  apply(cases a; cases b; cases x) apply auto oops
-
-
-
-
-section "NREST"
 
 datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{complete_lattice,monoid_add}) option"
-(*abbreviation "REST \<equiv> REST :: ('a \<Rightarrow> ('b::{complete_lattice,monoid_add}) option) \<Rightarrow> _"*)
 
+subsubsection \<open>NREST is a complete lattice\<close>
                    
 instantiation nrest :: (type,"{complete_lattice,monoid_add}") complete_lattice
 begin
@@ -339,6 +73,34 @@ instance
   done   
 end
 
+subsubsection \<open>NREST with resource type being unit\<close>
+
+
+instantiation unit :: plus
+begin
+fun plus_unit where "() + () = ()"
+instance
+  apply(intro_classes) .
+end
+
+instantiation unit :: zero
+begin
+definition zero_unit where "0 = ()"
+instance
+  apply(intro_classes) .
+end
+
+instantiation unit :: ordered_ab_semigroup_add
+begin 
+instance
+  apply(intro_classes) by auto
+end 
+
+
+term "M:: (_,unit) nrest"
+
+
+subsubsection \<open>Operations on NREST\<close>
 
 definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, monoid_add}) nrest" where
   "RETURNT x \<equiv> REST (\<lambda>e. if e=x then Some 0 else None)"
@@ -347,16 +109,54 @@ abbreviation "SUCCEEDT \<equiv> bot::(_,_::{complete_lattice, monoid_add}) nrest
 abbreviation SPECT where "SPECT \<equiv> REST"
 
 
+definition "consumea T = SPECT [()\<mapsto>T]"
+
 definition consume where "consume M t \<equiv> case M of 
           FAILi \<Rightarrow> FAILT |
           REST X \<Rightarrow> REST (map_option ((+) t) o (X))"
 
 
-
-
 definition "SPEC P t = REST (\<lambda>v. if P v then Some (t v) else None)"
 
 
+
+lemma consume_RETURNT: "consume (RETURNT x) T = SPECT [x \<mapsto> T]"
+  by(auto simp: RETURNT_def consume_def)
+
+
+lemma RETURNT_eq_RETURNT_iff[simp]: "RETURNT x \<le> RETURNT y \<longleftrightarrow> x=y"
+  by (auto simp: RETURNT_def le_fun_def split: if_splits) 
+
+lemma consume_cong1: "a=b \<Longrightarrow> consume a c = consume b c" by simp
+
+
+
+lemma SPEC_cong: "\<Phi>=\<Phi>' \<Longrightarrow> T=T' \<Longrightarrow> SPEC \<Phi> T = SPEC \<Phi>' T'"
+  by simp
+
+
+(* TODO: Move *)
+definition "satminus a b \<equiv> (if b=\<infinity> then 0 else a - the_enat b)"
+
+lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow> the_acost t b = \<infinity> \<or> ta \<le> the_enat (the_acost t b)"
+  unfolding satminus_def
+  by auto
+
+
+
+
+lemma consume_zero:
+  shows "x=0 \<Longrightarrow> consume M x = M"
+  apply(cases M, auto simp: consume_def top_nrest_def split: option.splits intro!: ext)
+  subgoal for f xa apply(cases "f xa") by auto
+  done
+
+
+lemma consume_alt_aux:
+  fixes T :: "'a::{comm_monoid_add}"
+  shows "map_option ((+) T) (if xa = x then Some t else None)
+  = (if xa = x then Some (t+T) else None)"
+  by (auto simp: add.commute)
 
 lemma 
   SPEC_leq_SPEC_I:
@@ -364,7 +164,14 @@ lemma
   apply(auto simp: SPEC_def)
   by (simp add: le_fun_def)  
 
- 
+
+lemma 
+  SPEC_leq_SPEC_I_strong:
+  "A \<le> A' \<Longrightarrow> (\<And>x. A' x \<Longrightarrow> B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
+  apply(auto simp: SPEC_def)
+  by (simp add: le_fun_def)  
+
+
 
 lemma consume_mono:
   fixes  t :: "'a::{ordered_ab_semigroup_add,complete_lattice,monoid_add}"
@@ -388,54 +195,6 @@ lemma consume_mono_ecost:
     by (metis acost.sel less_eq_acost_def less_eq_option_Some)
   done
 
-
-instantiation unit :: plus
-begin
-fun plus_unit where "() + () = ()"
-instance
-  apply(intro_classes) .
-end
-
-instantiation unit :: zero
-begin
-definition zero_unit where "0 = ()"
-instance
-  apply(intro_classes) .
-end
-(*
-instantiation "fun" :: (type, zero) zero
-begin 
-fun zero_fun where "zero_fun x = 0"
-instance
-  apply(intro_classes) .
-end
-*)
-
-instantiation unit :: ordered_ab_semigroup_add
-begin 
-instance
-  apply(intro_classes) by auto
-end 
-
-
-(*
-instantiation "fun" :: (type, ordered_ab_semigroup_add) ordered_ab_semigroup_add
-begin 
-
-fun plus_fun where "plus_fun a b x= a x + b x"
-
-term "a::('f::ab_semigroup_add)"
-
-thm ab_semigroup_add.add_commute
-
-instance
-  apply(intro_classes)
-  subgoal apply (rule ext) by (simp add: add.assoc)
-  subgoal apply (rule ext) by (simp add: add.commute)
-  subgoal by (simp add: add_left_mono le_fun_def)  
-  done
-end 
-*)
 lemma RETURNT_alt: "RETURNT x = REST [x\<mapsto>0]"
   unfolding RETURNT_def by auto
 
@@ -536,7 +295,7 @@ lemma consume_0:
   done
 
 
-section "pointwise reasoning"
+subsection \<open>Pointwise reasoning\<close>
 
 named_theorems refine_pw_simps 
 ML \<open>
@@ -570,7 +329,7 @@ lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
 lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
   by(auto simp: consume_def split: nrest.splits)
 
-subsection "pw reasoning for enat"
+subsubsection "pw reasoning for enat"
 
 locale pointwise_reasoning_defs =
   fixes  lift :: "'cc::{ord,zero} \<Rightarrow> 'ac::{complete_lattice,ord,zero,monoid_add}"
@@ -729,7 +488,7 @@ interpretation pointwise_reasoning enat
   done
 
 
-subsubsection \<open>Why does lifting to function or acost not work wit pointwise reasoning?\<close>
+paragraph \<open>Why does lifting to function or acost not work wit pointwise reasoning?\<close>
 
 (* instantiation "fun" :: (type, zero) zero
 begin
@@ -753,7 +512,7 @@ lemma "pointwise_reasoning (\<lambda>f. (\<lambda>y. enat ((f::'c\<Rightarrow>na
 end *)
 
 
-subsection \<open>pw reasoning for lifting to functions\<close>
+subsubsection \<open>pw reasoning for lifting to functions\<close>
 (*
 definition project_fun :: " 'b \<Rightarrow> ('a,'b\<Rightarrow>_) nrest \<Rightarrow>('a,_) nrest" where
   "project_fun b S  \<equiv> (case S of FAILi \<Rightarrow> FAILi | REST X \<Rightarrow> REST (\<lambda>x. case X x of None \<Rightarrow> None | Some m \<Rightarrow> Some (m b)))"
@@ -824,7 +583,7 @@ lemma pw_fun_eqI':
 end
 *)
  
-subsection \<open>pw reasoning for lifting to acost\<close>
+subsubsection \<open>pw reasoning for lifting to acost\<close>
 
 definition project_acost :: " 'b \<Rightarrow> ('a,(_,_) acost) nrest \<Rightarrow>('a,_) nrest" where
   "project_acost b S  \<equiv> (case S of FAILi \<Rightarrow> FAILi | REST X \<Rightarrow> REST (\<lambda>x. case X x of None \<Rightarrow> None | Some m \<Rightarrow> Some (the_acost m b)))"
@@ -904,7 +663,7 @@ lemma pw_acost_eqI':
 
 end
 
-subsection \<open> le_or_fail \<close>
+subsection \<open>le_or_fail\<close>
   definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
     "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
 
@@ -926,12 +685,12 @@ proof -
   finally show "a \<le> SPEC a_spec T" .
 qed
 
-section \<open> Monad Operators \<close>
+subsection \<open>Monad Operators\<close>
 
 
-subsection \<open>bind\<close>
+subsubsection \<open>bind\<close>
 
-definition bindT :: "('b,'c::{complete_lattice, plus,zero,monoid_add}) nrest \<Rightarrow> ('b \<Rightarrow> ('a,'c) nrest) \<Rightarrow> ('a,'c) nrest" where
+definition bindT :: "('b,'c::{complete_lattice, monoid_add}) nrest \<Rightarrow> ('b \<Rightarrow> ('a,'c) nrest) \<Rightarrow> ('a,'c) nrest" where
   "bindT M f \<equiv> case M of 
   FAILi \<Rightarrow> FAILT |
   REST X \<Rightarrow> Sup { (case f x of FAILi \<Rightarrow> FAILT 
@@ -954,7 +713,7 @@ lemma bindT_FAIL[simp]: "bindT FAILT g = FAILT"
 lemma "bindT SUCCEEDT f = SUCCEEDT"
   unfolding bindT_def by(auto split: nrest.split simp add: bot_nrest_def)
 
-subsection \<open>Pointwise reasoning for bindT\<close>
+paragraph \<open>Pointwise reasoning for bindT\<close>
 
 lemma pw_inresT_bindT_aux: "inresT (bindT m f) r t \<longleftrightarrow>
      (nofailT m \<longrightarrow> (\<exists>r' t' t''. inresT m r' t' \<and> inresT (f r') r t'' \<and> t \<le> t' + t''))"
@@ -1010,7 +769,7 @@ lemma pw_inresT_bindT[refine_pw_simps]: "inresT (bindT m f) r t \<longleftrighta
   by (metis (full_types) inresT_mono le_iff_add linear nat_add_left_cancel_le) 
 
 
-subsection \<open>project_acost on bindT\<close>
+paragraph \<open>project_acost on bindT\<close>
 
 lemma continuous_nrest: (* or generally, adding a top element *)
   assumes *: "continuous f"
@@ -1071,7 +830,7 @@ lemma project_acost_bindT[refine_pw_simps]: "(project_acost b (bindT m f)) = bin
   apply(rule arg_cong[where f="Sup"])
   by (auto split: option.splits simp: project_acost_consume[symmetric]) 
 
-subsubsection \<open>NofailT\<close>
+paragraph \<open>NofailT\<close>
 
 lemma pw_bindT_nofailT[refine_pw_simps]: "nofailT (bindT M f) \<longleftrightarrow> (nofailT M \<and> (\<forall>x t. inresT M x t \<longrightarrow> nofailT (f x)))"
   unfolding bindT_def   
@@ -1088,9 +847,7 @@ lemma g_pw_bindT_nofailT[refine_pw_simps]:
     by (metis enat_0_iff(1) i0_lb nofailT_simps(1))  
   done
 
-
-
-section \<open>Monad Rules\<close>
+subsection \<open>Monad Rules\<close>
 
 
 lemma nres_bind_left_identity[simp]:
@@ -1162,9 +919,50 @@ lemma nres_acost_bind_assoc[simp]:
 
 thm pw_inresT_Sup
 thm refine_pw_simps
- 
 
-section \<open>Monotonicity lemmas\<close>
+
+ 
+subsection \<open>Setup for do notation\<close>
+
+abbreviation (do_notation) bind_doN where "bind_doN \<equiv> NREST.bindT"
+
+notation (output) bind_doN (infixr "\<bind>" 54)
+notation (ASCII output) bind_doN (infixr ">>=" 54)
+
+nonterminal doN_binds and doN_bind
+syntax
+  "_doN_block" :: "doN_binds \<Rightarrow> 'a" ("doN {//(2  _)//}" [12] 62)
+  "_doN_bind"  :: "[pttrn, 'a] \<Rightarrow> doN_bind" ("(2_ \<leftarrow>/ _)" 13)
+  "_doN_let" :: "[pttrn, 'a] \<Rightarrow> doN_bind" ("(2let _ =/ _)" [1000, 13] 13)
+  "_doN_then" :: "'a \<Rightarrow> doN_bind" ("_" [14] 13)
+  "_doN_final" :: "'a \<Rightarrow> doN_binds" ("_")
+  "_doN_cons" :: "[doN_bind, doN_binds] \<Rightarrow> doN_binds" ("_;//_" [13, 12] 12)
+  "_thenM" :: "['a, 'b] \<Rightarrow> 'c" (infixr "\<then>" 54)
+
+syntax (ASCII)
+  "_doN_bind" :: "[pttrn, 'a] \<Rightarrow> doN_bind" ("(2_ <-/ _)" 13)
+  "_thenM" :: "['a, 'b] \<Rightarrow> 'c" (infixr ">>" 54)
+
+translations
+  "_doN_block (_doN_cons (_doN_then t) (_doN_final e))"
+    \<rightleftharpoons> "CONST bind_doN t (\<lambda>_. e)"
+  "_doN_block (_doN_cons (_doN_bind p t) (_doN_final e))"
+    \<rightleftharpoons> "CONST bind_doN t (\<lambda>p. e)"
+  "_doN_block (_doN_cons (_doN_let p t) bs)"
+    \<rightleftharpoons> "let p = t in _doN_block bs"
+  "_doN_block (_doN_cons b (_doN_cons c cs))"
+    \<rightleftharpoons> "_doN_block (_doN_cons b (_doN_final (_doN_block (_doN_cons c cs))))"
+  "_doN_cons (_doN_let p t) (_doN_final s)"
+    \<rightleftharpoons> "_doN_final (let p = t in s)"
+  "_doN_block (_doN_final e)" \<rightharpoonup> "e"
+(*  "(m \<then> n)" \<rightharpoonup> "(m \<bind> (\<lambda>_. n))"*)
+
+abbreviation RETURNTecost :: "'a \<Rightarrow> ('a, (string,enat) acost) nrest"
+  where "RETURNTecost \<equiv> RETURNT"
+
+
+
+subsection \<open>Monotonicity lemmas\<close>
 
 
 lemma bindT_mono: 
@@ -1256,12 +1054,33 @@ lemma inresT_ASSERT: "inresT (ASSERT Q \<bind> (\<lambda>_. M)) x ta = (Q \<long
   unfolding ASSERT_def iASSERT_def by auto
 
 
+
+lemma le_acost_ASSERTI_otherdir:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M') \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M')"
+  by(auto simp: pw_acost_le_iff refine_pw_simps)
+
+
+lemma le_acost_ASSERTI:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "(\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M')"
+  by(auto simp: pw_acost_le_iff refine_pw_simps)
+
+
 lemma nofailT_ASSERT_bind:
   fixes M :: "(_,enat) nrest"
   shows "nofailT (ASSERT P \<bind> (\<lambda>_. M)) \<longleftrightarrow> (P \<and> nofailT M)"
   by(auto simp: pw_bindT_nofailT pw_ASSERT)
 
-subsection \<open>SELECT\<close>
+
+lemma
+  nofailT_bindT_ASSERT_iff:
+  "nofailT (do { ASSERT I; M}) \<longleftrightarrow>
+    (I \<and> nofailT M)"
+  by (auto simp: ASSERT_def iASSERT_def) 
+  
+
+subsubsection \<open>SELECT\<close>
 
 
  
@@ -1276,14 +1095,17 @@ lemma emb_le_Some_conv: "\<And>T. Some t' \<le> emb' Q T x \<longleftrightarrow>
   by (auto simp: emb'_def)
 
 
-lemma SPEC_REST_emb'_conv: "SPEC P t = REST (emb' P t)"
-  unfolding SPEC_def emb'_def by auto
-
-
 text \<open>Select some value with given property, or \<open>None\<close> if there is none.\<close>  
 definition SELECT :: "('a \<Rightarrow> bool) \<Rightarrow> 'c \<Rightarrow> ('a option,'c::{complete_lattice,monoid_add}) nrest"
   where "SELECT P tf \<equiv> if \<exists>x. P x then REST (emb (\<lambda>r. case r of Some p \<Rightarrow> P p | None \<Rightarrow> False) tf)
                else REST [None \<mapsto> tf]"
+
+
+
+lemma SPEC_REST_emb'_conv: "SPEC P t = REST (emb' P t)"
+  unfolding SPEC_def emb'_def by auto
+
+
 
                     
 lemma inresT_SELECT_Some: "inresT (SELECT Q tt) (Some x) t' \<longleftrightarrow> (Q x  \<and> (enat t' \<le> tt))"
@@ -1300,7 +1122,7 @@ lemma inresT_SELECT[refine_pw_simps]:
 lemma nofailT_SELECT[refine_pw_simps]: "nofailT (SELECT Q tt)"
   by(auto simp: nofailT_def SELECT_def)
 
-lemma s1:
+lemma SELECT_refine_aux1:
   fixes T::enat
   shows "SELECT P T \<le> (SELECT P T') \<longleftrightarrow> T \<le> T'"
   apply(cases "\<exists>x. P x") 
@@ -1311,7 +1133,7 @@ lemma s1:
     by (metis (full_types) enat_ord_code(3) enat_ord_simps(1) lessI not_enat_eq not_le order_mono_setup.refl) 
   done
      
-lemma s2:
+lemma SELECT_refine_aux2:
   fixes T::enat
   shows  "SELECT P T \<le> (SELECT P' T) \<longleftrightarrow> (
     (Ex P' \<longrightarrow> Ex P)  \<and> (\<forall>x. P x \<longrightarrow> P' x)) "
@@ -1331,16 +1153,105 @@ lemma SELECT_refine:
   shows "SELECT P T \<le> (SELECT P' T')"
 proof -
   have "SELECT P T \<le> SELECT P T'"
-    using s1 assms(3) by auto
+    using SELECT_refine_aux1 assms(3) by auto
   also have "\<dots> \<le> SELECT P' T'"
-    unfolding s2 apply safe
+    unfolding SELECT_refine_aux2 apply safe
     using assms(1,2) by auto  
   finally show ?thesis .
 qed
 
 
+subsubsection \<open>More on consume\<close>
 
-section \<open>RECT\<close>
+
+
+lemma inresT_consume[refine_pw_simps]:
+ "inresT (consume M t) x t' \<longleftrightarrow> (inresT M x (satminus t' t))"
+  unfolding satminus_def
+  apply(cases t)
+  apply(auto simp: consume_def  split: nrest.splits )
+  subgoal for n x2 z apply(cases z) by auto  
+  subgoal for n x2 z apply(cases z) by auto  
+  subgoal for x2 z apply(cases z) by auto   
+  done
+
+lemma consume_alt:
+  fixes T :: "(_,enat) acost"
+  shows
+   "consume M T = do { r \<leftarrow> M; consumea T; RETURNT r}"
+  term "consume M T"
+  apply(auto simp: pw_acost_eq_iff consumea_def refine_pw_simps project_acost_SPECT')
+  subgoal for b x t
+    apply(rule exI[where x=x])
+    apply(rule exI[where x="(satminus t (the_acost T b))"])
+    apply auto  
+    apply (simp add: satminus_def project_acost_SPECT') apply auto
+    by presburger 
+  subgoal unfolding satminus_def 
+    using inresT_mono by fastforce
+  done
+
+
+lemma 
+  fixes T1 :: "(_,enat) acost"
+  shows
+  consumea_shrink_1:
+    "do { consumea T1; consumea T2 } = consumea (T1 + T2)"
+  unfolding consumea_def  by(auto simp: bindT_def)
+
+lemma 
+  fixes T1 :: "(_,enat) acost"
+  shows
+  consumea_shrink:
+    "do { consumea T1; consumea T2 } = consumea (T1 + T2)"
+    "do { consumea T1; consumea T2; M } = do { consumea (T1 + T2); M }" 
+  by (auto simp add: consumea_shrink_1 simp flip: nres_acost_bind_assoc)
+
+lemma consume_alt2:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "consume M T = do { consumea T; M}"
+  unfolding consumea_def consume_def
+  apply(cases M) by (auto simp: bindT_def) 
+
+
+lemma flat_ge_consume[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "flat_ge f f' \<Longrightarrow> flat_ge (consume f T) (consume f' T)"
+  by (auto simp: refine_pw_simps pw_acost_flat_ge_iff) 
+
+lemma consume_mono'[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "f \<le> f' \<Longrightarrow> (consume f T) \<le> (consume f' T)"
+  by (auto simp: refine_pw_simps pw_acost_le_iff) 
+
+
+
+subsection \<open>Monadic if\<close>
+
+
+
+definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
+
+abbreviation monadic_If :: "(bool,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest"
+  ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
+  where "monadic_If b x y \<equiv> do { t \<leftarrow> b; MIf t x y }"
+
+
+lemma flat_ge_MIf[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "\<lbrakk>flat_ge f f'; flat_ge g g'\<rbrakk> \<Longrightarrow> flat_ge (MIf xb f g) (MIf xb f' g')"
+  unfolding MIf_def 
+  by refine_mono
+
+lemma MIf_mono[refine_mono]:
+  fixes f :: "(_,(_,enat)acost) nrest"
+  shows "\<lbrakk>f \<le> f'; g \<le> g'\<rbrakk> \<Longrightarrow> (MIf xb f g) \<le> (MIf xb f' g')"
+  unfolding MIf_def 
+  by refine_mono
+
+
+
+subsection \<open>RECT\<close>
 
 definition "mono2 B \<equiv> flatf_mono_ge B \<and>  mono B"
 
@@ -1367,39 +1278,6 @@ lemma RECT_unfold: "\<lbrakk>mono2 B\<rbrakk> \<Longrightarrow> RECT B = B (RECT
   unfolding RECT_def [abs_def]
   by (auto dest: trimonoD_mono simp: gfp_unfold[ symmetric])
 
-
-
-definition whileT :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('a,_) nrest) \<Rightarrow> 'a \<Rightarrow> ('a,_) nrest" where
-  "whileT b c = RECT (\<lambda>whileT s. (if b s then bindT (c s) whileT else RETURNT s))"
-
-lemma trimonoI[refine_mono]: 
-  "\<lbrakk>flatf_mono_ge B; mono B\<rbrakk> \<Longrightarrow> mono2 B"
-  unfolding mono2_def by auto
-
-lemma [refine_mono]: "(\<And>f g x. (\<And>x. f x \<le> g x) \<Longrightarrow> B f x \<le> B g x) \<Longrightarrow> mono B"
-  apply(rule monoI) apply(rule le_funI)
-  by (simp add: le_funD)
-
-
-    
-thm refine_mono
-
-lemma whileT_unfold_enat:
-  fixes c :: "_\<Rightarrow>(_,enat) nrest"
-  shows
-   "whileT b c = (\<lambda>s. (if b s then bindT (c s) (whileT b c) else RETURNT s))"
-  unfolding whileT_def
-  apply(rule RECT_unfold) 
-  by ( refine_mono)    
-
-lemma whileT_unfold_acost:
-  fixes c :: "_\<Rightarrow>(_,(_,enat)acost) nrest"
-  shows
-   "whileT b c = (\<lambda>s. (if b s then bindT (c s) (whileT b c) else RETURNT s))"
-  unfolding whileT_def
-  apply(rule RECT_unfold) 
-  by ( refine_mono)    
-
 lemma RECT_mono[refine_mono]:
   assumes [simp]: "mono2 B'"
   assumes LE: "\<And>F x. (B' F x) \<le> (B F x) "
@@ -1407,6 +1285,8 @@ lemma RECT_mono[refine_mono]:
   unfolding RECT_def
   apply clarsimp  
   by (meson LE gfp_mono le_fun_def)  
+
+
 
 lemma flat_ge_RECT_aux:
  fixes f :: "'a \<Rightarrow> ('b, (char list, 'c::{complete_lattice,monoid_add,comm_monoid_add,one}) acost) nrest"
@@ -1442,6 +1322,14 @@ lemma flat_ge_RECT_aux2:
   done
 
 
+lemma trimonoI[refine_mono]: 
+  "\<lbrakk>flatf_mono_ge B; mono B\<rbrakk> \<Longrightarrow> mono2 B"
+  unfolding mono2_def by auto
+
+lemma [refine_mono]: "(\<And>f g x. (\<And>x. f x \<le> g x) \<Longrightarrow> B f x \<le> B g x) \<Longrightarrow> mono B"
+  apply(rule monoI) apply(rule le_funI)
+  by (simp add: le_funD)
+
 
 lemma RECT'_unfold_aux:
   fixes B :: "('a \<Rightarrow> ('b, (char list, enat) acost) nrest)
@@ -1451,9 +1339,6 @@ lemma RECT'_unfold_aux:
   subgoal apply(rule flat_ge_RECT_aux) by simp
   subgoal  apply(rule flat_ge_RECT_aux2) by simp
   done 
-
-
-lemma off: "a=b \<Longrightarrow> consume a c = consume b c" by simp
 
 experiment
 begin
@@ -1499,7 +1384,7 @@ lemma RECT'_unfold:
   unfolding RECT_def [abs_def]  
   using RECT'_unfold_aux[OF assms]
   apply auto 
-  apply(rule off)
+  apply(rule consume_cong1)
   apply(subst gfp_unfold)  
   by (auto dest: trimonoD_mono  ) 
 
@@ -1525,8 +1410,6 @@ lemma RECT_rule_arb:
   done
 
 
-
-
 lemma RECT'_mono[refine_mono]:
   fixes B :: "('a \<Rightarrow> ('b, (string, enat) acost) nrest)
    \<Rightarrow> 'a \<Rightarrow> ('b, (string, enat) acost) nrest"
@@ -1542,29 +1425,7 @@ lemma RECT'_mono[refine_mono]:
     done
   by (rule LE)
 
-lemma whileT_mono: 
-  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
-  shows " (whileT b c x) \<le> (whileT b c' x)"
-  oops
 
-lemma whileT_mono_enat: 
-  fixes c :: "_\<Rightarrow>(_,enat) nrest"
-  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
-  shows " (whileT b c x) \<le> (whileT b c' x)"
-  unfolding whileT_def apply(rule RECT_mono)
-    subgoal by(refine_mono)  
-    apply auto apply(rule bindT_mono) using assms by auto
-
-lemma whileT_mono_fenat: 
-  fixes c :: "_\<Rightarrow>(_,(_,enat)acost) nrest"
-  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
-  shows " (whileT b c x) \<le> (whileT b c' x)"
-  unfolding whileT_def apply(rule RECT_mono)
-    subgoal by(refine_mono)  
-  apply auto apply(rule bindT_acost_mono) using assms by auto
-
-
-find_theorems RECT
 lemma wf_fp_induct:
   assumes fp: "\<And>x. f x = B (f) x"
   assumes wf: "wf R"
@@ -1662,11 +1523,43 @@ theorem RECT_wf_induct[consumes 1]:
   using RECT_wf_induct_aux[where P = "\<lambda>x fx.  P x fx"] assms by metis
 
 
-definition "MIf a b c = consume (if a then b else c) (cost ''if'' 1)"
 
-abbreviation monadic_If :: "(bool,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest \<Rightarrow> ('b,_) nrest"
-  ("(if\<^sub>N (_)/ then (_)/ else (_))" [0, 0, 10] 10)
-  where "monadic_If b x y \<equiv> do { t \<leftarrow> b; MIf t x y }"
+subsubsection \<open>While\<close>
+
+definition whileT :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('a,_) nrest) \<Rightarrow> 'a \<Rightarrow> ('a,_) nrest" where
+  "whileT b c = RECT (\<lambda>whileT s. (if b s then bindT (c s) whileT else RETURNT s))"
+
+lemma whileT_unfold_enat:
+  fixes c :: "_\<Rightarrow>(_,enat) nrest"
+  shows
+   "whileT b c = (\<lambda>s. (if b s then bindT (c s) (whileT b c) else RETURNT s))"
+  unfolding whileT_def
+  apply(rule RECT_unfold) 
+  by ( refine_mono)    
+
+lemma whileT_unfold_acost:
+  fixes c :: "_\<Rightarrow>(_,(_,enat)acost) nrest"
+  shows
+   "whileT b c = (\<lambda>s. (if b s then bindT (c s) (whileT b c) else RETURNT s))"
+  unfolding whileT_def
+  apply(rule RECT_unfold) 
+  by ( refine_mono)    
+
+lemma whileT_mono_enat: 
+  fixes c :: "_\<Rightarrow>(_,enat) nrest"
+  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
+  shows " (whileT b c x) \<le> (whileT b c' x)"
+  unfolding whileT_def apply(rule RECT_mono)
+    subgoal by(refine_mono)  
+    apply auto apply(rule bindT_mono) using assms by auto
+
+lemma whileT_mono_fenat: 
+  fixes c :: "_\<Rightarrow>(_,(_,enat)acost) nrest"
+  assumes "\<And>x. b x \<Longrightarrow> c x \<le> c' x"
+  shows " (whileT b c x) \<le> (whileT b c' x)"
+  unfolding whileT_def apply(rule RECT_mono)
+    subgoal by(refine_mono)  
+  apply auto apply(rule bindT_acost_mono) using assms by auto
 
 
 definition "monadic_WHILEIT I b f s \<equiv> do {
@@ -1681,78 +1574,6 @@ definition "monadic_WHILEIT I b f s \<equiv> do {
     }) (do {RETURNT s})
   }) s
 }"
-
-(* TODO: Move *)
-definition "satminus a b \<equiv> (if b=\<infinity> then 0 else a - the_enat b)"
-
-lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow> the_acost t b = \<infinity> \<or> ta \<le> the_enat (the_acost t b)"
-  unfolding satminus_def
-  by auto
-
-lemma inresT_consume[refine_pw_simps]:
- "inresT (consume M t) x t' \<longleftrightarrow> (inresT M x (satminus t' t))"
-  unfolding satminus_def
-  apply(cases t)
-  apply(auto simp: consume_def  split: nrest.splits )
-  subgoal for n x2 z apply(cases z) by auto  
-  subgoal for n x2 z apply(cases z) by auto  
-  subgoal for x2 z apply(cases z) by auto   
-  done
-
-
-
-lemma consume_zero:
-  fixes M :: "(_,(_,enat) acost) nrest"
-  shows "x=0 \<Longrightarrow> NREST.consume M x = M"
-  by(auto simp: pw_acost_eq_iff refine_pw_simps zero_acost_def satminus_def zero_enat_def)
-
-
-
-definition "consumea T = SPECT [()\<mapsto>T]"
-
-lemma consume_alt_aux:
-  fixes T :: "'a::{comm_monoid_add}"
-  shows "map_option ((+) T) (if xa = x then Some t else None)
-  = (if xa = x then Some (t+T) else None)"
-  by (auto simp: add.commute)
-
-lemma consume_alt:
-  fixes T :: "(_,enat) acost"
-  shows
-   "consume M T = do { r \<leftarrow> M; consumea T; RETURNT r}"
-  term "consume M T"
-  apply(auto simp: pw_acost_eq_iff consumea_def refine_pw_simps project_acost_SPECT')
-  subgoal for b x t
-    apply(rule exI[where x=x])
-    apply(rule exI[where x="(satminus t (the_acost T b))"])
-    apply auto  
-    apply (simp add: satminus_def project_acost_SPECT') apply auto
-    by presburger 
-  subgoal unfolding satminus_def 
-    using inresT_mono by fastforce
-  done
-
-
-lemma 
-  fixes T1 :: "(_,enat) acost"
-  shows
-  consumea_shrink_1:
-    "do { consumea T1; consumea T2 } = consumea (T1 + T2)"
-  unfolding consumea_def  by(auto simp: bindT_def)
-
-lemma 
-  fixes T1 :: "(_,enat) acost"
-  shows
-  consumea_shrink:
-    "do { consumea T1; consumea T2 } = consumea (T1 + T2)"
-    "do { consumea T1; consumea T2; M } = do { consumea (T1 + T2); M }" 
-  by (auto simp add: consumea_shrink_1 simp flip: nres_acost_bind_assoc)
-
-lemma consume_alt2:
-  fixes M :: "(_,(_,enat) acost) nrest"
-  shows "consume M T = do { consumea T; M}"
-  unfolding consumea_def consume_def
-  apply(cases M) by (auto simp: bindT_def) 
 
 
 lemma monadic_WHILEIT_RECT'_conv:
@@ -1783,11 +1604,6 @@ definition "monadic_WHILEIT' I b f s \<equiv> do {
 }"
 
 
-
-
-
-
-
 definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> _) \<Rightarrow> ('a \<Rightarrow> bool)
                            \<Rightarrow> ('a \<Rightarrow> ('a,'c::{complete_lattice,plus,zero,monoid_add}) nrest)
                            \<Rightarrow> 'a \<Rightarrow> ('a,'c) nrest" where
@@ -1797,8 +1613,6 @@ definition  whileIET :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow>
 definition "monadic_WHILEIET I E b f s \<equiv> monadic_WHILEIT I b f s"
 definition "monadic_WHILEIET' I E b f s \<equiv> monadic_WHILEIT' I b f s"
                                                     
-
-
 
 
 subsection \<open>inresT retrieval\<close>
@@ -1882,89 +1696,6 @@ lemma acost_componentwise_leI:
    apply simp
   by (auto simp: less_eq_acost_def)
 
-
-
-section "some Monadic Refinement Automation"
-
-
-ML \<open>
-structure Refine = struct
-
-  structure vcg = Named_Thms
-    ( val name = @{binding refine_vcg}
-      val description = "Refinement Framework: " ^ 
-        "Verification condition generation rules (intro)" )
-
-  structure vcg_cons = Named_Thms
-    ( val name = @{binding refine_vcg_cons}
-      val description = "Refinement Framework: " ^
-        "Consequence rules tried by VCG" )
-
-  structure refine0 = Named_Thms
-    ( val name = @{binding refine0}
-      val description = "Refinement Framework: " ^
-        "Refinement rules applied first (intro)" )
-
-  structure refine = Named_Thms
-    ( val name = @{binding refine}
-      val description = "Refinement Framework: Refinement rules (intro)" )
-
-  structure refine2 = Named_Thms
-    ( val name = @{binding refine2}
-      val description = "Refinement Framework: " ^
-        "Refinement rules 2nd stage (intro)" )
-
-  (* If set to true, the product splitter of refine_rcg is disabled. *)
-  val no_prod_split = 
-    Attrib.setup_config_bool @{binding refine_no_prod_split} (K false);
-
-  fun rcg_tac add_thms ctxt = 
-    let 
-      val cons_thms = vcg_cons.get ctxt
-      val ref_thms = (refine0.get ctxt 
-        @ add_thms @ refine.get ctxt @ refine2.get ctxt);
-      val prod_ss = (Splitter.add_split @{thm prod.split} 
-        (put_simpset HOL_basic_ss ctxt));
-      val prod_simp_tac = 
-        if Config.get ctxt no_prod_split then 
-          K no_tac
-        else
-          (simp_tac prod_ss THEN' 
-            REPEAT_ALL_NEW (resolve_tac ctxt @{thms impI allI}));
-    in
-      REPEAT_ALL_NEW_FWD (DETERM o FIRST' [
-        resolve_tac ctxt ref_thms,
-        resolve_tac ctxt cons_thms THEN' resolve_tac ctxt ref_thms,
-        prod_simp_tac
-      ])
-    end;
-
-  fun post_tac ctxt = REPEAT_ALL_NEW_FWD (FIRST' [
-    eq_assume_tac,
-    (*match_tac ctxt thms,*)
-    SOLVED' (Tagged_Solver.solve_tac ctxt)]) 
-         
-
-end;
-\<close>
-setup \<open>Refine.vcg.setup\<close>
-setup \<open>Refine.vcg_cons.setup\<close>
-setup \<open>Refine.refine0.setup\<close>
-setup \<open>Refine.refine.setup\<close>
-setup \<open>Refine.refine2.setup\<close>
-(*setup {* Refine.refine_post.setup *}*)
-
-method_setup refine_rcg = 
-  \<open>Attrib.thms >> (fn add_thms => fn ctxt => SIMPLE_METHOD' (
-    Refine.rcg_tac add_thms ctxt THEN_ALL_NEW_FWD (TRY o Refine.post_tac ctxt)
-  ))\<close> 
-  "Refinement framework: Generate refinement conditions"     
-
-method_setup refine_vcg = 
-  \<open>Attrib.thms >> (fn add_thms => fn ctxt => SIMPLE_METHOD' (
-    Refine.rcg_tac (add_thms @ Refine.vcg.get ctxt) ctxt THEN_ALL_NEW_FWD (TRY o Refine.post_tac ctxt)
-  ))\<close> 
-  "Refinement framework: Generate refinement and verification conditions"
 
 
 end

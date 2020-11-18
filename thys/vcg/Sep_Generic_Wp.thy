@@ -868,7 +868,7 @@ section \<open>experiment: Hoare-triple without Time\<close>
 section \<open>experiment: cost type for Space\<close>
 
 
-datatype space_cost = Space_Cost nat nat (* highest point,  how far below that mark at the moment *)
+datatype space_cost = Space_Cost (sca: nat) (scb: nat) (* highest point,  how far below that mark at the moment *)
 
 
 (*

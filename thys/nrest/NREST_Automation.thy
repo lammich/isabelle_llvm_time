@@ -1,9 +1,104 @@
+\<^marker>\<open>creator "Maximilian P. L. Haslbeck"\<close>
+\<^marker>\<open>contributor "Peter Lammich"\<close>
+section \<open>Automation for NREST\<close>
 theory NREST_Automation
-imports NREST_Main "../cost/Enat_Cost"
+imports NREST_Backwards_Reasoning "../cost/Enat_Cost"
 begin
 
 
-section \<open>Solver for Time Side conditions\<close>
+paragraph \<open>Summary\<close>
+text \<open>This theory contains automation for NREST:
+\<^item> A refinement condition generator for lockstep refinement
+\<^item> Solver for Time Side conditions
+\<^item> Setup for normalizing time functions and exchange rates
+\<close>
+
+
+
+subsection "Monadic Refinement Automation"
+
+
+ML \<open>
+structure Refine = struct
+
+  structure vcg = Named_Thms
+    ( val name = @{binding refine_vcg}
+      val description = "Refinement Framework: " ^ 
+        "Verification condition generation rules (intro)" )
+
+  structure vcg_cons = Named_Thms
+    ( val name = @{binding refine_vcg_cons}
+      val description = "Refinement Framework: " ^
+        "Consequence rules tried by VCG" )
+
+  structure refine0 = Named_Thms
+    ( val name = @{binding refine0}
+      val description = "Refinement Framework: " ^
+        "Refinement rules applied first (intro)" )
+
+  structure refine = Named_Thms
+    ( val name = @{binding refine}
+      val description = "Refinement Framework: Refinement rules (intro)" )
+
+  structure refine2 = Named_Thms
+    ( val name = @{binding refine2}
+      val description = "Refinement Framework: " ^
+        "Refinement rules 2nd stage (intro)" )
+
+  (* If set to true, the product splitter of refine_rcg is disabled. *)
+  val no_prod_split = 
+    Attrib.setup_config_bool @{binding refine_no_prod_split} (K false);
+
+  fun rcg_tac add_thms ctxt = 
+    let 
+      val cons_thms = vcg_cons.get ctxt
+      val ref_thms = (refine0.get ctxt 
+        @ add_thms @ refine.get ctxt @ refine2.get ctxt);
+      val prod_ss = (Splitter.add_split @{thm prod.split} 
+        (put_simpset HOL_basic_ss ctxt));
+      val prod_simp_tac = 
+        if Config.get ctxt no_prod_split then 
+          K no_tac
+        else
+          (simp_tac prod_ss THEN' 
+            REPEAT_ALL_NEW (resolve_tac ctxt @{thms impI allI}));
+    in
+      REPEAT_ALL_NEW_FWD (DETERM o FIRST' [
+        resolve_tac ctxt ref_thms,
+        resolve_tac ctxt cons_thms THEN' resolve_tac ctxt ref_thms,
+        prod_simp_tac
+      ])
+    end;
+
+  fun post_tac ctxt = REPEAT_ALL_NEW_FWD (FIRST' [
+    eq_assume_tac,
+    (*match_tac ctxt thms,*)
+    SOLVED' (Tagged_Solver.solve_tac ctxt)]) 
+         
+
+end;
+\<close>
+setup \<open>Refine.vcg.setup\<close>
+setup \<open>Refine.vcg_cons.setup\<close>
+setup \<open>Refine.refine0.setup\<close>
+setup \<open>Refine.refine.setup\<close>
+setup \<open>Refine.refine2.setup\<close>
+(*setup {* Refine.refine_post.setup *}*)
+
+method_setup refine_rcg = 
+  \<open>Attrib.thms >> (fn add_thms => fn ctxt => SIMPLE_METHOD' (
+    Refine.rcg_tac add_thms ctxt THEN_ALL_NEW_FWD (TRY o Refine.post_tac ctxt)
+  ))\<close> 
+  "Refinement framework: Generate refinement conditions"     
+
+(*method_setup refine_vcg = 
+  \<open>Attrib.thms >> (fn add_thms => fn ctxt => SIMPLE_METHOD' (
+    Refine.rcg_tac (add_thms @ Refine.vcg.get ctxt) ctxt THEN_ALL_NEW_FWD (TRY o Refine.post_tac ctxt)
+  ))\<close> 
+  "Refinement framework: Generate refinement and verification conditions"
+*)
+
+subsection \<open>Solver for Time Side conditions\<close>
 
 lemma lift_acost_propagate: "lift_acost (t+t') = lift_acost t + lift_acost t' "
   unfolding lift_acost_def by (cases t; cases t'; auto)

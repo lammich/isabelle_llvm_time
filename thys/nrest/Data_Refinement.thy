@@ -1,9 +1,14 @@
+\<^marker>\<open>creator "Maximilian P. L. Haslbeck"\<close>
+\<^marker>\<open>contributor "Peter Lammich"\<close>
+section \<open>Data Refinement\<close>
 theory Data_Refinement
-imports NREST Time_Refinement 
+imports NREST  NREST_Type_Classes
 begin
 
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces data refinement.\<close>
 
-subsection \<open>Data Refinement\<close>
+subsection \<open>Definition\<close>
 
 
 definition conc_fun  ("\<Down>") where
@@ -194,64 +199,6 @@ lemma bindT_conc_acost_refine':
   by metis
 
 
-lemma inresT_project_acost_timerefine: "inresT (project_acost b (timerefine E m')) x' t 
-       \<Longrightarrow> \<exists>t b. inresT (project_acost b m') x' t"
-  unfolding inresT_def project_acost_def timerefine_def
-  apply(cases m'; auto simp: le_fun_def split: if_splits option.splits)
-  by (metis zero_enat_def zero_le)  
-
-
-lemma bindT_refine_conc_time:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R';  \<exists>t b. inresT (project_acost b m) x t;  \<exists>t b. inresT (project_acost b m') x' t;
-    nofailT m; nofailT m'\<rbrakk> \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  using assms
-proof -
-  term "(timerefine E m')"
-  term timerefine
-  have "bindT m (\<lambda>x.  (f x)) \<le>  \<Down> R (bindT (timerefine E m') (\<lambda>x. timerefine E (f' x)))"
-    apply(rule bindT_conc_acost_refine') apply(rule assms(2)) 
-    apply(rule assms(3))  
-    by (auto simp: refine_pw_simps dest: inresT_project_acost_timerefine) 
-  also have "\<dots> \<le> \<Down> R (timerefine E (bindT m' f'))"
-    apply(rule nrest_Rel_mono)
-    apply(rule timerefine_bindT_ge) by(fact assms(1))
-  finally show ?thesis .
-qed
-lemma bindT_refine_conc_time2:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R';  \<exists>t b. inresT (project_acost b m) x t;  \<exists>t b. inresT (project_acost b m') x' t;
-    nofailT m; nofailT m'\<rbrakk> \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  using assms
-proof -
-  term "(timerefine E m')"
-  term timerefine
-  have "bindT m (\<lambda>x.  (f x)) \<le>  \<Down> R (bindT (timerefine E m') (\<lambda>x. timerefine E (f' x)))"
-    apply(rule bindT_conc_acost_refine') apply(rule assms(2)) 
-    apply(rule assms(3))  
-    by (auto simp: refine_pw_simps dest: inresT_project_acost_timerefine) 
-  also have "\<dots> \<le> \<Down> R (timerefine E (bindT m' f'))"
-    apply(rule nrest_Rel_mono)
-    apply(rule timerefine_bindT_ge2) by(fact assms(1))
-  finally show ?thesis .
-qed
-
-
-
-lemma bindT_refine_conc_time_my:
-  fixes m :: "('e1,('c1,enat)acost) nrest"
-  fixes m' :: "('e2,('c2,enat)acost) nrest"
-  assumes "wfR'' E" " m \<le> \<Down>R' (timerefine E m')"
-  "(\<And>x x'. \<lbrakk>(x,x')\<in>R'; \<exists>t b. inresT (project_acost b m') x' t\<rbrakk>
-         \<Longrightarrow> f x \<le> \<Down> R (timerefine E (f' x') ))"
-shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
-  apply(rule bindT_refine_conc_time2) using assms by auto
 
 
 lemma "(x,x')\<in>R \<Longrightarrow> (RETURNT x ::(_,'a::{nonneg,order,complete_lattice,monoid_add}) nrest ) \<le> \<Down>R (RETURNT x')"
@@ -330,98 +277,7 @@ lemma
 end *)
 
 
-subsubsection \<open>Interaction with monadic operators\<close>
-
-thm continuous_option'[folded map_option_case]
-thm map_option_case
-lemma map_option_case_option_conv: "map_option f = case_option None (\<lambda>x. Some (f x))"
-  apply (rule ext) 
-  unfolding map_option_case by simp
-
-lemma continuous_map_option: "NREST.continuous f \<Longrightarrow> NREST.continuous (map_option f)"
-  unfolding map_option_case_option_conv apply(intro continuous_option') .
-
-lemma "NREST.continuous ((+) (t::enat))"
-  apply(rule continuousI)
-  oops
-
-lemma enat_plus_Sup_distrib:
-  "A\<noteq>{} \<Longrightarrow> (a::enat) + Sup A = Sup ((+) a ` A)"
-  apply(cases a)
-  subgoal 
-  unfolding Sup_enat_def apply auto
-   apply (metis Max.hom_commute empty_iff enat_add_left_cancel_le max_def plus_enat_simps(2))
-  apply(subst (asm) finite_image_iff)
-  subgoal unfolding inj_on_def by auto
-  subgoal apply simp done
-  done
-  subgoal by simp
-  done
-
-lemma ecost_plus_Sup_distrib:
-  "A\<noteq>{} \<Longrightarrow> (a::(_,enat) acost) + Sup A = Sup ((+) a ` A)"
-  unfolding Sup_acost_def apply(cases a)
-  unfolding plus_acost_alt apply simp
-  apply(rule ext)
-proof (goal_cases)
-  case (1 x xa)
-  have "x xa + (SUP f\<in>A. the_acost f xa) = x xa + (SUP f\<in>the_acost `A. f xa)"
-    apply simp  by (metis SUP_apply Sup_apply)  
-  also have "\<dots> = x xa + (SUP v\<in>{f xa|f. f \<in> the_acost `A}. v)"
-    by (simp add: setcompr_eq_image)  
-  also have "\<dots> = Sup ((+) (x xa) ` {f xa|f. f \<in> the_acost `A})"
-    apply(subst enat_plus_Sup_distrib) using 1(1) by auto
-  also have "\<dots> = (SUP x\<in>case_acost (\<lambda>b. acostC (\<lambda>xa. x xa + b xa)) ` A. the_acost x xa) "
-    apply(rule arg_cong[where f=Sup])
-    apply auto
-    subgoal for xb apply(cases xb) apply (auto simp: )
-      apply(rule image_eqI) by auto 
-    subgoal for xb apply(cases xb) apply (auto simp: )
-      apply(rule image_eqI) apply(rule refl) apply auto  
-      by force
-    done
-  finally show ?case .
-qed
-   
-lemma map_option_plus_ecost_continuous:
-  fixes t :: "(_,enat) acost"
-  shows "(\<lambda>a. map_option ((+) t) a) (Sup A) = Sup ((\<lambda>a. map_option ((+) (t)) a) ` A)"
-  unfolding map_option_case_option_conv
-  unfolding Sup_option_def[unfolded my_these_def] 
-  apply (simp add: option_Some_image  )
-  apply rule+
-  subgoal  
-    by (metis empty_is_image ffF these_empty_eq)  
-  subgoal apply(subst ecost_plus_Sup_distrib)
-    subgoal
-        using everywhereNone by fastforce  
-  apply(rule arg_cong[where f=Sup]) 
-    by  (auto split: option.splits  intro: rev_image_eqI)  
-  done
-
-lemma map_option_plus_enat_continuous:
-  fixes t :: enat
-  shows "(\<lambda>a. map_option ((+) t) a) (Sup A) = Sup ((\<lambda>a. map_option ((+) (t)) a) ` A)"
-  unfolding map_option_case_option_conv
-  unfolding Sup_option_def[unfolded my_these_def] 
-  apply (simp add: option_Some_image  )
-  apply rule+
-  subgoal  
-    by (metis empty_is_image ffF these_empty_eq)  
-  subgoal apply(subst enat_plus_Sup_distrib)
-    subgoal
-        using everywhereNone by fastforce  
-  apply(rule arg_cong[where f=Sup]) 
-    by  (auto split: option.splits  intro: rev_image_eqI)  
-  done
-
-lemma conc_fun_consume_aux:
-  fixes x2 :: "_ \<Rightarrow> (_,enat) acost option"
-  shows "Sup ((\<lambda>a. map_option ((+) t) a) ` {x2 a| a. (c, a) \<in> R})
-         = (\<lambda>a. map_option ((+) t) a) (Sup {x2 a |a. (c, a) \<in> R})"
-  apply(subst map_option_plus_ecost_continuous)
-  apply simp done
-
+subsection \<open>Interaction with monadic operators\<close>
 
 lemma conc_fun_consume: 
   fixes M :: "('c, (_,enat) acost ) nrest"
@@ -433,34 +289,52 @@ lemma conc_fun_consume:
   by auto 
 
 
-subsubsection \<open>Examples\<close>
-
-definition Rset where "Rset = { (c,a)| c a. set c = a}"
-                                     
-lemma "RETURNT [1,2,3] \<le> \<Down>Rset (RETURNT {1,2,3})"
-  unfolding conc_fun_def RETURNT_def Rset_def
-  apply simp unfolding le_fun_def by auto
-
-lemma "RETURNT [1,2,3] \<le> \<Down>Rset (RETURNT {1,2,3})"
-  unfolding conc_fun_def RETURNT_def Rset_def
-  apply simp unfolding le_fun_def by auto
+lemma consume_refine_easy:
+  fixes M :: "('e, ('b, enat) acost) nrest"
+  shows "\<lbrakk>t \<le> t'; M \<le> \<Down> R (   M')\<rbrakk> \<Longrightarrow> NREST.consume M t \<le> \<Down>R (  (NREST.consume M' t'))" 
+  apply(subst conc_fun_consume)
+  apply(rule consume_mono) by auto
 
 
-definition Reven where "Reven = { (c,a)| c a. even c = a}"
-
-lemma "RETURNT 3 \<le> \<Down>Reven (RETURNT False)"
-  unfolding conc_fun_def RETURNT_def Reven_def
-  apply simp unfolding le_fun_def by auto
-
-lemma "m \<le> \<Down>Id m"
-  unfolding conc_fun_def RETURNT_def 
-  apply (cases m) by auto
+lemma build_rel_SPEC_conv:
+  fixes T :: "_ \<Rightarrow> ((_,enat)acost)"
+  assumes "\<And>x. T (\<alpha> x) = T' x"
+  shows "\<Down>(br \<alpha> I) (SPEC \<Phi> T) = SPEC (\<lambda>x. I x \<and> \<Phi> (\<alpha> x)) T'"  
+  using assms by (auto simp: br_def pw_acost_eq_iff refine_pw_simps SPEC_def)
 
 
-lemma "m \<le> \<Down>{} m \<longleftrightarrow> (m=FAILT \<or> m = SPECT bot)"
-  unfolding conc_fun_def RETURNT_def 
-  apply (cases m) apply auto by (metis bot.extremum dual_order.antisym le_funI)
 
+subsection \<open>Examples\<close>
+
+experiment 
+begin
+  definition Rset where "Rset = { (c,a)| c a. set c = a}"
+                                       
+  lemma "RETURNT [1,2,3] \<le> \<Down>Rset (RETURNT {1,2,3})"
+    unfolding conc_fun_def RETURNT_def Rset_def
+    apply simp unfolding le_fun_def by auto
+  
+  lemma "RETURNT [1,2,3] \<le> \<Down>Rset (RETURNT {1,2,3})"
+    unfolding conc_fun_def RETURNT_def Rset_def
+    apply simp unfolding le_fun_def by auto
+  
+  
+  definition Reven where "Reven = { (c,a)| c a. even c = a}"
+  
+  lemma "RETURNT 3 \<le> \<Down>Reven (RETURNT False)"
+    unfolding conc_fun_def RETURNT_def Reven_def
+    apply simp unfolding le_fun_def by auto
+  
+  lemma "m \<le> \<Down>Id m"
+    unfolding conc_fun_def RETURNT_def 
+    apply (cases m) by auto
+  
+  
+  lemma "m \<le> \<Down>{} m \<longleftrightarrow> (m=FAILT \<or> m = SPECT bot)"
+    unfolding conc_fun_def RETURNT_def 
+    apply (cases m) apply auto by (metis bot.extremum dual_order.antisym le_funI)
+
+end
 
 lemma abs_fun_simps[simp]: 
   "\<Up>R FAILT = FAILT"
@@ -527,11 +401,11 @@ lemma ac_galois: "galois_connection (\<Up>R) (\<Down>R)"
   by (rule conc_abs_swap)
 *)
 
-lemma 
+lemma Sup_some_svD:
   fixes m :: "'b \<Rightarrow> enat option"
-  shows 
-  Sup_some_svD: "Sup {m a |a. (c, a) \<in> R} = Some t' \<Longrightarrow> (\<exists>a. (c,a)\<in>R \<and> m a = Some t')"
-  using SV by (smt Sup_le_iff dual_order.antisym less_eq_option_Some_None mem_Collect_eq order_refl single_valued_def)
+  shows "Sup {m a |a. (c, a) \<in> R} = Some t' \<Longrightarrow> (\<exists>a. (c,a)\<in>R \<and> m a = Some t')"
+  using SV by (smt Sup_le_iff dual_order.antisym less_eq_option_Some_None
+                    mem_Collect_eq order_refl single_valued_def)
  
 
 end 
@@ -752,17 +626,6 @@ lemma WHILET_refine:
      apply (fact R0)
     by(auto simp: COND_REF STEP_REF RETURNT_refine intro: bindT_refine[where R'=R])  
 
-lemma 
-  assumes a: "\<And>m n c a. c\<in>Domain R \<Longrightarrow> \<exists>a. SPECT (n c) \<le>  SPECT (m a)"
-  shows "(SPECT n) \<le> \<Down> R (SPECT m)"
-  using a  apply auto  
-    unfolding conc_fun_def apply (auto split: nrest.split) 
-      unfolding le_fun_def apply auto
-    proof -
-      fix c 
-      assume "(\<And>c n m. c \<in> Domain R \<Longrightarrow> \<exists>a. \<forall>x. n c x \<le> m a x)"
-      oops
-
 lemma SPECT_refines_conc_fun':
   assumes a: "\<And>m c.  M = SPECT m
           \<Longrightarrow> c \<in> dom n \<Longrightarrow> (\<exists>a. (c,a)\<in>R \<and> n c \<le> m a)"
@@ -851,78 +714,15 @@ lemma param_bind[param]:
   "(bind,bind) \<in> \<langle>Ra\<rangle>nrest_rel \<rightarrow> (Ra\<rightarrow>\<langle>Rb\<rangle>nrest_rel) \<rightarrow> (\<langle>Rb\<rangle>nrest_rel:: (('a, (_,enat)acost) nrest \<times> ('c, _) nrest) set)"
   by (auto simp: nrest_rel_def intro: bindT_conc_acost_refine' dest: fun_relD)
 
-lemma param_ASSERT_bind[param]: "\<lbrakk> 
+lemma param_ASSERT_bind[param]:
+  fixes f :: "(_,_) nrest"
+  shows 
+ "\<lbrakk>
     (\<Phi>,\<Psi>) \<in> bool_rel; 
     \<lbrakk> \<Phi>; \<Psi> \<rbrakk> \<Longrightarrow> (f,g)\<in>\<langle>R\<rangle>nrest_rel
-  \<rbrakk> \<Longrightarrow> (ASSERT \<Phi> \<then> f, ASSERT \<Psi> \<then> g) \<in> \<langle>R\<rangle>nrest_rel"
+  \<rbrakk> \<Longrightarrow> (doN { ASSERT \<Phi>; f}, doN {ASSERT \<Psi>; g}) \<in> \<langle>R\<rangle>nrest_rel"
   by (auto intro: nrest_relI)
 
-
-definition nrest_trel where 
-  nrest_trel_def_internal: "nrest_trel R E \<equiv> {(c,a).  c \<le> \<Down>R (timerefine E a)}"
-
-
-lemma nrest_trelD: "(c,a)\<in>nrest_trel R E \<Longrightarrow> c \<le> \<Down>R (timerefine E a)" by (simp add: nrest_trel_def_internal)
-
-  
-lemma nrest_trelI: "c \<le> \<Down>R (timerefine E a) \<Longrightarrow> (c,a)\<in>nrest_trel R E" by (simp add: nrest_trel_def_internal)
-
-(* TODO: move *)
-
-
-lemma timerefine_conc_fun_ge2:
-  fixes C :: "('f, ('b, enat) acost) nrest"
-  assumes "wfR'' E"
-  shows "timerefine E (\<Down> R C) \<ge> \<Down>R (timerefine E C)"
-
-  unfolding conc_fun_def timerefine_def
-  apply(cases C) apply auto apply(rule le_funI)
-  apply(rule Sup_least)
-  apply (auto split: option.splits)
-  subgoal 
-    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some_None mem_Collect_eq)
-  unfolding less_eq_acost_def apply auto
-  apply(rule Sum_any_mono)
-  apply(rule mult_right_mono)
-  subgoal     
-    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some mem_Collect_eq the_acost_mono)
-    apply simp
-  apply(rule wfR_finite_mult_left2 )
-  using assms by simp
-
-
-thm timerefine'_def
-term wfR
-lemma timerefine_conc_fun_le2:
-  assumes "continuous E"
-  shows "timerefine' E (\<Down> R C) = \<Down>R (timerefine' E C)"
-  unfolding timerefine'_def conc_fun_def 
-  apply(auto split: nrest.splits option.splits simp: fun_eq_iff)
-  subgoal 
-    by (smt Sup_bot_conv(1) bot_option_def mem_Collect_eq) 
-  subgoal premises p for x2 x2a x2b x x2c
-  proof -
-    have "Sup {x2b a |a. (x, a) \<in> R} = Sup {map_option E (x2 a) |a. (x, a) \<in> R}"
-      apply(rule arg_cong[where f=Sup])
-      using p(3)[rule_format] p(4)
-      apply auto
-      subgoal by (smt map_option_eq_Some option.exhaust) 
-      subgoal by (metis not_None_eq option.simps(8) option.simps(9)) 
-      done
-    also have "\<dots> = map_option E (Sup {x2 a |a. (x, a) \<in> R})" 
-      apply(subst continuous_map_option[OF assms, THEN continuousD] )
-      apply(rule arg_cong[where f=Sup])
-      by auto
-    also have "\<dots> = map_option E (Some x2c)"
-      using p(2)[rule_format, of x, unfolded p(4)] by simp
-    also have "\<dots> = Some (E x2c)" by simp
-    finally show "Some (E x2c) = Sup {x2b a |a. (x, a) \<in> R}"  by simp
-  qed
-  done 
-
-thm timerefine'_def
-thm timerefine_alt3
-thm wfR''_def
 
 
 definition continuous2 :: "_ \<Rightarrow> ('a::{Sup} \<Rightarrow> 'b::{Sup}) \<Rightarrow> bool"  where
@@ -937,14 +737,6 @@ lemma
   fixes A :: "enat set"
   shows "Sup A  \<in> A \<Longrightarrow> Sup ( (\<lambda>a. a * c) ` A) \<in> (\<lambda>a. a * c) ` A"   
   by (metis enat_mult_cont imageI)  
-
-
-lemma  
-  fixes A :: "_ set"
-  fixes f :: "_ \<Rightarrow> enat"
-  assumes "A\<noteq>{}" "mono f" "Sup A  \<in> A"
-  shows " Sup ( f ` A) \<in> f ` A"    
-    oops
 
 
 lemma plus_continuous_if_attains_sup:
@@ -1060,28 +852,4 @@ lemma timerefine_conc_fun_le2:
   done 
 
 *)
-
-
-lemma timerefine_conc_fun_ge:
-  fixes C :: "('f, ('b, enat) acost) nrest"
-  assumes "wfR E"
-  shows "timerefine E (\<Down> R C) \<ge> \<Down>R (timerefine E C)"
-
-  unfolding conc_fun_def timerefine_def
-  apply(cases C) apply auto apply(rule le_funI)
-  apply(rule Sup_least)
-  apply (auto split: option.splits)
-  subgoal 
-    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some_None mem_Collect_eq)
-  unfolding less_eq_acost_def apply auto
-  apply(rule Sum_any_mono)
-  apply(rule mult_right_mono)
-  subgoal     
-    by (metis (mono_tags, lifting) Sup_upper less_eq_option_Some mem_Collect_eq the_acost_mono)
-    apply simp
-  apply(rule wfR_finite_mult_left )
-  using assms by simp
-
-
-
 end

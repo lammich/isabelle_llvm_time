@@ -1,9 +1,16 @@
+\<^marker>\<open>creator "Maximilian P. L. Haslbeck"\<close>
+\<^marker>\<open>contributor "Peter Lammich"\<close>
+section \<open>Generalized Weakest Precondition - gwp\<close>
 theory NREST_Backwards_Reasoning
 imports NREST NREST_Type_Classes "../cost/Enat_Cost" Time_Refinement
-begin      
+begin
 
-section \<open>gwp - Generalized Weakest Precondition\<close>
 
+paragraph \<open>Summary\<close>
+text \<open>This theory introduces backwards reasoning for NREST. It generalizes weakest precondition
+    to resources and forms a syntax directed VCG.\<close>
+ 
+subsection \<open>Auxiliary Definitions\<close>
 
 
 definition mm3 where
@@ -49,7 +56,7 @@ lemma Some_eq_emb'_conv: "Some t = emb' Q ft x \<longleftrightarrow> Q x \<and> 
         "emb' Q ft x = Some t  \<longleftrightarrow> Q x \<and> t = ft x"
   by (auto simp: emb'_def)
 
-subsection "minus potential"
+subsubsection "minus potential"
 
 definition minus_potential :: "( 'a \<Rightarrow> ('d::{minus,ord,top}) option) \<Rightarrow> ( 'a \<Rightarrow> 'd option) \<Rightarrow> ( 'a \<Rightarrow> 'd option)" where
   "minus_potential R m = (\<lambda>x. (case m x of None \<Rightarrow> Some top
@@ -67,11 +74,6 @@ lemma minus_cost_None: "minus_cost r None = Some top" unfolding minus_cost_def b
 lemma f: "(t::_::complete_lattice) \<le> Some top \<longleftrightarrow> True" 
   unfolding less_eq_option_def top_option_def apply(cases t) by auto 
 
-lemma fixes r :: "'b::{complete_lattice,minus,drm}"
-  shows "R\<noteq>{} \<Longrightarrow> (INF mt\<in>R. r - mt) \<le> r - Sup mt"
-    
-  oops
-
 lemma minus_cost_mono: 
   fixes q q' :: "'b::{complete_lattice,minus,ord,top,drm} option"
   shows "(m \<noteq> None \<Longrightarrow> q' \<le> q) \<Longrightarrow> minus_cost q m \<ge> minus_cost q' m"
@@ -88,18 +90,9 @@ lemma minus_cost_antimono:
   subgoal using order_trans by auto   
   done
 
-
-term "R\<noteq>{} \<Longrightarrow> (SUP r\<in>R. mt - r) \<le> mt - Sup R" 
-
 lemma Option_these_non_empty_if_Sup_Some: "Sup X = Some t \<Longrightarrow> Option.these X \<noteq> {}"
   by (simp add: SupD these_empty_eq)
 
-lemma ASSN_enat:
-  shows "X\<noteq>{} \<Longrightarrow> \<forall>x\<in>X. t \<le> q - (x::enat) \<Longrightarrow> t \<le> q - (Sup X)"  
-  unfolding Sup_enat_def apply auto
-  apply(cases q) apply auto
-  by (metis antisym cancel_comm_monoid_add_class.diff_cancel drm_class.diff_left_mono finite_enat_bounded idiff_enat_enat linear zero_enat_def zero_le)
- 
 lemma Sup_option_these: "Sup X = Some b \<Longrightarrow> Sup (Option.these X) = (b::'a::complete_lattice)" 
     by (metis SupD Sup_option_def option.sel)   
 
@@ -142,10 +135,8 @@ lemma "minus_cost r m = case_option (Some top) (\<lambda>mt. case_option None (\
 lemma minus_potential_alt: "minus_potential r m = (\<lambda>x. minus_cost (r x) (m x))"
   unfolding minus_potential_def minus_cost_def by simp
 
-
 lemma diff_right_mono_enat: "a \<le> b \<Longrightarrow> a - c \<le> b - (c::enat)"
   apply(cases a; cases b; cases c) by auto
-
 
 lemma minus_potential_mono: 
   fixes q q' :: "_ \<Rightarrow> 'b::{complete_lattice,minus,ord,top,drm} option"
@@ -154,18 +145,12 @@ lemma minus_potential_mono:
   apply(rule le_funI) apply(rule minus_cost_mono) 
   by(simp add: le_fun_def)
 
-
 lemma minus_potential_antimono: 
   fixes x y :: "_ \<Rightarrow> 'b::{complete_lattice,minus,ord,top,drm} option"
   shows "x \<le> y \<Longrightarrow> minus_potential q x \<ge> minus_potential q y"
   unfolding minus_potential_alt 
   apply(rule le_funI) apply(rule minus_cost_antimono) 
   by(simp add: le_fun_def)
-
-  
-
-thm diff_right_mono
-thm helper
 
 lemma extract_hard_case:
   fixes infi :: "'b::{complete_lattice,drm}"
@@ -244,13 +229,6 @@ lemma mm_continuousInf:
   apply(rule continuousInfI)
   apply(rule mm_continousInf') .
  
-lemma continuousInf_funs:
-  assumes *: "\<And>x. continuousInf (\<lambda>s. f s x)"
-  shows "continuousInf (\<lambda>s. f (s x) (m x))"
-  apply(rule continuousInfI)
-  unfolding Inf_fun_def
-  apply(subst continuousInfD[OF *]) apply simp
-  apply(subst image_image) by simp
 
 lemma minus_potential_continuousInf:
   fixes m :: "_ \<Rightarrow> ('d::{minus,ord,top,complete_lattice,drm}) option"
@@ -260,7 +238,7 @@ lemma minus_potential_continuousInf:
   by (rule mm_continuousInf) 
 
 
-subsection "mii"
+subsubsection "mii"
 
 
 definition minus_p_m :: "('a \<Rightarrow> ('b::{minus,complete_lattice,monoid_add}) option) \<Rightarrow> ('a,'b) nrest \<Rightarrow> 'a \<Rightarrow> 'b option" where 
@@ -305,9 +283,6 @@ lemma minus_p_m_antimono:
   by(simp add: le_fun_def)
 
 
-lemma continuousInf_Map_empty: "continuousInf Map.empty"
-  apply(rule continuousInfI)
-  by simp
 
 lemma continuousInf_minus_p_m:
   fixes m :: "(_ ,'d::{minus,ord,top,complete_lattice,drm,monoid_add}) nrest"
@@ -339,14 +314,7 @@ proof -
      apply auto
     apply(rule arg_cong[where f=Inf]) by auto
 qed
-
-
-lemma continuous_minus_p_m: "anticontinuous (\<lambda>m. minus_p_m Q m x)"
-  unfolding minus_p_m_def oops
-  
-
-lemma "minus_p_m Q (Sup M) x = Inf ((\<lambda>m. minus_p_m Q m x) ` M)"
-  oops                                         
+              
 
 lemma minus_p_m_continuous:
   fixes t :: "'b::{complete_lattice,minus,ord,top,drm,monoid_add} option"
@@ -365,27 +333,21 @@ lemma minus_p_m_continuous:
     by (auto intro: minus_cost_contiuous2) 
   done 
 
-thm minus_cost_antimono
-
-
-
 
 subsection \<open>gwp\<close>
 
 
-definition gwp :: "('a,'b) nrest \<Rightarrow> ('a \<Rightarrow> ('b::{needname_zero}) option) \<Rightarrow> 'b option" 
+definition gwp :: "('a,'b) nrest \<Rightarrow> ('a \<Rightarrow> ('b::{complete_lattice,minus,ord,top,drm,monoid_add}) option) \<Rightarrow> 'b option" 
   where "gwp M Qf  = Inf { minus_p_m Qf M x | x. True}"
 
 
-  definition "gwp\<^sub>n m Q \<equiv> (if nofailT m then gwp m Q else Some top)"
+definition "gwp\<^sub>n m Q \<equiv> (if nofailT m then gwp m Q else Some top)"
 
 lemma gwp_FAILT[simp]: "gwp FAILT Q  = None"
   by(auto simp: gwp_def minus_p_m_Failt)
 
-thm minus_p_m_mono
-
 lemma gwp_mono:
-  fixes q q' :: "'a \<Rightarrow> 'b::{complete_lattice,minus,ord,top,drm,monoid_add,needname_zero} option"
+  fixes q q' :: "'a \<Rightarrow> 'b::{complete_lattice,minus,ord,top,drm,monoid_add} option"
   assumes "\<And>P x. \<lbrakk>m = SPECT P; P x \<noteq> None\<rbrakk> \<Longrightarrow> q x \<le> q' x"
   shows "gwp m q \<le> gwp m q'"
 proof -
@@ -414,10 +376,6 @@ lemma gwp_pw: "gwp M Q \<ge> t  \<longleftrightarrow> (\<forall>x. minus_p_m Q M
   subgoal by (auto intro: Inf_greatest)
   done
 
-
-
-
-
 lemma gwp_specifies_I: 
   shows "gwp m Q \<ge> Some 0 \<Longrightarrow> (m \<le> SPECT Q)"
   unfolding gwp_pw apply (cases m)
@@ -431,6 +389,7 @@ lemma gwp_specifies_I:
   done
 
 lemma gwp_specifies_rev_I: 
+  fixes m :: "('b, 'a::{complete_lattice,minus,ord,top,drm,monoid_add,needname_zero}) nrest"
   shows "(m \<le> SPECT Q) \<Longrightarrow> gwp m Q \<ge> Some 0 "
   unfolding gwp_pw apply (cases m)
    apply (auto simp: minus_p_m_Failt le_fun_def minus_p_m_def minus_potential_def split: option.splits)
@@ -441,6 +400,22 @@ lemma gwp_specifies_rev_I:
     subgoal by (auto split: if_splits)
     done
   subgoal using needname_nonneg by blast
+  subgoal by (metis less_eq_option_Some) 
+  done
+
+
+
+lemma gwp_specifies_rev_I_bot: 
+  fixes m :: "('b, 'a::{complete_lattice,minus,ord,top,drm,monoid_add}) nrest"
+  shows "(m \<le> SPECT Q) \<Longrightarrow> gwp m Q \<ge> Some bot "
+  unfolding gwp_pw apply (cases m)
+   apply (auto simp: minus_p_m_Failt le_fun_def minus_p_m_def minus_potential_def split: option.splits)
+  subgoal for M x apply(cases "Q x"; cases "M x")
+    subgoal by (auto split: if_splits)[1]
+    subgoal by (metis less_eq_option_Some_None) 
+    subgoal by (auto split: if_splits)[1]
+    subgoal by (auto split: if_splits)
+    done
   subgoal by (metis less_eq_option_Some) 
   done
 
@@ -615,7 +590,7 @@ lemma Sup_Some: "Sup (S::('c::complete_lattice) option set) = Some e \<Longright
   unfolding Sup_option_def by (auto split: if_splits)
 
 
-lemma p:
+lemma progress_bind_aux1:
   fixes a b :: "'a::{ordered_comm_monoid_add,nonneg}" shows
  "0<a \<Longrightarrow> 0<a+b"  
     "0<a \<Longrightarrow> 0<b+a"  
@@ -652,7 +627,7 @@ next
     ultimately
     have " t1 > 0 \<or> x2a s' > Some 0" using assms by auto
 
-    then have "Some 0 < fa s'" using   a1  3  p  
+    then have "Some 0 < fa s'" using   a1  3  progress_bind_aux1  
       by fastforce  
     also have "\<dots> \<le> Sup {fa s'|fa. ?P fa}" 
       apply(rule Sup_upper) using P by blast
@@ -748,9 +723,6 @@ lemma gwp_bindT:
   apply (rule nres3_bindT)
   done
 
-thm gwp_bindT[where Q="Q::_\<Rightarrow>(_,enat) acost option"]
-
-
 lemma gwp_bindT_I[vcg_rules']:
   fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
   shows "\<And>t. Some t \<le>  gwp  M (\<lambda>y. gwp (f y) Q ) \<Longrightarrow>  Some t \<le> gwp (M \<bind> f) Q"
@@ -833,9 +805,28 @@ next
   then show ?thesis using assms(1) unfolding SELECT_def emb'_def by auto
 qed 
 
+
+
+lemma gwp_ASSERT_bind_I[vcg_rules']:
+  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
+  shows "(\<Phi> \<Longrightarrow> Some t \<le> gwp M Q) \<Longrightarrow> \<Phi> \<Longrightarrow> Some t \<le> gwp (do { ASSERT \<Phi>; M}) Q"
+  apply(cases \<Phi>)
+  by (auto intro: vcg_rules' )
+
+
+
+  lemma gwp_specifies_acr_I: 
+    fixes m :: "(_,(_,enat) acost) nrest"
+    shows "(\<Phi> \<Longrightarrow> gwp m [x \<mapsto> T] \<ge> Some 0) \<Longrightarrow> (m \<le> doN { ASSERT \<Phi>; consume (RETURNT x) T })"
+    apply(rule le_acost_ASSERTI)
+    unfolding consume_RETURNT
+    apply(rule gwp_specifies_I) by simp
+
+
+
 subsubsection \<open>Consequence Rules\<close>
 
-lemma aux1: 
+lemma gwp_conseq_aux1: 
   fixes Q :: "('b::{needname_zero}) option"
   shows "Some t \<le> minus_cost Q (Some t') \<longleftrightarrow> Some (t+t') \<le> Q"
   apply (auto simp: minus_cost_def split: option.splits)
@@ -864,7 +855,7 @@ proof -
         apply(cases "x2 x")
         subgoal  by (simp add: minus_cost_None)
         subgoal
-          apply(simp add: aux1)  
+          apply(simp add: gwp_conseq_aux1)  
           apply(cases "Q' x")
           subgoal by simp  
           apply(cases "Q x")
@@ -883,6 +874,7 @@ qed
 
 
 lemma gwp_conseq:
+  fixes f :: "('b, 'a::{complete_lattice,minus,ord,top,drm,monoid_add,needname_zero}) nrest"
   assumes 
     "gwp f Q' \<ge> Some t"
     "\<And>x t'' M. f = SPECT M \<Longrightarrow> M x \<noteq> None \<Longrightarrow> Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ( t'')" 
@@ -898,7 +890,7 @@ proof -
         apply(cases "x2 x")
         subgoal  by (simp add: minus_cost_None)
         subgoal
-          apply(simp add: aux1)  
+          apply(simp add: gwp_conseq_aux1)  
           apply(cases "Q' x")
           subgoal by simp  
           apply(cases "Q x")
@@ -937,7 +929,7 @@ proof -
     from i ii have "Some t \<le> minus_p_m Q f x"
       unfolding minus_p_m_alt apply(auto split: nrest.splits)
       subgoal for x2 apply(cases "x2 x") apply (simp add: minus_cost_None)
-        apply(simp add: aux1)  
+        apply(simp add: gwp_conseq_aux1)  
         apply(cases "Q' x") apply simp
         apply auto 
         apply(cases "Q x") apply auto 
@@ -950,10 +942,6 @@ proof -
 qed
 
 subsubsection \<open>Rules for While\<close>
-
-term RECT
-
-
 
 lemma gwp_whileT_rule_wf: 
   fixes r :: "('a,(_,enat)acost) nrest"
@@ -986,50 +974,7 @@ next
 
 qed
 
- 
-
-lemma flat_ge_consume[refine_mono]:
-  fixes f :: "(_,(_,enat)acost) nrest"
-  shows "flat_ge f f' \<Longrightarrow> flat_ge (consume f T) (consume f' T)"
-  by (auto simp: refine_pw_simps pw_acost_flat_ge_iff) 
-
-lemma flat_ge_MIf[refine_mono]:
-  fixes f :: "(_,(_,enat)acost) nrest"
-  shows "\<lbrakk>flat_ge f f'; flat_ge g g'\<rbrakk> \<Longrightarrow> flat_ge (MIf xb f g) (MIf xb f' g')"
-  unfolding MIf_def 
-  by refine_mono
-
-thm consume_mono
-
-lemma consume_mono'[refine_mono]:
-  fixes f :: "(_,(_,enat)acost) nrest"
-  shows "f \<le> f' \<Longrightarrow> (consume f T) \<le> (consume f' T)"
-  by (auto simp: refine_pw_simps pw_acost_le_iff) 
-
-lemma MIf_mono[refine_mono]:
-  fixes f :: "(_,(_,enat)acost) nrest"
-  shows "\<lbrakk>f \<le> f'; g \<le> g'\<rbrakk> \<Longrightarrow> (MIf xb f g) \<le> (MIf xb f' g')"
-  unfolding MIf_def 
-  by refine_mono
-
-lemma gwp_ASSERT_bind_I[vcg_rules']:
-  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
-  shows "(\<Phi> \<Longrightarrow> Some t \<le> gwp M Q) \<Longrightarrow> \<Phi> \<Longrightarrow> Some t \<le> gwp (do { ASSERT \<Phi>; M}) Q"
-  apply(cases \<Phi>)
-  by (auto intro: vcg_rules' )
-
-
-
-lemma grr: "Inf {uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa \<noteq> x \<longrightarrow> uu = Some top)} = Some (a-T)"
-proof -
-  consider "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa \<noteq> x \<longrightarrow> uu = Some top)}
-        = { Some (a-T) }" | "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa \<noteq> x \<longrightarrow> uu = Some top)}
-        = { Some (a-T) , Some top }" by auto
-  then show ?thesis
-    apply(cases) apply simp apply simp done
-qed
-
-lemma grr2: "Inf {uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)} = Some (a-T)"
+lemma Inf_option_Some_aux1: "Inf {uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)} = Some (a-T)"
 proof -
   consider "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)}
         = { Some (a-T) }" | "{uu. \<exists>xa. (xa = x \<longrightarrow> uu = Some (a - T)) \<and> (xa = x \<or> uu = Some top)}
@@ -1047,7 +992,7 @@ lemma monadic_WHILE_rule''_aux1:
   apply(cases "Q x") apply simp apply auto 
   apply(auto split: if_splits)
   subgoal for a
-  unfolding grr2  apply simp apply(cases T; cases t; cases a)
+  unfolding Inf_option_Some_aux1  apply simp apply(cases T; cases t; cases a)
     unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp
       apply(rule ext)  
     by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat) 
@@ -1059,105 +1004,6 @@ lemma consume_alt3:
   using consume_alt  apply (simp add: consumea_def)
   by blast
 
-
-
-subsection \<open>gwpn\<close>
-
-
-lemma gwpn_specifies_I: "Some 0 \<le> gwp\<^sub>n m Q  \<Longrightarrow> m \<le>\<^sub>n SPECT Q"
-  unfolding gwp\<^sub>n_def le_or_fail_def by (auto intro: gwp_specifies_I) 
-
-lemma gwpn_RETURNT_I:
-  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
-  shows "Some t \<le> Q x \<Longrightarrow> Some t \<le> gwp\<^sub>n (RETURNT x) Q"
-  unfolding gwp\<^sub>n_def  by(auto intro: gwp_RETURNT_I)
-
-lemma gwpn_FAIL[simp]: "gwp\<^sub>n FAILT Q = Some top"
-  by(auto simp: gwp\<^sub>n_def)
-
-lemma gwpn_ASSERT_I: "(P \<Longrightarrow> Some t \<le> Q ()) \<Longrightarrow> Some t \<le> gwp\<^sub>n (ASSERT P) Q"
-  apply(cases P)
-  by(auto intro: gwpn_RETURNT_I)
-
-
-lemma gwpn_ASSERT_bind_I:
-  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
-  shows "(\<Phi> \<Longrightarrow> Some t \<le> gwp\<^sub>n M Q) \<Longrightarrow> Some t \<le> gwp\<^sub>n (do { ASSERT \<Phi>; M}) Q"
-  apply(cases \<Phi>)
-  by(auto intro: gwpn_RETURNT_I)
-
-thm gwp_SPECT_I
-
-lemma gwpn_SPECT_I:
-  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option" and t
-  assumes "(Some (t' + t ) \<le> Q x)"
-  shows "Some t' \<le> gwp\<^sub>n (SPECT [ x \<mapsto> t]) Q"
-  unfolding gwp\<^sub>n_def using assms by (auto intro: gwp_SPECT_I)
-
-
-lemma gwpn_bindT_I:
-  fixes M :: "(_, (_,enat) acost) nrest"
-  shows "Some t \<le> gwp\<^sub>n M (\<lambda>y. gwp\<^sub>n (f y) Q) \<Longrightarrow> Some t \<le> gwp\<^sub>n (M \<bind> f) Q"
-  unfolding gwp\<^sub>n_def apply (auto intro!: gwp_bindT_I simp: g_pw_bindT_nofailT)
-  apply(rule order.trans) apply simp
-  apply(rule gwp_mono) apply auto 
-  subgoal  premises prems for m x t using prems(2)[rule_format, where x=x] prems(5) prems(3) prems(4)
-    apply(auto simp: inresT_def project_acost_def)
-    unfolding inresT_def apply (auto simp: le_fun_def)  
-    by (smt less_eq_option_None_code less_eq_option_Some option.simps(5) zero_enat_def zero_le)
-  done
-
-
-lemma gwpn_MIf_I:
-  fixes c1 :: "(_,(_,enat) acost) nrest"
-  assumes "(b \<Longrightarrow> Some (cost ''if'' 1 + t) \<le> gwp\<^sub>n c1 Q)"
-    "(\<not>b \<Longrightarrow> Some (cost ''if'' 1 + t) \<le> gwp\<^sub>n c2 Q)"
-  shows "Some t \<le> gwp\<^sub>n (MIf b c1 c2) Q"
-  using assms 
-  unfolding gwp\<^sub>n_def
-  apply auto
-  apply(rule gwp_MIf_I)
-  by(auto simp: MIf_def nofailT_consume split: if_splits)
-
-
-lemma gwpn_consume:
-  fixes m :: "(_,(_,enat) acost) nrest"
-  shows "Some (T+t) \<le> gwp\<^sub>n m Q \<Longrightarrow> Some t \<le> gwp\<^sub>n (consume m T) Q"
-  unfolding gwp\<^sub>n_def
-  apply auto apply(rule gwp_consume) apply (cases m) by auto
-
-
-lemma gwpn_conseq:
-  assumes 
-    "gwp\<^sub>n f Q' \<ge> Some t"
-    "\<And>x t'' M. f = SPECT M \<Longrightarrow> M x \<noteq> None \<Longrightarrow> Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ( t'')" 
-  shows "gwp\<^sub>n f Q \<ge> Some t"
-  using assms
-  unfolding gwp\<^sub>n_def apply auto
-  apply(rule gwp_conseq[where Q'="Q'"]) by auto
-
-
-lemma gwpn_monadic_WHILE_rule''_aux1:
-  fixes T :: "(_,enat) acost"
-  shows "gwp\<^sub>n (SPECT [x\<mapsto>T]) Q = Some t \<Longrightarrow> Q x = Some (T+t)"
-  unfolding gwp\<^sub>n_def gwp_def minus_p_m_def minus_potential_def apply simp
-  apply(auto split: if_splits)
-  apply(cases "Q x") apply simp apply auto 
-  apply(auto split: if_splits)
-  subgoal for a
-  unfolding grr2  apply simp apply(cases T; cases t; cases a)
-    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp
-      apply(rule ext)  
-    by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat) 
-  done
-
-
-lemma gwpn_bindT:                       
-  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero,drm}) option"
-  shows "gwp\<^sub>n (bindT M f) Q = gwp\<^sub>n M (\<lambda>y. gwp\<^sub>n (f y) Q)"
-  unfolding gwp\<^sub>n_def apply auto
-  unfolding gwp_bindT  
-  oops
 
 
 lemma
@@ -1737,74 +1583,9 @@ lemma WHILEIET_weaken:
   apply(rule WHILEIT_weaken[OF IW])
   .
 
-subsection \<open>inres - a monadic operation has a certain result\<close>
-
-definition "inres M x = (\<exists>m t. M = SPECT m \<and> m x = Some t)"
-
-lemma inres_alt: "inres m x \<longleftrightarrow> (\<exists>P. m = SPECT P \<and> P x \<noteq> None)"
-  unfolding inres_def by auto
-
-lemma inres_consume_conv: "inres (NREST.consume m t) x = inres m x"
-  by(auto simp: inres_def consume_def split: nrest.splits)
-
-lemma inres_if_inresT:
-  "inresT M x t \<Longrightarrow> nofailT M \<Longrightarrow> inres M x"
-  unfolding inresT_def inres_def nofailT_def apply (cases M) apply (auto simp: le_fun_def)
-  by (metis (full_types) le_some_optE)
-
-lemma inres_if_inresT_acost:
-  "inresT (project_acost b M) x t \<Longrightarrow> nofailT M \<Longrightarrow> inres M x"
-  unfolding inresT_def inres_def nofailT_def apply (cases M) apply (auto simp: le_fun_def project_acost_SPECT)
-  subgoal premises p for m
-    using p(1)[rule_format, of x] apply simp
-    apply(cases "m x") by auto
-  done
-
-lemma nofailT_bindT:
-  "nofailT (bindT M f) \<longleftrightarrow> (nofailT M \<and> (\<forall>x. inres M x \<longrightarrow> nofailT (f x)))"
-  unfolding bindT_def nofailT_def inres_def
-  apply(cases M) by (auto simp: nrest_Sup_FAILT split: nrest.splits)
-
-lemma inres_SPECT: "inres (SPECT [x\<mapsto>t]) y \<longleftrightarrow> x = y"
-  unfolding inres_def by auto 
-
-
-lemma inres_bindT_SPECT_one[simp]: "inres (do {l' \<leftarrow> SPECT [x \<mapsto> t]; M l'}) r \<longleftrightarrow> inres (M x) r"
-  by(auto simp: bindT_def inres_def split: nrest.splits)
-
-declare inres_SPECT[simp]
 
 
 
-
-lemma inres_consumea[simp]: "inres (do {_ \<leftarrow> consumea t; M}) r \<longleftrightarrow> inres M r"
-  by (cases M) (auto simp: bindT_def inres_def consumea_def)
-
-lemma inres_RETURNT[simp]: "inres (RETURNT x) y \<longleftrightarrow> (x=y)"
-  by(auto simp: inres_def )
-
-lemma inres_bind_ASSERT[simp]: "inres (do { ASSERT \<phi>; N }) r \<longleftrightarrow> (\<phi> \<and> inres N r)"
-  by(auto simp: inres_def ASSERT_def iASSERT_def)
-
-declare inres_consume_conv[simp]
-
-lemma inres_bindT_consume_conv[simp]:
-  fixes t :: "(_,enat) acost"
-  shows "inres (do { x  \<leftarrow> NREST.consume m t; M x}) r = inres (do { x \<leftarrow> m; M x }) r"
-  unfolding consume_alt2 by simp
-
-
-lemma
-  nofailT_bindT_SPEC_iff:
-  shows "nofailT (do { _ \<leftarrow> SPECT [x\<mapsto>t]; M}) \<longleftrightarrow> nofailT M"
-  by (auto simp add: nofailT_bindT inres_SPECT) 
-
-lemma
-  nofailT_bindT_ASSERT_iff:
-  "nofailT (do { ASSERT I; M}) \<longleftrightarrow>
-    (I \<and> nofailT M)"
-  by (auto simp: ASSERT_def iASSERT_def) 
-  
 lemma monadic_WHILEIT_unfold:
   fixes c :: "'b \<Rightarrow> ('b, (char list, enat) acost) nrest"
   shows "monadic_WHILEIT I bm c s
@@ -1831,65 +1612,6 @@ lemma
   shows "M = SPECT P \<Longrightarrow> P x = Some t \<Longrightarrow> (\<exists>b t. inresT (project_acost b M) x t)"
   apply (auto simp: project_acost_SPECT)  
   by (metis zero_enat_def zero_le)  
-
-
-
-lemma gwp_mono_alt:
-  fixes q q' :: "'c \<Rightarrow> 'b::{complete_lattice,minus,ord,top,drm,monoid_add,needname_zero} option"
-  assumes "\<And>x. inres m x \<Longrightarrow> q x \<le> q' x"
-  shows "gwp m q \<le> gwp m q'"
-  apply(rule gwp_mono)
-  apply(rule assms) by(simp add: inres_alt)
-
-lemma
-  fixes s0 :: 'a and I :: "'a \<Rightarrow> bool" and E :: "'a \<Rightarrow> (string, nat) acost" and t :: "(string, enat) acost"
-    and Q :: "'a \<Rightarrow>  (string, enat) acost option"
-  assumes wf: "\<And>s. wfR2 (if I s then E s else 0)"
-  assumes
-  step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp\<^sub>n (bm s) (\<lambda>b. gwp\<^sub>n (SPECT [()\<mapsto> (cost ''if'' 1)])
-       (\<lambda>_. if b then gwp\<^sub>n (do { consume (c s) (cost ''call'' 1)  })
-                             (\<lambda>s'. loop_body_condition (I s') (E s') (E s) )
-                 else loop_exit_condition (Q s) t (E s) (E s0))))"
- and  i: "I s0"                                       
-shows gwpn_monadic_WHILEIET: "Some t \<le> gwp\<^sub>n (monadic_WHILEIET I E bm c s0) Q"
-  unfolding gwp\<^sub>n_def apply clarsimp
-  subgoal premises nofailT_WHILE
-    apply(rule order.trans[OF _ ])
-     defer
-     apply(rule gwp_antimono)
-     apply(rule WHILEIET_weaken[of "\<lambda>s. I s \<and> nofailT (monadic_WHILEIET I E bm c s)"])
-     apply simp  
-    apply(rule gwp_monadic_WHILEIET)
-    subgoal  unfolding wfR2_def apply - apply(rule finite_subset[OF _ wf[unfolded wfR2_def]])
-      by (auto simp: the_acost_zero_app) 
-    subgoal for s 
-      unfolding monadic_WHILEIET_def 
-      apply(rule order.trans)
-       apply(rule step[of s])
-       apply simp
-      apply(subst gwp\<^sub>n_def)
-      apply(subst (asm) monadic_WHILEIT_unfold)  
-      apply auto
-      subgoal
-        apply(rule gwp_mono_alt)
-        apply(subst gwp\<^sub>n_def)        
-        apply auto
-        apply(rule gwp_mono_alt)
-        apply(subst gwp\<^sub>n_def)
-        apply (auto)
-        subgoal                    
-          by (auto simp add: nofailT_bindT inres_SPECT MIf_def nofailT_consume inres_consume_conv
-                  intro!: gwp_mono_alt loop_body_condition_weaken split: if_splits) 
-        subgoal     
-          by (auto simp: nofailT_bindT inres_SPECT MIf_def nofailT_consume)  
-        done
-      subgoal   
-        by (auto simp: nofailT_bindT inres_SPECT MIf_def nofailT_consume)  
-      done
-    subgoal using i nofailT_WHILE by simp
-    done
-  done
-
 
 
 thm neueWhile_rule''_real[unfolded loopbody_cond_def loopexit_cond_def]
@@ -2007,6 +1729,224 @@ lemma While[vcg_rules']:
     subgoal premises prems using prems(1)[of x] prems(2-4) apply auto  
       by (simp add: needname_minus_absorb)  
     done   
+  done
+
+
+
+subsection \<open>inres - a monadic operation has a certain result\<close>
+
+definition "inres M x = (\<exists>m t. M = SPECT m \<and> m x = Some t)"
+
+lemma inres_alt: "inres m x \<longleftrightarrow> (\<exists>P. m = SPECT P \<and> P x \<noteq> None)"
+  unfolding inres_def by auto
+
+lemma inres_consume_conv: "inres (NREST.consume m t) x = inres m x"
+  by(auto simp: inres_def consume_def split: nrest.splits)
+
+lemma inres_if_inresT:
+  "inresT M x t \<Longrightarrow> nofailT M \<Longrightarrow> inres M x"
+  unfolding inresT_def inres_def nofailT_def apply (cases M) apply (auto simp: le_fun_def)
+  by (metis (full_types) le_some_optE)
+
+lemma inres_if_inresT_acost:
+  "inresT (project_acost b M) x t \<Longrightarrow> nofailT M \<Longrightarrow> inres M x"
+  unfolding inresT_def inres_def nofailT_def apply (cases M) apply (auto simp: le_fun_def project_acost_SPECT)
+  subgoal premises p for m
+    using p(1)[rule_format, of x] apply simp
+    apply(cases "m x") by auto
+  done
+
+lemma nofailT_bindT:
+  "nofailT (bindT M f) \<longleftrightarrow> (nofailT M \<and> (\<forall>x. inres M x \<longrightarrow> nofailT (f x)))"
+  unfolding bindT_def nofailT_def inres_def
+  apply(cases M) by (auto simp: nrest_Sup_FAILT split: nrest.splits)
+
+lemma inres_SPECT: "inres (SPECT [x\<mapsto>t]) y \<longleftrightarrow> x = y"
+  unfolding inres_def by auto 
+
+
+lemma inres_bindT_SPECT_one[simp]: "inres (do {l' \<leftarrow> SPECT [x \<mapsto> t]; M l'}) r \<longleftrightarrow> inres (M x) r"
+  by(auto simp: bindT_def inres_def split: nrest.splits)
+
+declare inres_SPECT[simp]
+
+
+
+
+lemma inres_consumea[simp]: "inres (do {_ \<leftarrow> consumea t; M}) r \<longleftrightarrow> inres M r"
+  by (cases M) (auto simp: bindT_def inres_def consumea_def)
+
+lemma inres_RETURNT[simp]: "inres (RETURNT x) y \<longleftrightarrow> (x=y)"
+  by(auto simp: inres_def )
+
+lemma inres_bind_ASSERT[simp]: "inres (do { ASSERT \<phi>; N }) r \<longleftrightarrow> (\<phi> \<and> inres N r)"
+  by(auto simp: inres_def ASSERT_def iASSERT_def)
+
+declare inres_consume_conv[simp]
+
+lemma inres_bindT_consume_conv[simp]:
+  fixes t :: "(_,enat) acost"
+  shows "inres (do { x  \<leftarrow> NREST.consume m t; M x}) r = inres (do { x \<leftarrow> m; M x }) r"
+  unfolding consume_alt2 by simp
+
+lemma
+  nofailT_bindT_SPEC_iff:
+  shows "nofailT (do { _ \<leftarrow> SPECT [x\<mapsto>t]; M}) \<longleftrightarrow> nofailT M"
+  by (auto simp add: nofailT_bindT inres_SPECT) 
+
+
+
+lemma gwp_mono_alt:
+  fixes q q' :: "'c \<Rightarrow> 'b::{complete_lattice,minus,ord,top,drm,monoid_add,needname_zero} option"
+  assumes "\<And>x. inres m x \<Longrightarrow> q x \<le> q' x"
+  shows "gwp m q \<le> gwp m q'"
+  apply(rule gwp_mono)
+  apply(rule assms) by(simp add: inres_alt)
+
+
+
+subsection \<open>Rules for gwpn\<close>
+
+
+lemma gwpn_specifies_I: "Some 0 \<le> gwp\<^sub>n m Q  \<Longrightarrow> m \<le>\<^sub>n SPECT Q"
+  unfolding gwp\<^sub>n_def le_or_fail_def by (auto intro: gwp_specifies_I) 
+
+lemma gwpn_RETURNT_I:
+  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
+  shows "Some t \<le> Q x \<Longrightarrow> Some t \<le> gwp\<^sub>n (RETURNT x) Q"
+  unfolding gwp\<^sub>n_def  by(auto intro: gwp_RETURNT_I)
+
+lemma gwpn_FAIL[simp]: "gwp\<^sub>n FAILT Q = Some top"
+  by(auto simp: gwp\<^sub>n_def)
+
+lemma gwpn_ASSERT_I: 
+  fixes Q :: "unit \<Rightarrow> ('b::{complete_lattice,monoid_add,drm,needname_zero}) option"
+  shows "(P \<Longrightarrow> Some t \<le> Q ()) \<Longrightarrow> Some t \<le> gwp\<^sub>n (ASSERT P) Q"
+  apply(cases P)
+  by(auto intro: gwpn_RETURNT_I)
+
+
+lemma gwpn_ASSERT_bind_I:
+  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option"
+  shows "(\<Phi> \<Longrightarrow> Some t \<le> gwp\<^sub>n M Q) \<Longrightarrow> Some t \<le> gwp\<^sub>n (do { ASSERT \<Phi>; M}) Q"
+  apply(cases \<Phi>)
+  by(auto intro: gwpn_RETURNT_I)
+
+thm gwp_SPECT_I
+
+lemma gwpn_SPECT_I:
+  fixes Q :: "_ \<Rightarrow> ('b::{needname_zero}) option" and t
+  assumes "(Some (t' + t ) \<le> Q x)"
+  shows "Some t' \<le> gwp\<^sub>n (SPECT [ x \<mapsto> t]) Q"
+  unfolding gwp\<^sub>n_def using assms by (auto intro: gwp_SPECT_I)
+
+
+lemma gwpn_bindT_I:
+  fixes M :: "(_, (_,enat) acost) nrest"
+  shows "Some t \<le> gwp\<^sub>n M (\<lambda>y. gwp\<^sub>n (f y) Q) \<Longrightarrow> Some t \<le> gwp\<^sub>n (M \<bind> f) Q"
+  unfolding gwp\<^sub>n_def apply (auto intro!: gwp_bindT_I simp: g_pw_bindT_nofailT)
+  apply(rule order.trans) apply simp
+  apply(rule gwp_mono) apply auto 
+  subgoal  premises prems for m x t using prems(2)[rule_format, where x=x] prems(5) prems(3) prems(4)
+    apply(auto simp: inresT_def project_acost_def)
+    unfolding inresT_def apply (auto simp: le_fun_def)  
+    by (smt less_eq_option_None_code less_eq_option_Some option.simps(5) zero_enat_def zero_le)
+  done
+
+
+lemma gwpn_MIf_I:
+  fixes c1 :: "(_,(_,enat) acost) nrest"
+  assumes "(b \<Longrightarrow> Some (cost ''if'' 1 + t) \<le> gwp\<^sub>n c1 Q)"
+    "(\<not>b \<Longrightarrow> Some (cost ''if'' 1 + t) \<le> gwp\<^sub>n c2 Q)"
+  shows "Some t \<le> gwp\<^sub>n (MIf b c1 c2) Q"
+  using assms 
+  unfolding gwp\<^sub>n_def
+  apply auto
+  apply(rule gwp_MIf_I)
+  by(auto simp: MIf_def nofailT_consume split: if_splits)
+
+
+lemma gwpn_consume:
+  fixes m :: "(_,(_,enat) acost) nrest"
+  shows "Some (T+t) \<le> gwp\<^sub>n m Q \<Longrightarrow> Some t \<le> gwp\<^sub>n (consume m T) Q"
+  unfolding gwp\<^sub>n_def
+  apply auto apply(rule gwp_consume) apply (cases m) by auto
+
+
+lemma gwpn_conseq:
+  fixes Q :: "unit \<Rightarrow> ('b::{complete_lattice,monoid_add,drm,needname_zero}) option"
+  assumes 
+    "gwp\<^sub>n f Q' \<ge> Some t"
+    "\<And>x t'' M. f = SPECT M \<Longrightarrow> M x \<noteq> None \<Longrightarrow> Q' x = Some t'' \<Longrightarrow> (Q x) \<ge> Some ( t'')" 
+  shows "gwp\<^sub>n f Q \<ge> Some t"
+  using assms
+  unfolding gwp\<^sub>n_def apply auto
+  apply(rule gwp_conseq[where Q'="Q'"]) by auto
+
+
+lemma gwpn_monadic_WHILE_rule''_aux1:
+  fixes T :: "(_,enat) acost"
+  shows "gwp\<^sub>n (SPECT [x\<mapsto>T]) Q = Some t \<Longrightarrow> Q x = Some (T+t)"
+  unfolding gwp\<^sub>n_def gwp_def minus_p_m_def minus_potential_def apply simp
+  apply(auto split: if_splits)
+  apply(cases "Q x") apply simp apply auto 
+  apply(auto split: if_splits)
+  subgoal for a
+  unfolding Inf_option_Some_aux1  apply simp apply(cases T; cases t; cases a)
+    unfolding less_eq_acost_def minus_acost_alt plus_acost_alt apply simp
+      apply(rule ext)  
+    by (metis add_diff_assoc_enat add_diff_cancel_enat enat_ord_simps(4) leD plus_eq_infty_iff_enat) 
+  done
+
+
+
+lemma
+  fixes s0 :: 'a and I :: "'a \<Rightarrow> bool" and E :: "'a \<Rightarrow> (string, nat) acost" and t :: "(string, enat) acost"
+    and Q :: "'a \<Rightarrow>  (string, enat) acost option"
+  assumes wf: "\<And>s. wfR2 (if I s then E s else 0)"
+  assumes
+  step: "(\<And>s. I s \<Longrightarrow> Some 0 \<le> gwp\<^sub>n (bm s) (\<lambda>b. gwp\<^sub>n (SPECT [()\<mapsto> (cost ''if'' 1)])
+       (\<lambda>_. if b then gwp\<^sub>n (do { consume (c s) (cost ''call'' 1)  })
+                             (\<lambda>s'. loop_body_condition (I s') (E s') (E s) )
+                 else loop_exit_condition (Q s) t (E s) (E s0))))"
+ and  i: "I s0"                                       
+shows gwpn_monadic_WHILEIET: "Some t \<le> gwp\<^sub>n (monadic_WHILEIET I E bm c s0) Q"
+  unfolding gwp\<^sub>n_def apply clarsimp
+  subgoal premises nofailT_WHILE
+    apply(rule order.trans[OF _ ])
+     defer
+     apply(rule gwp_antimono)
+     apply(rule WHILEIET_weaken[of "\<lambda>s. I s \<and> nofailT (monadic_WHILEIET I E bm c s)"])
+     apply simp  
+    apply(rule gwp_monadic_WHILEIET)
+    subgoal  unfolding wfR2_def apply - apply(rule finite_subset[OF _ wf[unfolded wfR2_def]])
+      by (auto simp: the_acost_zero_app) 
+    subgoal for s 
+      unfolding monadic_WHILEIET_def 
+      apply(rule order.trans)
+       apply(rule step[of s])
+       apply simp
+      apply(subst gwp\<^sub>n_def)
+      apply(subst (asm) monadic_WHILEIT_unfold)  
+      apply auto
+      subgoal
+        apply(rule gwp_mono_alt)
+        apply(subst gwp\<^sub>n_def)        
+        apply auto
+        apply(rule gwp_mono_alt)
+        apply(subst gwp\<^sub>n_def)
+        apply (auto)
+        subgoal                    
+          by (auto simp add: nofailT_bindT inres_SPECT MIf_def nofailT_consume inres_consume_conv
+                  intro!: gwp_mono_alt loop_body_condition_weaken split: if_splits) 
+        subgoal     
+          by (auto simp: nofailT_bindT inres_SPECT MIf_def nofailT_consume)  
+        done
+      subgoal   
+        by (auto simp: nofailT_bindT inres_SPECT MIf_def nofailT_consume)  
+      done
+    subgoal using i nofailT_WHILE by simp
+    done
   done
 
 
