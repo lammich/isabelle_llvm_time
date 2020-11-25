@@ -1,4 +1,3 @@
-
 theory Dynamic_Array
   imports "../../sepref/Hnr_Primitives_Experiment" "../../nrest/Refine_Heuristics"
   "../../nrest/NREST_Automation"
@@ -149,7 +148,7 @@ begin
     apply auto
     sorry
 
-
+end
 
   
 subsection \<open>List Double\<close>
@@ -171,9 +170,8 @@ definition dyn_list_double_spec where
   "dyn_list_double_spec \<equiv> \<lambda>(bs,l,c). doN {
        ASSERT (l\<le>c \<and> c=length bs);
        SPEC (\<lambda>(bs',l',c'). take l bs' = take l bs \<and> 
-              length bs' = 2 * length bs \<and> l' = l \<and> l<c' \<and> c'=length bs')
-        (\<lambda>(bs',l',c'). (enat (length bs')) *m cost ''alloc_raw'' 1
-                       + cost ''list_copy_c'' (enat l')) 
+              length bs' = 2 * length bs \<and> l' = l \<and> l\<le>c' \<and> c'=length bs')
+        (\<lambda>(bs',l',c'). cost ''dyn_list_double_c'' (enat c')) 
   }"
 
 definition dyn_list_double where
@@ -188,7 +186,7 @@ definition dyn_list_double where
 
 lemma "dyn_list_double ini (bs,l,c) \<le> dyn_list_double_spec (bs,l,c)"
   unfolding dyn_list_double_def dyn_list_double_spec_def
-
+  sorry
 
 
 subsection \<open>List Push\<close>
@@ -209,8 +207,8 @@ definition dyn_list_append_basic_spec where
 
 
 
-definition dyn_list_append_spec where
-  "dyn_list_append_spec \<equiv> \<lambda>(bs,l,c) x. doN {
+definition dyn_list_append where
+  "dyn_list_append \<equiv> \<lambda>(bs,l,c) x. doN {
       ASSERT (l\<le>c \<and> c=length bs \<and> 0<length bs);
       if\<^sub>N SPECc2 ''less'' (<) l c then doN {
         dyn_list_append_basic_spec (bs,l,c) x
@@ -233,9 +231,28 @@ lemma dyn_list_rel_alt: "dyn_list_rel = br (\<lambda>(bs,l,c). take l bs) (\<lam
 
 
 
+text \<open>The abstract program A for empty list:\<close>
+
 
 definition mop_list_emptylist where
   "mop_list_emptylist T = SPECT [ [] \<mapsto> T ]"
+
+
+text \<open>The abstract program B for empty dynamic list, (in dynamic array currencies) :\<close>
+
+
+definition "dyn_list_empty_spec T = SPEC (\<lambda>(ls,l,c). l=0 \<and> c=8 \<and> c = length ls) (\<lambda>_. T)"
+
+
+lemma timerefine_dyn_list_empty_spec: "timerefine TR (dyn_list_empty_spec T) = dyn_list_empty_spec (timerefineA TR T)"
+  unfolding dyn_list_empty_spec_def
+  by (auto split: prod.splits simp: SPEC_timerefine_conv)
+
+definition dyn_list_new_raw where
+  "dyn_list_new_raw = do {
+       dst \<leftarrow> mop_list_init_raw (\<lambda>n. cost ''list_init_c'' 8) 8;
+       RETURNT (dst,0,8)
+    }"
 
 definition dyn_list_new where
   "dyn_list_new ini = do {
@@ -245,11 +262,23 @@ definition dyn_list_new where
 
 
 
-lemma "dyn_list_new ini \<le> \<Down>dyn_list_rel (timerefine RR (mop_list_emptylist (cost ''list_init_c'' 8)))"
-  sorry
+text \<open>Refinement THEOREM A-B\<close>
+
+abbreviation "TR_dyn_list_new ==  (0(''list_empty'':=cost ''list_init_c'' 8))"
+
+lemma dyn_list_new_refines:
+ "dyn_list_new ini \<le> \<Down>dyn_list_rel (\<Down>\<^sub>C TR_dyn_list_new (mop_list_emptylist (cost ''list_empty'' 1)))"
+  unfolding mop_list_emptylist_def dyn_list_new_def dyn_list_rel_alt
+  apply (simp add: timerefine_SPECT_map norm_cost )                   
+  apply (simp add: SPECT_assign_emb' conc_fun_br)
+  apply(rule gwp_specifies_I)
+  apply(refine_vcg \<open>-\<close>)    by(auto simp: emb'_def)
+
 
 
 subsection \<open>dynamic list lookup\<close>
+
+
 
 definition dyn_list_get where
   "dyn_list_get \<equiv> \<lambda>(bs,l,c) i. doN {
@@ -266,6 +295,13 @@ subsection \<open>Sketch\<close>
 fun reclaim where
   "reclaim FAILi t = FAILT"
 | "reclaim (SPECT M) t = Sup { if t'\<ge>t x then SPECT [x\<mapsto>t' - t x] else FAILT | t' x. M x = Some t' }"
+
+
+
+
+
+
+
 
 lemma reclaim_nofailT[simp]: "reclaim FAILT t = FAILT"
   unfolding top_nrest_def apply (simp add: )
@@ -293,18 +329,32 @@ lemma nofailT_reclaim:
 
 
 
-definition dyn_list_append_spec2 where
-  "dyn_list_append_spec2 T \<equiv> \<lambda>(bs,l,c) x. SPEC (\<lambda>(bs',l',c'). l'\<le>c' \<and> c'=length bs' \<and> l'=l+1 \<and> length bs' \<ge> length bs
-                                                          \<and> take l bs' = take l bs \<and> bs' ! l = x) T"
 
-definition "RRmm = 0(''list_append'':=cost ''bla'' (1::enat))"
+lemma "reclaim (SPECT M) (t::_\<Rightarrow>ecost) = SPECT rM
+    \<Longrightarrow> (rM x = Some tt) \<longleftrightarrow> M x = Some (tt - t x)"
+  apply(cases "nofailT (reclaim (SPECT M) t)")
+  subgoal
+    unfolding nofailT_reclaim
+    apply simp
+    apply(drule nrest_Sup_SPECT_D[where x=x]) apply auto
+    oops
+  
 
-definition "dyn_list_append_spec2_cost == \<lambda>_. cost ''bla'' 1"
+
+
+definition dyn_list_append_spec where
+  "dyn_list_append_spec T \<equiv> \<lambda>(bs,l,c) x. SPEC (\<lambda>(bs',l',c'). l'\<le>c' \<and> c'=length bs' \<and> l'=l+1 \<and> length bs' \<ge> length bs
+                                                          \<and> take l bs' = take l bs \<and> bs' ! l = x) (\<lambda>_. T)"
+
+lemma timerefine_dyn_list_append_spec: "timerefine TR (dyn_list_append_spec T dl x) = dyn_list_append_spec (timerefineA TR T) dl x"
+  unfolding dyn_list_append_spec_def
+  by (auto split: prod.splits simp: SPEC_timerefine_conv)
+
 
 lemma "((bs,l,c),as)\<in>dyn_list_rel \<Longrightarrow> (x',x) \<in> Id
- \<Longrightarrow> dyn_list_append_spec2 (\<lambda>_. cost ''bla'' 1) (bs,l,c) x'
-         \<le> \<Down>dyn_list_rel (timerefine RRmm (mop_list_append (cost ''list_append'' 1) as x))"
-  unfolding dyn_list_append_spec2_def mop_list_append_def
+ \<Longrightarrow> dyn_list_append_spec T (bs,l,c) x'
+         \<le> \<Down>dyn_list_rel (timerefine (0(''list_append'':=T)) (mop_list_append (cost ''list_append'' 1) as x))"
+  unfolding dyn_list_append_spec_def mop_list_append_def
   apply(subst timerefine_SPECT_map)
   apply(subst SPECT_assign_emb')
   unfolding dyn_list_rel_alt
@@ -313,7 +363,7 @@ lemma "((bs,l,c),as)\<in>dyn_list_rel \<Longrightarrow> (x',x) \<in> Id
   apply safe
   apply(rule SPEC_leq_SPEC_I_even_stronger)
   subgoal by (auto simp: in_br_conv take_Suc_conv_app_nth)
-  subgoal apply auto unfolding RRmm_def
+  subgoal apply auto 
     by(simp add: norm_cost ) 
   done
 
@@ -376,9 +426,10 @@ lemma costmult_right_mono:
 lemma costmult_left_cong: "a=b \<Longrightarrow> a *m A = b *m A"
   by simp
 
-definition "A_dlas \<equiv> cost ''alloc_raw'' 2 + cost ''list_copy_c'' 1"
+definition "A_dlas \<equiv> cost ''dyn_list_double_c'' (2::nat)"
 definition "C_dlas \<equiv> cost ''add'' 1 + (cost ''list_set'' 1 + (cost ''if'' 1 + (cost ''less'' 1 + cost ''list_length'' 1)))"
-definition "\<Phi>_dlas \<equiv> (\<lambda>(xs,l,c). lift_acost (((2*l -length xs)) *m A_dlas))"
+definition "\<Phi>_dlas \<equiv> (\<lambda>(xs,l,c). (((2*l -length xs)) *m A_dlas))"
+abbreviation "\<Phi>_dlas' \<equiv> lift_acost o \<Phi>_dlas"
 
 lemma pff: "b\<ge>c \<Longrightarrow> (a+b)-c = (a::(string,nat) acost) + (b-c)"
   apply(cases a; cases b; cases c) 
@@ -386,15 +437,17 @@ lemma pff: "b\<ge>c \<Longrightarrow> (a+b)-c = (a::(string,nat) acost) + (b-c)"
 
 lemma  dyn_list_append_spec_refines:
   assumes a: "l \<le> c" "c=length bs" "0<length bs"
-  shows "dyn_list_append_spec (bs,l,c) x \<le> reclaim (consume (dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas)) (bs,l,c) x) (\<Phi>_dlas (bs,l,c))) \<Phi>_dlas"
+  shows "dyn_list_append (bs,l,c) x \<le> reclaim (consume (dyn_list_append_spec (lift_acost (2 *m A_dlas + C_dlas)) (bs,l,c) x) (\<Phi>_dlas' (bs,l,c))) \<Phi>_dlas'"
   unfolding dyn_list_append_spec_def
-  unfolding dyn_list_append_spec2_def
+  unfolding dyn_list_append_def
   apply simp
   apply(subst consume_SPEC_eq)
   apply(subst reclaim_if_covered)
   subgoal
     unfolding \<Phi>_dlas_def A_dlas_def C_dlas_def
-    apply (auto simp: norm_cost) apply sc_solve  by auto 
+    apply (auto simp: norm_cost) apply(subst add.commute) apply(subst (2) add.assoc) apply(subst cost_same_curr_add)
+    apply(simp add: add.assoc)  
+      apply sc_solve  by auto
   unfolding SPEC_def
   apply(rule gwp_specifies_I)
   unfolding mop_list_length_def SPECc2_alt dyn_list_append_basic_spec_def mop_list_set_def
@@ -415,7 +468,7 @@ lemma  dyn_list_append_spec_refines:
         apply auto [1]
   subgoal apply simp (* can't see why auto would loop here *)
     unfolding \<Phi>_dlas_def apply (simp add: lift_acost_propagate[symmetric] lift_acost_minus add.assoc)
-    apply(subst (6) add.commute)
+    apply(subst (5) add.commute)
     apply(subst add.assoc)
     apply(subst costmult_add_distrib_left)
     apply(subst pff) subgoal apply(rule costmult_right_mono) by auto
@@ -427,10 +480,38 @@ lemma  dyn_list_append_spec_refines:
     apply sc_solve  by(simp add: one_enat_def)
       apply auto [1]
      apply auto [1]
-    apply auto [1]
-   apply auto [1]
-  using assms    apply auto [1]
+  subgoal by force
+  using assms  
+   apply auto 
   done
+
+
+
+definition "E_dlas \<equiv> cost ''list_init_c'' 8" (* the cost to initialize the empty list *)
+
+lemma cost_mult_zero_enat[simp]:"(0::enat) *m m = (0) "
+  by(auto simp: zero_acost_def costmult_def) 
+lemma cost_mult_zero_nat[simp]: "(0::nat) *m m = (0) "
+  by(auto simp: zero_acost_def costmult_def) 
+ 
+
+lemma  dyn_list_new_raw_refines:
+  shows "dyn_list_new_raw \<le> reclaim (consume (dyn_list_empty_spec (lift_acost E_dlas)) 0) \<Phi>_dlas'"
+  unfolding dyn_list_new_raw_def mop_list_init_raw_def
+  unfolding dyn_list_empty_spec_def
+  apply(subst consume_SPEC_eq)
+  apply(subst reclaim_if_covered)
+  subgoal unfolding \<Phi>_dlas_def  by (auto simp: lift_acost_def less_eq_acost_def zero_acost_def)
+  unfolding SPEC_def
+  unfolding autoref_tag_defs
+  apply(rule gwp_specifies_I)
+  apply(refine_vcg \<open>-\<close>)
+  subgoal 
+    unfolding \<Phi>_dlas_def  apply (auto simp: lift_acost_zero E_dlas_def lift_acost_cost needname_minus_absorb) 
+    apply sc_solve by auto
+  subgoal by simp
+  done
+
 
 
 definition "augment_amor_assn \<Phi> A = (\<lambda>ra r. $\<Phi> ra ** A ra r)"
@@ -438,6 +519,18 @@ definition "augment_amor_assn' \<Phi> A = (\<lambda>ra r. $(lift_acost (\<Phi> r
 
 lemma invalid_assn_augment_amor_assn: "invalid_assn (augment_amor_assn \<Phi> A) = invalid_assn A"
   unfolding augment_amor_assn_def invalid_assn_def
+  unfolding pure_part_def 
+  apply auto apply(rule ext) apply(rule ext)
+  apply auto
+  subgoal  
+    using hnr_vcg_aux3 by blast
+  subgoal
+    by (metis hnr_vcg_aux1 sep_conj_commute) 
+  done
+
+
+lemma invalid_assn_augment'_amor_assn: "invalid_assn (augment_amor_assn' \<Phi> A) = invalid_assn A"
+  unfolding augment_amor_assn'_def invalid_assn_def
   unfolding pure_part_def 
   apply auto apply(rule ext) apply(rule ext)
   apply auto
@@ -464,6 +557,52 @@ lemma hn_refineI2:
 thm hn_refine_payday
 thm hn_refine_payday_reverse
 
+term the_enat
+
+lemma extract_lift_acost_if_less_infinity:
+  assumes
+    less_infinity: "\<And>x. the_acost t x < \<infinity>" 
+  obtains t' where "lift_acost t' = t"
+proof 
+  show "lift_acost (acostC (\<lambda>x. the_enat (the_acost t x))) = t"
+    unfolding lift_acost_def
+    apply(cases t)
+    apply simp
+    using less_infinity
+    by (metis (mono_tags) acost.sel acost_eq_I comp_apply less_infinityE the_enat.simps)
+qed
+
+definition "finite_cost t \<equiv> \<forall>x. the_acost t x < \<infinity>"
+
+lemma finite_costD: "finite_cost t \<Longrightarrow> the_acost t x < \<infinity>"
+  unfolding finite_cost_def by auto
+   
+lemma finite_costI: "(\<And>x. the_acost t x < \<infinity>) \<Longrightarrow> finite_cost t"
+  unfolding finite_cost_def by auto
+
+
+lemma finite_cost_lift_acost: "finite_cost (lift_acost x)"
+  unfolding finite_cost_def lift_acost_def by auto
+
+
+lemma hn_refine_payday_reverse_alt:
+  fixes m :: " ('d, (char list, enat) acost) nrest"
+  assumes 
+    a: "finite_cost t" 
+  and "hn_refine \<Gamma> c \<Gamma>' R (consume m t)"
+  shows "hn_refine ($t \<and>* \<Gamma>) c \<Gamma>' R m"
+proof -
+  from extract_lift_acost_if_less_infinity[OF a[THEN finite_costD]]
+  obtain t' where t: "t = lift_acost t'" by blast
+
+
+  show ?thesis
+    unfolding t apply(rule hn_refine_payday_reverse)
+    apply(fold t)
+    apply(fact)
+    done
+qed
+
 lemma wp_time_frame: "wp c (\<lambda>r s. (G r) (ll_\<alpha> s)) (s,tc)
   \<Longrightarrow> wp c (\<lambda>r s. ($t ** G r) (ll_\<alpha> s)) (s,tc+t)"
   unfolding wp_def apply auto
@@ -483,27 +622,32 @@ lemma wp_time_frame: "wp c (\<lambda>r s. (G r) (ll_\<alpha> s)) (s,tc)
     using cost_ecost_add_increasing2 by blast
   done
  
-lemma meh: "b \<ge> lift_acost a \<Longrightarrow> Ca \<le> b - lift_acost a\<Longrightarrow> Ca + lift_acost a \<le> b"
+lemma meh_special: "b \<ge> lift_acost a \<Longrightarrow> Ca \<le> b - lift_acost a\<Longrightarrow> Ca + lift_acost a \<le> b"
   apply(cases b; cases Ca; cases a) apply auto
   using plus_minus_adjoint_ecost by blast 
+
+
+lemma meh: "b \<ge> (a::ecost) \<Longrightarrow> Ca \<le> b - a\<Longrightarrow> Ca + a \<le> b"
+  apply(subst plus_minus_adjoint_ecost[symmetric]) by simp_all
+
 
 lemma
    hn_refine_reclaimday: 
    assumes
-     nofail: "nofailT m \<Longrightarrow> nofailT (reclaim m (lift_acost o \<Phi>))"
-     and as: "hn_refine \<Gamma> c \<Gamma>' G (reclaim m (lift_acost o \<Phi>))"
-   shows "hn_refine \<Gamma> c \<Gamma>' (augment_amor_assn' \<Phi> G) m"
+     nofail: "nofailT m \<Longrightarrow> nofailT (reclaim m \<Phi>)"
+     and as: "hn_refine \<Gamma> c \<Gamma>' G (reclaim m \<Phi>)"
+   shows "hn_refine \<Gamma> c \<Gamma>' (augment_amor_assn \<Phi> G) m"
 proof (rule hn_refineI2)
   fix F s cr M
   assume n: "nofailT m"
       and m: "m = SPECT M" and H: "(\<Gamma> \<and>* F) (ll_\<alpha> (s, cr))"
 
-  from n nofail have z: "nofailT (reclaim m (lift_acost o \<Phi>))" by simp
-  then obtain M' where kl: " (reclaim m (lift_acost o \<Phi>)) = SPECT M'"   
+  from n nofail have z: "nofailT (reclaim m \<Phi>)" by simp
+  then obtain M' where kl: " (reclaim m \<Phi>) = SPECT M'"   
     unfolding nofailT_def 
     by force
 
-  from z m have Z: "(\<forall>x t'. M x = Some t' \<longrightarrow> lift_acost (\<Phi> x) \<le> t')" apply(simp only: nofailT_reclaim) by auto
+  from z m have Z: "(\<forall>x t'. M x = Some t' \<longrightarrow> \<Phi> x \<le> t')" apply(simp only: nofailT_reclaim) by auto
 
   from as[unfolded hn_refine_def STATE_def, rule_format, OF z, OF kl H] obtain ra Ca where
     ff: "Some Ca \<le> M' ra" and wp: "wp c (\<lambda>r s. (\<Gamma>' \<and>* G ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)" by blast
@@ -516,140 +660,380 @@ proof (rule hn_refineI2)
 
   then obtain mra where Mra: "M ra = Some mra" by auto
 
-  have nene: "M' ra \<le> Some (mra - lift_acost (\<Phi> ra))"
+  have nene: "M' ra \<le> Some (mra - \<Phi> ra)"
     using kl unfolding m  apply (auto split: if_splits)
     unfolding Sup_nrest_def apply (auto split: if_splits)
     apply(rule Sup_least) apply auto 
     by (simp add: Mra) 
 
-  with ff have ff': " Some Ca \<le>Some (mra - lift_acost (\<Phi> ra))" by(rule order.trans)
+  with ff have ff': " Some Ca \<le>Some (mra - \<Phi> ra)" by(rule order.trans)
 
-  show "\<exists>ra Ca. Some Ca \<le> M ra \<and> wp c (\<lambda>r s. (\<Gamma>' \<and>* augment_amor_assn' \<Phi> G ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)"
+  show "\<exists>ra Ca. Some Ca \<le> M ra \<and> wp c (\<lambda>r s. (\<Gamma>' \<and>* augment_amor_assn \<Phi> G ra r \<and>* F \<and>* GC) (ll_\<alpha> s)) (s, cr + Ca)"
     apply(rule exI[where x=ra])
-    apply(rule exI[where x="Ca+lift_acost (\<Phi> ra)"])
+    apply(rule exI[where x="Ca+\<Phi> ra"])
     apply safe
     subgoal        
       using ff' unfolding Mra apply simp
       apply(rule meh) apply auto using Z[rule_format, of ra mra] Mra by simp
-    subgoal using wp_time_frame[OF wp, where t="lift_acost (\<Phi> ra)"] unfolding augment_amor_assn'_def
+    subgoal using wp_time_frame[OF wp, where t="\<Phi> ra"] unfolding augment_amor_assn_def
       by (auto simp:  sep_conj_left_commute sep_conj_commute add.assoc add.left_commute add.commute)
     done
 qed
 
 
 lemma
-   brut: 
+   hn_refine_amortization: 
    assumes
-     nofail: "\<And>x r. nofailT (m x r) \<Longrightarrow> nofailT (reclaim (consume (m x r) ((lift_acost o \<Phi>) x)) (lift_acost o \<Phi>))"
-     and as: "hn_refine (G x x' ** F' r r') (c x' r') (invalid_assn G x x' ** F' r r') G (reclaim (consume (m x r) ((lift_acost o \<Phi>) x)) (lift_acost o \<Phi>))"
+     nofail: "\<And>x r. nofailT (m x r) \<Longrightarrow> nofailT (reclaim (consume (m x r) (\<Phi> x)) \<Phi>)"
+  and finite: "\<And>x. finite_cost (\<Phi> x)" 
+     and as: "hn_refine (G x x' ** F' r r') (c x' r') (invalid_assn G x x' ** F' r r') G (reclaim (consume (m x r) (\<Phi> x)) \<Phi>)"
    shows
-  "hn_refine ((augment_amor_assn (lift_acost o \<Phi>) G) x x' ** F' r r') (c x' r') (invalid_assn G x x' ** F' r r') (augment_amor_assn (lift_acost o \<Phi>) G) (m x r)"
+  "hn_refine ((augment_amor_assn \<Phi> G) x x' ** F' r r') (c x' r') (invalid_assn (augment_amor_assn \<Phi> G) x x' ** F' r r') (augment_amor_assn \<Phi> G) (m x r)"
+  unfolding invalid_assn_augment_amor_assn
   unfolding augment_amor_assn_def
   apply(subst sep_conj_assoc) apply simp
-  apply(fold augment_amor_assn'_def)
-  apply(rule hn_refine_payday_reverse)
+  apply(fold augment_amor_assn_def)
+  apply(rule hn_refine_payday_reverse_alt[OF finite])
   apply(rule hn_refine_reclaimday)
   subgoal apply (simp add: nofailT_consume) using nofail by simp
   subgoal using as by simp
   done
 
-
-lemma
-   brut2: 
-  "hn_refine (G x x' ** F' r r') (c x' r') (invalid_assn G x x' ** F' r r') G (reclaim (consume (m x r) (\<Phi> x)) \<Phi>)
-    \<Longrightarrow> hn_refine ((augment_amor_assn \<Phi> G) x x' ** F' r r') (c x' r') (invalid_assn (augment_amor_assn \<Phi> G) x x' ** F' r r') (augment_amor_assn \<Phi> G) (m x r)"
-  sorry
+(* TODO: move *)
 
 
 
-definition dyn_array_append_impl :: "'b ptr \<times> 'c word \<times> 'd word \<Rightarrow> 'b \<Rightarrow> ('b ptr \<times> 'c word \<times> 'd word) llM "  where
-  "dyn_array_append_impl = undefined"
-
-lemma AA: "hn_refine (L (bs,n) (p,m) ** A x x')
-        (dyn_array_append_impl (p,m) x')
-            (invalid_assn L (bs,n) (p,m) ** A x x')
-            L (dyn_list_append_spec (bs,n) x)"
-  sorry
-
- 
-
-thm hn_refine_ref[OF AA dyn_list_append_spec_refines, THEN brut[where m="dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas))" and c=dyn_array_append_impl and \<Phi>="\<Phi>_dlas"]]
-
-thm  brut[where m="dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas))" and c=dyn_array_append_impl and \<Phi>="\<Phi>_dlas", OF _ hn_refine_ref[OF AA dyn_list_append_spec_refines]]
-
-
-term array_assn
-
-definition dyn_array_raw_assn where
-  "dyn_array_raw_assn A \<equiv> \<lambda>(bs,l,c) (p,l',c'). array_assn A bs p ** snat_assn l l' ** snat_assn c c'"
-                                            
-lemma AA_real: "hn_refine (dyn_array_raw_assn A (bs,l,c) (p,l',c') ** A x x')
-        (dyn_array_append_impl (p,l',c') x')
-            (invalid_assn (dyn_array_raw_assn A) (bs,l,c) (p,l',c') ** A x x')
-           (dyn_array_raw_assn A) (dyn_list_append_spec (bs,l,c) x)"
-  sorry
+lemma timerefineA_mono:
+    assumes "wfR'' R"
+    shows "t \<le> t' \<Longrightarrow> timerefineA R t \<le> timerefineA R (t'::ecost)"
+  apply (auto simp: less_eq_acost_def timerefineA_def split: nrest.splits option.splits simp: le_fun_def)
+  proof (goal_cases)
+    case (1 ac)
+    then have l: "\<And>ac. the_acost t ac \<le>  the_acost t' ac"
+      apply(cases t; cases t') unfolding less_eq_acost_def  
+      by auto
+    show ?case
+      apply(rule Sum_any_mono)
+      subgoal using l apply(rule ordered_semiring_class.mult_right_mono) by (simp add: needname_nonneg)
+      apply(rule wfR_finite_mult_left2) by fact
+  qed 
 
 
+locale dyn_list_impl =
+  fixes dyn_list_append2
+    and dyn_array_append_impl :: "'f \<Rightarrow> 'i \<Rightarrow> 'f llM" 
 
-thm hn_refine_ref[ OF AA_real dyn_list_append_spec_refines, THEN brut[where m="dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas))" and c=dyn_array_append_impl and \<Phi>="\<Phi>_dlas"], no_vars]
+    and dynamiclist_empty2 :: "((('e::llvm_rep) list \<times> nat \<times> nat),ecost) nrest"
+    and dynamiclist_empty_impl :: "'f llM"
+
+    and TR_dynarray
+    and dyn_array_raw_assn :: "('e \<Rightarrow> 'i \<Rightarrow> assn)  \<Rightarrow> 'e list \<times> nat \<times> nat \<Rightarrow> 'f \<Rightarrow> assn"
+  assumes 
+        wfR_TR_dynarray: "wfR'' TR_dynarray"                           
+    and TR_dynarray_keeps_finite: "\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq>0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR_dynarray \<Phi>)"
+    and dyn_list_append2_refine: "dyn_list_append2 dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_append dl x)"
+
+    and AA_real: "hn_refine (dyn_array_raw_assn A (bs,l,c) da' ** A x x')
+                        (dyn_array_append_impl da' x')
+                      (invalid_assn (dyn_array_raw_assn A) (bs,l,c) da' ** A x x')
+                        (dyn_array_raw_assn A) (dyn_list_append2 (bs,l,c) x)"
+
+    and emptylist2_real: "(uncurry0 dynamiclist_empty_impl, uncurry0 dynamiclist_empty2) \<in> unit_assn\<^sup>k \<rightarrow>\<^sub>a  dyn_array_raw_assn A"
+    and emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
+begin 
 
 
+
+thm dyn_list_append_spec_refines[no_vars]
+
+abbreviation "\<Phi>_d == \<lambda>x. timerefineA TR_dynarray  (\<Phi>_dlas' x)"
+abbreviation "abstract_advertised_cost == lift_acost (2 *m A_dlas + C_dlas)"
+abbreviation "abstracted_advertised_cost == timerefineA TR_dynarray abstract_advertised_cost"
+
+
+thm pw_inresT_Sup
+
+
+lemma reclaim_SPEC: "(\<And>x. \<Phi> x \<Longrightarrow> T x \<ge> t x) \<Longrightarrow> reclaim (SPEC \<Phi> T) t = SPEC \<Phi> (\<lambda>x. T x - t x)"
+  unfolding SPEC_def apply simp
+  unfolding Sup_nrest_def apply auto 
+  apply(rule ext) apply auto 
+  subgoal for v apply(rule antisym)
+    subgoal apply(rule Sup_least) by auto
+    subgoal apply(rule Sup_upper2[where u="[v\<mapsto>T v - t v] v"])
+       apply(rule image_eqI[where x="[v \<mapsto> T v - t v]"]) apply simp by auto
+    done
+  subgoal 
+    by (smt SUP_bot_conv(2) Sup_empty empty_Sup fun_upd_apply mem_Collect_eq) 
+  done
+
+
+thm Sum_any.distrib[no_vars]
+
+lemma finite_nonzero_minus: "finite {a. g a \<noteq> 0} \<Longrightarrow> finite {a. h a \<noteq> (0::enat)} \<Longrightarrow> finite {a. g a - h a \<noteq> 0}"
+  by (metis (mono_tags, lifting) Collect_mono_iff idiff_0 rev_finite_subset)
+
+
+lemma sum_minus_distrib_enat:
+  assumes "\<And>a. g a \<ge> (h a::enat)"
+  shows "finite A \<Longrightarrow> sum (\<lambda>a. g a - h a) A = sum g A - sum h A" 
+proof (induct rule: finite_induct)
+  case (insert x F)
+  have *: "sum g F \<ge> sum h F"
+    apply(rule sum_mono) using assms by auto
+  have "(\<Sum>a\<in>insert x F. g a - h a)
+      = (g x - h x) + (\<Sum>a\<in>F. g a - h a)"  
+    by (simp add: insert.hyps(1) insert.hyps(2))
+  also have "\<dots> = (g x - h x) + (sum g F - sum h F)"
+    by (simp add: insert.hyps(3))
+  also have "\<dots> = (g x + sum g F) - (h x + sum h F)"
+    using assms[of x] * 
+    by (metis add.commute add_diff_assoc_enat assms minus_plus_assoc2) 
+  also have "\<dots> = sum g (insert x F) - sum h (insert x F)"
+    by (simp add: insert.hyps(1) insert.hyps(2))
+  finally show ?case .
+qed simp  
+
+lemma Sum_any_minus_distrib_enat:
+  assumes "finite {a. g a \<noteq> 0}" "finite {a. h a \<noteq> 0}"
+  assumes "\<And>a. g a \<ge> (h a :: enat)"
+  shows "Sum_any (\<lambda>a. g a - h a) = Sum_any g - Sum_any h"
+proof -
+  have z: "{a. g a - h a \<noteq> 0} \<subseteq> {a. g a \<noteq> (0::enat)}"
+    by auto
+
+  have "Sum_any (\<lambda>a. g a - h a) = sum (\<lambda>a. g a - h a)  {a. g a \<noteq> 0}"
+    apply  (rule Sum_any.expand_superset) 
+    apply(rule assms(1))
+    apply(rule z)
+    done
+  also have "\<dots> = sum g {a. g a \<noteq> 0} - sum h {a. g a \<noteq> 0}"
+    apply(subst sum_minus_distrib_enat) 
+      apply(rule assms(3))
+    apply(rule assms(1))
+    apply simp done 
+  also have "\<dots> = Sum_any g - Sum_any h"
+    apply(subst Sum_any.expand_set)
+    apply(subst Sum_any.expand_superset[OF assms(1)])
+    subgoal using assms(3)  apply auto 
+      by (metis ile0_eq) 
+    apply simp 
+    done
+  finally show ?thesis .
+qed
+    
+
+thm diff_mult_distrib
+lemma 
+  assumes "a\<ge>b"
+  shows "(a - b) * (c::enat) = a * c - b * c"
+  using assms apply(cases a; cases b; cases c; auto)
+  oops
+
+lemma diff_mult_sub_distrib_enat:
+  shows "(a - b) * (c::enat) \<le> a * c - b * c"
+  apply(cases a; cases b; cases c; auto)
+  using diff_mult_distrib by simp
+
+
+(* TODO: move improved version upstream *)
+lemma wfR''_finite_mult_left:
+  assumes "wfR'' R"
+  shows "finite {ac. x ac * the_acost (R ac) cc \<noteq> 0}"
+proof - 
+  from assms have "finite {s. the_acost (R s) cc \<noteq> 0}" unfolding wfR''_def by auto
+  show ?thesis
+    apply(rule finite_subset[where B="{ac. the_acost (R ac) cc \<noteq> 0}"])
+    subgoal by auto
+    subgoal apply fact done
+    done
+qed 
+
+thm timerefineA_propagate
+lemma timerefineA_propagate_minus:
+  assumes "wfR'' E"
+  fixes a b :: "('a, enat) acost"
+  assumes "a\<ge>b"
+  shows "timerefineA E (a - b) \<le> timerefineA E a - timerefineA E b"
+  unfolding timerefineA_def
+  apply(auto simp: less_eq_acost_def minus_acost_alt timerefine_def consume_def timerefineA_def split: nrest.splits option.splits)
+  apply(cases a, cases b) 
+  apply auto
+  unfolding  ring_distribs 
+  apply(rule order.trans)
+   apply(rule Sum_any_mono)
+    apply(rule diff_mult_sub_distrib_enat) 
+   apply(rule finite_nonzero_minus)
+  subgoal apply(rule wfR''_finite_mult_left) by(rule assms(1))
+  subgoal apply(rule wfR''_finite_mult_left) by(rule assms(1))
+  apply(subst Sum_any_minus_distrib_enat)
+  subgoal apply(rule wfR''_finite_mult_left) by(rule assms(1))
+  subgoal apply(rule wfR''_finite_mult_left) by(rule assms(1))
+  subgoal apply(rule mult_right_mono) using assms(2) unfolding le_fun_def  by (auto simp: less_eq_acost_def  )
+  apply simp
+  done
+
+lemma add_increasing2_nat_acost: "(a::(_,nat)acost)\<le>b \<Longrightarrow> a\<le>b+c" 
+  apply(cases a; cases b; cases c) apply (auto simp: less_eq_acost_def)  
+  by (simp add: add_increasing2)  
+lemma add_increasing2_ecost: "(a::ecost)\<le>b \<Longrightarrow> a\<le>b+c" 
+  apply(cases a; cases b; cases c) apply (auto simp: less_eq_acost_def)  
+  by (simp add: add_increasing2)  
+
+
+lemma pull_timerefine_through_reclaim:
+  fixes TR :: "_\<Rightarrow>ecost"
+  assumes *: "wfR'' TR"
+      and ineq: "\<And>x. \<Psi> x \<Longrightarrow> \<Phi>' x \<le> T x + \<Phi>"
+  shows "\<Down>\<^sub>C TR (reclaim (NREST.consume (SPEC \<Psi> (T::_\<Rightarrow>ecost)) \<Phi>) \<Phi>') \<le>
+         (reclaim (NREST.consume (SPEC \<Psi> (\<lambda>x. timerefineA TR ((T::_\<Rightarrow>ecost) x))) (timerefineA TR \<Phi>)) (timerefineA TR o \<Phi>'))"
+  unfolding dyn_list_append_spec_def
+  apply(subst consume_SPEC_eq)
+  apply(subst consume_SPEC_eq)  
+  apply(subst reclaim_SPEC) 
+    subgoal apply(rule ineq) by simp
+  apply(subst reclaim_SPEC) 
+    subgoal
+     apply(subst timerefineA_propagate[symmetric])
+       apply(rule *)     apply simp
+      apply(rule timerefineA_mono)
+      subgoal by(rule *)   
+    subgoal apply(rule ineq) by simp
+      done
+  apply(subst SPEC_timerefine_conv)
+  apply(rule SPEC_leq_SPEC_I_even_stronger)
+  subgoal apply auto done
+  subgoal apply (subst timerefineA_propagate[symmetric])
+     apply(rule *)       apply simp
+    apply(rule order.trans[rotated])
+     apply(rule timerefineA_propagate_minus)
+    subgoal by(rule *)     
+    subgoal apply(rule ineq) by simp
+    subgoal 
+      apply(rule timerefineA_mono)
+      subgoal by(rule *)     
+      apply simp
+      done
+    done
+  done   
+
+lemma dyn_list_append_spec_leq_pull_TR:
+  fixes TR :: "_\<Rightarrow>ecost"
+  assumes *: "wfR'' TR"
+  shows "\<Down>\<^sub>C TR (reclaim (NREST.consume (dyn_list_append_spec abstract_advertised_cost (bs, l, c) x) (\<Phi>_dlas' (bs, l, c))) \<Phi>_dlas') \<le>
+         (reclaim (NREST.consume ((dyn_list_append_spec (timerefineA TR abstract_advertised_cost) (bs, l, c) x)) (timerefineA TR (\<Phi>_dlas' (bs, l, c)))) (timerefineA TR o \<Phi>_dlas'))"
+  unfolding dyn_list_append_spec_def
+  apply simp
+  supply [[unify_trace_failure]]
+  apply(rule pull_timerefine_through_reclaim)
+   apply(rule *) 
+  subgoal apply(auto simp: \<Phi>_dlas_def) apply(subst lift_acost_propagate[symmetric])
+    apply(rule lift_acost_mono)
+    apply(subst add.commute) apply(subst add.assoc)
+    apply(subst costmult_add_distrib_left)
+    apply(subst add.commute)
+    apply(rule add_increasing2_nat_acost) 
+    apply(rule costmult_right_mono) by auto 
+  done
+
+
+lemma dyn_list_append2_refines:
+  "\<lbrakk>l \<le> c; c = length bs; 0 < length bs\<rbrakk> \<Longrightarrow> dyn_list_append2 (bs,l,c) x
+    \<le> reclaim
+          (NREST.consume (dyn_list_append_spec abstracted_advertised_cost (bs, l, c) x)
+            (\<Phi>_d (bs, l, c)))
+          \<Phi>_d"
+  apply(rule order.trans)   
+  apply(rule dyn_list_append2_refine)
+  apply(rule order.trans)
+   apply(rule timerefine_mono2)
+  apply(rule wfR_TR_dynarray)
+   apply(rule dyn_list_append_spec_refines)
+     apply simp_all [3]
+  apply(rule order.trans)
+   apply(rule dyn_list_append_spec_leq_pull_TR)
+  apply(rule wfR_TR_dynarray)
+  apply(simp add: timerefine_dyn_list_append_spec)
+  unfolding comp_def
+  by auto
+  
+  
 
 definition dyn_array_raw_armor_assn where
-  "dyn_array_raw_armor_assn \<equiv> \<lambda>A (bs, l, c) (p, l', c').  $\<Phi>_dlas (bs, l, c) \<and>* dyn_array_raw_assn A (bs, l, c) (p, l', c')"
+  "dyn_array_raw_armor_assn \<equiv> \<lambda>A (bs, l, c) da'.  $\<Phi>_d (bs, l, c) \<and>* dyn_array_raw_assn A (bs, l, c) da'"
 
-lemma dyn_array_raw_armor_assn_alt: "dyn_array_raw_armor_assn A = augment_amor_assn \<Phi>_dlas (dyn_array_raw_assn A)"
+lemma dyn_array_raw_armor_assn_alt: "dyn_array_raw_armor_assn A = augment_amor_assn \<Phi>_d (dyn_array_raw_assn A)"
   unfolding augment_amor_assn_def dyn_array_raw_armor_assn_def 
   apply (rule ext) 
   apply (rule ext) by simp
 
 
-lemma LLL: "invalid_assn (dyn_array_raw_armor_assn A) = invalid_assn (dyn_array_raw_assn A)"
-  unfolding dyn_array_raw_armor_assn_alt
-  apply(rule invalid_assn_augment_amor_assn)
-  done
+thm timerefine_mono2
 
 lemma YEAH: "\<lbrakk>l \<le> c; c = length bs; 0 < length bs\<rbrakk>
-\<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn A) (bs, l, c) (p, l', c') \<and>* hn_ctxt A r r')
-     (dyn_array_append_impl $ (p, l', c') $ r')
-     (hn_invalid (dyn_array_raw_armor_assn A) (bs, l, c) (p, l', c') \<and>* hn_ctxt A r r')
+\<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn A) (bs, l, c) da' \<and>* hn_ctxt A r r')
+     (dyn_array_append_impl $ da' $ r')
+     (hn_invalid (dyn_array_raw_armor_assn A) (bs, l, c) da' \<and>* hn_ctxt A r r')
        (dyn_array_raw_armor_assn A)
-      (PR_CONST (dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas))) $ (bs, l, c) $ r) "
+      (PR_CONST (dyn_list_append_spec abstracted_advertised_cost) $ (bs, l, c) $ r) "
   unfolding hn_ctxt_def APP_def PR_CONST_def
-  unfolding LLL
-  unfolding dyn_array_raw_armor_assn_alt apply (simp only: prod.case)
-  apply(rule brut[where m="dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas))" and c=dyn_array_append_impl and \<Phi>="\<Phi>_dlas"])
+  unfolding dyn_array_raw_armor_assn_alt apply (simp only: prod.case)        
+  apply(rule hn_refine_amortization[where m="dyn_list_append_spec abstracted_advertised_cost" and c=dyn_array_append_impl and \<Phi>="\<Phi>_d"])
+  subgoal 
+    apply(simp add: nofailT_reclaim nofailT_consume)
+    unfolding dyn_list_append_spec_def apply (auto simp: SPEC_def consume_def split: prod.splits)
+    unfolding \<Phi>_dlas_def
+    apply(subst timerefineA_propagate[OF wfR_TR_dynarray, symmetric])
+    apply(rule timerefineA_mono[OF wfR_TR_dynarray])
+    apply auto
+    unfolding lift_acost_propagate[symmetric]
+    apply(rule lift_acost_mono) 
+    apply(subst add.assoc[symmetric])
+    apply(subst costmult_add_distrib_left) 
+    apply(rule add_increasing2_nat_acost) 
+    apply(rule costmult_right_mono) by auto
+  subgoal 
+    apply(rule TR_dynarray_keeps_finite)
+    subgoal apply (auto simp: \<Phi>_dlas_def lift_acost_def A_dlas_def norm_cost split: prod.splits)
+      apply(rule finite_subset[where B="{''dyn_list_double_c''}"])
+       apply auto
+      apply(rule ccontr) unfolding cost_def zero_acost_def zero_enat_def by auto
+    by(auto intro: finite_cost_lift_acost)
   apply(rule hn_refine_ref)
    apply(rule AA_real)
-  apply(rule dyn_list_append_spec_refines)
+  apply(rule dyn_list_append2_refines)
     apply auto
   done
 
 
+abbreviation "specify_cost == 0(''list_append'':= abstracted_advertised_cost)"
 
-lemma dyn_list_append_spec2_refines: "((bs,l,c),as)\<in> dyn_list_rel \<Longrightarrow> (r',r)\<in>Id \<Longrightarrow> dyn_list_append_spec2 (\<lambda>_. T) (bs, l, c) r' \<le> \<Down>dyn_list_rel (mop_list_append T as r)"
+lemma dyn_list_append_spec_refines: 
+  "((bs,l,c),as)\<in> dyn_list_rel \<Longrightarrow> (r',r)\<in>Id
+   \<Longrightarrow> dyn_list_append_spec abstracted_advertised_cost (bs, l, c) r' \<le> \<Down>dyn_list_rel (\<Down>\<^sub>C specify_cost  (mop_list_append (cost ''list_append'' 1)  as r))"
+  unfolding mop_list_append_def dyn_list_rel_alt
+  apply(subst timerefine_SPECT_map)
+  apply(subst SPECT_assign_emb')
+  unfolding conc_fun_br
+  apply(subst SPEC_REST_emb'_conv[symmetric])
+  unfolding dyn_list_append_spec_def  apply simp
+  apply(rule SPEC_leq_SPEC_I_even_stronger)
+  unfolding in_br_conv
+  by (auto simp add: take_Suc_conv_app_nth norm_cost) 
+
+
+lemma dyn_list_append_spec_refines_one_step: 
+  "((bs,l,c),as)\<in> dyn_list_rel \<Longrightarrow> (r',r)\<in>Id
+   \<Longrightarrow> dyn_list_append_spec T (bs, l, c) r' \<le> \<Down>dyn_list_rel (mop_list_append T  as r)"
   unfolding mop_list_append_def dyn_list_rel_alt
   apply(subst SPECT_assign_emb')
   unfolding conc_fun_br
   apply(subst SPEC_REST_emb'_conv[symmetric])
-  unfolding dyn_list_append_spec2_def  apply simp
+  unfolding dyn_list_append_spec_def  apply simp
   apply(rule SPEC_leq_SPEC_I_even_stronger)
   unfolding in_br_conv
-  by (auto simp add: take_Suc_conv_app_nth) 
+  by (auto simp add: take_Suc_conv_app_nth norm_cost) 
 
-
-
-
-lemma YEAH2: "hn_refine (hn_ctxt E x x' \<and>* hn_ctxt A r r')
-     (dyn_array_append_impl $ x' $ r')
-     (hn_invalid E x x' \<and>* hn_ctxt A r r')
-       (F A)
-      (PR_CONST AE $ x $ r) "
-  sorry
-
-lemma faz: "hn_refine (hn_val E a ai \<and>* hn_val bool1_rel b bi) (ll_xor $ ai $ bi) (hn_val E a ai \<and>* hn_val bool1_rel b bi) bool1_assn (PR_CONST (SPECc2 ''xor'' op_neq) $ a $ b)"
-  sorry
-thm faz[to_hfref]
 
 
 lemma YEAH3: "\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs)\<rbrakk>
@@ -657,27 +1041,36 @@ lemma YEAH3: "\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = le
      (dyn_array_append_impl $ x' $ r')
      (hn_invalid (dyn_array_raw_armor_assn A) x x' \<and>* hn_ctxt A r r')
        (dyn_array_raw_armor_assn A)
-      (PR_CONST (dyn_list_append_spec2 (\<lambda>_. lift_acost (2 *m A_dlas + C_dlas))) $ x $ r) "
-  sorry
+      (PR_CONST (dyn_list_append_spec abstracted_advertised_cost) $ x $ r) "
+  apply(cases x)
+  apply (simp only:)
+  apply(rule YEAH)
+  by auto
 
-thm YEAH2[to_hfref]
 lemmas RICHTIGCOOL = YEAH3[to_hfref]
 
-lemma dyn_list_append_spec2_refines_fref: "(uncurry (PR_CONST (dyn_list_append_spec2 (\<lambda>_. T))), uncurry (PR_CONST (mop_list_append T)))
+lemma dyn_list_append_spec2_refines_fref: "(uncurry (PR_CONST (dyn_list_append_spec T)), uncurry (PR_CONST (mop_list_append T)))
         \<in> dyn_list_rel \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>dyn_list_rel\<rangle>nrest_rel" 
-  sorry
-
-thm dyn_list_append_spec2_refines[to_fref]
+  apply(rule frefI)
+  apply(rule nrest_relI)
+  apply(auto split: prod.splits simp del: mop_list_append_def simp add: PR_CONST_def uncurry_def)
+  apply(rule dyn_list_append_spec_refines_one_step) by auto
 
 thm RICHTIGCOOL dyn_list_append_spec2_refines_fref[where T="lift_acost (2 *m A_dlas + C_dlas)"]
 
+term the_pure
 
 definition "dyn_array_assn A = hr_comp (dyn_array_raw_armor_assn A) dyn_list_rel"
 
 lemma dyn_array_raw_armor_: "hr_comp (dyn_array_raw_armor_assn A) dyn_list_rel = dyn_array_assn A"
   unfolding dyn_array_assn_def by auto
 
- 
+
+
+definition "dynamiclist_append_spec = mop_list_append abstracted_advertised_cost"
+
+sepref_register dynamiclist_append_spec
+
 
 lemma dyn_list_rel_sv[relator_props]: "single_valued dyn_list_rel"
   unfolding dyn_list_rel_alt by(rule br_sv)  
@@ -688,15 +1081,159 @@ text \<open>this makes the tactic \<open>solve_attains_sup\<close> solve the sup
 declare dyn_list_rel_def[simp] \<comment> \<open>don't know how to tag this fact such that FCOMP picks it up
     correctly\<close>
 declare dyn_array_raw_armor_[fcomp_norm_unfold]
-thm RICHTIGCOOL[FCOMP dyn_list_append_spec2_refines_fref[where T="lift_acost (2 *m A_dlas + C_dlas)"]]
-lemmas FFF = RICHTIGCOOL[FCOMP dyn_list_append_spec2_refines_fref]
+
+lemmas FFF = RICHTIGCOOL[FCOMP dyn_list_append_spec2_refines_fref, folded dynamiclist_append_spec_def, unfolded PR_CONST_def]
 
 declare dyn_list_rel_def[simp del]
 
 thm FFF
 
 
+subsection \<open>empty list\<close>
 
+
+
+
+abbreviation "el_abstract_advertised_cost == lift_acost E_dlas"
+abbreviation "el_abstracted_advertised_cost == timerefineA TR_dynarray el_abstract_advertised_cost"
+
+definition "dynamiclist_empty_spec = mop_list_emptylist el_abstracted_advertised_cost"
+
+
+
+
+lemma dyn_list_empty2_refines:
+  "dynamiclist_empty2
+    \<le> reclaim (dyn_list_empty_spec el_abstracted_advertised_cost) \<Phi>_d"
+  apply(rule order.trans)
+  apply(rule emptylist2_refine)
+  apply(rule order.trans)
+   apply(rule timerefine_mono2)
+  apply(rule wfR_TR_dynarray)
+   apply(rule dyn_list_new_raw_refines)
+  apply(rule order.trans)
+  unfolding dyn_list_empty_spec_def
+   apply(rule pull_timerefine_through_reclaim[OF wfR_TR_dynarray])
+  subgoal by (auto simp: \<Phi>_dlas_def lift_acost_zero ecost_nneg)
+  apply(simp add: timerefine_dyn_list_empty_spec consume_0)
+  unfolding comp_def            
+  by auto
+  
+
+(* declare [[unify_trace_failure]] *)
+
+
+thm emptylist2_real
+thm emptylist2_real[to_hnr]
+thm emptylist2_refine
+
+
+lemma YEAH32: "hn_refine \<box> dynamiclist_empty_impl \<box>
+       (dyn_array_raw_armor_assn A)
+      (PR_CONST (dyn_list_empty_spec el_abstracted_advertised_cost) ) "
+  unfolding hn_ctxt_def APP_def PR_CONST_def
+  unfolding dyn_array_raw_armor_assn_alt
+  apply(rule hn_refine_reclaimday)
+  subgoal                                    
+    apply(simp add: nofailT_reclaim nofailT_consume)
+    unfolding dyn_list_empty_spec_def apply (auto simp: SPEC_def consume_def split: prod.splits)
+    unfolding \<Phi>_dlas_def apply auto
+    apply(rule timerefineA_mono[OF wfR_TR_dynarray])
+    by (auto simp: lift_acost_zero ecost_nneg) 
+  apply(rule hn_refine_ref) 
+   apply(rule emptylist2_real[to_hnr])
+  apply(rule dyn_list_empty2_refines)
+  done
+
+
+lemmas RICHTIGCOOL2 = YEAH32[to_hfref]
+
+
+lemma dynamiclist_empty_refines_fref: "(uncurry0 (PR_CONST (dyn_list_empty_spec (T::ecost))), uncurry0 (PR_CONST (mop_list_emptylist T)))
+        \<in> unit_rel \<rightarrow>\<^sub>f \<langle>dyn_list_rel\<rangle>nrest_rel" 
+  apply(rule frefI)
+  apply(rule nrest_relI)
+  unfolding mop_list_emptylist_def dyn_list_empty_spec_def dyn_list_rel_alt
+  apply (simp add: timerefine_SPECT_map norm_cost )                   
+  apply (simp add: SPECT_assign_emb' conc_fun_br)
+  apply(subst SPEC_REST_emb'_conv[symmetric])
+  apply(rule SPEC_leq_SPEC_I_even_stronger)
+  by auto
+
+lemmas GGG = RICHTIGCOOL2[FCOMP dynamiclist_empty_refines_fref, folded dynamiclist_empty_spec_def, unfolded PR_CONST_def]
+
+
+end
+
+
+thm hnr_raw_array_new
+term mop_array_new
+
+
+definition dyn_array_raw_assn where
+  "dyn_array_raw_assn A \<equiv> \<lambda>(bs,l,c) (p,l',c'). array_assn A bs p ** snat_assn l l' ** snat_assn c c'"
+
+definition "dyn_array_append_impl = undefined"
+definition "dynamiclist_empty_impl = undefined"
+definition "TR_dynarray = undefined"
+
+global_interpretation dyn_array: dyn_list_impl dynamiclist_append2 dyn_array_append_impl
+                            dynamiclist_empty2 dynamiclist_empty_impl
+                            TR_dynarray dyn_array_raw_assn
+    defines dynamic_array_append_spec = "dyn_array.dynamiclist_append_spec"
+      and dynamic_array_empty_spec = "dyn_array.dynamiclist_empty_spec" 
+      and dynamic_array_assn = dyn_array.dyn_array_assn
+  sorry
+
+sepref_register dynamic_array_append_spec
+declare dyn_array.FFF[sepref_fr_rules]
+
+term dynamic_array_empty_spec
+sepref_register dynamic_array_empty_spec
+declare dyn_array.GGG[sepref_fr_rules]
+
+
+
+term dyn_array.dynamiclist_empty_spec
+term dyn_array.dynamiclist_append_spec
+
+
+term dynamic_array_append_spec
+
+definition "algorithm = doN {
+    (s::nat list) \<leftarrow> dynamic_array_empty_spec;
+    s \<leftarrow> dynamic_array_append_spec s (0::nat);
+    s \<leftarrow> dynamic_array_append_spec s (1::nat);
+    s \<leftarrow> dynamic_array_append_spec s (42::nat);
+    s \<leftarrow> dynamic_array_append_spec s (42::nat);
+    s \<leftarrow> dynamic_array_append_spec s (32::nat);
+    s \<leftarrow> dynamic_array_append_spec s (31::nat);
+    s \<leftarrow> dynamic_array_append_spec s (42::nat);
+    s \<leftarrow> dynamic_array_append_spec s (1::nat);
+    s \<leftarrow> dynamic_array_append_spec s (1::nat);
+    RETURNT s
+  }"
+
+term "dynnamic_array_assn snat_assn"
+
+term narray_new
+
+sepref_def algorithm_impl is "uncurry0 algorithm"
+  :: "(unit_assn)\<^sup>k \<rightarrow>\<^sub>a dynamic_array_assn (snat_assn' TYPE(32))"
+  unfolding algorithm_def
+    supply [[goals_limit = 1]]
+    apply (annot_snat_const "TYPE(32)")
+  apply sepref_dbg_preproc
+  apply sepref_dbg_cons_init
+  apply sepref_dbg_id
+  apply sepref_dbg_monadify
+  apply sepref_dbg_opt_init
+  apply sepref_dbg_trans
+  apply sepref_dbg_opt
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_cons_solve
+  apply sepref_dbg_constraints
+  done
 
 subsection \<open>The Refinement Relation between abstract dynamic lists and lists\<close>
 
