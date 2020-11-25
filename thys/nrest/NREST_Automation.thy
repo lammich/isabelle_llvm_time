@@ -119,7 +119,7 @@ definition "leq_sidecon (a::(string,enat) acost) as1 as2 b bs1 bs2 T \<equiv> a 
 
 lemma leq_sc_init: 
     "leq_sidecon a 0 (as + 0) 0 0 (bs + 0) True \<Longrightarrow> a + as \<le> bs"
-    "leq_sidecon a 0 0 0 0 bs True \<Longrightarrow> a \<le> bs"
+    "leq_sidecon a 0 0 0 0 (bs + 0) True \<Longrightarrow> a \<le> bs"
   unfolding leq_sidecon_def by simp_all
 
 lemma leq_sc_l_SUCC:
