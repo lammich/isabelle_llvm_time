@@ -231,7 +231,7 @@ lemma nofailT_reclaim:
   unfolding pw_Sup_nofail  
   apply force
   by auto
-
+ 
 
 lemma reclaim_SPEC: "(\<And>x. Q x \<Longrightarrow> T x \<ge> \<Phi> x) \<Longrightarrow> reclaim (SPEC Q T) (\<Phi>::_\<Rightarrow>ecost) = SPEC Q (\<lambda>x. T x - \<Phi> x)"
   apply(rule antisym)
@@ -240,7 +240,19 @@ lemma reclaim_SPEC: "(\<And>x. Q x \<Longrightarrow> T x \<ge> \<Phi> x) \<Longr
   subgoal    
     by (auto simp: SPEC_def Sup_nrest_def le_fun_def intro!: Sup_upper2)
   done
-  
+
+lemma reclaim_SPEC_le: "SPEC Q (\<lambda>x. T x - \<Phi> x) \<le> reclaim (SPEC Q T) (\<Phi>::_\<Rightarrow>ecost)"
+  apply(cases "nofailT (reclaim (SPEC Q T) (\<Phi>::_\<Rightarrow>ecost))")
+  subgoal
+    apply(subst (asm) nofailT_reclaim)
+    apply (auto simp: nofailT_SPEC )
+    apply(subst (asm) SPEC_def) apply (auto split: if_splits) 
+    subgoal    
+      by (auto simp: SPEC_def Sup_nrest_def le_fun_def intro!: Sup_upper2)
+    done
+  subgoal unfolding nofailT_def by auto
+  done
+
 
 
 lemma pull_timerefine_through_reclaim:
@@ -325,6 +337,8 @@ subsection \<open>wp can frame time through\<close>
 
 
 text \<open>Is this property specific to wp of LLVM, or is this general?\<close>
+
+thm wp_time_mono text \<open>is this morally the same lemma? it was also proven with unfolding mwp\<close>
 
 lemma wp_time_frame: "wp c (\<lambda>r s. (G r) (ll_\<alpha> s)) (s,tc)
   \<Longrightarrow> wp c (\<lambda>r s. ($t ** G r) (ll_\<alpha> s)) (s,tc+t)"
@@ -453,9 +467,9 @@ section \<open>Specification of List Operations\<close>
 (* TODO: it is not append but snoc ! *)
 
 context fixes T :: ecost begin
-definition mop_list_append where
- [simp]: "mop_list_append  xs x = SPECT [xs @ [x] \<mapsto> T]"
-sepref_register mop_list_append
+definition mop_list_snoc where
+ [simp]: "mop_list_snoc  xs x = SPECT [xs @ [x] \<mapsto> T]"
+sepref_register mop_list_snoc
 end
 
 
@@ -535,8 +549,8 @@ lemma
 
 lemma "((bs,l,c),as)\<in>dyn_list_rel \<Longrightarrow> (x',x) \<in> Id
  \<Longrightarrow> dyn_list_push_spec T (bs,l,c) x'
-         \<le> \<Down>dyn_list_rel (timerefine (0(''list_append'':=T)) (mop_list_append (cost ''list_append'' 1) as x))"
-  unfolding dyn_list_push_spec_def mop_list_append_def
+         \<le> \<Down>dyn_list_rel (timerefine (0(''list_append'':=T)) (mop_list_snoc (cost ''list_append'' 1) as x))"
+  unfolding dyn_list_push_spec_def mop_list_snoc_def
   apply(subst timerefine_SPECT_map)
   apply(subst SPECT_assign_emb')
   unfolding dyn_list_rel_alt
@@ -553,8 +567,8 @@ lemma "((bs,l,c),as)\<in>dyn_list_rel \<Longrightarrow> (x',x) \<in> Id
 
 lemma dyn_list_push_spec_refines_one_step: 
   "((bs,l,c),as)\<in> dyn_list_rel \<Longrightarrow> (r',r)\<in>Id
-   \<Longrightarrow> dyn_list_push_spec T (bs, l, c) r' \<le> \<Down>dyn_list_rel (mop_list_append T  as r)"
-  unfolding mop_list_append_def dyn_list_rel_alt
+   \<Longrightarrow> dyn_list_push_spec T (bs, l, c) r' \<le> \<Down>dyn_list_rel (mop_list_snoc T  as r)"
+  unfolding mop_list_snoc_def dyn_list_rel_alt
   apply(subst SPECT_assign_emb')
   unfolding conc_fun_br
   apply(subst SPEC_REST_emb'_conv[symmetric])
@@ -563,11 +577,11 @@ lemma dyn_list_push_spec_refines_one_step:
   unfolding in_br_conv
   by (auto simp add: take_Suc_conv_app_nth norm_cost) 
 
-lemma dyn_list_push_spec_refines_fref: "(uncurry (PR_CONST (dyn_list_push_spec T)), uncurry (PR_CONST (mop_list_append T)))
+lemma dyn_list_push_spec_refines_fref: "(uncurry (PR_CONST (dyn_list_push_spec T)), uncurry (PR_CONST (mop_list_snoc T)))
         \<in> dyn_list_rel \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>dyn_list_rel\<rangle>nrest_rel" 
   apply(rule frefI)
   apply(rule nrest_relI)
-  apply(auto split: prod.splits simp del: mop_list_append_def simp add: PR_CONST_def uncurry_def)
+  apply(auto split: prod.splits simp del: mop_list_snoc_def simp add: PR_CONST_def uncurry_def)
   apply(rule dyn_list_push_spec_refines_one_step) by auto
 
 
@@ -634,7 +648,7 @@ definition dyn_list_double_spec where
        ASSERT (l\<le>c \<and> c=length bs);
        SPEC (\<lambda>(bs',l',c'). take l bs' = take l bs \<and> 
               length bs' = 2 * length bs \<and> l' = l \<and> l\<le>c' \<and> c'=length bs')
-        (\<lambda>(bs',l',c'). cost ''dyn_list_double_c'' (enat c')) 
+        (\<lambda>(bs',l',c'). cost ''dyn_list_double_c'' (enat c)) 
   }"
 
 
@@ -668,7 +682,7 @@ definition dyn_list_push where
 paragraph \<open>Amortization proof\<close>
   
 
-definition "push_amortized_cost \<equiv> cost ''dyn_list_double_c'' (2::nat)"
+definition "push_amortized_cost \<equiv> cost ''dyn_list_double_c'' (1::nat)"
 definition "push_overhead_cost \<equiv> cost ''add'' 1 + (cost ''list_set'' 1 + (cost ''if'' 1 + (cost ''less'' 1 + cost ''list_length'' 1)))"
 definition "\<Phi>_push \<equiv> (\<lambda>(xs,l,c). (((2*l -length xs)) *m push_amortized_cost))"
 abbreviation "\<Phi>_push' \<equiv> lift_acost o \<Phi>_push"
@@ -699,6 +713,34 @@ text\<open>The amortization inequality is:
   we now prove:
       raw_operation \<le> reclaim ( consume advertised_opertion PREPOTENTIAL) POSTPOTENTIAL
  \<close>
+
+lemma  dyn_list_push_spec_refines_sketch:
+  assumes a: "l \<le> c" "c=length bs" "0<length bs"
+  shows "dyn_list_push (bs,l,c) x \<le> reclaim (consume (dyn_list_push_spec ACC (bs,l,c) x) (\<Phi> (bs,l,c))) \<Phi>"
+  unfolding dyn_list_push_spec_def
+  unfolding dyn_list_push_def
+  apply simp
+  apply(subst consume_SPEC_eq)
+  apply(rule order.trans[rotated])
+  apply(rule reclaim_SPEC_le)
+  unfolding SPEC_def
+  apply(rule gwp_specifies_I)
+  unfolding SPECc2_alt dyn_list_push_basic_spec_def mop_list_set_def
+    dyn_list_double_spec_def SPEC_REST_emb'_conv
+  apply(refine_vcg \<open>-\<close>)
+  using a 
+  subgoal apply auto sorry
+         apply auto[1]
+        apply auto [1]
+  subgoal 
+    apply simp sorry
+      apply auto [1]
+     apply auto [1]
+  subgoal by force
+  using assms  
+   apply auto 
+  done
+
 
 
 lemma  dyn_list_push_spec_refines:
@@ -836,7 +878,7 @@ abbreviation "push_concrete_advertised_cost == timerefineA TR_dynarray push_abst
 
 text \<open>this is the operation that is used in abstract programs when already decided which 
       data structure to use here: array_lists\<close>
-definition "dyn_array_push_spec = mop_list_append push_concrete_advertised_cost"
+definition "dyn_array_push_spec = mop_list_snoc push_concrete_advertised_cost"
 
 
 
@@ -970,8 +1012,8 @@ abbreviation "specify_cost == 0(''list_append'':= push_concrete_advertised_cost)
 
 lemma dyn_list_push_spec_refines: 
   "((bs,l,c),as)\<in> dyn_list_rel \<Longrightarrow> (r',r)\<in>Id
-   \<Longrightarrow> dyn_list_push_spec push_concrete_advertised_cost (bs, l, c) r' \<le> \<Down>dyn_list_rel (\<Down>\<^sub>C specify_cost  (mop_list_append (cost ''list_append'' 1)  as r))"
-  unfolding mop_list_append_def dyn_list_rel_alt
+   \<Longrightarrow> dyn_list_push_spec push_concrete_advertised_cost (bs, l, c) r' \<le> \<Down>dyn_list_rel (\<Down>\<^sub>C specify_cost  (mop_list_snoc (cost ''list_append'' 1)  as r))"
+  unfolding mop_list_snoc_def dyn_list_rel_alt
   apply(subst timerefine_SPECT_map)
   apply(subst SPECT_assign_emb')
   unfolding conc_fun_br
