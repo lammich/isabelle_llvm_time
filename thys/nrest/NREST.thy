@@ -49,7 +49,23 @@ x \<mapsto> {set}
 subsubsection \<open>NREST is a complete lattice\<close>
 
 
-definition cl :: "('a\<times>'b::order) set \<Rightarrow> _" where "cl a \<equiv> { (x,c'). \<exists>c. (x,c)\<in>a \<and> c'\<le>c }"
+definition dcl :: "('b::order) set \<Rightarrow> _" where "dcl a \<equiv> { c'. \<exists>c. c\<in>a \<and> c'\<le>c }"
+
+definition is_dcl :: "('b::order) set \<Rightarrow> _" where "is_dcl X = (\<forall>x\<in>X. \<forall>y\<le>x. y\<in>X)"
+
+lemma dcl_is_dcl[simp, intro!]: "is_dcl (dcl X)"
+  unfolding is_dcl_def dcl_def
+  by auto
+
+lemma is_dcl_iff_dcl_eq: "is_dcl X \<longleftrightarrow> dcl X = X"  
+  unfolding is_dcl_def dcl_def
+  by auto
+
+lemma dcl_eq_if_dcl[simp]: "is_dcl X \<Longrightarrow> dcl X = X"
+  unfolding is_dcl_def dcl_def
+  by auto
+    
+
 (* TODO: actually we can get away with defining cl only on the resource component 
     and use maps from result to resource type.
 
@@ -57,117 +73,94 @@ definition cl :: "('a\<times>'b::order) set \<Rightarrow> _" where "cl a \<equiv
     our closure  =   lower set
 
   *)
+ 
+
+lemma dcl_is_closure: "x \<le> dcl y  \<longleftrightarrow> dcl x \<le> dcl y"
+  by (force simp: dcl_def) 
 
 
-lemma cl_is_closure: "x \<le> cl y  \<longleftrightarrow> cl x \<le> cl y"
-  by (force simp: cl_def) 
+lemma dcl_empty[simp]: "dcl {} = {}"
+  unfolding dcl_def by auto
 
+lemma dcl_idem[simp]: "dcl (dcl S) = dcl S"
+  unfolding dcl_def by auto
 
-lemma cl_empty[simp]: "cl {} = {}"
-  unfolding cl_def by auto
+lemma dcl_extensive: "s \<le> dcl s"
+  unfolding dcl_def by auto          
 
-lemma cl_idem[simp]: "cl (cl S) = cl S"
-  unfolding cl_def by auto
+lemma dcl_monotone[intro]: "s\<le>s' \<Longrightarrow> dcl s \<le> dcl s'"
+  unfolding dcl_def by auto
 
-lemma rcolse_extensive: "s \<le> cl s"
-  unfolding cl_def by auto          
+lemmas dcl_extI[intro] = dcl_extensive[THEN set_mp]
 
-lemma rcolse_monotone[intro]: "s\<le>s' \<Longrightarrow> cl s \<le> cl s'"
-  unfolding cl_def by auto
+lemma dcl_commute_Union: "dcl (\<Union>S) = \<Union>(dcl`S)"
+  by (auto simp: dcl_def)
+  
+  
+typedef (overloaded) 'a dclosed = "{X::'a::order set. is_dcl X}" by auto
+setup_lifting type_definition_dclosed  
+  
 
-declare rcolse_extensive[THEN set_mp, intro]
-
-
-lemma cl_commute_Union: "cl (\<Union>S) = \<Union>(cl`S)"
-  by (auto simp: cl_def)
-
-
-quotient_type (overloaded) ('a,'b) cls = "('a\<times>'b::order) set" / "\<lambda>a b. cl a = cl b"
-  apply (simp add: equivp_def) by metis
-
-
-instantiation cls :: (type, order) order
+instantiation dclosed :: (order) order
 begin
-  lift_definition less_eq_cls :: "('a,'b) cls \<Rightarrow> ('a,'b) cls \<Rightarrow> bool"
-    is "\<lambda>a b. cl a\<le>cl b" by (auto simp: cl_def)
+  lift_definition less_eq_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> bool"
+    is "\<lambda>a b. dcl a\<le>dcl b" .
 
-  definition "a < b \<equiv> a\<le>b \<and> a\<noteq>b" for a b :: "('a,'b) cls" 
+  lift_definition less_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> bool"
+    is "\<lambda>a b. dcl a < dcl b" .
     
   instance
     apply standard
-    unfolding less_cls_def
-    apply (transfer'; auto simp: cl_def; force)+
+    apply (transfer; auto)+ 
     done
   
 end  
 
-definition cls_elem :: "('a \<times> 'b::order) set \<Rightarrow> ('a \<times> 'b) set set \<Rightarrow> bool" where "cls_elem x S \<equiv> cl x\<in>cl`S"
 
-lemma cls_elem_xfer[transfer_rule]: "(rel_fun (pcr_cls (=) (=)) (rel_fun (rel_set (pcr_cls (=) (=))) (=))) (cls_elem) (\<in>)"
-  apply rule
-  apply rule
-  apply (simp add: cls.pcr_cr_eq cr_cls_def cls_elem_def)
-  subgoal for x y X Y
-    apply (cases y; clarsimp; safe)
-    subgoal
-      by (smt cls.abs_eq_iff rel_setD1)
-    subgoal
-      by (smt cls.abs_eq_iff image_iff rel_setD2)
-    done
-  done
-    
-
-instantiation cls :: (type, complete_lattice) complete_lattice
+instantiation dclosed :: (complete_lattice) complete_lattice
 begin
-  lift_definition Sup_cls :: "('a,'b) cls set \<Rightarrow> ('a,'b) cls" is "\<Union>"
-    by (auto simp: cl_commute_Union rel_set_def; blast)
-    
-  find_theorems "Inf _ = Sup _  "
+  lift_definition Sup_dclosed :: "('a) dclosed set \<Rightarrow> ('a) dclosed" is "\<Union>"
+    by (auto simp: is_dcl_def)
 
-   (* TODO: use lift definition to obtain transfer rules ! ! ! 
-        or prove transfer rules by hand ! ! !  *)
-  definition "Inf_cls A = Sup {b. \<forall>a\<in>A. b \<le> a}" for A :: "('a,'b) cls set"
-  definition "top_cls = Sup (UNIV::('a,'b) cls set)"
-  definition "bot_cls = Sup ({}::('a,'b) cls set)"
-  definition "inf_cls a b = Inf {a,b}" for a b :: "('a,'b) cls"
-  definition "sup_cls a b = Sup {a,b}" for a b :: "('a,'b) cls"
+  lift_definition Inf_dclosed :: "('a) dclosed set \<Rightarrow> ('a) dclosed" is "\<Inter>"
+    by (auto simp: is_dcl_def)
+
+  lift_definition top_dclosed :: "'a dclosed" is "top"
+    by (auto simp: is_dcl_def)
+
+  lift_definition bot_dclosed :: "'a dclosed" is "bot"
+    by (auto simp: is_dcl_def)
+            
+  lift_definition inf_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is "inf"
+    by (auto simp: is_dcl_def)
+
+  lift_definition sup_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is "sup"
+    by (auto simp: is_dcl_def)
     
   instance
     apply standard
-    unfolding inf_cls_def sup_cls_def Inf_cls_def top_cls_def bot_cls_def
-    supply [simp] = cl_def
-    apply (transfer; auto; fail)
-    apply (transfer; force) 
-    apply (transfer; auto; fail)
-    apply (transfer; auto; fail)
-    apply (transfer; auto; fail)
-    apply (transfer; force)
-    apply (transfer; auto simp: cls_elem_def; force)
-    subgoal by (transfer; auto simp: cls_elem_def; meson imageI)
-    subgoal
-      apply (transfer; auto simp: cls_elem_def)
-      apply (smt case_prod_conv mem_Collect_eq)
-      done
-    subgoal by (transfer; auto simp: cls_elem_def; blast)
-    apply (transfer; force)
-    apply simp
+    apply (all \<open>transfer\<close>)
+    apply auto
+    unfolding dcl_def is_dcl_def
+    apply (all \<open>simp; blast\<close>)
     done  
     
   
 
 end
 
-lift_definition cl_Abs_pred :: "('a \<Rightarrow> 'b::order \<Rightarrow> bool) \<Rightarrow> ('a,'b) cls" is 
-  "\<lambda>S. { (a,b) | a b. S a b}" .
 
-lemma "cl_Abs_pred P = cl_Abs_pred Q \<longleftrightarrow> cl { (a,b) | a b. P a b} = cl { (a,b) | a b. Q a b}"
-  by transfer rule
+
+
+
+
+
 
 context
   notes [[typedef_overloaded]]
 begin
 
-datatype ('a,'b) nrest = FAILi | REST "('a , ('b::{complete_lattice})) cls"
+datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{complete_lattice}) dclosed"
 
 end
 
@@ -208,11 +201,11 @@ definition "top \<equiv> FAILi"
 
 instance
   apply(intro_classes)
-  unfolding Sup_nrest_def  Inf_nrest_def  bot_nrest_def top_nrest_def less_nrest_def cl_def
-  apply (case_tac x, case_tac [!] y, auto simp: top_nrest_def cl_def) []
+  unfolding Sup_nrest_def  Inf_nrest_def  bot_nrest_def top_nrest_def less_nrest_def
+  apply (case_tac x, case_tac [!] y, auto simp: top_nrest_def) []
   apply (case_tac x, auto) []
   apply (case_tac x, case_tac [!] y, case_tac [!] z, auto; fail) []
-  apply (case_tac x, (case_tac [!] y)?, simp_all  add: le_fun_def) [] 
+  apply (case_tac x, (case_tac [!] y)?, simp_all  add: le_fun_def fun_eq_iff eq_iff) [] 
   apply (case_tac x, (case_tac [!] y)?, simp_all  add: le_fun_def) []
   apply (case_tac x, (case_tac [!] y)?, auto   simp: le_fun_def) []
   apply (case_tac x, case_tac [!] y, case_tac [!] z, auto   simp: le_fun_def) []
@@ -257,11 +250,8 @@ term "M:: (_,unit) nrest"
 
 subsubsection \<open>Operations on NREST\<close>
 
-definition raw_SPEC :: "('a \<Rightarrow> ('b::complete_lattice) \<Rightarrow> bool) \<Rightarrow> ('a, 'b) nrest" where
- "raw_SPEC P = REST (cl_Abs_pred P)"
-
 definition SPEC :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('c::complete_lattice)) \<Rightarrow> ('a, 'c) nrest" where 
-  "SPEC P t = raw_SPEC (\<lambda>a t'. P a \<and> t' = t a)"
+  "SPEC P t = REST (\<lambda>a. if P a then Abs_dclosed {t a} else bot)"
 
 definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, monoid_add}) nrest" where
   "RETURNT x \<equiv> SPEC (\<lambda>a. a=x) (\<lambda>_. 0)"
@@ -269,94 +259,58 @@ definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, monoid_add})
 abbreviation "FAILT \<equiv> top::(_,_::{complete_lattice}) nrest"
 abbreviation "SUCCEEDT \<equiv> bot::(_,_::{complete_lattice}) nrest" 
 
-
-
 definition SPECT :: "('a \<Rightarrow> ('b::complete_lattice) option) \<Rightarrow> ('a, 'b) nrest" where
-  "SPECT P \<equiv> raw_SPEC (\<lambda>a t'. P a = Some t' )"
-
+  "SPECT P \<equiv> REST (\<lambda>a. case P a of Some t \<Rightarrow> Abs_dclosed {t} | None \<Rightarrow> bot)"
 
 definition "consumea T = SPECT [()\<mapsto>T]"
 
+definition "dcl_continuous f = (\<forall>S S'.  dcl S = dcl S' \<longrightarrow> dcl (f` S) = dcl (f ` S'))"
 
-lift_definition cls_fst_image :: "('a  \<Rightarrow> 'c ) \<Rightarrow> ('a,'b::order) cls \<Rightarrow> ('c,'b) cls" is "\<lambda>f S. (\<lambda>(a,b). ((f a),b)) ` S" 
-  apply(auto simp: cl_def)
-  subgoal by fastforce  
-  subgoal by (smt case_prod_conv mem_Collect_eq pair_imageI)
-  done
-
-
-lift_definition cls_snd_image :: "('b  \<Rightarrow> 'c ) \<Rightarrow> ('a,'b::order) cls \<Rightarrow> ('a,'c::order) cls" is "\<lambda>g S. (\<lambda>(a,b). (a, g b)) ` S" 
-  apply(auto simp: cl_def)
-  subgoal  sorry 
-  subgoal  sorry
-  oops (* in general false *)
-term "g = (\<lambda>y. if odd y then 0else y)" 
-
-
-definition "cls_continuous f = (\<forall>S S'.  cl S = cl S' \<longrightarrow> cl (f` S) = cl (f ` S'))"
-
-lemma cls_continuousI[intro]: "(\<And>S S'.  cl S = cl S' \<Longrightarrow> cl (f` S) = cl (f ` S')) \<Longrightarrow> cls_continuous f"
-  unfolding cls_continuous_def 
+lemma dcl_continuousI[intro]: "(\<And>S S'.  dcl S = dcl S' \<Longrightarrow> dcl (f` S) = dcl (f ` S')) \<Longrightarrow> dcl_continuous f"
+  unfolding dcl_continuous_def 
   by blast
 
-locale cls_cont_function = 
-  fixes f :: "'a \<times> 'b::order \<Rightarrow> 'c \<times> 'd::order"
-  assumes f_cont: "cls_continuous f"
+locale dcl_cont_function = 
+  fixes f :: "'b::order \<Rightarrow> 'd::order"
+  assumes f_cont: "dcl_continuous f"
 begin
-  
-  lift_definition cls_image :: "('a,'b) cls \<Rightarrow> ('c,'d) cls" is "image f" 
-    using f_cont
-    apply(auto)
-    unfolding cls_continuous_def
-    by blast+
+  lift_definition dcl_image :: "('b) dclosed \<Rightarrow> ('d) dclosed" is "dcl o (image f)" by simp
 end
-print_theorems
 
-
-term cls_image
-find_theorems cls_cont_function.cls_image name: transfer
-
-(* declare cls_cont_function.cls_image.transfer[transfer_rule del] *)
-
-thm  cls_cont_function.cls_image.transfer[no_vars]
-
-lemma "cls_cont_function f \<Longrightarrow> rel_fun (pcr_cls (=) (=)) (pcr_cls (=) (=)) ((`) f) (cls_cont_function.cls_image f)"
-  oops
-
-
-lemma cl_subs_clI:
-  fixes A :: "('a \<times> ('b::order)) set"
-  assumes "\<And>a c. (a,c)\<in>A \<Longrightarrow> \<exists>c'. (a,c')\<in>B \<and> c\<le>c'"
-  shows "cl A \<subseteq> cl B"
+lemma dcl_subs_dclI:
+  fixes A :: "('b::order) set"
+  assumes "\<And>c. c\<in>A \<Longrightarrow> \<exists>c'\<in>B. c\<le>c'"
+  shows "dcl A \<subseteq> dcl B"
   using assms 
-  unfolding cl_def
+  unfolding dcl_def
   apply auto 
   using order_trans by blast 
   
-lemma cl_eqI:
-  fixes A :: "('a \<times> ('b::order)) set"
-  assumes "\<And>a c. (a,c)\<in>A \<Longrightarrow> \<exists>c'. (a,c')\<in>B \<and> c\<le>c'"
-  assumes "\<And>a c. (a,c)\<in>B \<Longrightarrow> \<exists>c'. (a,c')\<in>A \<and> c\<le>c'"
-  shows "cl A = cl B"
+lemma dcl_eqI:
+  fixes A :: "('b::order) set"
+  assumes "\<And>c. c\<in>A \<Longrightarrow> \<exists>c'\<in>B. c\<le>c'"
+  assumes "\<And>c. c\<in>B \<Longrightarrow> \<exists>c'\<in>A. c\<le>c'"
+  shows "dcl A = dcl B"
   apply rule
-  apply(rule cl_subs_clI) apply fact
-  apply(rule cl_subs_clI) apply fact
+  apply(rule dcl_subs_dclI) apply fact
+  apply(rule dcl_subs_dclI) apply fact
   done
 
 
-lemma in_clD:
-    assumes "(a,b)\<in> cl S"
-    shows "\<exists>b'\<ge>b. (a,b')\<in>S"
-  using assms unfolding cl_def by auto
+lemma in_dclD:
+  assumes "b \<in> dcl S"
+  shows "\<exists>b'\<ge>b. b'\<in>S"
+  using assms unfolding dcl_def by auto
 
 
-lemma cls_cont_function_aux:
-  assumes "cl S = cl S'" 
-    assumes "(a,b)\<in> S"
-    shows "\<exists>b'\<ge>b. (a,b')\<in>S'"
-  using assms unfolding cl_def
-  by (metis (no_types, lifting) assms(1) in_clD in_mono rcolse_extensive) 
+lemma dcl_cont_function_aux:
+  assumes "dcl S = dcl S'" 
+    assumes "b\<in> S"
+    shows "\<exists>b'\<ge>b. (b')\<in>S'"
+  using assms unfolding dcl_def
+  by (metis (no_types, lifting) assms(1) in_dclD in_mono dcl_extensive) 
 
+  (*
 interpretation cls_plus_nat: cls_cont_function "\<lambda>(a,b). (a,b+c)" for c :: "nat" (* monoid_add *) 
   apply standard
   apply rule 
@@ -365,39 +319,44 @@ interpretation cls_plus_nat: cls_cont_function "\<lambda>(a,b). (a,b+c)" for c :
    apply(force dest: cls_cont_function_aux)   
   apply(force dest: cls_cont_function_aux[OF sym])
   done 
+*)
 
-interpretation cls_minus: cls_cont_function "\<lambda>(a,b). (a,b-c)" for c :: "nat" (* monoid_add *) 
+interpretation dcl_minus: dcl_cont_function "\<lambda>b. b-c" for c :: "nat" (* monoid_add *) 
   apply standard
   apply rule 
-  apply(rule cl_eqI)
+  apply(rule dcl_eqI)
    apply clarsimp
-   apply(force dest: cls_cont_function_aux)   
-  apply(force dest: cls_cont_function_aux[OF sym])
+   apply (drule (1) dcl_cont_function_aux) apply auto []
+  using diff_le_mono apply blast
+   apply clarsimp
+   apply (drule (1) dcl_cont_function_aux[OF sym]) apply auto []
+  using diff_le_mono apply blast
   done 
 
 
-interpretation cls_plus: cls_cont_function "\<lambda>(a,b). (a,b+c)" for c :: "'a::ordered_ab_semigroup_add" (* monoid_add *) 
+interpretation dcl_plus: dcl_cont_function "\<lambda>b. b+c" for c :: "'a::ordered_ab_semigroup_add" (* monoid_add *) 
   apply standard
   apply rule 
-  apply(rule cl_eqI)
+  apply(rule dcl_eqI)
    apply clarsimp_all
   subgoal
-    apply(drule (1) cls_cont_function_aux) 
-    apply auto
-    by (meson add_right_mono pair_imageI)
+    apply(drule (1) dcl_cont_function_aux) 
+    apply auto 
+    by (meson add_right_mono)
   subgoal 
-    apply(drule (1) cls_cont_function_aux[OF sym]) 
+    apply(drule (1) dcl_cont_function_aux[OF sym]) 
     apply auto
-    by (meson add_right_mono pair_imageI)
+    by (meson add_right_mono)
   done 
-print_theorems
 
 
-definition "cls_plus_image c =  cls_plus.cls_image c"
 
-thm cls_plus.cls_image.transfer[folded cls_plus_image_def]
+definition "dcl_plus_image c =  dcl_plus.dcl_image c"
 
-lemma cls_plus_image_transfer[transfer_rule]: 
+XXX, CTD HERE
+
+
+lemma dcl_plus_image_transfer[transfer_rule]: 
   "rel_fun (=) (rel_fun (pcr_cls (=) (=)) (pcr_cls (=) (=))) (\<lambda>c. (`) (\<lambda>(a, b). (a, b + c))) (\<lambda>c. cls_plus_image c)"
   apply(subst rel_fun_def)
   using cls_plus.cls_image.transfer[folded cls_plus_image_def] by auto
