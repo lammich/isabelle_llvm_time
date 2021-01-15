@@ -15,11 +15,166 @@ text \<open>This theory introduces NREST, the nondeterministc result monad with 
 subsection \<open>Definition of the NREST type\<close>
 
 
-datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{complete_lattice,monoid_add}) option"
+
+(* 
+
+  
+GOAL:
+elemente mit gleichem unterem abschluss identifizieren, equivalence class
+
+First approach:
+- das Supremum ist zu viel.
+
+
+vlt dazwischen
+
+
+Second approach:
+- quotient bzg. cl
+
+Drunter gibts nix mehr
+
+
+gibts nen schönen datentyp in HOL, der equivalent ist zu dem quotient type?
+
+x \<mapsto> {set}
+
+
+-> für Nats und 
+
+
+*)
+
 
 subsubsection \<open>NREST is a complete lattice\<close>
-                   
-instantiation nrest :: (type,"{complete_lattice,monoid_add}") complete_lattice
+
+
+definition cl :: "('a\<times>'b::order) set \<Rightarrow> _" where "cl a \<equiv> { (x,c'). \<exists>c. (x,c)\<in>a \<and> c'\<le>c }"
+(* TODO: actually we can get away with defining cl only on the resource component 
+    and use maps from result to resource type.
+
+
+    our closure  =   lower set
+
+  *)
+
+
+lemma cl_is_closure: "x \<le> cl y  \<longleftrightarrow> cl x \<le> cl y"
+  by (force simp: cl_def) 
+
+
+lemma cl_empty[simp]: "cl {} = {}"
+  unfolding cl_def by auto
+
+lemma cl_idem[simp]: "cl (cl S) = cl S"
+  unfolding cl_def by auto
+
+lemma rcolse_extensive: "s \<le> cl s"
+  unfolding cl_def by auto          
+
+lemma rcolse_monotone[intro]: "s\<le>s' \<Longrightarrow> cl s \<le> cl s'"
+  unfolding cl_def by auto
+
+declare rcolse_extensive[THEN set_mp, intro]
+
+
+lemma cl_commute_Union: "cl (\<Union>S) = \<Union>(cl`S)"
+  by (auto simp: cl_def)
+
+
+quotient_type (overloaded) ('a,'b) cls = "('a\<times>'b::order) set" / "\<lambda>a b. cl a = cl b"
+  apply (simp add: equivp_def) by metis
+
+
+instantiation cls :: (type, order) order
+begin
+  lift_definition less_eq_cls :: "('a,'b) cls \<Rightarrow> ('a,'b) cls \<Rightarrow> bool"
+    is "\<lambda>a b. cl a\<le>cl b" by (auto simp: cl_def)
+
+  definition "a < b \<equiv> a\<le>b \<and> a\<noteq>b" for a b :: "('a,'b) cls" 
+    
+  instance
+    apply standard
+    unfolding less_cls_def
+    apply (transfer'; auto simp: cl_def; force)+
+    done
+  
+end  
+
+definition cls_elem :: "('a \<times> 'b::order) set \<Rightarrow> ('a \<times> 'b) set set \<Rightarrow> bool" where "cls_elem x S \<equiv> cl x\<in>cl`S"
+
+lemma cls_elem_xfer[transfer_rule]: "(rel_fun (pcr_cls (=) (=)) (rel_fun (rel_set (pcr_cls (=) (=))) (=))) (cls_elem) (\<in>)"
+  apply rule
+  apply rule
+  apply (simp add: cls.pcr_cr_eq cr_cls_def cls_elem_def)
+  subgoal for x y X Y
+    apply (cases y; clarsimp; safe)
+    subgoal
+      by (smt cls.abs_eq_iff rel_setD1)
+    subgoal
+      by (smt cls.abs_eq_iff image_iff rel_setD2)
+    done
+  done
+    
+
+instantiation cls :: (type, complete_lattice) complete_lattice
+begin
+  lift_definition Sup_cls :: "('a,'b) cls set \<Rightarrow> ('a,'b) cls" is "\<Union>"
+    by (auto simp: cl_commute_Union rel_set_def; blast)
+    
+  find_theorems "Inf _ = Sup _  "
+
+   (* TODO: use lift definition to obtain transfer rules ! ! ! 
+        or prove transfer rules by hand ! ! !  *)
+  definition "Inf_cls A = Sup {b. \<forall>a\<in>A. b \<le> a}" for A :: "('a,'b) cls set"
+  definition "top_cls = Sup (UNIV::('a,'b) cls set)"
+  definition "bot_cls = Sup ({}::('a,'b) cls set)"
+  definition "inf_cls a b = Inf {a,b}" for a b :: "('a,'b) cls"
+  definition "sup_cls a b = Sup {a,b}" for a b :: "('a,'b) cls"
+    
+  instance
+    apply standard
+    unfolding inf_cls_def sup_cls_def Inf_cls_def top_cls_def bot_cls_def
+    supply [simp] = cl_def
+    apply (transfer; auto; fail)
+    apply (transfer; force) 
+    apply (transfer; auto; fail)
+    apply (transfer; auto; fail)
+    apply (transfer; auto; fail)
+    apply (transfer; force)
+    apply (transfer; auto simp: cls_elem_def; force)
+    subgoal by (transfer; auto simp: cls_elem_def; meson imageI)
+    subgoal
+      apply (transfer; auto simp: cls_elem_def)
+      apply (smt case_prod_conv mem_Collect_eq)
+      done
+    subgoal by (transfer; auto simp: cls_elem_def; blast)
+    apply (transfer; force)
+    apply simp
+    done  
+    
+  
+
+end
+
+lift_definition cl_Abs_pred :: "('a \<Rightarrow> 'b::order \<Rightarrow> bool) \<Rightarrow> ('a,'b) cls" is 
+  "\<lambda>S. { (a,b) | a b. S a b}" .
+
+lemma "cl_Abs_pred P = cl_Abs_pred Q \<longleftrightarrow> cl { (a,b) | a b. P a b} = cl { (a,b) | a b. Q a b}"
+  by transfer rule
+
+context
+  notes [[typedef_overloaded]]
+begin
+
+datatype ('a,'b) nrest = FAILi | REST "('a , ('b::{complete_lattice})) cls"
+
+end
+
+
+term "a::(nat,enat) nrest"
+
+instantiation nrest :: (type,"{complete_lattice}") complete_lattice
 begin
 
 fun less_eq_nrest where
@@ -27,37 +182,37 @@ fun less_eq_nrest where
   "(REST a) \<le> (REST b) \<longleftrightarrow> a \<le> b" |
   "FAILi \<le> (REST _) \<longleftrightarrow> False"
 
-fun less_nrest where
-  "FAILi < _ \<longleftrightarrow> False" |
-  "(REST _) < FAILi \<longleftrightarrow> True" |
-  "(REST a) < (REST b) \<longleftrightarrow> a < b"
+definition less_nrest where
+  "less_nrest a b = ((a::('a,'b) nrest) \<le> b \<and> \<not> b \<le> a)"
+
 
 fun sup_nrest where
   "sup _ FAILi = FAILi" |
   "sup FAILi _ = FAILi" |
-  "sup (REST a) (REST b) = REST (\<lambda>x. sup (a x) (b x))"
+  "sup (REST a) (REST b) = REST (sup a b)"
 
 fun inf_nrest where 
   "inf x FAILi = x" |
   "inf FAILi x = x" |
-  "inf (REST a) (REST b) = REST (\<lambda>x. inf (a x) (b x))"
+  "inf (REST a) (REST b) = REST (inf a b)"
 
 lemma "min (None) (Some (1::enat)) = None" by simp
 lemma "max (None) (Some (1::enat)) = Some 1" by eval
 
+
 definition "Sup X \<equiv> if FAILi\<in>X then FAILi else REST (Sup {f . REST f \<in> X})"
 definition "Inf X \<equiv> if \<exists>f. REST f\<in>X then REST (Inf {f . REST f \<in> X}) else FAILi"
 
-definition "bot \<equiv> REST (Map.empty)"
+definition "bot \<equiv> REST bot"
 definition "top \<equiv> FAILi"
 
 instance
   apply(intro_classes)
-  unfolding Sup_nrest_def  Inf_nrest_def  bot_nrest_def top_nrest_def
-  apply (case_tac x, case_tac [!] y, auto) []
+  unfolding Sup_nrest_def  Inf_nrest_def  bot_nrest_def top_nrest_def less_nrest_def cl_def
+  apply (case_tac x, case_tac [!] y, auto simp: top_nrest_def cl_def) []
   apply (case_tac x, auto) []
-  apply (case_tac x, case_tac [!] y, case_tac [!] z, auto) []
-  apply (case_tac x, (case_tac [!] y)?, auto) []
+  apply (case_tac x, case_tac [!] y, case_tac [!] z, auto; fail) []
+  apply (case_tac x, (case_tac [!] y)?, simp_all  add: le_fun_def) [] 
   apply (case_tac x, (case_tac [!] y)?, simp_all  add: le_fun_def) []
   apply (case_tac x, (case_tac [!] y)?, auto   simp: le_fun_def) []
   apply (case_tac x, case_tac [!] y, case_tac [!] z, auto   simp: le_fun_def) []
@@ -102,30 +257,173 @@ term "M:: (_,unit) nrest"
 
 subsubsection \<open>Operations on NREST\<close>
 
+definition raw_SPEC :: "('a \<Rightarrow> ('b::complete_lattice) \<Rightarrow> bool) \<Rightarrow> ('a, 'b) nrest" where
+ "raw_SPEC P = REST (cl_Abs_pred P)"
+
+definition SPEC :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('c::complete_lattice)) \<Rightarrow> ('a, 'c) nrest" where 
+  "SPEC P t = raw_SPEC (\<lambda>a t'. P a \<and> t' = t a)"
+
 definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, monoid_add}) nrest" where
-  "RETURNT x \<equiv> REST (\<lambda>e. if e=x then Some 0 else None)"
-abbreviation "FAILT \<equiv> top::(_,_::{complete_lattice, monoid_add}) nrest"
-abbreviation "SUCCEEDT \<equiv> bot::(_,_::{complete_lattice, monoid_add}) nrest"
-abbreviation SPECT where "SPECT \<equiv> REST"
+  "RETURNT x \<equiv> SPEC (\<lambda>a. a=x) (\<lambda>_. 0)"
+
+abbreviation "FAILT \<equiv> top::(_,_::{complete_lattice}) nrest"
+abbreviation "SUCCEEDT \<equiv> bot::(_,_::{complete_lattice}) nrest" 
+
+
+
+definition SPECT :: "('a \<Rightarrow> ('b::complete_lattice) option) \<Rightarrow> ('a, 'b) nrest" where
+  "SPECT P \<equiv> raw_SPEC (\<lambda>a t'. P a = Some t' )"
 
 
 definition "consumea T = SPECT [()\<mapsto>T]"
 
-definition consume where "consume M t \<equiv> case M of 
+
+lift_definition cls_fst_image :: "('a  \<Rightarrow> 'c ) \<Rightarrow> ('a,'b::order) cls \<Rightarrow> ('c,'b) cls" is "\<lambda>f S. (\<lambda>(a,b). ((f a),b)) ` S" 
+  apply(auto simp: cl_def)
+  subgoal by fastforce  
+  subgoal by (smt case_prod_conv mem_Collect_eq pair_imageI)
+  done
+
+
+lift_definition cls_snd_image :: "('b  \<Rightarrow> 'c ) \<Rightarrow> ('a,'b::order) cls \<Rightarrow> ('a,'c::order) cls" is "\<lambda>g S. (\<lambda>(a,b). (a, g b)) ` S" 
+  apply(auto simp: cl_def)
+  subgoal  sorry 
+  subgoal  sorry
+  oops (* in general false *)
+term "g = (\<lambda>y. if odd y then 0else y)" 
+
+
+definition "cls_continuous f = (\<forall>S S'.  cl S = cl S' \<longrightarrow> cl (f` S) = cl (f ` S'))"
+
+lemma cls_continuousI[intro]: "(\<And>S S'.  cl S = cl S' \<Longrightarrow> cl (f` S) = cl (f ` S')) \<Longrightarrow> cls_continuous f"
+  unfolding cls_continuous_def 
+  by blast
+
+locale cls_cont_function = 
+  fixes f :: "'a \<times> 'b::order \<Rightarrow> 'c \<times> 'd::order"
+  assumes f_cont: "cls_continuous f"
+begin
+  
+  lift_definition cls_image :: "('a,'b) cls \<Rightarrow> ('c,'d) cls" is "image f" 
+    using f_cont
+    apply(auto)
+    unfolding cls_continuous_def
+    by blast+
+end
+print_theorems
+
+
+term cls_image
+find_theorems cls_cont_function.cls_image name: transfer
+
+(* declare cls_cont_function.cls_image.transfer[transfer_rule del] *)
+
+thm  cls_cont_function.cls_image.transfer[no_vars]
+
+lemma "cls_cont_function f \<Longrightarrow> rel_fun (pcr_cls (=) (=)) (pcr_cls (=) (=)) ((`) f) (cls_cont_function.cls_image f)"
+  oops
+
+
+lemma cl_subs_clI:
+  fixes A :: "('a \<times> ('b::order)) set"
+  assumes "\<And>a c. (a,c)\<in>A \<Longrightarrow> \<exists>c'. (a,c')\<in>B \<and> c\<le>c'"
+  shows "cl A \<subseteq> cl B"
+  using assms 
+  unfolding cl_def
+  apply auto 
+  using order_trans by blast 
+  
+lemma cl_eqI:
+  fixes A :: "('a \<times> ('b::order)) set"
+  assumes "\<And>a c. (a,c)\<in>A \<Longrightarrow> \<exists>c'. (a,c')\<in>B \<and> c\<le>c'"
+  assumes "\<And>a c. (a,c)\<in>B \<Longrightarrow> \<exists>c'. (a,c')\<in>A \<and> c\<le>c'"
+  shows "cl A = cl B"
+  apply rule
+  apply(rule cl_subs_clI) apply fact
+  apply(rule cl_subs_clI) apply fact
+  done
+
+
+lemma in_clD:
+    assumes "(a,b)\<in> cl S"
+    shows "\<exists>b'\<ge>b. (a,b')\<in>S"
+  using assms unfolding cl_def by auto
+
+
+lemma cls_cont_function_aux:
+  assumes "cl S = cl S'" 
+    assumes "(a,b)\<in> S"
+    shows "\<exists>b'\<ge>b. (a,b')\<in>S'"
+  using assms unfolding cl_def
+  by (metis (no_types, lifting) assms(1) in_clD in_mono rcolse_extensive) 
+
+interpretation cls_plus_nat: cls_cont_function "\<lambda>(a,b). (a,b+c)" for c :: "nat" (* monoid_add *) 
+  apply standard
+  apply rule 
+  apply(rule cl_eqI)
+   apply clarsimp
+   apply(force dest: cls_cont_function_aux)   
+  apply(force dest: cls_cont_function_aux[OF sym])
+  done 
+
+interpretation cls_minus: cls_cont_function "\<lambda>(a,b). (a,b-c)" for c :: "nat" (* monoid_add *) 
+  apply standard
+  apply rule 
+  apply(rule cl_eqI)
+   apply clarsimp
+   apply(force dest: cls_cont_function_aux)   
+  apply(force dest: cls_cont_function_aux[OF sym])
+  done 
+
+
+interpretation cls_plus: cls_cont_function "\<lambda>(a,b). (a,b+c)" for c :: "'a::ordered_ab_semigroup_add" (* monoid_add *) 
+  apply standard
+  apply rule 
+  apply(rule cl_eqI)
+   apply clarsimp_all
+  subgoal
+    apply(drule (1) cls_cont_function_aux) 
+    apply auto
+    by (meson add_right_mono pair_imageI)
+  subgoal 
+    apply(drule (1) cls_cont_function_aux[OF sym]) 
+    apply auto
+    by (meson add_right_mono pair_imageI)
+  done 
+print_theorems
+
+
+definition "cls_plus_image c =  cls_plus.cls_image c"
+
+thm cls_plus.cls_image.transfer[folded cls_plus_image_def]
+
+lemma cls_plus_image_transfer[transfer_rule]: 
+  "rel_fun (=) (rel_fun (pcr_cls (=) (=)) (pcr_cls (=) (=))) (\<lambda>c. (`) (\<lambda>(a, b). (a, b + c))) (\<lambda>c. cls_plus_image c)"
+  apply(subst rel_fun_def)
+  using cls_plus.cls_image.transfer[folded cls_plus_image_def] by auto
+
+term cls_plus.cls_image
+term REST
+
+(* TODO: minus *)
+
+
+definition consume :: "('a, ('b::{ordered_ab_semigroup_add,complete_lattice})) nrest \<Rightarrow> 'b \<Rightarrow> ('a, 'b) nrest"
+    where "consume M t \<equiv> case M of 
           FAILi \<Rightarrow> FAILT |
-          REST X \<Rightarrow> REST (map_option ((+) t) o (X))"
+          REST X \<Rightarrow> REST (cls_plus_image t X)"
 
 
-definition "SPEC P t = REST (\<lambda>v. if P v then Some (t v) else None)"
-
-
+find_theorems cls_cont_function.cls_image name: transfer
 
 lemma consume_RETURNT: "consume (RETURNT x) T = SPECT [x \<mapsto> T]"
-  by(auto simp: RETURNT_def consume_def)
-
+  apply (auto simp: RETURNT_def consume_def SPEC_def SPECT_def raw_SPEC_def split: nrest.splits ) 
+  apply transfer 
+  by (auto intro!: cl_eqI split: if_splits)
 
 lemma RETURNT_eq_RETURNT_iff[simp]: "RETURNT x \<le> RETURNT y \<longleftrightarrow> x=y"
-  by (auto simp: RETURNT_def le_fun_def split: if_splits) 
+  apply (auto simp: RETURNT_def le_fun_def split: if_splits) 
+  sorry
 
 lemma consume_cong1: "a=b \<Longrightarrow> consume a c = consume b c" by simp
 
@@ -143,13 +441,13 @@ lemma satminus_the_acost: "satminus ta (the_acost t b) = 0 \<longleftrightarrow>
   by auto
 
 
+lemma cls_plus_image_0[simp]: "cls_plus_image 0 x2 = x2"
+  sorry
 
 
 lemma consume_zero:
   shows "x=0 \<Longrightarrow> consume M x = M"
-  apply(cases M, auto simp: consume_def top_nrest_def split: option.splits intro!: ext)
-  subgoal for f xa apply(cases "f xa") by auto
-  done
+  by(cases M, auto simp: consume_def top_nrest_def)
 
 
 lemma consume_alt_aux:
@@ -162,14 +460,14 @@ lemma
   SPEC_leq_SPEC_I:
   "A \<le> A' \<Longrightarrow> (\<And>x. B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
   apply(auto simp: SPEC_def)
-  by (simp add: le_fun_def)  
+  sorry
 
 
 lemma 
   SPEC_leq_SPEC_I_strong:
   "A \<le> A' \<Longrightarrow> (\<And>x. A' x \<Longrightarrow> B x \<le> (B' x)) \<Longrightarrow> SPEC A B \<le> (SPEC A' B')"
   apply(auto simp: SPEC_def)
-  by (simp add: le_fun_def)  
+  sorry
 
 
 
@@ -181,7 +479,7 @@ lemma consume_mono:
   subgoal for m m' x apply(cases "m' x";cases "m x" ) apply auto
      apply (metis less_eq_option_Some_None)        
     by (metis add_mono less_eq_option_Some)  
-  done
+  sorry
 
 lemma consume_mono_ecost:
   fixes  t :: "(string,enat) acost"
@@ -193,7 +491,7 @@ lemma consume_mono_ecost:
     apply(cases t; cases t')
       apply(auto intro!: add_mono simp: less_eq_acost_def plus_acost_alt split: acost.splits)  
     by (metis acost.sel less_eq_acost_def less_eq_option_Some)
-  done
+  sorry
 
 lemma RETURNT_alt: "RETURNT x = REST [x\<mapsto>0]"
   unfolding RETURNT_def by auto
@@ -208,7 +506,7 @@ lemma nrest_inequalities[simp]:
   "RETURNT x \<noteq> FAILT"
   "RETURNT x \<noteq> SUCCEEDT"
   unfolding top_nrest_def bot_nrest_def RETURNT_def  
-  apply (auto) by (metis option.distinct(1))+
+  apply (auto) sorry (* (metis option.distinct(1))+ *)
 
 
 lemma nrest_more_simps[simp]:
@@ -298,14 +596,11 @@ lemma consume_0:
 subsection \<open>Pointwise reasoning\<close>
 
 named_theorems refine_pw_simps 
-ML \<open>
-  structure refine_pw_simps = Named_Thms
-    ( val name = @{binding refine_pw_simps}
-      val description = "Refinement Framework: " ^
-        "Simplifier rules for pointwise reasoning" )
-\<close>    
   
 definition nofailT :: "('a,_) nrest \<Rightarrow> bool" where "nofailT S \<equiv> S\<noteq>FAILT"
+
+lemma FAILi[simp]: "FAILi = FAILT"
+  unfolding top_nrest_def ..
 
 
 lemma nofailT_simps[simp]:
@@ -314,20 +609,126 @@ lemma nofailT_simps[simp]:
   "nofailT (RETURNT x) \<longleftrightarrow> True"
   "nofailT SUCCEEDT \<longleftrightarrow> True"
   unfolding nofailT_def
-  by (simp_all add: RETURNT_def)
+  apply (simp_all add: RETURNT_def)
+  unfolding top_nrest_def SPEC_def raw_SPEC_def by auto
 
 
 lemma pw_Sup_nofail[refine_pw_simps]: "nofailT (Sup X) \<longleftrightarrow> (\<forall>x\<in>X. nofailT x)"
   apply (cases "Sup X")  
-   apply auto unfolding Sup_nrest_def apply (auto split: if_splits)
-  apply force unfolding nofailT_def apply(force simp add: nres_simp_internals)
+   apply auto
+  unfolding Sup_nrest_def 
+    apply (auto split: if_splits)
+  subgoal
+    using nofailT_simps(1) by blast
+  subgoal 
+    using nofailT_def by blast
   done
 
 lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
-  unfolding SPEC_def by auto
+  unfolding SPEC_def raw_SPEC_def by auto
 
 lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
   by(auto simp: consume_def split: nrest.splits)
+
+
+
+definition inresT :: "(_,'c) nrest \<Rightarrow> _ \<Rightarrow> ('c::{complete_lattice}) \<Rightarrow> bool"
+  where "inresT S x t \<equiv> SPECT ([x\<mapsto>t]) \<le> S"
+
+
+lemma inresT_raw_SPEC_help: "(if x = y then Some t else None) = Some c \<longleftrightarrow> (t=c \<and> x=y)"
+  by auto
+
+lemma inresT_raw_SPEC: "inresT (raw_SPEC P) y t \<longleftrightarrow> (\<exists>t'. P y t' \<and> t\<le>t')"
+  unfolding inresT_def
+  unfolding raw_SPEC_def SPECT_def apply simp
+  apply(transfer)
+  by(auto simp: inresT_raw_SPEC_help cl_def split: if_splits)
+
+lemma inresT_SPEC[refine_pw_simps]: "inresT (SPEC P T) y t \<longleftrightarrow> P y \<and> t\<le>T y" 
+  unfolding SPEC_def by (simp add: inresT_raw_SPEC)
+
+lemma inresT_SPECT[refine_pw_simps]: "inresT (SPECT M) y t \<longleftrightarrow> (\<exists>t'. M y = Some t' \<and> t \<le> t')" 
+  unfolding SPECT_def by (simp add: inresT_raw_SPEC)
+
+lemma inresT_RETURNT'[refine_pw_simps]: "inresT (RETURNT x) y t \<longleftrightarrow> t \<le> 0 \<and> y = x"
+  unfolding RETURNT_def by (auto simp add: refine_pw_simps)
+
+
+
+term cls_elem
+
+lemma inresT_FAILT[refine_pw_simps]: "inresT FAILT x t"
+  by(auto simp: inresT_def)
+
+lemma FAILT_not_inD: "FAILT \<notin> X \<Longrightarrow> \<exists>Y. X = REST ` Y"
+  sorry
+
+lemma cl_empty_iff[simp]: " cl X = {} \<longleftrightarrow> X = {}"
+  by(auto simp: cl_def)
+
+
+lemma inresT_not_bot[refine_pw_simps]: "\<not> inresT bot x t"
+  unfolding inresT_def apply (auto simp: SPECT_def inresT_raw_SPEC_help raw_SPEC_def bot_nrest_def)
+  apply(simp only: bot_unique)
+  unfolding bot_cls_def
+  apply transfer 
+  by simp
+
+
+lemma helper: "REST f \<in> REST ` Y \<longleftrightarrow> f\<in>Y"
+  by auto
+
+
+lemma blub: "{(a, b) |a b. t = b \<and> a = xa}  = {(xa,t)}"
+  by simp
+
+lemma cl_singleton_subs_cl_iff: "cl {(a,b)} \<subseteq> cl X \<longleftrightarrow> (\<exists>y. (a,y)\<in>X \<and> b\<le> y)"
+  unfolding cl_def by auto
+
+lemma "inresT (Sup X) x t =  (\<exists>m\<in>X. inresT m x t)"
+  apply(rule)
+  subgoal (* \<Rightarrow> *)
+    apply(cases "X={}")
+    subgoal 
+      by (auto simp: refine_pw_simps)
+    subgoal 
+      unfolding Sup_nrest_def
+      apply(erule set_notEmptyE)
+      apply auto
+      subgoal 
+        unfolding inresT_def 
+        apply (auto split: if_splits)
+        subgoal using top_greatest by blast
+        subgoal
+          unfolding SPECT_def raw_SPEC_def   apply simp_all
+          unfolding inresT_raw_SPEC_help
+          apply(frule FAILT_not_inD)
+          apply (auto simp: helper)
+          apply(thin_tac "FAILT \<notin> REST ` Y")
+          apply(thin_tac "X = REST ` Y")
+          apply(thin_tac "_ = REST xb")
+ 
+
+          apply transfer 
+          subgoal for Y x t xa
+            by (auto simp: blub cl_singleton_subs_cl_iff)
+          done
+        done
+      done
+    done
+  subgoal 
+    sorry
+  done
+
+
+
+lemma "inresT (Sup X) x t = (\<exists>t'. GG (x,t') X )"
+  unfolding inresT_def
+  
+
+
+
 
 subsubsection "pw reasoning for enat"
 
