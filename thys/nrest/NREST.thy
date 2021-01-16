@@ -161,6 +161,8 @@ context
 begin
 
 datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{complete_lattice}) dclosed"
+(* TODO:  comment by max: I think 'b does not need to be a complete_lattice, order suffices 
+                  the lattice structure comes from the set in 'a dclosed *)
 
 end
 
@@ -352,16 +354,15 @@ interpretation dcl_plus: dcl_cont_function "\<lambda>b. b+c" for c :: "'a::order
 
 
 definition "dcl_plus_image c =  dcl_plus.dcl_image c"
-
-XXX, CTD HERE
+ 
 
 
 lemma dcl_plus_image_transfer[transfer_rule]: 
-  "rel_fun (=) (rel_fun (pcr_cls (=) (=)) (pcr_cls (=) (=))) (\<lambda>c. (`) (\<lambda>(a, b). (a, b + c))) (\<lambda>c. cls_plus_image c)"
+  "rel_fun (=) (rel_fun (pcr_dclosed (=)) (pcr_dclosed (=))) (\<lambda>c. (dcl \<circ>\<circ> (`)) (\<lambda>b. b + c)) (\<lambda>c. dcl_plus_image c)"
   apply(subst rel_fun_def)
-  using cls_plus.cls_image.transfer[folded cls_plus_image_def] by auto
+  using dcl_plus.dcl_image.transfer[folded dcl_plus_image_def] by auto
 
-term cls_plus.cls_image
+term dcl_plus.dcl_image
 term REST
 
 (* TODO: minus *)
@@ -370,15 +371,25 @@ term REST
 definition consume :: "('a, ('b::{ordered_ab_semigroup_add,complete_lattice})) nrest \<Rightarrow> 'b \<Rightarrow> ('a, 'b) nrest"
     where "consume M t \<equiv> case M of 
           FAILi \<Rightarrow> FAILT |
-          REST X \<Rightarrow> REST (cls_plus_image t X)"
+          REST X \<Rightarrow> REST (\<lambda>r. dcl_plus_image t (X r))"
 
 
-find_theorems cls_cont_function.cls_image name: transfer
+find_theorems dcl_cont_function.dcl_image name: transfer
+
+lemma consume_RETURNT_help1: " dcl_plus.dcl_image T (Abs_dclosed {0}) = Abs_dclosed {T}"
+  unfolding dcl_plus.dcl_image_def
+  sorry
+
+lemma consume_RETURNT_help2: "dcl_plus.dcl_image T bot = bot"
+  unfolding dcl_plus.dcl_image_def apply auto 
+  by (metis bot_dclosed.abs_eq bot_dclosed.rep_eq dcl_empty image_empty) 
+  
 
 lemma consume_RETURNT: "consume (RETURNT x) T = SPECT [x \<mapsto> T]"
-  apply (auto simp: RETURNT_def consume_def SPEC_def SPECT_def raw_SPEC_def split: nrest.splits ) 
-  apply transfer 
-  by (auto intro!: cl_eqI split: if_splits)
+  apply (auto simp: RETURNT_def consume_def SPEC_def SPECT_def  split: nrest.splits ) 
+  apply (rule ext) apply auto unfolding dcl_plus_image_def
+  apply transfer   
+  by (auto simp: consume_RETURNT_help1 consume_RETURNT_help2)
 
 lemma RETURNT_eq_RETURNT_iff[simp]: "RETURNT x \<le> RETURNT y \<longleftrightarrow> x=y"
   apply (auto simp: RETURNT_def le_fun_def split: if_splits) 
@@ -569,7 +580,7 @@ lemma nofailT_simps[simp]:
   "nofailT SUCCEEDT \<longleftrightarrow> True"
   unfolding nofailT_def
   apply (simp_all add: RETURNT_def)
-  unfolding top_nrest_def SPEC_def raw_SPEC_def by auto
+  unfolding top_nrest_def SPEC_def   by auto
 
 
 lemma pw_Sup_nofail[refine_pw_simps]: "nofailT (Sup X) \<longleftrightarrow> (\<forall>x\<in>X. nofailT x)"
@@ -584,7 +595,7 @@ lemma pw_Sup_nofail[refine_pw_simps]: "nofailT (Sup X) \<longleftrightarrow> (\<
   done
 
 lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
-  unfolding SPEC_def raw_SPEC_def by auto
+  unfolding SPEC_def  by auto
 
 lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
   by(auto simp: consume_def split: nrest.splits)
@@ -605,7 +616,10 @@ lemma inresT_raw_SPEC: "inresT (raw_SPEC P) y t \<longleftrightarrow> (\<exists>
   by(auto simp: inresT_raw_SPEC_help cl_def split: if_splits)
 
 lemma inresT_SPEC[refine_pw_simps]: "inresT (SPEC P T) y t \<longleftrightarrow> P y \<and> t\<le>T y" 
-  unfolding SPEC_def by (simp add: inresT_raw_SPEC)
+  unfolding inresT_def
+  unfolding SPEC_def SPECT_def apply (auto split: if_splits simp: le_fun_def)
+  sorry
+
 
 lemma inresT_SPECT[refine_pw_simps]: "inresT (SPECT M) y t \<longleftrightarrow> (\<exists>t'. M y = Some t' \<and> t \<le> t')" 
   unfolding SPECT_def by (simp add: inresT_raw_SPEC)
