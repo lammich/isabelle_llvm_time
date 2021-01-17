@@ -94,7 +94,7 @@ begin
       done
   end
 
-
+  
   term "(a::cost) + b"
   term "(0::cost)"
 
@@ -144,6 +144,24 @@ lemma "acostC (\<lambda>x. the_acost (cost n t) x + r x) = cost n t + acostC r"
   
 end
 
+  instance acost :: (type,order) order
+    apply standard                
+    apply (auto simp: less_eq_acost_def less_acost_def)
+    subgoal for a b c by (cases a; cases b; auto dest: leD)
+    subgoal
+      using less_le_not_le by blast 
+    subgoal
+      using order.trans by blast 
+    subgoal
+      by (simp add: acost_eq_I antisym) 
+    done  
+    
+    
+  instance acost :: (type,"{ordered_ab_semigroup_add,comm_monoid_add}") ordered_ab_semigroup_add
+    apply standard
+    subgoal for a b c by (cases a; cases b; cases c; simp add: less_eq_acost_def add_left_mono)
+    done
+
   instantiation acost :: (type, complete_lattice) complete_lattice
   begin                                                   
     definition "bot_acost = acostC (\<lambda>x. bot)"             
@@ -154,14 +172,6 @@ end
     instance 
       apply standard
      apply(auto simp add: le_fun_def less_eq_acost_def less_acost_def split: acost.split)
-      subgoal for x y apply(cases x; cases y) apply (auto simp: le_less less_fun_def le_fun_def)  
-        using less_not_sym by fastforce
-      subgoal for x y apply(cases x; cases y) apply (auto simp: le_less less_fun_def le_fun_def)  
-        by metis
-      subgoal for x y z apply(cases x; cases y; cases z) apply (auto simp: less_fun_def le_fun_def)
-        using order_trans by blast
-      subgoal for x y  apply(cases x; cases y) apply (auto simp: less_fun_def le_fun_def)
-        using antisym_conv by fastforce  
       subgoal for x y  apply(cases x; cases y) by (auto simp: inf.strict_order_iff inf_acost_def inf_commute) 
       subgoal for x y  apply(cases x; cases y) by (auto simp: inf.strict_order_iff inf_acost_def)  
       subgoal for x y z apply(cases x; cases y; cases z) by (auto simp: inf_acost_def)

@@ -48,10 +48,14 @@ x \<mapsto> {set}
 
 subsubsection \<open>NREST is a complete lattice\<close>
 
-
+text \<open>Downwards Closure and downwards closed sets\<close>
 definition dcl :: "('b::order) set \<Rightarrow> _" where "dcl a \<equiv> { c'. \<exists>c. c\<in>a \<and> c'\<le>c }"
 
 definition is_dcl :: "('b::order) set \<Rightarrow> _" where "is_dcl X = (\<forall>x\<in>X. \<forall>y\<le>x. y\<in>X)"
+
+lemma is_dcl_empty[simp, intro!]: "is_dcl {}"
+  unfolding is_dcl_def dcl_def
+  by auto
 
 lemma dcl_is_dcl[simp, intro!]: "is_dcl (dcl X)"
   unfolding is_dcl_def dcl_def
@@ -97,9 +101,16 @@ lemma dcl_commute_Union: "dcl (\<Union>S) = \<Union>(dcl`S)"
   by (auto simp: dcl_def)
   
   
-typedef (overloaded) 'a dclosed = "{X::'a::order set. is_dcl X}" by auto
+typedef (overloaded) 'a dclosed = "{X::'a::order set. is_dcl X}" 
+  morphisms Rep_dclosed internal_Abs_dclosed
+  by auto
+  
 setup_lifting type_definition_dclosed  
   
+text \<open>Downward-close set and inject into @{type dclosed}\<close>
+lift_definition dclose :: "'a::order set \<Rightarrow> 'a dclosed" is "dcl :: 'a set \<Rightarrow> _"
+  by simp
+
 
 instantiation dclosed :: (order) order
 begin
@@ -117,7 +128,7 @@ begin
 end  
 
 
-instantiation dclosed :: (complete_lattice) complete_lattice
+instantiation dclosed :: (order) complete_lattice
 begin
   lift_definition Sup_dclosed :: "('a) dclosed set \<Rightarrow> ('a) dclosed" is "\<Union>"
     by (auto simp: is_dcl_def)
@@ -149,27 +160,153 @@ begin
 
 end
 
+  lemma "a\<le>b+c \<Longrightarrow> \<exists>b'\<le>b. \<exists>c'\<le>c. a=b'+c'" for a b c :: nat
+    by (metis Nat.le_imp_diff_is_add diff_is_0_eq' leI le_add2 le_add_diff_inverse2 le_diff_conv le_refl less_imp_le_nat)
+    
+    thm Nat.le_imp_diff_is_add diff_is_0_eq' leI le_add2 le_add_diff_inverse2 le_diff_conv le_refl less_imp_le_nat
+    
+
+find_theorems "?a\<le>?b \<Longrightarrow> (?a + (?b-?a)) = ?b"
+class cost_structure = ordered_comm_monoid_add + minus +
+  assumes diff_right_mono[algebra_simps]: "a\<le>b \<Longrightarrow> a-c \<le> b-c"
+  assumes diff_left_mono[algebra_simps]: "b\<le>a \<Longrightarrow> c-a \<le> c-b"
+  assumes diff_smaller[algebra_simps]: "a-b \<le> a" 
+  assumes zero_le[simp]: "0 \<le> a"
+  assumes add_diff_inverse[algebra_simps]: "a\<le>b \<Longrightarrow> (a + (b-a)) = b"
+  (*assumes le_imp_diff_is_add: "i \<le> j \<Longrightarrow> (j - i = k) = (j = k + i)"*)
+  assumes less_sum_down: "a\<le>b+c \<Longrightarrow> \<exists>b'\<le>b. \<exists>c'\<le>c. a=b'+c'"
+    (* Needed such that inresT_bind holds.
+    *)
+begin  
+  lemma lessZ_IsZ[simp]: "a\<le>0 \<longleftrightarrow> a=0"
+    by (simp add: local.eq_iff) 
+
+end
+
+instance nat :: cost_structure
+  apply standard 
+  apply auto
+  by presburger
+
+  (*
+instance int :: cost_structure
+  apply standard 
+  apply auto 
+  by presburger
+  *)
+    
+instance enat :: cost_structure
+  apply standard 
+  apply simp_all
+  subgoal for a b c by (cases a; cases b; cases c; simp)
+  subgoal for a b c by (cases a; cases b; cases c; simp)
+  subgoal for a b by (cases a; cases b; simp)
+  subgoal for a b by (cases a; cases b; simp)
+  subgoal for a b c apply (cases a; cases b; cases c; simp)
+    subgoal by (metis enat_ord_simps(1) less_sum_down plus_enat_simps(1)) 
+    subgoal by (meson le_cases le_iff_add) 
+    subgoal by (metis add.right_neutral canonically_ordered_monoid_add_class.zero_le) 
+    subgoal by (metis add.right_neutral) 
+    subgoal by (metis dual_order.refl plus_enat_simps(3)) 
+    subgoal by (metis order_mono_setup.refl plus_enat_simps(2)) 
+    subgoal by (metis plus_enat_simps(2)) 
+    done
+  done
+  
+instantiation "fun" :: (type,zero) zero begin
+  definition [simp]: "zero_fun x \<equiv> 0" 
+  instance ..
+end 
+  
+instantiation "fun" :: (type,plus) plus begin
+  definition [simp]: "(f+g) x = f x + g x"
+  instance ..
+end
+
+thm fun_diff_def
 
 
+lemma fun_swap_arg_all_ex_aux:
+  assumes "\<forall>x. \<exists>b'x c'x. b'x \<le> b x \<and> c'x \<le> c x \<and> a x = b'x + c'x"
+  shows "\<exists>b'. (\<forall>x. b' x \<le> b x) \<and> (\<exists>c'. (\<forall>x. c' x \<le> c x) \<and> (\<forall>x. a x = b' x + c' x))"
+  using assms
+  by metis
+
+instance "fun" :: (type,cost_structure) cost_structure
+  apply standard
+  apply (auto simp: fun_eq_iff algebra_simps le_fun_def add_right_mono intro!: fun_swap_arg_all_ex_aux less_sum_down)
+  done  
+  
+                 
+instantiation dclosed :: ("{order,plus}") plus begin
+  lift_definition plus_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is 
+    "\<lambda>a b :: 'a set. dcl {x+y | x y. x\<in>a \<and> y\<in>b }" by simp
+  
+  instance ..
+end    
+
+instantiation dclosed :: ("{order,minus}") minus begin
+  lift_definition minus_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is 
+    "\<lambda>a b :: 'a set. dcl {x-y | x y. x\<in>a \<and> y\<in>b }" by simp
+  
+  instance ..
+end    
+
+abbreviation dcl_empty :: "_ dclosed" where "dcl_empty \<equiv> bot"
+lift_definition dcl_insert :: "'a \<Rightarrow> 'a::order dclosed \<Rightarrow> 'a dclosed" is "dcl oo insert" by simp
+lift_definition dcl_image :: "('a::order \<Rightarrow> 'b::order) \<Rightarrow> 'a dclosed \<Rightarrow> 'b dclosed" is "\<lambda>f a. dcl (f`a)" by auto  
+
+abbreviation "dcl_singleton x \<equiv> dcl_insert x dcl_empty"
+
+lemma dclose_empty: "dclose {} = dcl_empty" by transfer auto
+lemma dclose_insert: "dclose (insert x s) = dcl_insert x (dclose s)" 
+  apply transfer
+  apply (auto simp: dcl_def)
+  done
+  
+lemma dclose_image: "mono f \<Longrightarrow> dclose (f`s) = dcl_image f (dclose s)"
+  apply transfer
+  apply (auto simp: dcl_def mono_def)
+  using order_trans by blast 
+
+lemma dclose_eq_iff[simp]: "dclose A = dclose B \<longleftrightarrow> dcl A = dcl B"
+  by transfer simp  
 
 
+lemma "dcl_image ((+)c) A = A + dcl_singleton c" for c :: "'a::cost_structure"
+  apply transfer
+  apply (auto simp: dcl_def is_dcl_def)
+  subgoal 
+    using add.commute by blast
+  subgoal 
+    by (metis (no_types, hide_lams) add.commute add_mono eq_iff order_trans)
+  done
 
+lemma in_dcl_singleton[simp]: "y\<in>dcl {x} \<longleftrightarrow> y\<le>x" by (auto simp: dcl_def)  
 
-
+lemma "dcl_image (\<lambda>x. x-c) A = A - dcl_singleton c" for c :: "nat"
+  apply transfer
+  apply auto
+  apply (auto simp: dcl_def is_dcl_def)
+  oops (* does not hold, pointwise - may not make sense, as also smaller values are subtracted! *)
+  
+  
 context
   notes [[typedef_overloaded]]
 begin
 
-datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{complete_lattice}) dclosed"
+datatype ('a,'b) nrest = FAILi | REST "'a \<Rightarrow> ('b::{order}) dclosed"
 (* TODO:  comment by max: I think 'b does not need to be a complete_lattice, order suffices 
-                  the lattice structure comes from the set in 'a dclosed *)
+                  the lattice structure comes from the set in 'a dclosed
+   DONE by Peter: Jep!                  
+                   *)
 
 end
 
 
 term "a::(nat,enat) nrest"
 
-instantiation nrest :: (type,"{complete_lattice}") complete_lattice
+instantiation nrest :: (type,"{order}") complete_lattice
 begin
 
 fun less_eq_nrest where
@@ -252,19 +389,585 @@ term "M:: (_,unit) nrest"
 
 subsubsection \<open>Operations on NREST\<close>
 
-definition SPEC :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('c::complete_lattice)) \<Rightarrow> ('a, 'c) nrest" where 
-  "SPEC P t = REST (\<lambda>a. if P a then Abs_dclosed {t a} else bot)"
+definition SPEC :: "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> ('c::order)) \<Rightarrow> ('a, 'c) nrest" where 
+  "SPEC P t = REST (\<lambda>a. if P a then dclose {t a} else bot)"
 
-definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{complete_lattice, monoid_add}) nrest" where
+definition RETURNT :: "'a \<Rightarrow> ('a, 'b::{order, monoid_add}) nrest" where
   "RETURNT x \<equiv> SPEC (\<lambda>a. a=x) (\<lambda>_. 0)"
+  
+abbreviation "FAILT \<equiv> top::(_,_::{order}) nrest"
+abbreviation "SUCCEEDT \<equiv> bot::(_,_::{order}) nrest" 
 
-abbreviation "FAILT \<equiv> top::(_,_::{complete_lattice}) nrest"
-abbreviation "SUCCEEDT \<equiv> bot::(_,_::{complete_lattice}) nrest" 
-
-definition SPECT :: "('a \<Rightarrow> ('b::complete_lattice) option) \<Rightarrow> ('a, 'b) nrest" where
-  "SPECT P \<equiv> REST (\<lambda>a. case P a of Some t \<Rightarrow> Abs_dclosed {t} | None \<Rightarrow> bot)"
+definition SPECT :: "('a \<Rightarrow> ('b::order) option) \<Rightarrow> ('a, 'b) nrest" where
+  "SPECT P \<equiv> REST (\<lambda>a. case P a of Some t \<Rightarrow> dclose {t} | None \<Rightarrow> bot)"
 
 definition "consumea T = SPECT [()\<mapsto>T]"
+
+
+
+definition consume :: "('a, ('b::{ordered_ab_semigroup_add})) nrest \<Rightarrow> 'b \<Rightarrow> ('a, 'b) nrest"
+    where "consume M t \<equiv> case M of 
+          FAILi \<Rightarrow> FAILT |
+          REST X \<Rightarrow> REST (\<lambda>r. dcl_image ((+)t) (X r))"
+
+
+lemma dcl_image_insert[simp]: "mono f \<Longrightarrow> dcl_image f (dcl_insert a s) = dcl_insert (f a) (dcl_image f s)"
+  apply (transfer)
+  apply (simp add: mono_def dcl_def is_dcl_def)
+  apply safe
+  apply fastforce
+  by auto
+
+lemma dcl_image_empty[simp]: "dcl_image f dcl_empty = dcl_empty"
+  by transfer auto              
+                    
+lemma "mono f \<Longrightarrow> dcl_image f (dcl_singleton a) = dcl_singleton (f a)"
+  apply (transfer)
+  apply (simp add: dcl_def is_dcl_def)
+  apply (force simp: mono_def) 
+  done          
+
+lemma add_left_mono'[intro!,simp]: "mono ((+)(T::'a::{ordered_ab_semigroup_add}))"
+  by (auto simp: mono_def add_left_mono)
+  
+lemma consume_RETURNT: "consume (RETURNT x) T = SPECT [x \<mapsto> T]" for T :: "_::{monoid_add,ordered_ab_semigroup_add}"
+  apply (auto simp: RETURNT_def consume_def SPEC_def SPECT_def  split: nrest.splits ) 
+  apply (rule ext) apply (auto simp: dclose_empty dclose_insert)
+  done  
+
+lemma dclose_empty_iff[simp]: 
+  "dclose s = dcl_empty \<longleftrightarrow> s={}" 
+  "dcl_empty = dclose s \<longleftrightarrow> s={}" 
+  by (determ transfer; auto)+  
+  
+lemma "a\<le>bot \<longleftrightarrow> a=bot" for a :: "_::complete_lattice" by (rule bot_unique)
+declare bot_unique[simp]
+
+lemma RETURNT_eq_RETURNT_iff[simp]: "RETURNT x \<le> RETURNT y \<longleftrightarrow> x=y"
+  by (auto simp: RETURNT_def SPEC_def le_fun_def split: if_splits) 
+
+lemma dclose_le_iff[simp]: "dclose a \<le> dclose b \<longleftrightarrow> dcl a \<subseteq> dcl b" by transfer simp
+lemma dcl_subseteq_iff: "dcl a \<subseteq> dcl b \<longleftrightarrow> (\<forall>x\<in>a. \<exists>y\<in>b. x\<le>y)" by (force simp: dcl_def)  
+  
+lemma SPEC_le_iff[simp]: "SPEC T \<le> SPEC Q \<longleftrightarrow> (\<forall>x. T x \<longrightarrow> Q x)"
+  unfolding SPEC_def
+  by (auto simp: fun_eq_iff le_fun_def)  
+  
+lemma SPECT_le_iff[simp]: "SPECT T \<le> SPECT Q \<longleftrightarrow> (\<forall>x c. T x = Some c \<longrightarrow> (\<exists>c'\<ge>c. Q x = Some c'))"  
+  unfolding SPECT_def
+  by (auto 0 3 simp: fun_eq_iff le_fun_def dcl_subseteq_iff split: option.split)  
+  
+  
+  
+lemma consume_cong1: "a=b \<Longrightarrow> consume a c = consume b c" by simp
+
+
+lemma SPEC_cong: "\<Phi>=\<Phi>' \<Longrightarrow> T=T' \<Longrightarrow> SPEC \<Phi> T = SPEC \<Phi>' T'"
+  by simp
+
+lemma dcl_image_id[simp]: "dcl_image (\<lambda>x. x) s = s"
+  by transfer auto  
+  
+lemma plus_zero_id[simp]: "(+)(0::_::monoid_add) = (\<lambda>x. x)" by auto 
+  
+  
+lemma consume_zero:
+  fixes x :: "_::{ordered_ab_semigroup_add,monoid_add}"
+  shows "x=0 \<Longrightarrow> consume M x = M"
+  by(cases M, auto simp: consume_def top_nrest_def)
+
+lemma consume_0[simp]:
+  "consume M (0::_::{ordered_ab_semigroup_add,monoid_add}) = M"
+  by (simp add: consume_zero)
+
+lemma dcl_image_leI:
+  assumes "s\<le>s'"
+  assumes "f\<le>f'"
+  shows "dcl_image f s \<le> dcl_image f' s'"  
+  using assms
+  apply transfer
+  by (fastforce simp: is_dcl_def dcl_def mono_def le_fun_def)
+  
+  
+lemma consume_mono:
+  fixes  t :: "'a::{ordered_ab_semigroup_add,monoid_add}"
+  shows "t\<le>t' \<Longrightarrow> M \<le> M' \<Longrightarrow> consume M t \<le> consume M' t'"
+  unfolding consume_def apply (auto split: nrest.splits )
+  unfolding le_fun_def by (auto intro!: dcl_image_leI simp: le_fun_def add_right_mono)
+  
+lemma consume_mono_ecost:
+  fixes  t :: "(string,enat) acost"
+  shows "t\<le>t' \<Longrightarrow> M \<le> M' \<Longrightarrow> consume M t \<le> consume M' t'"
+  by (rule consume_mono)
+
+
+lemma ex_acost_iff: "(\<exists>x. P x) \<longleftrightarrow> (\<exists>x'. P (acostC x'))"  
+  apply auto
+  by (metis acost.exhaust_sel)
+  
+instance acost :: (type,cost_structure) cost_structure
+  apply standard
+  subgoal for a b c by (cases a; cases b; cases c; auto simp add: less_eq_acost_def diff_right_mono)
+  subgoal for a b c by (cases a; cases b; cases c; auto simp add: less_eq_acost_def diff_left_mono)
+  subgoal for a b by (cases a; cases b; auto simp: less_eq_acost_def diff_smaller zero_acost_def)
+  subgoal for a by (cases a; auto simp: less_eq_acost_def zero_acost_def)
+  subgoal for a b by (cases a; cases b; auto simp: less_eq_acost_def algebra_simps)
+  subgoal for a b c 
+    apply (cases a; cases b; cases c; auto simp add: less_eq_acost_def diff_right_mono ex_acost_iff fun_eq_iff)
+    apply (rule fun_swap_arg_all_ex_aux)
+    by (simp add: less_sum_down)
+  
+  done
+
+lemma RETURNT_alt: "RETURNT x = SPECT [x\<mapsto>0]"
+  unfolding RETURNT_def SPEC_def SPECT_def by auto
+
+lemma dcl_eq_iff: "dcl s = dcl s' \<longleftrightarrow> (\<forall>x\<in>s. \<exists>y\<in>s'. x\<le>y) \<and> (\<forall>x\<in>s'. \<exists>y\<in>s. x\<le>y)"
+  by (fastforce simp: dcl_def)
+    
+lemma dcl_singleton_iff[simp]: "dcl {x} = dcl {y} \<longleftrightarrow> x=y"
+  by (auto simp: dcl_eq_iff)  
+  
+lemma nrest_inequalities[simp]: 
+  "FAILT \<noteq> REST X"
+  "FAILT \<noteq> SUCCEEDT" 
+  "FAILT \<noteq> RETURNT x"
+  "SUCCEEDT \<noteq> FAILT"
+  "SUCCEEDT \<noteq> RETURNT x"
+  "REST X \<noteq> FAILT"
+  "RETURNT x \<noteq> FAILT"
+  "RETURNT x \<noteq> SUCCEEDT"
+  unfolding top_nrest_def bot_nrest_def RETURNT_def SPEC_def  
+  by (auto simp: fun_eq_iff)    
+
+lemma nrest_more_simps[simp]:
+  fixes X :: "('a\<rightharpoonup>'b::order)"
+  fixes X' :: "('a\<rightharpoonup>'bb::{comm_monoid_add,order})"
+  shows
+  "SUCCEEDT = SPECT X \<longleftrightarrow> X=Map.empty"
+  "SPECT X = SUCCEEDT \<longleftrightarrow> X=Map.empty" 
+  "SPECT X' = RETURNT x \<longleftrightarrow> X'=[x\<mapsto>0]" 
+  "SPECT X = SPECT Y \<longleftrightarrow> X=Y"
+  "RETURNT x = SPECT X' \<longleftrightarrow> X'=[x\<mapsto>0]"
+  "RETURNT x = RETURNT y \<longleftrightarrow> x=y" 
+  unfolding top_nrest_def bot_nrest_def RETURNT_def SPECT_def SPEC_def 
+  apply (auto split: if_splits simp: )
+  apply (simp_all add: fun_eq_iff split: option.splits if_splits)
+  apply auto
+  by (metis not_Some_eq)
+  
+lemma nres_simp_internals: 
+  "SPECT Map.empty = SUCCEEDT"
+   "FAILi = FAILT" 
+  unfolding top_nrest_def bot_nrest_def SPECT_def 
+  by (simp_all add: bot_fun_def)
+
+
+lemma nres_order_simps[simp]:
+  "\<not> FAILT \<le> REST M" 
+  "REST M \<le> REST M' \<longleftrightarrow> (M\<le>M')"
+  by (auto simp: nres_simp_internals[symmetric])   
+
+lemma nres_top_unique[simp]:" FAILT \<le> S' \<longleftrightarrow> S' = FAILT"
+  by (rule top_unique) 
+
+lemma FAILT_cases[simp]: "(case FAILT of FAILi \<Rightarrow> P | REST x \<Rightarrow> Q x) = P"
+  by (auto simp: nres_simp_internals[symmetric])  
+
+lemma nrest_Sup_FAILT: 
+  "Sup X = FAILT \<longleftrightarrow> FAILT \<in> X"
+  "FAILT = Sup X \<longleftrightarrow> FAILT \<in> X"
+  by (auto simp: nres_simp_internals Sup_nrest_def)
+
+(*
+lemma nrest_Sup_SPECT_D: "Sup X = SPECT m \<Longrightarrow> m x = Sup {f x | f. REST f \<in> X}"
+  unfolding Sup_nrest_def apply(auto split: if_splits) unfolding Sup_fun_def  
+  apply(fo_rule arg_cong) by blast
+*)
+declare nres_simp_internals(2)[simp]
+
+lemma nrest_noREST_FAILT[simp]: "(\<forall>x2. m \<noteq> REST x2) \<longleftrightarrow> m=FAILT"
+  apply (cases m) apply auto done
+
+lemma   no_FAILTE:  
+  assumes "g xa \<noteq> FAILT" 
+  obtains X where "g xa = REST X" using assms by (cases "g xa") auto
+
+
+lemma case_prod_refine:
+  fixes P Q :: "'a \<Rightarrow> 'b \<Rightarrow> ('c,_) nrest"
+  assumes
+    "\<And>a b. P a b \<le> Q a b"
+  shows
+ "(case x of (a,b) \<Rightarrow> P a b) \<le> (case x of (a,b) \<Rightarrow> Q a b)"
+  using assms 
+  by (simp add: split_def)
+
+lemma case_option_refine: (* obsolete ? *)
+  fixes P Q :: "'a \<Rightarrow> 'b \<Rightarrow> ('c,_) nrest"
+  assumes
+    "PN \<le> QN"
+    "\<And>a. PS a \<le> QS a"
+  shows
+ "(case x of None \<Rightarrow> PN | Some a \<Rightarrow> PS a ) \<le> (case x of None \<Rightarrow> QN | Some a \<Rightarrow> QS a )"
+  using assms 
+  by (auto split: option.splits)
+
+
+
+
+lemma consume_FAIL:
+    "(FAILT = consume m t1 ) \<longleftrightarrow> m = FAILT"
+    "(consume m t1 = FAILT ) \<longleftrightarrow> m = FAILT"
+  unfolding consume_def by (auto split: nrest.splits)
+lemma consume_Fails[simp]: "consume FAILT t = FAILT" by(auto simp: consume_def)
+
+
+
+subsection \<open>Pointwise reasoning\<close>
+
+named_theorems refine_pw_simps 
+  
+definition nofailT :: "('a,_) nrest \<Rightarrow> bool" where "nofailT S \<equiv> S\<noteq>FAILT"
+
+lemma FAILi[simp]: "FAILi = FAILT"
+  unfolding top_nrest_def ..
+
+
+lemma nofailT_simps[simp]:
+  "nofailT FAILT \<longleftrightarrow> False"
+  "nofailT (REST X) \<longleftrightarrow> True"
+  "nofailT (RETURNT x) \<longleftrightarrow> True"
+  "nofailT SUCCEEDT \<longleftrightarrow> True"
+  unfolding nofailT_def
+  apply (simp_all add: RETURNT_def)
+  unfolding top_nrest_def SPEC_def   by auto
+
+
+lemma pw_Sup_nofail[refine_pw_simps]: "nofailT (Sup X) \<longleftrightarrow> (\<forall>x\<in>X. nofailT x)"
+  apply (cases "Sup X")  
+   apply auto
+  unfolding Sup_nrest_def 
+    apply (auto split: if_splits)
+  subgoal
+    using nofailT_simps(1) by blast
+  subgoal 
+    using nofailT_def by blast
+  done
+
+lemma nofailT_SPEC[refine_pw_simps]: "nofailT (SPEC a b)"
+  unfolding SPEC_def  by auto
+
+lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightarrow> nofailT M"
+  by(auto simp: consume_def split: nrest.splits)
+
+
+
+definition inresT :: "(_,'c) nrest \<Rightarrow> _ \<Rightarrow> ('c::order) \<Rightarrow> bool"
+  where "inresT S x t \<equiv> SPECT ([x\<mapsto>t]) \<le> S"
+
+
+lemma inresT_REST[refine_pw_simps]: "inresT (REST P) x t \<longleftrightarrow> dcl_singleton t \<le> P x" 
+  by (auto simp: inresT_def SPECT_def le_fun_def dclose_empty dclose_insert)
+ 
+(* TODO: Move *)  
+lemma dcl_insert_not_empty[simp]: 
+  "dcl_insert x s \<noteq> dcl_empty"  
+  "dcl_empty \<noteq> dcl_insert x s"  
+  by (transfer; auto)+
+  
+(* TODO: Move *)  
+lemma dcl_singleton_compare[simp]: "dcl_singleton x \<le> dcl_singleton y \<longleftrightarrow> x\<le>y"
+  apply transfer by auto  
+  
+lemma inresT_SPEC[refine_pw_simps]: "inresT (SPEC P T) y t \<longleftrightarrow> P y \<and> t\<le>T y" 
+  unfolding SPEC_def
+  by (auto simp add: refine_pw_simps dclose_empty dclose_insert)
+
+lemma inresT_SPECT[refine_pw_simps]: "inresT (SPECT M) y t \<longleftrightarrow> (\<exists>t'. M y = Some t' \<and> t \<le> t')" 
+  unfolding SPECT_def 
+  by (auto simp: refine_pw_simps dclose_empty dclose_insert split: option.split)
+
+lemma inresT_RETURNT'[refine_pw_simps]: "inresT (RETURNT x) y t \<longleftrightarrow> t \<le> 0 \<and> y = x"
+  unfolding RETURNT_def by (auto simp add: refine_pw_simps)
+
+
+
+term cls_elem
+
+lemma inresT_FAILT[refine_pw_simps]: "inresT FAILT x t"
+  by(auto simp: inresT_def)
+
+lemma FAILT_not_inD: "FAILT \<notin> X \<Longrightarrow> \<exists>Y. X = REST ` Y"
+  unfolding top_nrest_def
+  apply (rule exI[where x="(\<lambda>REST x \<Rightarrow> x)`X"])
+  apply auto
+  apply (metis (full_types) imageI nrest.simps(5) nrest_noREST_FAILT) 
+  by (metis FAILi Sup_upper less_eq_nrest.elims(2) nrest.simps(5) nrest_Sup_FAILT(2))
+
+
+lemma inresT_not_bot[refine_pw_simps]: "\<not> inresT bot x t"
+  unfolding inresT_def 
+  by (auto simp:)
+  
+
+lemma REST_in_REST_image_conv: "REST f \<in> REST ` Y \<longleftrightarrow> f\<in>Y"
+  by auto
+
+
+lemma inresT_Sup[refine_pw_simps]: "inresT (Sup X) x t =  (\<exists>m\<in>X. inresT m x t)"
+  apply(rule)
+  subgoal (* \<Rightarrow> *)
+    apply (auto simp: inresT_def Sup_nrest_def intro: top_greatest split: if_splits)
+    apply (auto simp: SPECT_def le_fun_def REST_in_REST_image_conv split: if_splits dest!: FAILT_not_inD)
+    apply (thin_tac "_ = REST`_")
+    apply transfer
+    apply (fastforce simp: dcl_def is_dcl_def)
+    done
+  subgoal (* \<Leftarrow> *)
+    apply (auto simp: inresT_def Sup_nrest_def intro: top_greatest split: if_splits)
+    apply (auto simp: SPECT_def le_fun_def REST_in_REST_image_conv split: if_splits dest!: FAILT_not_inD)
+    apply (thin_tac "_ = REST`_")
+    apply transfer
+    apply (fastforce simp: dcl_def is_dcl_def)
+    done    
+  done  
+
+(* TODO: Move *)  
+lemma dcl_compare_pointwise_conv: "s \<le> s' \<longleftrightarrow> (\<forall>t. dcl_singleton t \<le> s \<longrightarrow> dcl_singleton t \<le> s')"
+  apply transfer
+  apply (simp; fastforce simp: dcl_def is_dcl_def)
+  done
+  
+lemmas dcl_compare_pwI = iffD2[OF dcl_compare_pointwise_conv]  
+  
+lemma pw_le_iff: 
+  "S \<le> S' \<longleftrightarrow> (nofailT S'\<longrightarrow> (nofailT S \<and> (\<forall>x t. inresT S x t \<longrightarrow> inresT S' x t)))"
+  apply (cases S; cases S', simp_all)
+  unfolding nofailT_def inresT_def SPECT_def apply (auto split: nrest.splits simp: le_fun_def)
+  using dual_order.trans apply blast 
+  apply (auto simp: dclose_insert dclose_empty intro: dcl_compare_pwI)
+  done
+
+lemma pw_eq_iff:
+  "S=S' \<longleftrightarrow> (nofailT S = nofailT S' \<and> (\<forall>x t. inresT S x t \<longleftrightarrow> inresT S' x t))"
+  apply (rule iffI)
+  apply simp
+  apply (rule antisym)
+  apply (auto simp add: pw_le_iff)
+  done
+  
+lemma pw_flat_ge_iff: "flat_ge S S' \<longleftrightarrow> 
+  (nofailT S) \<longrightarrow> nofailT S' \<and> (\<forall>x t. inresT S x t \<longleftrightarrow> inresT S' x t)"
+  apply (simp add: flat_ord_def)
+  apply(simp add: pw_eq_iff) apply safe
+  by (auto simp add: nofailT_def)   
+  
+  
+subsection \<open>le_or_fail\<close>
+  definition le_or_fail :: "('a,_) nrest \<Rightarrow> ('a,_) nrest \<Rightarrow> bool" (infix "\<le>\<^sub>n" 50) where
+    "m \<le>\<^sub>n m' \<equiv> nofailT m \<longrightarrow> m \<le> m'"
+
+lemma le_if_leof: "nofailT a \<Longrightarrow> a \<le>\<^sub>n b \<Longrightarrow> a \<le> b"
+  unfolding le_or_fail_def by simp
+
+text \<open>separate functional correctness from running time\<close>
+
+(* TODO: Move *)
+lemma dcl_univ_if_top: "(top::_::order_top)\<in>s \<Longrightarrow> dcl s = UNIV"
+  by (auto simp: dcl_def)
+
+lemma dclose_top_if_top: "(top::_::order_top)\<in>s \<Longrightarrow> dclose s = top"  
+  apply transfer
+  by (simp add: dcl_univ_if_top)
+    
+lemma dcl_sng_top[simp]: "dclose ({top::_::order_top}) = top"
+  by (auto simp: dclose_top_if_top)
+
+lemma
+  fixes T :: "_::order_top" 
+  assumes correctness: "a \<le> SPEC a_spec (\<lambda>_. top)"
+  and time: " a \<le>\<^sub>n SPEC (\<lambda>_. True) T"
+shows separate_correct_and_time: "a \<le> SPEC a_spec T"
+proof -
+  from correctness have [simp]: "nofailT a"
+    unfolding nofailT_def by(cases a; simp add: SPEC_def)
+  have "a \<le> inf (SPEC a_spec (\<lambda>_. top)) (SPEC (\<lambda>_. True) T)"
+    using time correctness by (auto intro: inf_greatest  le_if_leof)
+  also have "\<dots> = SPEC a_spec T"
+    by(auto simp add: SPEC_def fun_eq_iff)
+  finally show "a \<le> SPEC a_spec T" .
+qed
+  
+subsection \<open>Monad Operators\<close>
+
+
+subsubsection \<open>bind\<close>
+
+definition "from_nfir nf ir \<equiv> if nf then REST (\<lambda>x. dclose {t . ir x t }) else FAILT"
+
+lemma nofail_from_nfir[refine_pw_simps]: "nofailT (from_nfir nf ir) = nf"
+  unfolding from_nfir_def
+  by (auto)
+
+lemma inresT_from_nfir[refine_pw_simps]: "inresT (from_nfir nf ir) x t \<longleftrightarrow> (nf \<longrightarrow> (\<exists>t'\<ge>t. ir x t'))"
+  by (auto 
+    simp: from_nfir_def refine_pw_simps dcl_subseteq_iff
+    simp flip: dclose_insert dclose_empty)
+  
+definition bindT :: "('b,'c::cost_structure) nrest \<Rightarrow> ('b \<Rightarrow> ('a,'c) nrest) \<Rightarrow> ('a,'c) nrest" where
+  "bindT m f \<equiv> from_nfir (nofailT m \<and> (\<forall>x t. inresT m x t \<longrightarrow> nofailT (f x))) 
+                         (\<lambda>x t. \<exists>y t\<^sub>1 t\<^sub>2. inresT m y t\<^sub>1 \<and> inresT (f y) x t\<^sub>2 \<and> t=t\<^sub>1+t\<^sub>2)"
+ 
+lemma bindT_nofail[refine_pw_simps]: "nofailT (bindT m f) \<longleftrightarrow> nofailT m \<and> (\<forall>x t. inresT m x t \<longrightarrow> nofailT (f x))"
+  by (simp add: bindT_def refine_pw_simps)                         
+                              
+lemma not_nofail_eq: "\<not>nofailT m \<longleftrightarrow> m=FAILT" by (cases m; auto)  
+    
+lemma inresT_t_mono: "t\<le>t' \<Longrightarrow> inresT m x t' \<Longrightarrow> inresT m x t"
+  apply (cases m)
+  by (auto simp: refine_pw_simps intro: dual_order.trans)
+
+corollary inresT_0: "inresT m x t \<Longrightarrow> inresT m x (0::_::cost_structure)"
+  by (simp add: inresT_t_mono)
+  
+lemma pw_inresT_bindT[refine_pw_simps]: "inresT (bindT m f) r t \<longleftrightarrow>
+     (nofailT m \<longrightarrow> (\<exists>r' t' t''. inresT m r' t' \<and> inresT (f r') r t'' \<and> t = t' + t''))"
+  apply rule
+  subgoal   
+    apply (simp add: bindT_def refine_pw_simps)
+    apply auto
+    subgoal for xx tt
+      apply (rule ccontr)
+      apply (auto simp add: refine_pw_simps not_nofail_eq)
+      by (metis inresT_0 inresT_FAILT plus_zero_id)
+    subgoal for y t\<^sub>1 t\<^sub>2
+      by (meson inresT_t_mono less_sum_down)
+    done
+  subgoal
+    apply (simp add: bindT_def refine_pw_simps)
+    apply auto
+    done    
+  done      
+      
+
+adhoc_overloading
+  Monad_Syntax.bind NREST.bindT
+
+find_theorems inresT "(\<le>)"  
+  
+
+lemma bindT_FAIL[simp]: "bindT FAILT g = FAILT"
+  by (auto simp: refine_pw_simps pw_eq_iff)     
+
+lemma bindT_SUCCEED[simp]: "bindT SUCCEEDT f = SUCCEEDT"
+  by (auto simp: refine_pw_simps pw_eq_iff)     
+
+subsection \<open>Monad Rules\<close>
+
+(* TODO: Move *)
+lemma not_nofail_inres[refine_pw_simps]: "\<not> nofailT M \<Longrightarrow> inresT M x t"
+  apply (cases M) apply (auto simp: inresT_FAILT) done
+
+lemma nres_bind_left_identity[simp]:
+  shows  "bindT (RETURNT x) f = f x"
+  by (auto simp: pw_eq_iff refine_pw_simps)
+
+lemma nres_bind_right_identity[simp]:
+  shows "bindT M RETURNT = M"
+  by (auto simp: pw_eq_iff refine_pw_simps)
+
+lemma nres_bind_assoc[simp]:
+  shows "bindT (bindT M (\<lambda>x. f x)) g = bindT M (%x. bindT (f x) g)"
+  apply (auto simp: pw_eq_iff refine_pw_simps)
+  apply blast 
+  using inresT_0 apply fastforce
+  using group_cancel.add1 apply blast
+  by (metis group_cancel.add1)
+  
+subsection \<open>Setup for do notation\<close>
+
+abbreviation (do_notation) bind_doN where "bind_doN \<equiv> NREST.bindT"
+
+notation (output) bind_doN (infixr "\<bind>" 54)
+notation (ASCII output) bind_doN (infixr ">>=" 54)
+
+nonterminal doN_binds and doN_bind
+syntax
+  "_doN_block" :: "doN_binds \<Rightarrow> 'a" ("doN {//(2  _)//}" [12] 62)
+  "_doN_bind"  :: "[pttrn, 'a] \<Rightarrow> doN_bind" ("(2_ \<leftarrow>/ _)" 13)
+  "_doN_let" :: "[pttrn, 'a] \<Rightarrow> doN_bind" ("(2let _ =/ _)" [1000, 13] 13)
+  "_doN_then" :: "'a \<Rightarrow> doN_bind" ("_" [14] 13)
+  "_doN_final" :: "'a \<Rightarrow> doN_binds" ("_")
+  "_doN_cons" :: "[doN_bind, doN_binds] \<Rightarrow> doN_binds" ("_;//_" [13, 12] 12)
+  "_thenM" :: "['a, 'b] \<Rightarrow> 'c" (infixr "\<then>" 54)
+
+syntax (ASCII)
+  "_doN_bind" :: "[pttrn, 'a] \<Rightarrow> doN_bind" ("(2_ <-/ _)" 13)
+  "_thenM" :: "['a, 'b] \<Rightarrow> 'c" (infixr ">>" 54)
+
+translations
+  "_doN_block (_doN_cons (_doN_then t) (_doN_final e))"
+    \<rightleftharpoons> "CONST bind_doN t (\<lambda>_. e)"
+  "_doN_block (_doN_cons (_doN_bind p t) (_doN_final e))"
+    \<rightleftharpoons> "CONST bind_doN t (\<lambda>p. e)"
+  "_doN_block (_doN_cons (_doN_let p t) bs)"
+    \<rightleftharpoons> "let p = t in _doN_block bs"
+  "_doN_block (_doN_cons b (_doN_cons c cs))"
+    \<rightleftharpoons> "_doN_block (_doN_cons b (_doN_final (_doN_block (_doN_cons c cs))))"
+  "_doN_cons (_doN_let p t) (_doN_final s)"
+    \<rightleftharpoons> "_doN_final (let p = t in s)"
+  "_doN_block (_doN_final e)" \<rightharpoonup> "e"
+(*  "(m \<then> n)" \<rightharpoonup> "(m \<bind> (\<lambda>_. n))"*)
+
+abbreviation RETURNTecost :: "'a \<Rightarrow> ('a, (string,enat) acost) nrest"
+  where "RETURNTecost \<equiv> RETURNT"
+
+
+
+subsection \<open>Monotonicity lemmas\<close>
+
+
+lemma bindT_mono: 
+  "m \<le> m' \<Longrightarrow> (\<And>x. (\<exists>t. inresT m x t) \<Longrightarrow> nofailT m' \<Longrightarrow>  f x \<le> f' x)
+ \<Longrightarrow> bindT m f \<le> bindT  m' f'"
+  apply(auto simp: pw_le_iff refine_pw_simps) 
+  by fastforce+      
+
+lemma bindT_mono'[refine_mono]: 
+  fixes m :: "('a,enat) nrest"
+  shows "m \<le> m' \<Longrightarrow> (\<And>x.   f x \<le> f' x)
+ \<Longrightarrow> bindT m f \<le> bindT  m' f'"
+  apply(rule bindT_mono) by auto
+ 
+lemma bindT_flat_mono[refine_mono]:  
+  fixes M :: "('a,enat) nrest"
+  shows 
+  "\<lbrakk> flat_ge M M'; \<And>x. flat_ge (f x) (f' x) \<rbrakk> \<Longrightarrow> flat_ge (bindT M f) (bindT M' f')" 
+  apply (auto simp: refine_pw_simps pw_flat_ge_iff) []
+  by fastforce+      
+
+  
+  
+subsection \<open>Derived Program Constructs\<close>
+  
+  
+oops  end end end
+    
+
+XXX: Continue here, copy stuff up as needed
+  
+  
+  
+
+
+
+
+
+
+
+
+
 
 definition "dcl_continuous f = (\<forall>S S'.  dcl S = dcl S' \<longrightarrow> dcl (f` S) = dcl (f ` S'))"
 
@@ -322,7 +1025,7 @@ interpretation cls_plus_nat: cls_cont_function "\<lambda>(a,b). (a,b+c)" for c :
   apply(force dest: cls_cont_function_aux[OF sym])
   done 
 *)
-
+(*
 interpretation dcl_minus: dcl_cont_function "\<lambda>b. b-c" for c :: "nat" (* monoid_add *) 
   apply standard
   apply rule 
@@ -334,7 +1037,89 @@ interpretation dcl_minus: dcl_cont_function "\<lambda>b. b-c" for c :: "nat" (* 
    apply (drule (1) dcl_cont_function_aux[OF sym]) apply auto []
   using diff_le_mono apply blast
   done 
+*)
+find_theorems "_\<le>_" "_-_ \<le> _-_"
+  
+typedecl foo
+(*
+instantiation foo :: ordered_cancel_comm_monoid_add begin
 
+  instance
+  apply standard
+  oops
+end
+*)
+
+find_theorems name: diff_right_mono
+
+class cost_structure = ordered_comm_monoid_add + minus +
+  assumes diff_right_mono[algebra_simps]: "a\<le>b \<Longrightarrow> a-c \<le> b-c"
+  assumes diff_left_mono[algebra_simps]: "b\<le>a \<Longrightarrow> c-a \<le> c-b"
+  assumes diff_smaller[algebra_simps]: "0\<le>b \<Longrightarrow> a-b \<le> a" 
+  assumes diff_greater[algebra_simps]: "b\<le>0 \<Longrightarrow> a \<le> a-b" (* not sure if needed here *)
+begin  
+
+
+
+end
+
+instance nat :: cost_structure
+  by standard auto
+
+instance int :: cost_structure
+  by standard auto
+    
+instance enat :: cost_structure
+  apply standard 
+  apply simp_all
+  subgoal for a b c by (cases a; cases b; cases c; simp)
+  subgoal for a b c by (cases a; cases b; cases c; simp)
+  subgoal for a b by (cases a; cases b; simp)
+  done
+  
+instantiation "fun" :: (type,zero) zero begin
+  definition [simp]: "zero_fun x \<equiv> 0" 
+  instance ..
+end 
+  
+instantiation "fun" :: (type,plus) plus begin
+  definition [simp]: "(f+g) x = f x + g x"
+  instance ..
+end
+
+thm fun_diff_def
+
+
+instance "fun" :: (type,cost_structure) cost_structure
+  apply standard
+  apply (auto simp: fun_eq_iff algebra_simps le_fun_def add_right_mono)
+  done  
+  
+
+instantiation dclosed :: ("{order,plus}") plus begin
+  lift_definition plus_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is 
+    "\<lambda>a b :: 'a set. dcl {x+y | x y. x\<in>a \<and> y\<in>b }" by simp
+  
+  instance ..
+end    
+
+instantiation dclosed :: ("{order,minus}") minus begin
+  lift_definition minus_dclosed :: "'a dclosed \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is 
+    "\<lambda>a b :: 'a set. dcl {x-y | x y. x\<in>a \<and> y\<in>b }" by simp
+  
+  instance ..
+end    
+
+  
+interpretation dcl_minus: dcl_cont_function "\<lambda>b. b-c" for c :: "'a::cost_structure" (* monoid_add *) 
+  apply standard
+  apply rule 
+  apply(rule dcl_eqI)
+   apply clarsimp
+   apply (drule (1) dcl_cont_function_aux) apply (auto intro: diff_right_mono) []
+   apply clarsimp
+   apply (drule (1) dcl_cont_function_aux[OF sym]) apply (auto intro: diff_right_mono) []
+  done 
 
 interpretation dcl_plus: dcl_cont_function "\<lambda>b. b+c" for c :: "'a::ordered_ab_semigroup_add" (* monoid_add *) 
   apply standard
@@ -351,10 +1136,16 @@ interpretation dcl_plus: dcl_cont_function "\<lambda>b. b+c" for c :: "'a::order
     by (meson add_right_mono)
   done 
 
+lift_definition dcl_image :: "('a::order \<Rightarrow> 'b::order) \<Rightarrow> 'a dclosed \<Rightarrow> 'b dclosed" is "\<lambda>f a. dcl (f`a)" by auto  
 
+xxx, ctd here: get rid of dcl_continous for first
+  
+lift_definition dcl_plus_image :: "'a::ordered_ab_semigroup_add \<Rightarrow> 'a dclosed \<Rightarrow> 'a dclosed" is "\<lambda>c a. dcl ((+)c`a)"
+  by simp
 
 definition "dcl_plus_image c =  dcl_plus.dcl_image c"
  
+
 
 
 lemma dcl_plus_image_transfer[transfer_rule]: 
