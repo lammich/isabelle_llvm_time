@@ -171,16 +171,16 @@ class cost_structure = ordered_comm_monoid_add + minus +
   assumes diff_right_mono[algebra_simps]: "a\<le>b \<Longrightarrow> a-c \<le> b-c"
   assumes diff_left_mono[algebra_simps]: "b\<le>a \<Longrightarrow> c-a \<le> c-b"
   assumes diff_smaller[algebra_simps]: "a-b \<le> a" 
-  assumes zero_le[simp]: "0 \<le> a"
+ (* assumes zero_le[simp]: "0 \<le> a" *)
   assumes add_diff_inverse[algebra_simps]: "a\<le>b \<Longrightarrow> (a + (b-a)) = b"
   (*assumes le_imp_diff_is_add: "i \<le> j \<Longrightarrow> (j - i = k) = (j = k + i)"*)
   assumes less_sum_down: "a\<le>b+c \<Longrightarrow> \<exists>b'\<le>b. \<exists>c'\<le>c. a=b'+c'"
     (* Needed such that inresT_bind holds.
     *)
 begin  
-  lemma lessZ_IsZ[simp]: "a\<le>0 \<longleftrightarrow> a=0"
+(*  lemma lessZ_IsZ[simp]: "a\<le>0 \<longleftrightarrow> a=0"
     by (simp add: local.eq_iff) 
-
+*)
 end
 
 instance nat :: cost_structure
@@ -197,7 +197,6 @@ instance int :: cost_structure
     
 instance enat :: cost_structure
   apply standard 
-  apply simp_all
   subgoal for a b c by (cases a; cases b; cases c; simp)
   subgoal for a b c by (cases a; cases b; cases c; simp)
   subgoal for a b by (cases a; cases b; simp)
@@ -510,7 +509,7 @@ instance acost :: (type,cost_structure) cost_structure
   subgoal for a b c by (cases a; cases b; cases c; auto simp add: less_eq_acost_def diff_right_mono)
   subgoal for a b c by (cases a; cases b; cases c; auto simp add: less_eq_acost_def diff_left_mono)
   subgoal for a b by (cases a; cases b; auto simp: less_eq_acost_def diff_smaller zero_acost_def)
-  subgoal for a by (cases a; auto simp: less_eq_acost_def zero_acost_def)
+(*  subgoal for a by (cases a; auto simp: less_eq_acost_def zero_acost_def) *)
   subgoal for a b by (cases a; cases b; auto simp: less_eq_acost_def algebra_simps)
   subgoal for a b c 
     apply (cases a; cases b; cases c; auto simp add: less_eq_acost_def diff_right_mono ex_acost_iff fun_eq_iff)
@@ -664,12 +663,12 @@ lemma nofailT_consume[refine_pw_simps]: "nofailT (consume M t) \<longleftrightar
 
 
 definition inresT :: "(_,'c) nrest \<Rightarrow> _ \<Rightarrow> ('c::order) \<Rightarrow> bool"
-  where "inresT S x t \<equiv> SPECT ([x\<mapsto>t]) \<le> S"
-
+  where "inresT S x t \<equiv> nofailT S \<and> SPECT ([x\<mapsto>t]) \<le> S"
 
 lemma inresT_REST[refine_pw_simps]: "inresT (REST P) x t \<longleftrightarrow> dcl_singleton t \<le> P x" 
   by (auto simp: inresT_def SPECT_def le_fun_def dclose_empty dclose_insert)
- 
+
+
 (* TODO: Move *)  
 lemma dcl_insert_not_empty[simp]: 
   "dcl_insert x s \<noteq> dcl_empty"  
@@ -695,8 +694,12 @@ lemma inresT_RETURNT'[refine_pw_simps]: "inresT (RETURNT x) y t \<longleftrighta
 
 term cls_elem
 
-lemma inresT_FAILT[refine_pw_simps]: "inresT FAILT x t"
+lemma inresT_FAILT[refine_pw_simps]: "~ inresT FAILT x t"
   by(auto simp: inresT_def)
+
+lemma inresT_FAILT'[refine_pw_simps]: "inresT FAILT x ta \<longleftrightarrow> False"
+  by(auto simp: inresT_def)
+
 
 lemma FAILT_not_inD: "FAILT \<notin> X \<Longrightarrow> \<exists>Y. X = REST ` Y"
   unfolding top_nrest_def
@@ -715,7 +718,7 @@ lemma REST_in_REST_image_conv: "REST f \<in> REST ` Y \<longleftrightarrow> f\<i
   by auto
 
 
-lemma inresT_Sup[refine_pw_simps]: "inresT (Sup X) x t =  (\<exists>m\<in>X. inresT m x t)"
+lemma inresT_Sup[refine_pw_simps]: "inresT (Sup X) x t =  (FAILT \<notin> X \<and> (\<exists>m\<in>X. inresT m x t))"
   apply(rule)
   subgoal (* \<Rightarrow> *)
     apply (auto simp: inresT_def Sup_nrest_def intro: top_greatest split: if_splits)
@@ -725,8 +728,8 @@ lemma inresT_Sup[refine_pw_simps]: "inresT (Sup X) x t =  (\<exists>m\<in>X. inr
     apply (fastforce simp: dcl_def is_dcl_def)
     done
   subgoal (* \<Leftarrow> *)
-    apply (auto simp: inresT_def Sup_nrest_def intro: top_greatest split: if_splits)
-    apply (auto simp: SPECT_def le_fun_def REST_in_REST_image_conv split: if_splits dest!: FAILT_not_inD)
+    apply (auto simp: inresT_def Sup_nrest_def   split: if_splits)
+     apply (auto simp: SPECT_def le_fun_def REST_in_REST_image_conv split: if_splits dest!: FAILT_not_inD)
     apply (thin_tac "_ = REST`_")
     apply transfer
     apply (fastforce simp: dcl_def is_dcl_def)
@@ -810,7 +813,7 @@ lemma nofail_from_nfir[refine_pw_simps]: "nofailT (from_nfir nf ir) = nf"
   unfolding from_nfir_def
   by (auto)
 
-lemma inresT_from_nfir[refine_pw_simps]: "inresT (from_nfir nf ir) x t \<longleftrightarrow> (nf \<longrightarrow> (\<exists>t'\<ge>t. ir x t'))"
+lemma inresT_from_nfir[refine_pw_simps]: "inresT (from_nfir nf ir) x t \<longleftrightarrow> (nf \<and> (\<exists>t'\<ge>t. ir x t'))"
   by (auto 
     simp: from_nfir_def refine_pw_simps dcl_subseteq_iff
     simp flip: dclose_insert dclose_empty)
@@ -818,6 +821,21 @@ lemma inresT_from_nfir[refine_pw_simps]: "inresT (from_nfir nf ir) x t \<longlef
 definition bindT :: "('b,'c::cost_structure) nrest \<Rightarrow> ('b \<Rightarrow> ('a,'c) nrest) \<Rightarrow> ('a,'c) nrest" where
   "bindT m f \<equiv> from_nfir (nofailT m \<and> (\<forall>x t. inresT m x t \<longrightarrow> nofailT (f x))) 
                          (\<lambda>x t. \<exists>y t\<^sub>1 t\<^sub>2. inresT m y t\<^sub>1 \<and> inresT (f y) x t\<^sub>2 \<and> t=t\<^sub>1+t\<^sub>2)"
+
+
+lemma "nofailT (bindT m f) \<Longrightarrow> \<exists>x t. inresT (bindT m f) x t"
+  oops (* does not hold  *)
+
+lemma "nofailT m \<Longrightarrow> \<exists>x t. inresT m x t"
+  oops
+(* also does not hold m might not fail, but just does not calculate any result.  *)
+
+
+
+definition "bP m f =  (\<lambda>x t. \<exists>y t\<^sub>1 t\<^sub>2. inresT m y t\<^sub>1 \<and> inresT (f y) x t\<^sub>2 \<and> t=t\<^sub>1+t\<^sub>2)"
+
+lemma bindT_alt: "bindT m f = from_nfir (nofailT m \<and> (\<forall>x t. inresT m x t \<longrightarrow> nofailT (f x))) (bP m f)"
+  unfolding bP_def bindT_def ..
  
 lemma bindT_nofail[refine_pw_simps]: "nofailT (bindT m f) \<longleftrightarrow> nofailT m \<and> (\<forall>x t. inresT m x t \<longrightarrow> nofailT (f x))"
   by (simp add: bindT_def refine_pw_simps)                         
@@ -828,28 +846,27 @@ lemma inresT_t_mono: "t\<le>t' \<Longrightarrow> inresT m x t' \<Longrightarrow>
   apply (cases m)
   by (auto simp: refine_pw_simps intro: dual_order.trans)
 
-corollary inresT_0: "inresT m x t \<Longrightarrow> inresT m x (0::_::cost_structure)"
+(* Maybe for bot ? *)
+(* corollary inresT_0: "inresT m x t \<Longrightarrow> inresT m x (0::_::cost_structure)"
   by (simp add: inresT_t_mono)
-  
-lemma pw_inresT_bindT[refine_pw_simps]: "inresT (bindT m f) r t \<longleftrightarrow>
-     (nofailT m \<longrightarrow> (\<exists>r' t' t''. inresT m r' t' \<and> inresT (f r') r t'' \<and> t = t' + t''))"
+  *)                                                                 
+
+lemma pw_inresT_bindT_aux: "inresT (bindT m f) r t \<longleftrightarrow> (nofailT (bindT m f) \<and> bP m f r t)"
   apply rule
   subgoal   
-    apply (simp add: bindT_def refine_pw_simps)
-    apply auto
-    subgoal for xx tt
-      apply (rule ccontr)
-      apply (auto simp add: refine_pw_simps not_nofail_eq)
-      by (metis inresT_0 inresT_FAILT plus_zero_id)
+    apply (simp add: bindT_alt refine_pw_simps bP_def)
+    apply safe
     subgoal for y t\<^sub>1 t\<^sub>2
       by (meson inresT_t_mono less_sum_down)
     done
   subgoal
-    apply (simp add: bindT_def refine_pw_simps)
+    apply (simp add: bindT_def refine_pw_simps bP_def)
     apply auto
     done    
   done      
-      
+
+lemma pw_inresT_bindT[refine_pw_simps]: "inresT (bindT m f) x t \<longleftrightarrow> (nofailT (bindT m f) \<and> (\<exists>y t\<^sub>1 t\<^sub>2. inresT m y t\<^sub>1 \<and> inresT (f y) x t\<^sub>2 \<and> t=t\<^sub>1+t\<^sub>2))"
+  unfolding pw_inresT_bindT_aux bP_def ..      
 
 adhoc_overloading
   Monad_Syntax.bind NREST.bindT
@@ -865,24 +882,40 @@ lemma bindT_SUCCEED[simp]: "bindT SUCCEEDT f = SUCCEEDT"
 
 subsection \<open>Monad Rules\<close>
 
-(* TODO: Move *)
+(* TODO: Move *) (* THAT'S PLAIN WRONG *)
 lemma not_nofail_inres[refine_pw_simps]: "\<not> nofailT M \<Longrightarrow> inresT M x t"
-  apply (cases M) apply (auto simp: inresT_FAILT) done
+  apply (cases M) apply (auto simp: inresT_FAILT) oops
+
+lemma not_nofail_inres: "inresT M x t \<Longrightarrow> nofailT M"
+  apply (cases M) by (auto simp: inresT_FAILT)
+
 
 lemma nres_bind_left_identity[simp]:
   shows  "bindT (RETURNT x) f = f x"
-  by (auto simp: pw_eq_iff refine_pw_simps)
+  apply (auto simp: pw_eq_iff refine_pw_simps)
+  subgoal unfolding inresT_def  apply auto apply(rule order.trans[rotated]) apply assumption 
+    apply simp
+    using add_decreasing by blast 
+  subgoal unfolding inresT_def by simp
+  done
+
 
 lemma nres_bind_right_identity[simp]:
   shows "bindT M RETURNT = M"
-  by (auto simp: pw_eq_iff refine_pw_simps)
+  apply (auto simp: pw_eq_iff refine_pw_simps)
+  subgoal unfolding inresT_def  apply auto apply(rule order.trans[rotated]) apply assumption 
+    apply simp 
+    by (simp add: add_decreasing2)
+  subgoal unfolding inresT_def  apply auto done
+  subgoal by force 
+  done
 
 lemma nres_bind_assoc[simp]:
   shows "bindT (bindT M (\<lambda>x. f x)) g = bindT M (%x. bindT (f x) g)"
   apply (auto simp: pw_eq_iff refine_pw_simps)
-  apply blast 
-  using inresT_0 apply fastforce
-  using group_cancel.add1 apply blast
+     apply blast 
+  subgoal unfolding inresT_def by blast 
+  subgoal using group_cancel.add1 by blast  
   by (metis group_cancel.add1)
   
 subsection \<open>Setup for do notation\<close>
@@ -950,7 +983,164 @@ lemma bindT_flat_mono[refine_mono]:
   
   
 subsection \<open>Derived Program Constructs\<close>
-  
+
+
+
+subsubsection \<open>Assertion\<close> 
+
+definition "iASSERT ret \<Phi> \<equiv> if \<Phi> then ret () else top"
+
+definition ASSERT where "ASSERT \<equiv> iASSERT RETURNT"
+
+lemma ASSERT_True[simp]: "ASSERT True = RETURNT ()" 
+  by (auto simp: ASSERT_def iASSERT_def)
+lemma ASSERT_False[simp]: "ASSERT False = FAILT" 
+  by (auto simp: ASSERT_def iASSERT_def) 
+
+lemma bind_ASSERT_eq_if:
+  fixes m :: "(_,'a::cost_structure) nrest"
+  shows "do { ASSERT \<Phi>; m } = (if \<Phi> then m else FAILT)"
+  unfolding ASSERT_def iASSERT_def by simp
+
+lemma pw_ASSERT[refine_pw_simps]:
+  "nofailT (ASSERT \<Phi>) \<longleftrightarrow> \<Phi>"
+  "inresT (ASSERT \<Phi>) x t \<longleftrightarrow> (\<Phi> \<and> t \<le> 0)"
+  subgoal
+   apply (cases \<Phi>)
+     apply (auto simp: refine_pw_simps)
+    done
+  subgoal
+   apply (cases \<Phi>)
+     apply (auto simp: refine_pw_simps)
+    done
+  done
+
+lemma ASSERT_refine:
+  shows "(Q \<Longrightarrow> P) \<Longrightarrow> (ASSERT P::(_,enat)nrest) \<le> ASSERT Q"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma ASSERT_leI: 
+  fixes M :: "(_,enat) nrest"
+  shows "\<Phi> \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> ASSERT \<Phi> \<bind> (\<lambda>_. M) \<le> M'"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma ASSERT_leI_f: 
+  fixes M :: "(_,(_,enat)acost) nrest"
+  shows "\<Phi> \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> ASSERT \<Phi> \<bind> (\<lambda>_. M) \<le> M'"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+lemma le_ASSERTI:
+  fixes M :: "(_,enat) nrest"
+  shows "(\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M')"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+
+lemma inresT_ASSERT: "inresT (ASSERT Q \<bind> (\<lambda>_. M)) x ta = (Q \<and> inresT M x ta)"
+  unfolding ASSERT_def iASSERT_def apply(cases Q) by (auto simp: refine_pw_simps)
+
+
+lemma ASSERTI_otherdir:
+  fixes M :: "(_,_) nrest"
+  shows "M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M') \<Longrightarrow> (\<Phi> \<Longrightarrow> M \<le> M')"
+  by(auto simp:  refine_pw_simps)
+
+
+lemma le_acost_ASSERTI:
+  fixes M :: "(_,(_,enat) acost) nrest"
+  shows "(\<Phi> \<Longrightarrow> M \<le> M') \<Longrightarrow> M \<le> ASSERT \<Phi> \<bind> (\<lambda>_. M')"
+  by(auto simp: pw_le_iff refine_pw_simps)
+
+
+lemma nofailT_ASSERT_bind:
+  fixes M :: "(_,_) nrest"
+  shows "nofailT (ASSERT P \<bind> (\<lambda>_. M)) \<longleftrightarrow> (P \<and> nofailT M)"
+  by(auto simp: bindT_nofail pw_ASSERT)
+
+lemma
+  nofailT_bindT_ASSERT_iff:
+  "nofailT (do { ASSERT I; M}) \<longleftrightarrow>  (I \<and> nofailT M)"
+  by (auto simp: ASSERT_def iASSERT_def) 
+
+
+
+
+subsubsection \<open>SELECT\<close>
+
+
+ 
+definition emb' where "\<And>Q T. emb' Q (T::'a \<Rightarrow> _) = (\<lambda>x. if Q x then dcl_singleton (T x) else bot)"
+
+abbreviation "emb Q t \<equiv> emb' Q (\<lambda>_. t)" 
+
+(*lemma emb_eq_Some_conv: "\<And>T. emb' Q T x = Some t' \<longleftrightarrow> (t'=T x \<and> Q x)"
+  by (auto simp: emb'_def)
+
+lemma emb_le_Some_conv: "\<And>T. Some t' \<le> emb' Q T x \<longleftrightarrow> ( t'\<le>T x \<and> Q x)"
+  by (auto simp: emb'_def)
+*)
+
+text \<open>Select some value with given property, or \<open>None\<close> if there is none.\<close>  
+definition SELECT :: "('a \<Rightarrow> bool) \<Rightarrow> 'c \<Rightarrow> ('a option,'c::order) nrest"
+  where "SELECT P tf \<equiv> if \<exists>x. P x then REST (emb (\<lambda>r. case r of Some p \<Rightarrow> P p | None \<Rightarrow> False) tf)
+               else SPECT [None \<mapsto> tf]"
+
+
+lemma dclose_singleton: "dclose {x} = dcl_singleton x"
+  apply transfer by auto
+
+lemma SPEC_REST_emb'_conv: "SPEC P t = REST (emb' P t)"
+  unfolding SPEC_def emb'_def by (auto simp: dclose_singleton)
+
+                    
+lemma inresT_SELECT_Some: "inresT (SELECT Q tt) (Some x) t' \<longleftrightarrow> (Q x  \<and> (t' \<le> tt))"
+  by(auto simp:  inresT_def SPECT_def dclose_singleton  le_fun_def SELECT_def emb'_def) 
+
+lemma inresT_SELECT_None: "inresT (SELECT Q tt) None t' \<longleftrightarrow> (\<not>(\<exists>x. Q x) \<and> (t' \<le> tt))"
+  by(auto simp:  inresT_def SPECT_def dclose_singleton  le_fun_def SELECT_def emb'_def) 
+
+lemma inresT_SELECT[refine_pw_simps]:
+ "inresT (SELECT Q tt) x t' \<longleftrightarrow> ((case x of None \<Rightarrow> \<not>(\<exists>x. Q x) | Some x \<Rightarrow> Q x)  \<and> ( t' \<le> tt))"
+  by(auto simp: inresT_def SPECT_def le_fun_def dclose_singleton SELECT_def emb'_def split: option.splits) 
+
+
+
+lemma nofailT_SELECT[refine_pw_simps]: "nofailT (SELECT Q tt)"
+  by(auto simp: nofailT_def SELECT_def SPECT_def)
+
+
+lemma SELECT_refine_aux1:
+  fixes T::enat
+  shows "SELECT P T \<le> (SELECT P T') \<longleftrightarrow> T \<le> T'"
+  apply(cases "\<exists>x. P x") 
+  by(auto simp: pw_le_iff refine_pw_simps split: option.splits) 
+
+     
+lemma SELECT_refine_aux2:
+  fixes T::enat
+  shows  "SELECT P T \<le> (SELECT P' T) \<longleftrightarrow> (
+    (Ex P' \<longrightarrow> Ex P)  \<and> (\<forall>x. P x \<longrightarrow> P' x)) "
+  by(auto simp: pw_le_iff refine_pw_simps split: option.splits)
+
+ 
+lemma SELECT_refine:
+  fixes T::enat
+    
+  assumes "\<And>x'. P' x' \<Longrightarrow> \<exists>x. P x"
+  assumes "\<And>x. P x \<Longrightarrow>   P' x"
+  assumes "T \<le> T'"
+  shows "SELECT P T \<le> (SELECT P' T')"
+proof -
+  have "SELECT P T \<le> SELECT P T'"
+    using SELECT_refine_aux1 assms(3) by auto
+  also have "\<dots> \<le> SELECT P' T'"
+    unfolding SELECT_refine_aux2 apply safe
+    using assms(1,2) by auto  
+  finally show ?thesis .
+qed
+
+
+end
+(*
   
 oops  end end end
     
@@ -2864,3 +3054,4 @@ lemma acost_componentwise_leI:
 
 
 end
+*)
