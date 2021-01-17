@@ -11,23 +11,21 @@ text \<open>This theory introduces currency refinement.\<close>
 subsection "time refine" 
 
 (* mult_zero for wfR_finite_mult_left *)
-definition timerefine ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoid_add,times,mult_zero}) acost)
+
+
+definition timerefine ::"('b \<Rightarrow> ('c,'d::{order,comm_monoid_add,times,mult_zero}) acost)
                              \<Rightarrow> ('a, ('b,'d) acost) nrest \<Rightarrow> ('a, ('c,'d) acost) nrest" ("\<Down>\<^sub>C") 
   where "\<Down>\<^sub>C R m = (case m of FAILi \<Rightarrow> FAILi |
-                REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
-                  Some cm \<Rightarrow> Some (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))))"
-
+                REST M \<Rightarrow> REST (\<lambda>r. dcl_image (\<lambda>cm. (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))) (M r)))"
+ 
 lemma timerefine_alt3:
   assumes "TR =( \<lambda>cm.  (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
   shows 
- "\<Down>\<^sub>C R m = (case m of FAILi \<Rightarrow> FAILi |
-                REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
-                  Some cm \<Rightarrow> Some (TR cm) ))"
+ "\<Down>\<^sub>C R m = (case m of FAILi \<Rightarrow> FAILi | REST M \<Rightarrow> REST (\<lambda>r. dcl_image TR (M r) ))"
   unfolding assms unfolding timerefine_def by simp
 
 definition "timerefine' TR m = (case m of FAILi \<Rightarrow> FAILi |
-                REST M \<Rightarrow> REST (\<lambda>r. case M r of None \<Rightarrow> None |
-                  Some cm \<Rightarrow> Some (TR cm) ))"
+                REST M \<Rightarrow> REST (\<lambda>r. dcl_image TR (M r) ))"
 
 lemma timerefine_alt4:
   fixes R
@@ -38,10 +36,9 @@ lemma timerefine_alt4:
 
 
 
-definition timerefineF ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoid_add,times,mult_zero}) acost)
-                             \<Rightarrow> ('a \<Rightarrow> ('b,'d) acost option) \<Rightarrow> ('a \<Rightarrow> ('c,'d) acost option)"
-  where "timerefineF R M = (\<lambda>r. case M r of None \<Rightarrow> None |
-                  Some cm \<Rightarrow> Some (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc))))"
+definition timerefineF ::"('b \<Rightarrow> ('c,'d::{order,comm_monoid_add,times,mult_zero}) acost)
+                             \<Rightarrow> ('a \<Rightarrow> ('b,'d) acost dclosed) \<Rightarrow> ('a \<Rightarrow> ('c,'d) acost dclosed)"
+  where "timerefineF R M = (\<lambda>r. dcl_image (\<lambda>cm. (acostC (\<lambda>cc. Sum_any (\<lambda>ac. the_acost cm ac * the_acost (R ac) cc)))) (M r))"
 
 
 
@@ -53,13 +50,15 @@ definition timerefineA ::"('b \<Rightarrow> ('c,'d::{complete_lattice,comm_monoi
 lemma timerefineA_0[simp]: "timerefineA r 0 = 0"
   by(auto simp: timerefineA_def zero_acost_def)
 
-lemma timerefine_alt: "\<Down>\<^sub>C R m = case_nrest FAILi (\<lambda>M. SPECT (timerefineF R M)) m"
+lemma timerefine_alt: "\<Down>\<^sub>C R m = case_nrest FAILi (\<lambda>M. REST (timerefineF R M)) m"
   unfolding timerefine_def timerefineF_def ..
 
-lemma timerefine_SPECT: "\<Down>\<^sub>C R (SPECT Q) = SPECT (timerefineF R Q)" 
+lemma timerefine_SPECT: "\<Down>\<^sub>C R (REST Q) = REST (timerefineF R Q)" 
   unfolding timerefine_alt by simp
 
 
+end
+ (*
 
 lemma SPEC_timerefine_conv:
   "\<Down>\<^sub>C R (SPEC A B') = SPEC A (\<lambda>x. timerefineA R (B' x))"
@@ -67,7 +66,18 @@ lemma SPEC_timerefine_conv:
   unfolding timerefine_SPECT 
   apply auto
   unfolding timerefineF_def timerefineA_def
-  by auto
+  apply(rule ext) subgoal for r apply(cases "A r") apply auto
+    
+    thm dclose_image
+    apply(subst dclose_image[symmetric])
+    subgoal 
+      unfolding mono_def apply auto unfolding less_eq_acost_def
+      apply auto
+      apply(rule Sum_any.mono)
+      sorry
+    apply auto 
+    done
+  done
 
 
 
@@ -1389,3 +1399,5 @@ lemma finite_sum_nonzero_if_summands_finite_nonzero:
 
 
 end
+
+*)
