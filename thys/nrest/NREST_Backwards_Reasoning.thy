@@ -9,7 +9,103 @@ begin
 paragraph \<open>Summary\<close>
 text \<open>This theory introduces backwards reasoning for NREST. It generalizes weakest precondition
     to resources and forms a syntax directed VCG.\<close>
+
+
+term dclose
+
+
+
+lemma 
+  fixes A:: "('a::cost_structure) dclosed"
+  shows  " A \<le> B \<Longrightarrow> \<exists>lst. lst + A = B"
+  apply transfer
+  apply auto unfolding  dcl_def
+  apply auto 
+  
+  
+  sorry
+
+
+
+  oops
  
+end end
+
+
+
+
+lemma "extreme = { e . dclose {e} \<le> M \<and> (\<forall>e'>e. ~ dclose {e} \<le> M) }"
+  oops
+
+definition minus_value :: "( ('d::{minus,ord,cost_structure}) dclosed) \<Rightarrow> ('d dclosed) \<Rightarrow> ('d dclosed)" where
+  "minus_value rt mt = (if mt = bot then top
+                               else (if rt = bot then bot
+                                               else
+                                                      dclose { s |s s'. dclose {s'} \<le> mt \<and> dclose {s+s'} \<le> rt }   ))"
+
+      
+    
+(*
+          (case m x of None \<Rightarrow> Some top
+                                | Some mt \<Rightarrow>
+                                  (case R x of None \<Rightarrow> None | Some rt \<Rightarrow> (if mt \<le> rt then  Some (rt - mt) else None))))"
+*)
+
+definition minus_potential :: "( 'a \<Rightarrow> ('d::{minus,cost_structure}) dclosed) \<Rightarrow> ( 'a \<Rightarrow> 'd dclosed) \<Rightarrow> ( 'a \<Rightarrow> 'd dclosed)" where
+  "minus_potential R m = (\<lambda>x. minus_value (R x) (m x))"
+  
+
+definition minus_p_m :: "('a \<Rightarrow> ('b::{minus,cost_structure,monoid_add}) dclosed) \<Rightarrow> ('a,'b) nrest \<Rightarrow> 'a \<Rightarrow> 'b dclosed" where 
+  "minus_p_m Qf M x =  (case M of FAILi \<Rightarrow> bot | REST Mf \<Rightarrow> (minus_potential Qf Mf) x)"
+                                                           
+
+
+
+definition gwp :: "('a,'b) nrest \<Rightarrow> ('a \<Rightarrow> ('b::{cost_structure,minus,ord,top,drm,monoid_add}) dclosed) \<Rightarrow> 'b dclosed" 
+  where "gwp M Qf  = Inf { minus_p_m Qf M x | x. True}"
+
+
+
+lemma bot_neq_iff: "bot \<noteq> x \<longleftrightarrow> bot < (x::(_ dclosed))" apply auto
+  apply transfer apply auto done
+
+
+
+lemma "m \<le> REST Q \<Longrightarrow> bot \<noteq> gwp m Q"
+  apply(cases m) apply simp
+  apply simp
+  unfolding gwp_def
+  apply(thin_tac "_ = REST _")
+  unfolding bot_neq_iff 
+  subgoal premises p for M
+  apply(transfer)
+    unfolding minus_p_m_def minus_potential_def minus_value_def
+proof -
+  fix M
+  assume "M \<le> Q"
+
+  have "\exists
+
+qed
+
+
+lemma "m \<le> REST M \<longleftrightarrow> bot \<noteq> gwp m M"
+
+
+
+definition gwp :: "('a,'b) nrest \<Rightarrow> ('a \<Rightarrow> ('b::{order,minus,ord,top,drm,monoid_add}) option) \<Rightarrow> 'b option" 
+  where "gwp M Qf  = Inf { minus_p_m Qf M x | x. True}"
+
+
+
+
+
+
+
+
+  oops
+end
+
 subsection \<open>Auxiliary Definitions\<close>
 
 
