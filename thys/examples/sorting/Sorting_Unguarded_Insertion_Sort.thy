@@ -1526,6 +1526,12 @@ lemma cost_insert_mono: "a \<le> b \<Longrightarrow> cost_insert a \<le> cost_in
 
 subsubsection \<open>Refinement Lemma\<close>
 
+
+  lemma fun_upd_parallel_I: "f\<le>f' \<Longrightarrow> y\<le>y' \<Longrightarrow> f(x:=y) \<le> f'(x:=y')"
+    unfolding fun_upd_def le_fun_def  
+    by auto
+
+
   lemma is_insert_guarded3_sorts_one_more: 
     assumes "(xs,xs')\<in>slicep_rel l h" "(i,i')\<in>idx_shift_rel l" "i<h" "N\<ge>i-l"
     shows "is_insert3_guarded xs l i \<le>\<Down>(slice_rel xs l h) (timerefine (TR_is_insert3 N) (sort_one_more_spec_guarded xs' i'))"

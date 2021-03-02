@@ -50,6 +50,7 @@ thys/lib/Sep_Algebra_Add.thy
 thys/lib/named_simpsets.ML
 thys/lib/subgoal_focus_some.ML
 thys/nrest/Data_Refinement.thy
+thys/nrest/NREST_Misc.thy
 thys/nrest/NREST.thy
 thys/nrest/NREST_Automation.thy
 thys/nrest/NREST_Backwards_Reasoning.thy

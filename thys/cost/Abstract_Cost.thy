@@ -1,5 +1,5 @@
 theory Abstract_Cost
-imports Main
+imports Main "HOL-Library.Extended_Nat"
 begin
 
 
@@ -182,12 +182,56 @@ end
 
 
 
+lemma top_acost_absorbs: "top + (x::(_,enat)acost) = top"
+  apply(cases x) by (auto simp: top_acost_def plus_acost_alt top_enat_def)
+
+
 lemma the_acost_mono: "T \<le> T' \<Longrightarrow> the_acost T b \<le> the_acost T' b"
   apply(cases T; cases T') by (auto simp: le_fun_def less_eq_acost_def)
 
 lemma the_acost_propagate:  
   shows "the_acost (a + b) = (\<lambda>x. the_acost a x + the_acost b x)"
   apply(cases a; cases b) by auto
+
+
+subsection \<open>skalar multiplication with acost\<close>
+definition costmult :: "_ \<Rightarrow> ('b, _ ) acost \<Rightarrow> ('b, _ ) acost" (infixl "*m" 80)
+  where  "costmult s c \<equiv> acostC (\<lambda>x. s * the_acost c x)"
+
+lemma costmult_1_absorb[simp]: "(1::('b::comm_semiring_1)) *m c = c"
+  "(Suc 0) *m d = d"
+  by(simp_all add: costmult_def) 
+
+lemma costmult_right_mono:
+  fixes a :: enat
+  shows "a \<le> a' \<Longrightarrow> a *m c \<le> a' *m c"
+  unfolding costmult_def less_eq_acost_def
+  by (auto simp add: mult_right_mono)  
+
+
+lemma costmult_zero_is_zero_enat[simp]: "(x::enat) *m 0 = 0"
+  unfolding costmult_def zero_acost_def by auto
+
+lemma costmult_add_distrib:
+  fixes a :: "'b::semiring"
+  shows "a *m (c + d) = a *m c + a *m d"
+  apply(cases c; cases d) by (auto simp: costmult_def plus_acost_alt ring_distribs)
+
+lemma costmult_minus_distrib2:
+  fixes a :: nat
+  shows "a *m c - a *m d = a *m (c - d)"
+  apply(cases c; cases d) by (auto simp: costmult_def plus_acost_alt diff_mult_distrib2)
+
+lemma costmult_minus_distrib:
+  fixes a :: nat
+  shows "a *m c - b *m c = (a-b) *m c"
+  apply(cases c) by (auto simp: costmult_def plus_acost_alt diff_mult_distrib)
+
+lemma costmult_cost:
+  fixes x :: "'b::comm_semiring_1"
+  shows "x *m (cost n y) = cost n (x*y)"
+  by(auto simp: costmult_def cost_def zero_acost_def)
+
 
 
 

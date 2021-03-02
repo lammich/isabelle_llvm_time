@@ -1,10 +1,15 @@
+\<^marker>\<open>creator "Maximilian P. L. Haslbeck"\<close>
+\<^marker>\<open>contributor "Peter Lammich"\<close>
+section \<open>Type Class needed for currency refine and backwards reasoning gwp\<close>
 theory NREST_Type_Classes
 imports NREST
 begin
 
+paragraph \<open>Summary\<close>
+text \<open>This theory collects the properties a resource type needs to allow for currency refinement
+  and backwards reasoning.\<close>
 
-
-subsection \<open>Type Class needed for timerefine\<close>
+subsection \<open>Type class for currency refinement\<close>
 
 text \<open>this is needed for monotonicity of Sum_any\<close>
 
