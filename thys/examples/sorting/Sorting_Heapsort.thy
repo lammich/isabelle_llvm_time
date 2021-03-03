@@ -1326,8 +1326,11 @@ subsubsection \<open>Functional Refinement Lemma\<close>
       apply normalize_blocks
       apply (intro refine0 bindT_refine_easy)
             apply refine_dref_type
-            apply (use [[put_named_ss Main_ss]] in \<open>auto simp: conc_Id in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth\<close>) [6]
-        apply simp
+            apply (use [[put_named_ss Main_ss]] in \<open>auto simp: conc_Id in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth\<close>) [4]
+            subgoal supply [[put_named_ss Main_ss]] by (auto simp: conc_Id in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth)
+            subgoal supply [[put_named_ss Main_ss]] apply (auto simp: conc_Id in_sd23_rel_conv woe_eq_except_length woe_eq_except_nth)
+            using \<open>\<lbrakk>i < length xs; l \<le> i; i < h\<rbrakk> \<Longrightarrow> wfR'' TId\<close> by fastforce
+        
       subgoal apply(rule consumea_Id_refine) by (simp only: top_acost_absorbs timerefineA_TId_eq top_greatest)
 
       unfolding mop_seth3_def SPECc2_alt

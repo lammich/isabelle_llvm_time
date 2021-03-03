@@ -398,9 +398,9 @@ subsection \<open>Code Generator Driver\<close>
           File.full_path o Resources.master_directory o Proof_Context.theory_of;
           
         fun prepare_path ctxt (s,pos) = let
-          val _ = Position.report pos Markup.language_path;
+          val _ = Position.report pos (Markup.language_path false);
           val path = Path.explode s;
-          val _ = Position.report pos (Markup.path (Path.smart_implode path));
+          val _ = Position.report pos (Markup.path (Path.implode_symbolic path));
           val path = using_master_directory ctxt path
         in path end
       
@@ -496,7 +496,7 @@ subsection \<open>Code Generator Driver\<close>
                   I'm not even sure at this point whether the local-target stuff is required
                   in extract_recursion_eqs in first place?
               *)
-              val lthy = Local_Theory.open_target lthy |> snd
+              val lthy = Local_Theory.begin_nested lthy |> snd
             
                             
               val cns = map (apfst (Syntax.read_term lthy)) cns
@@ -510,7 +510,7 @@ subsection \<open>Code Generator Driver\<close>
               
               val (_,lthy) = Local_Theory.note (bnd,cthms) lthy 
               
-              val lthy = Local_Theory.close_target lthy
+              val lthy = Local_Theory.end_nested lthy
               
               
             in lthy end))

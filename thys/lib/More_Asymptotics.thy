@@ -1,6 +1,6 @@
 theory More_Asymptotics
   imports
-   "Imperative_HOL_Time.Asymptotics_1D"
+   "Asymptotics_1D"
    "HOL-Real_Asymp.Real_Asymp"
 begin
 

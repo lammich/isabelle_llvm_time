@@ -163,7 +163,7 @@ lemma word_clz'_eq: "x\<noteq>0 \<Longrightarrow> word_clz' x = word_clz x"
   by (simp add: word_clz'_def)  
   
 lemma of_bl_eqZ: 
-  "\<lbrakk> length xs = LENGTH ('a::len0) \<rbrakk> \<Longrightarrow> (of_bl xs :: 'a word) = 0 \<longleftrightarrow> (xs = replicate LENGTH('a) False)"  
+  "\<lbrakk> length xs = LENGTH ('a::len) \<rbrakk> \<Longrightarrow> (of_bl xs :: 'a word) = 0 \<longleftrightarrow> (xs = replicate LENGTH('a) False)"  
   apply auto
   by (metis to_bl_0 to_bl_use_of_bl word_bl_Rep')    
 

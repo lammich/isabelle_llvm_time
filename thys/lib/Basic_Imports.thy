@@ -10,7 +10,5 @@ imports
   Find_In_Thms
   "HOL-Library.Rewrite"
 begin
-    (* DO NOT USE IN PRODUCTION VERSION \<rightarrow> SLOWDOWN *)
-    declare [[ML_exception_debugger, ML_debugger, ML_exception_trace]]
 
 end

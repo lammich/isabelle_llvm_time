@@ -475,11 +475,8 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
       apply(rule gwp_specifies_acr_I)
       apply (refine_vcg \<open>-\<close>)
            apply (simp_all add: list_update_swap[of i j] map_update[symmetric])
-      subgoal apply(simp add: add.assoc) by force 
+      subgoal apply(simp add: add.assoc) done 
       subgoal by (metis list_update_id list_update_overwrite option.sel)
-      subgoal by auto
-      subgoal by auto
-      subgoal by auto
       done
     done
 

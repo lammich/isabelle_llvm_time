@@ -387,7 +387,7 @@ subsubsection \<open>Correctness Theorem\<close>
       apply(rule insertion_sort_unguarded_correct_prepared[THEN gwp_specifies_rev_I, THEN gwp_conseq_0 ])
       apply(simp_all add: emb_eq_Some_conv)
       subgoal by (simp add: Misc.slice_def sort_spec_def) 
-      subgoal for xs' t M (* transfer guard over initial sorting *)
+      subgoal for xs' M (* transfer guard over initial sorting *)
         apply safe
         apply(rule transfer_guard_over_initial_sorting[where xs=xs])
         by auto
