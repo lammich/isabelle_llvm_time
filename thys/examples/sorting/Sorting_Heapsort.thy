@@ -2702,7 +2702,8 @@ ML \<open>
     | cost_term t = t
     
   fun mk_plus a b = @{mk_term "?a+?b"}  
-  fun mk_sum (t::ts) = fold mk_plus ts t
+  fun mk_sum [t] = t
+    | mk_sum (t::ts) = mk_plus t (mk_sum ts)
     | mk_sum [] = raise Match
     
   fun summarize_cost t = let
@@ -2717,7 +2718,7 @@ ML \<open>
       |> map fst
     
   in
-    mk_sum (ots@cts)
+    mk_sum (cts@ots)
   end  
   
   
@@ -2753,12 +2754,18 @@ lemma summarize_same_cost_mult:
   apply (cases c; auto simp: fun_eq_iff algebra_simps mult_2_right; fail)+
   done
 
+lemma costmult_cost_left:
+  fixes x :: "'b::comm_semiring_1"
+  shows "x *m (cost n y + cc) = cost n (x*y) + x *m cc"
+  apply (cases cc)
+  apply(auto simp: costmult_def cost_def zero_acost_def fun_eq_iff algebra_simps)
+  done
   
 method_setup summarize_same_cost_aux = \<open>Scan.succeed (SIMPLE_METHOD' o summarize_cost_tac)\<close>
 method summarize_same_cost = summarize_same_cost_aux, 
-  (simp only: cost_same_curr_add cost_same_curr_left_add add.assoc costmult_cost summarize_same_cost_mult)?
+  (simp only: cost_same_curr_add cost_same_curr_left_add add.assoc costmult_cost 
+    summarize_same_cost_mult costmult_cost_left costmult_zero_is_zero_enat)?
 
-  
 find_theorems "_+(_*_) = _*_ + _*_"
 
 find_theorems "_ *m cost _ _"
@@ -2791,7 +2798,7 @@ lemma timerefine_apply2: "EQ_TAG (TR n) TRn \<Longrightarrow> EQ_TAG (t *m TRn) 
 method apply_timerefine = 
   ((subst timerefine_apply1, (intro wfR''_upd wfR''_TId; fail)) | subst timerefine_apply2),
   (simp named_ss Main_ss: TId_apply; rule EQ_TAG_refl),
-  (simp named_ss Main_ss: costmult_add_distrib costmult_cost; rule EQ_TAG_refl)
+  ((simp named_ss Main_ss: costmult_add_distrib costmult_cost)?; rule EQ_TAG_refl)
 
 method summarize_and_apply_tr =
   summarize_same_cost, (apply_timerefine+,summarize_same_cost)+  

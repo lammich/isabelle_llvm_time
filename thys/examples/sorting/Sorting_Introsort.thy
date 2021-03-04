@@ -648,6 +648,23 @@ text \<open>We simplify @{term introsort5_TR}\<close>
 schematic_goal ub_introsort5: "timerefineA (introsort5_TR l h) (cost ''slice_sort'' 1) \<le> ?x"
   unfolding introsort5_TR_def introsort3_cost_def
   apply(simp add: norm_pp norm_cost )
+  apply summarize_and_apply_tr
+  unfolding log2_iter_cost_def TR_is_insert3_def E_isa4_def Tia43_def introsort_aux_cost_def
+      cost_insert_guarded_def cost_is_insert_guarded_step_def
+      cost_insert_def cost_is_insert_step_def move_median_to_first_cost_def
+  apply(simp add: norm_pp norm_cost )
+  apply summarize_and_apply_tr
+  (* TODO: Add 0+_ = and _+0= to summarize_same_cost*)
+  apply (simp add: add_ac numeral_eq_enat one_enat_def left_add_twice)
+  apply summarize_and_apply_tr
+  apply (simp add: add_ac numeral_eq_enat one_enat_def left_add_twice)
+  unfolding cmpo_v_idx2'_cost_def cmp_idxs2'_cost_def myswap_cost_def cmpo_idxs2'_cost_def
+  apply(simp add: norm_pp norm_cost )
+  apply summarize_same_cost
+  apply (simp add: add_ac numeral_eq_enat one_enat_def left_add_twice)
+  by (rule order_refl)
+(*  
+  oops
   apply(subst timerefineA_propagate, (auto intro!: wfR''_upd)[1])+ 
   apply(simp add: norm_pp norm_cost )
   unfolding log2_iter_cost_def TR_is_insert3_def E_isa4_def Tia43_def introsort_aux_cost_def
@@ -666,6 +683,7 @@ schematic_goal ub_introsort5: "timerefineA (introsort5_TR l h) (cost ''slice_sor
 
   apply sc_solve_upperbound
   by simp
+*)
 
 text \<open>and give it a name\<close>
 concrete_definition introsort5_acost is ub_introsort5 uses "_ \<le> \<hole>"
@@ -673,8 +691,7 @@ concrete_definition introsort5_acost is ub_introsort5 uses "_ \<le> \<hole>"
 text \<open>we pull the lifting to the outer most:\<close>
 schematic_goal lift_introsort5_acost: "introsort5_acost x y = lift_acost ?y"
   unfolding introsort5_acost_def
-  apply(simp add: numeral_eq_enat one_enat_def)
-  unfolding lift_acost_cost[symmetric]  lift_acost_propagate[symmetric]
+  unfolding lift_acost_cost[symmetric]  lift_acost_propagate[symmetric] lift_acost_push_mult
   apply(rule refl)
   done
 
