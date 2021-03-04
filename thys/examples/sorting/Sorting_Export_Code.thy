@@ -7,7 +7,7 @@ text \<open>
   We then export code and generate a C header file to interface the code.
 \<close>
 
-global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" "TYPE(64)" ll_icmp_ult  "''icmp_ult''" unat_assn
+global_interpretation unat_sort: pure_sort_impl_context "(\<le>)" "(<)" "TYPE(64)" ll_icmp_ult  "cost ''icmp_ult'' 1" unat_assn
   defines unat_sort_is_guarded_insert_impl = unat_sort.is_guarded_insert_impl
       and unat_sort_is_unguarded_insert_impl = unat_sort.is_unguarded_insert_impl
       and unat_sort_unguarded_insertion_sort_impl = unat_sort.unguarded_insertion_sort_impl

@@ -41,23 +41,45 @@ begin
     "x=y \<Longrightarrow> cmpi x y = 0"
     "x<y \<Longrightarrow> cmpi x y = -1"
     unfolding cmpi_def by auto
+
+ 
+  term "m *m e"
+  definition "compare_cost xs ys n = (enat n) *m (cost ''ult_lt'' 1 
+              + lift_acost mop_array_nth_cost + lift_acost mop_array_nth_cost 
+              + cost ''ult_eq'' 1 + cost ''ult_add'' 1)"
   
-  
-  definition "compare_spec xs ys n \<equiv> doN {ASSERT (n\<le>length xs \<and> n\<le>length ys); RETURN (cmpi (take n xs) (take n ys))}"
+  definition "compare_spec xs ys n \<equiv> doN {ASSERT (n\<le>length xs \<and> n\<le>length ys); SPECT [ (cmpi (take n xs) (take n ys)) \<mapsto> compare_cost xs ys n]}"
 
 
   definition "compare1 xs ys n \<equiv> doN {
     ASSERT (n\<le>length xs \<and> n\<le>length ys);
-    (i,r)\<leftarrow>WHILEIT (\<lambda>(i,r). i\<le>n \<and> r=cmpi (take i xs) (take i ys) ) (\<lambda>(i,r). i<n \<and> r=0) (\<lambda>(i,r). doN {
-      x \<leftarrow> mop_list_get xs i;
-      y \<leftarrow> mop_list_get ys i;
+    (i,r)\<leftarrow> monadic_WHILEIET (\<lambda>(i,r). i\<le>n \<and> r=cmpi (take i xs) (take i ys) )
+        (\<lambda>(i::nat,r::int). False)
+       (\<lambda>(i,r).doN { 
+              if\<^sub>N SPECc2 ''ult_lt'' (<) i n 
+                then SPECc2 ''ult_eq'' (=) r 0
+                else RETURNT False
+            } )
+       (\<lambda>(i,r). doN {
+      x \<leftarrow> mop_array_nth xs i;
+      y \<leftarrow> mop_array_nth ys i;
       ASSERT (i<n);
-      if x=y then RETURN (i+1,0)
-      else if x<y then RETURN (i+1,-1)
-      else RETURN (i+1,1)
+      if\<^sub>N SPECc2 ''ult_eq'' (=) x y
+        then doN {
+            i' \<leftarrow> SPECc2 ''ult_add'' (+) i 1;
+            RETURNT (i',0) }
+      else if\<^sub>N SPECc2 ''ult_lt'' (<) x y then doN {
+            i' \<leftarrow> SPECc2 ''ult_add'' (+) i 1;
+            RETURNT (i',-1) }
+      else doN {
+            i' \<leftarrow> SPECc2 ''ult_add'' (+) i 1;
+            RETURNT (i',1) }
     }) (0,0);
     RETURN r
   }"
+
+  (* TODO: fix type of monadic_WHILEIET *)
+
 
   (* TODO: Move *)    
   lemma irreflD: "irrefl R \<Longrightarrow> (x,x)\<notin>R" by (auto simp: irrefl_def) 
@@ -82,13 +104,14 @@ begin
     
     private lemma preorder_less_irrefl: "irrefl {(x, y::_::preorder). x < y}" by (auto simp: irrefl_def) 
       
-    lemma compare1_refine: "(compare1, compare_spec) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    lemma compare1_refine: "(compare1, compare_spec) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel" (*
       apply (intro fun_relI, clarsimp)
       subgoal for xs ys n
         unfolding compare1_def compare_spec_def
         apply (refine_vcg WHILEIT_rule[where R="measure (\<lambda>(i,_). n-i)"])
         by (auto simp: take_Suc_conv_app_nth list_less_def lexord_append compare_impl_aux1 lexord_irreflD[OF preorder_less_irrefl])
-      done
+      done *)
+      sorry
       
   end
 
