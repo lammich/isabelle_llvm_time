@@ -2689,205 +2689,194 @@ lemmas heapsort_ht = heapsort_impl_correct[unfolded slice_sort_spec_def SPEC_RES
 
 lemma ub_heapsort3_yx: "y - Suc x = (y - x) - 1"
   by auto
+  
+ML \<open>
 
-lemma ub_heapsort3: "timerefineA (heapsort3_TR l h) (cost ''slice_sort'' 1)
-\<le> cost ''add''
-    (enat (h - l) + enat (h - Suc l) + enat (h - l + (h - l) * Discrete.log (h - l)) +
-     enat (h - Suc l + (h - Suc l) * Discrete.log (h - l)) +
-     enat ((h - l) * (4 + 4 * Discrete.log (h - l))) +
-     enat ((h - Suc l) * (4 + 4 * Discrete.log (h - l))) +
-     enat (2 * (h - l) + (h - l) * (2 * Discrete.log (h - l))) +
-     enat (2 * (h - Suc l) + (h - Suc l) * (2 * Discrete.log (h - l))) +
-     (1 + (enat (h - l) + (enat (h - l) * 5 + enat (h - Suc l) * 5)))) +
-   (cost ''ofs_ptr''
-     (enat
-       (h - l +
-        (h - l +
-         (h - l +
-          (h - l +
-           (h - l +
-            (h - l +
-             (h - l +
-              (h - l +
-               (h - l +
-                (h - l +
-                 (h - l +
-                  (h - l +
-                   (h - l +
-                    (h - l +
-                     (h - l +
-                      (h - l +
-                       (h - Suc l +
-                        (h - Suc l +
-                         (h - Suc l +
-                          (h - Suc l +
-                           (h - Suc l +
-                            (h - Suc l +
-                             (h - Suc l +
-                              (h - Suc l +
-                               (h - Suc l +
-                                (h - Suc l +
-                                 (h - Suc l +
-                                  (h - Suc l +
-                                   (h - Suc l +
-                                    (h - Suc l +
-                                     (h - Suc l +
-                                      (h - Suc l +
-                                       ((h - l) * Discrete.log (h - l) +
-                                        ((h - l) * Discrete.log (h - l) +
-                                         ((h - l) * Discrete.log (h - l) +
-                                          ((h - l) * Discrete.log (h - l) +
-                                           ((h - l) * Discrete.log (h - l) +
-                                            ((h - l) * Discrete.log (h - l) +
-                                             ((h - l) * Discrete.log (h - l) +
-                                              ((h - l) * Discrete.log (h - l) +
-                                               ((h - Suc l) * Discrete.log (h - l) +
-                                                ((h - Suc l) * Discrete.log (h - l) +
-                                                 ((h - Suc l) * Discrete.log (h - l) +
-                                                  ((h - Suc l) * Discrete.log (h - l) +
-                                                   ((h - Suc l) * Discrete.log (h - l) +
-                                                    ((h - Suc l) * Discrete.log (h - l) +
-                                                     ((h - Suc l) * Discrete.log (h - l) +
-                                                      (h - Suc l) * Discrete.log (h - l)))))))))))))))))))))))))))))))))))))))))))))))) +
-      enat (h - l + (h - l + (h - l + (h - l))))) +
-    (cost ''and''
-      (enat (h - l) + enat (h - Suc l) + enat (h - l + (h - l) * Discrete.log (h - l)) +
-       enat (h - Suc l + (h - Suc l) * Discrete.log (h - l))) +
-     (cost ''icmp_slt''
-       (enat (h - l) * 2 +
-        (enat (h - l) * 2 +
-         (enat (h - Suc l) * 2 +
-          (enat (h - Suc l) * 2 +
-           enat (2 * (h - l) + (2 * (h - Suc l) + ((h - l) * (2 * Discrete.log (h - l)) + (h - Suc l) * (2 * Discrete.log (h - l)))))))) +
-        (1 + (1 + (1 + enat (h - Suc l)))) +
-        enat (h - l)) +
-      (cost ''mul''
-        (enat (h - l) + enat (h - Suc l) + enat (h - l + (h - l) * Discrete.log (h - l)) +
-         enat (h - Suc l + (h - Suc l) * Discrete.log (h - l)) +
-         enat (2 * (h - l) + (h - l) * (2 * Discrete.log (h - l))) +
-         enat (2 * (h - Suc l) + (h - Suc l) * (2 * Discrete.log (h - l)))) +
-       (cost ''load''
-         (enat
-           (h - Suc l +
-            (h - Suc l +
-             (h - Suc l +
-              (h - Suc l +
-               (h - Suc l +
-                (h - Suc l +
-                 ((h - Suc l) * Discrete.log (h - l) + ((h - Suc l) * Discrete.log (h - l) + (h - Suc l) * Discrete.log (h - l))))))))) +
-          enat (h - l + (h - l + ((h - l) * Discrete.log (h - l) + (h - l) * Discrete.log (h - l)))) +
-          enat (h - Suc l + (h - Suc l + (h - Suc l) * Discrete.log (h - l))) +
-          enat (h - l + (h - l + (h - l) * Discrete.log (h - l))) +
-          enat (h - l + (h - l) * Discrete.log (h - l)) +
-          enat (h - l + (h - l + (h - l))) +
-          enat (h - l + (h - l))) +
-        (cost ''sub''
-          (enat (h - l) + enat (h - Suc l) * 4 + (enat (h - l) + enat (h - l) * 2) + (enat (h - Suc l) + enat (h - Suc l) * 2) +
-           enat ((h - Suc l) * (4 + 4 * Discrete.log (h - l))) +
-           (2 + (enat (h - Suc l) + (enat (h - l) * 4 + enat ((h - l) * (4 + 4 * Discrete.log (h - l))))))) +
-         (cost ''store''
-           (enat
-             (h - l +
-              (h - Suc l +
-               (h - Suc l + (h - Suc l + (h - Suc l + ((h - l) * Discrete.log (h - l) + (h - Suc l) * Discrete.log (h - l))))))) +
-            enat (h - Suc l + (h - Suc l + ((h - Suc l) * Discrete.log (h - l) + (h - Suc l) * Discrete.log (h - l)))) +
-            enat (h - l + (h - l + ((h - l) * Discrete.log (h - l) + (h - l) * Discrete.log (h - l)))) +
-            enat (h - Suc l + (h - Suc l + (h - Suc l) * Discrete.log (h - l))) +
-            enat (h - l + (h - l + (h - l) * Discrete.log (h - l))) +
-            enat (h - l + (h - l + (h - l))) +
-            enat (h - l + (h - l))) +
-          (cost ''if''
-            (1 + (3 + enat (h - l + (h - Suc l))) +
-             enat
-              (h - l +
-               (h - l +
-                (h - l +
-                 (h - l +
-                  (h - l +
-                   (h - l + ((h - l) * Discrete.log (h - l) + ((h - l) * Discrete.log (h - l) + (h - l) * Discrete.log (h - l))))))))) +
-             enat
-              (h - Suc l +
-               (h - Suc l +
-                (h - Suc l +
-                 (h - Suc l +
-                  (h - Suc l +
-                   (h - Suc l +
-                    ((h - Suc l) * Discrete.log (h - l) +
-                     ((h - Suc l) * Discrete.log (h - l) + (h - Suc l) * Discrete.log (h - l)))))))))) +
-           (cost ''call''
-             (enat (h - l + (h - Suc l + ((h - l) * Discrete.log (h - l) + (h - Suc l) * Discrete.log (h - l)))) + (2 + enat (h - Suc l)) +
-              enat (h - l + (h - l)) +
-              enat (h - Suc l)) +
-            (cost ''udiv''
-              (enat (h - l) * 2 + enat (h - l) * 2 + (enat (h - Suc l) * 2 + enat (h - Suc l) * 2) +
-               enat (2 * (h - l) + (h - l) * (2 * Discrete.log (h - l))) +
-               enat (2 * (h - Suc l) + (h - Suc l) * (2 * Discrete.log (h - l)))) +
-              
-              (enat
-                (h - l +
-                 (h - l +
-                  (h - l +
-                   (h - Suc l +
-                    (h - Suc l +
-                     (h - Suc l +
-                      ((h - l) * Discrete.log (h - l) +
-                       ((h - l) * Discrete.log (h - l) +
-                        ((h - Suc l) * Discrete.log (h - l) + (h - Suc l) * Discrete.log (h - l))))))))))) *m lt_cost   ))))))))))"
-  sorry
+  fun dest_sum @{mpat \<open>?a+?b\<close>} = dest_sum a @ dest_sum b
+    | dest_sum t = [t]
 
-(*
- 
+  fun cost_name @{mpat \<open>cost ?name _\<close>} = try HOLogic.dest_string name
+    | cost_name _ = NONE
+    
+  fun cost_term @{mpat \<open>_ *m ?ct\<close>} = ct
+    | cost_term t = t
+    
+  fun mk_plus a b = @{mk_term "?a+?b"}  
+  fun mk_sum (t::ts) = fold mk_plus ts t
+    | mk_sum [] = raise Match
+    
+  fun summarize_cost t = let
+    val ts = dest_sum t
+      |> map (fn t => (t,cost_name t))
+  
+    val (cts,ots) = List.partition (is_some o snd) ts 
+    val cts = map (apsnd the) cts |> sort_by snd 
+    val cts = map fst cts
+    val ots = map (fn (t,_) => (t,cost_term t)) ots
+      |> sort (Term_Ord.fast_term_ord o apply2 snd)
+      |> map fst
+    
+  in
+    mk_sum (ots@cts)
+  end  
+  
+  
+  fun summarize_cost_conv ctxt = let
+    open Refine_Util Conv
+    fun is_sum_conv ct = case Thm.term_of ct of @{mpat "_+_"} => all_conv ct | _ => no_conv ct
+  
+    val tac = ALLGOALS (simp_tac (put_simpset HOL_ss ctxt addsimps @{thms add_ac}))
+  in
+    is_sum_conv 
+    then_conv f_tac_conv ctxt summarize_cost tac
+  end  
+  
+  fun summarize_cost_tac ctxt = CONVERSION (Conv.top_sweep_conv (summarize_cost_conv) ctxt)
+  
+\<close>  
+
+
+lemma summarize_same_cost_mult: 
+  "n *m c + m *m c = (n+m) *m c" 
+  "n *m c + (m *m c + x) = (n+m) *m c + x" 
+  
+  "n *m c + c = (n+1) *m c" 
+  "n *m c + (c + x) = (n+1) *m c + x" 
+  
+  "c + m *m c = (1+m) *m c" 
+  "c + (m *m c + x) = (1+m) *m c + x" 
+  
+  "c+c = 2 *m c"
+  "c+(c+x) = 2 *m c + x"
+  for c :: "('n,enat) acost"
+  unfolding costmult_def
+  apply (cases c; auto simp: fun_eq_iff algebra_simps mult_2_right; fail)+
+  done
+
+  
+method_setup summarize_same_cost_aux = \<open>Scan.succeed (SIMPLE_METHOD' o summarize_cost_tac)\<close>
+method summarize_same_cost = summarize_same_cost_aux, 
+  (simp only: cost_same_curr_add cost_same_curr_left_add add.assoc costmult_cost summarize_same_cost_mult)?
+
+  
+find_theorems "_+(_*_) = _*_ + _*_"
+
+find_theorems "_ *m cost _ _"
+
+
+find_theorems "_ *m _ + _ *m _"
+
+find_theorems timerefineA cost
+
+
+thm timerefineA_propagate
+
+find_theorems "_ ?a ?b \<equiv> ?a=?b"
+
+definition "EQ_TAG a b \<equiv> a=b"
+lemma EQ_TAG_refl: "EQ_TAG a a" unfolding EQ_TAG_def by auto
+lemma EQ_TAG_cong[cong]: "a=a' \<Longrightarrow> EQ_TAG a b = EQ_TAG a' b" by simp
+
+
+lemma timerefine_apply1: "wfR'' TR \<Longrightarrow> EQ_TAG (TR n) TRn \<Longrightarrow> EQ_TAG (t *m TRn) (tt')  \<Longrightarrow> timerefineA TR (cost n t + x) = tt' + timerefineA TR x" 
+  for TR :: "string \<Rightarrow> (string, enat) acost"
+  unfolding EQ_TAG_def
+  by (simp add: timerefineA_propagate timerefineA_cost_apply_costmult)
+  
+lemma timerefine_apply2: "EQ_TAG (TR n) TRn \<Longrightarrow> EQ_TAG (t *m TRn) (tt')  \<Longrightarrow> timerefineA TR (cost n t) = tt'" 
+  for TR :: "string \<Rightarrow> (string, enat) acost"
+  unfolding EQ_TAG_def
+  by (simp add: timerefineA_propagate timerefineA_cost_apply_costmult)
+  
+method apply_timerefine = 
+  ((subst timerefine_apply1, (intro wfR''_upd wfR''_TId; fail)) | subst timerefine_apply2),
+  (simp named_ss Main_ss: TId_apply; rule EQ_TAG_refl),
+  (simp named_ss Main_ss: costmult_add_distrib costmult_cost; rule EQ_TAG_refl)
+
+method summarize_and_apply_tr =
+  summarize_same_cost, (apply_timerefine+,summarize_same_cost)+  
+  
+  
+find_theorems "_ *m (_+_)"  
+find_theorems "_ *m cost _ _"  
+  
+thm numeral_One
+
+lemma "1+enat n = enat (1+n)" 
+  by (metis one_enat_def plus_enat_simps(1))
+
+lemma "numeral k + enat n = enat (numeral k+n)" 
+  using numeral_eq_enat plus_enat_simps(1) by presburger
+  
+find_theorems "_*?a+_*?a = _*_"  
+  
+context
+  fixes l h :: nat and hml hmsl
+  defines "hml \<equiv> h-l"
+  defines "hmsl \<equiv> h-Suc l"
+begin
 schematic_goal ub_heapsort3': "timerefineA (heapsort3_TR l h) (cost ''slice_sort'' 1) \<le> ?x"
   unfolding heapsort3_TR_def heapsort_TR_def singleton_heap_context.sift_down3_cost_def
       Rsd_a_def heapsort_time_def  heapsort_lbc_def
   unfolding singleton_heap_context.E_sd3_l_def
   unfolding myswap_cost_def cmpo_idxs2'_cost_def cmpo_v_idx2'_cost_def cmp_idxs2'_cost_def
-  apply(simp add: norm_pp norm_cost )
-  apply(subst timerefineA_propagate, (auto intro!: wfR''_upd)[1])+ 
-  apply(simp add: norm_pp norm_cost )
-  apply(subst timerefineA_propagate, intro wfR''_upd wfR''_TId)
-  apply(simp only: norm_pp norm_cost )
-  apply(simp add: add.commute add.left_commute)
-  apply(simp add: cost_same_curr_left_add cost_same_curr_add) 
-  apply(subst timerefineA_propagate, intro wfR''_upd wfR''_TId, (simp add: norm_cost)?)+
-  apply(simp add: add.commute add.left_commute)
-  apply(simp add: cost_same_curr_left_add cost_same_curr_add) 
-  apply(simp add: add.commute add.left_commute)
-  apply(simp add: cost_same_curr_left_add cost_same_curr_add) 
-  apply(simp add: add.assoc add.commute add.left_commute)
+  apply (fold hml_def hmsl_def)
+  apply(simp add: norm_pp norm_cost)
+  apply summarize_and_apply_tr
+  
+  apply (simp add: add_ac numeral_eq_enat one_enat_def left_add_twice)
+  by (rule order_refl)
+  
+end
 
-  apply sc_solve_upperbound
-  apply simp oops
-*)
 text \<open>and give it a name\<close>
-concrete_definition heapsort3_acost' is ub_heapsort3 uses "_ \<le> \<hole>"
+concrete_definition heapsort3_acost' is ub_heapsort3' uses "_ \<le> \<hole>"
+
+thm heapsort3_acost'_def
 
 lemma enat_mono: "x\<le>y \<Longrightarrow> enat x \<le> enat y"
   by simp
 
-lemma aprox_aux: "h - Suc l \<le> h - l"
+lemma approx_aux: "h - Suc l \<le> h - l"
   by auto
+
+lemma Suc_le_monoI: "x\<le>y \<Longrightarrow> Suc x \<le> Suc y" by blast 
+lemma costmult_le_monoI: "n\<le>n' \<Longrightarrow> n *m c \<le> n' *m c" for n n' :: enat 
+  apply (cases c)
+  apply (auto simp add: costmult_def less_eq_acost_def ) 
+  by (simp add: mult_right_mono)
+
 
 text \<open>estimate "h-(l+1)" with "h-l"\<close>
 schematic_goal aprox: "heapsort3_acost' l h \<le> ?x"
   unfolding heapsort3_acost'_def
-  unfolding numeral_eq_enat times_enat_simps plus_enat_simps one_enat_def
-  apply(rule cost_mono add_mono enat_mono  mult_le_mono log_mono[THEN monoD]   
-       aprox_aux  order.refl[of "h - l"] order.refl[of "numeral x" for x]  order.refl[of "1"]   )+
-  apply(rule order_refl)
+  (* TODO: This is an excellent example for setoid rewriting! *)
+  supply mono_rls = cost_mono add_mono enat_mono  mult_le_mono log_mono[THEN monoD] Suc_le_monoI costmult_le_monoI
+  supply refl_rules = order_refl
+  apply (rule order_trans)
+  apply (repeat_all_new \<open>determ \<open>rule approx_aux mono_rls\<close>\<close>; rule refl_rules)
+  apply (simp add: add_ac left_add_twice flip: mult_2 )
+  apply (rule order_refl)
   done
-
 
 thm order.trans[OF heapsort3_acost'.refine aprox]
 
 
 concrete_definition heapsort_impl_cost is order.trans[OF heapsort3_acost'.refine aprox]  uses "_ \<le> \<hole>"
 
+lemma lift_acost_push_mult: "enat n *m lift_acost c = lift_acost (n *m c)"
+  apply (cases c)
+  apply (auto simp: lift_acost_def costmult_def)
+  done
+
+
+
+find_theorems "lift_acost" "(*m)"
+
 text \<open>we pull the lifting to the outer most:\<close>
 schematic_goal lift_heapsort3_acost: "heapsort_impl_cost x y = lift_acost ?y"
   unfolding heapsort_impl_cost_def
-  apply(simp add: numeral_eq_enat one_enat_def)
-  unfolding lift_acost_cost[symmetric]  lift_acost_propagate[symmetric]
+  unfolding lift_acost_cost[symmetric]  lift_acost_propagate[symmetric] lift_acost_push_mult
   unfolding ub_heapsort3_yx[where x=x and y=y]
   apply(rule refl)
   done
@@ -2925,15 +2914,40 @@ lemma (in -) norm_cost_tagI: "norm_cost_tag a a"
   unfolding norm_cost_tag_def
   by simp
 
+lemma the_acost_mult_eq_z_iff: "the_acost (n *m c) a = 0 \<longleftrightarrow> the_acost c a = 0 \<or> n=0" for n :: nat 
+  apply (cases c)
+  apply (auto simp: costmult_def)
+  done
+  
+lemma finite_the_acost_mult_nonzeroI: "finite {a. the_acost c a \<noteq> 0} \<Longrightarrow> finite {a. the_acost (n *m c) a \<noteq> 0}" for n :: nat 
+  apply (erule finite_subset[rotated])
+  by (auto simp: the_acost_mult_eq_z_iff)
+  
+  
+  
+  
+lemma sum_any_push_costmul: "Sum_any (the_acost (n *m c)) = n * (Sum_any (the_acost c))" for n :: nat 
+  apply (cases c) subgoal for x
+  apply (auto simp: costmult_def algebra_simps) 
+  apply (cases "finite {a. x a \<noteq> 0}"; cases "n=0")
+  apply (simp_all add: Sum_any_right_distrib)
+  done done
+  
 
 text \<open>Calculate the cost for all currencies:\<close>
-schematic_goal heapsort3_cost_Sum_any_calc: "project_all (heapsort_impl_cost l h) = ?x"
+schematic_goal heapsort3_cost_Sum_any_calc: 
+  assumes A: "finite {a. the_acost lt_acost a \<noteq> 0}" (* TODO: Move assumption to locale! *)
+  shows "project_all (heapsort_impl_cost l h) = ?x"
   unfolding norm_cost_tag_def[symmetric]
   apply(subst project_all_is_Sumany_if_lifted[OF heapsort3_cost.refine])
   unfolding heapsort3_cost_def
   apply(simp add: the_acost_propagate add.assoc) 
-  apply(subst Sum_any.distrib;  ( auto simp only: Sum_any_cost 
-          intro!: finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero))+
+  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI A
+  
+  apply (subst Sum_any.distrib, (intro acost_finiteIs;fail), (intro acost_finiteIs;fail))+
+  apply (simp only: Sum_any_cost sum_any_push_costmul)
+  apply (simp add: add_ac)
+  
   apply(rule norm_cost_tagI)
   done
 
@@ -2941,19 +2955,35 @@ text \<open>Give the result a name:\<close>
 concrete_definition (in -) heapsort3_allcost' is sort_impl_context.heapsort3_cost_Sum_any_calc
     uses "_ = \<hole>"
 
+thm heapsort3_allcost'_def      
+    
 lemma heapsort3_allcost'_Sum_any: 
-  "heapsort3_allcost' l h = project_all (heapsort_impl_cost l h)"  
-  apply(subst heapsort3_allcost'.refine[OF sort_impl_context_axioms, symmetric])
+  assumes A: "finite {a. the_acost lt_acost a \<noteq> 0}"
+  shows "heapsort3_allcost' lt_acost l h = project_all (heapsort_impl_cost l h)"  
+  apply(subst heapsort3_allcost'.refine[OF sort_impl_context_axioms, symmetric, OF A])
   by simp
 
 end  
 
-
 lemma heapsort3_allcost'_simplified:
-  "heapsort3_allcost' l h = 12 + 187 * (h - l)  + 82 * (h - l) * Discrete.log (h - l)"
+  "heapsort3_allcost' lt_acost l h = 
+    12 
+    + 181 * (h - l)  
+    + 6 * (h - l) * Sum_any (the_acost lt_acost)
+    + 78 * (h - l) * Discrete.log (h - l)
+    + 4 * (h - l) * Sum_any (the_acost lt_acost) * (Discrete.log (h - l))
+    "
   unfolding heapsort3_allcost'_def
   apply (simp add: algebra_simps del: algebra_simps(19,20) )
   done
+
+(*
+lemma heapsort3_allcost'_simplified:
+  "heapsort3_allcost' lt_acost l h = 12 + 187 * (h - l)  + 82 * (h - l) * Discrete.log (h - l)"
+  unfolding heapsort3_allcost'_def
+  apply (simp add: algebra_simps del: algebra_simps(19,20) )
+  done
+*)  
 
 definition "heapsort3_allcost n = 12 + 187 * n  + 82 * (n * Discrete.log n)"
 
@@ -2963,10 +2993,11 @@ lemma heapsort3_allcost_simplified:
   unfolding heapsort3_allcost_def
   by simp
 
+(* TODO: Show under assumption on lt_acost!    
 lemma heapsort3_allcost_is_heapsort3_allcost': 
   "heapsort3_allcost (h-l) = heapsort3_allcost' l h"
   unfolding heapsort3_allcost_def heapsort3_allcost'_simplified by auto
-
+*)
 
 lemma heapsort3_allcost_nlogn:
   "(\<lambda>x. real (heapsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
