@@ -345,14 +345,54 @@ end
 *)    
     
 end  
-  
-     
-definition "refines_relp A name op Rimpl \<equiv> (uncurry Rimpl,uncurry (PR_CONST (SPECc2 name op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
 
-lemma gen_refines_relpD: "GEN_ALGO Rimpl (refines_relp A name op) \<Longrightarrow> (uncurry Rimpl,uncurry (PR_CONST (SPECc2 name op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
+
+
+  definition "SPECc3 c aop == ( (\<lambda>a b. SPECT ( [(aop a b)\<mapsto> c])))"
+
+
+
+(* TODO: move *)
+lemma gwp_SPECc3[vcg_rules']:
+  fixes t :: ecost
+  assumes "Some (t + c) \<le> Q (op a b)"
+  shows "Some t \<le> gwp (SPECc3 c op a b) Q"
+  unfolding SPECc3_def 
+  apply(refine_vcg \<open>-\<close>)
+  using assms by auto
+
+
+lemma SPECc3_alt: "SPECc3 c aop = ( (\<lambda>a b. consume (RETURNT (aop a b)) c))"
+  unfolding SPECc3_def consume_def by(auto simp: RETURNT_def intro!: ext)
+
+(*
+lemma SPECc3_refine':
+  fixes TR :: "'h \<Rightarrow> ('h, enat) acost"
+  shows "(op x y, op' x' y')\<in>R \<Longrightarrow> preserves_curr TR n  \<Longrightarrow> SPECc3 c op x y \<le> \<Down> R (\<Down>\<^sub>C TR (SPECc3 c op' x' y'))"
+  unfolding SPECc3_def    
+  apply(subst SPECT_refine_t) by (auto simp: preserves_curr_def timerefineA_cost_apply) 
+  *)
+
+lemma SPECc3_refine:
+  fixes c :: ecost
+  shows "(op x y, op' x' y')\<in>R \<Longrightarrow> c \<le> timerefineA TR c'  \<Longrightarrow> SPECc3 c op x y \<le> \<Down> R (\<Down>\<^sub>C TR (SPECc3 c' op' x' y'))"
+  unfolding SPECc3_def    
+  apply(subst SPECT_refine_t) by auto
+
+
+context 
+  fixes c :: ecost and f:: "('a \<Rightarrow> 'b \<Rightarrow> 'c)"
+begin
+  sepref_register timed_binop': "SPECc3 c f"
+end
+
+definition "refines_relp A c op Rimpl \<equiv> (uncurry Rimpl,uncurry (PR_CONST (SPECc3 c op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
+
+lemma gen_refines_relpD: "GEN_ALGO Rimpl (refines_relp A c op)
+   \<Longrightarrow> (uncurry Rimpl,uncurry (PR_CONST (SPECc3 c op))) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn"
   by (simp add: GEN_ALGO_def refines_relp_def)
 
-lemma gen_refines_relpI[intro?]: "(uncurry Rimpl,uncurry (SPECc2 name op)) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn \<Longrightarrow> GEN_ALGO Rimpl (refines_relp A name op)"
+lemma gen_refines_relpI[intro?]: "(uncurry Rimpl,uncurry (SPECc3 c op)) \<in> A\<^sup>k*\<^sub>aA\<^sup>k\<rightarrow>\<^sub>abool1_assn \<Longrightarrow> GEN_ALGO Rimpl (refines_relp A c op)"
   by (simp add: GEN_ALGO_def refines_relp_def)
   
 (*  
@@ -412,19 +452,25 @@ locale sort_impl_context = size_t_context size_t + weak_ordering
   for size_t :: "'size_t::len2 itself" +
   fixes
         lt_impl :: "'ai::llvm_rep \<Rightarrow> 'ai \<Rightarrow> 1 word llM"
-    and lt_curr_name :: string
+    and lt_acost :: "(_,nat) acost"
     and elem_assn :: "'a \<Rightarrow> 'ai \<Rightarrow> assn"
-  assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn lt_curr_name (\<^bold><))"
-  assumes lt_curr_name_no_clash: "lt_curr_name \<noteq> ''eo_extract''" "lt_curr_name \<noteq> ''eo_set''" 
+  assumes lt_impl: "GEN_ALGO lt_impl (refines_relp elem_assn (lift_acost lt_acost) (\<^bold><))"
+  assumes no_clash:
+    "the_acost (lift_acost lt_acost) ''eo_extract'' = 0"
+    "the_acost (lift_acost lt_acost) ''eo_set'' = 0" (* both are no llvm currencies, thus it does not
+                                                clash!  *)
   assumes size_t_min: "8 \<le> LENGTH('size_t)"
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
-  notes [[sepref_register_adhoc "lt_curr_name"]]
+  notes [[sepref_register_adhoc "lt_acost"]]
 begin
 
   abbreviation "arr_assn \<equiv> array_assn elem_assn"
 
+  abbreviation "lt_cost == (lift_acost lt_acost)"
+
+  thm lt_hnr
 
 subsubsection \<open>Implementing the Array-Compare Operations\<close>
 
@@ -433,7 +479,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
     ASSERT (i \<noteq> j);
     (vi,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 i;
     (vj,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs j;
-    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi vj;
+    r \<leftarrow> SPECc3 lt_cost (\<^bold><) vi vj;
     xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
     xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs j vj;
     unborrow xs xs\<^sub>0;
@@ -442,7 +488,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
   
   definition "cmpo_v_idx2 xs\<^sub>0 v j \<equiv> doN {
     (vj,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 j;
-    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) v vj;
+    r \<leftarrow> SPECc3 lt_cost (\<^bold><) v vj;
     xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs j vj;
     unborrow xs xs\<^sub>0;
     RETURN r
@@ -450,7 +496,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
   
   definition "cmpo_idx_v2 xs\<^sub>0 i v \<equiv> doN {
     (vi,xs) \<leftarrow> mop_eo_extract (\<lambda>_. cost ''eo_extract'' 1) xs\<^sub>0 i;
-    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi v;
+    r \<leftarrow> SPECc3 lt_cost (\<^bold><) vi v;
     xs \<leftarrow> mop_eo_set (\<lambda>_. cost ''eo_set'' 1) xs i vi;
     unborrow xs xs\<^sub>0;
     RETURN r
@@ -463,11 +509,10 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
     unborrow xs xs\<^sub>0;
     RETURN b
   }"  
+ 
 
 
-
-
-  lemma cmpo_idxs2_refine: "(uncurry2 cmpo_idxs2, uncurry2 (PR_CONST (mop_cmpo_idxs (cost ''eo_set'' 1 + cost ''eo_set'' 1 + cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  lemma cmpo_idxs2_refine: "(uncurry2 cmpo_idxs2, uncurry2 (PR_CONST (mop_cmpo_idxs (cost ''eo_set'' 1 + cost ''eo_set'' 1 + cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + lt_cost)))) \<in> [\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding cmpo_idxs2_def  mop_cmpo_idxs_def unborrow_def SPECc2_def
     apply (intro frefI nrest_relI)
     apply clarsimp
@@ -481,15 +526,15 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
     done
 
 
-  definition "E_cmpo_idxs \<equiv> TId(''cmpo_idxs'':=(cost ''eo_extract'' 2) + (cost lt_curr_name 1))"
+  definition "E_cmpo_idxs \<equiv> TId(''cmpo_idxs'':=(cost ''eo_extract'' 2) + lt_cost)"
 
-  lemma "mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1  + cost lt_curr_name 1) xs i j \<le> \<Down>Id (timerefine E_cmpo_idxs (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) xs i j))"
+  lemma "mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1  + lt_cost) xs i j \<le> \<Down>Id (timerefine E_cmpo_idxs (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) xs i j))"
     unfolding mop_cmpo_idxs_def
     apply(refine_rcg)
       apply (auto simp: E_cmpo_idxs_def timerefineA_update_apply_same_cost)
-    apply sc_solve by simp
+    apply sc_solve  sorry
 
-  lemma cmpo_v_idx2_refine: "(cmpo_v_idx2, PR_CONST (mop_cmpo_v_idx (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  lemma cmpo_v_idx2_refine: "(cmpo_v_idx2, PR_CONST (mop_cmpo_v_idx (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + lt_cost)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
      unfolding cmpo_v_idx2_def  mop_cmpo_v_idx_def unborrow_def SPECc2_def
     apply (intro frefI nrest_relI fun_relI)
     apply clarsimp
@@ -504,7 +549,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
     done
 
 
-  lemma cmpo_idx_v2_refine: "(cmpo_idx_v2, PR_CONST (mop_cmpo_idx_v (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + cost lt_curr_name 1)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  lemma cmpo_idx_v2_refine: "(cmpo_idx_v2, PR_CONST (mop_cmpo_idx_v (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + lt_cost)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     unfolding cmpo_idx_v2_def mop_cmpo_idx_v_def unborrow_def SPECc2_def
     apply (intro frefI nrest_relI fun_relI)
     apply clarsimp
@@ -522,7 +567,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
     ASSERT (i \<noteq> j);
     (vi,xs) \<leftarrow> mop_oarray_extract xs\<^sub>0 i;
     (vj,xs) \<leftarrow> mop_oarray_extract xs j;
-    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi vj;
+    r \<leftarrow> SPECc3 lt_cost (\<^bold><) vi vj;
     xs \<leftarrow> mop_oarray_upd xs i vi; \<comment> \<open>TODO: Let's hope the optimizer eliminates these assignments. In mid-term, eliminate them during sepref phase!\<close>
     xs \<leftarrow> mop_oarray_upd xs j vj;
     unborrow xs xs\<^sub>0;
@@ -531,7 +576,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
   
   definition "cmpo_v_idx2' xs\<^sub>0 v i \<equiv> doN {
     (vi,xs) \<leftarrow> mop_oarray_extract xs\<^sub>0 i;
-    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) v vi;
+    r \<leftarrow> SPECc3 lt_cost (\<^bold><) v vi;
     xs \<leftarrow> mop_oarray_upd xs i vi;
     unborrow xs xs\<^sub>0;
     RETURN r
@@ -539,7 +584,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
   
   definition "cmpo_idx_v2' xs\<^sub>0 i v \<equiv> doN {
     (vi,xs) \<leftarrow> mop_oarray_extract xs\<^sub>0 i;
-    r \<leftarrow> SPECc2 lt_curr_name (\<^bold><) vi v;
+    r \<leftarrow> SPECc3 lt_cost (\<^bold><) vi v;
     xs \<leftarrow> mop_oarray_upd xs i vi;
     unborrow xs xs\<^sub>0;
     RETURN r
@@ -586,9 +631,12 @@ lemma unborrow_refine[refine]:
     done
   
   lemma SPECc2_lt_refine[refine]:
-    "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc2 lt_curr_name (\<^bold><) a b \<le> \<Down> bool_rel (timerefine E_mop_oarray_extract (SPECc2 lt_curr_name (\<^bold><) a' b'))"
-    apply(rule SPECc2_refine) by (auto simp: cost_n_leq_TId_n lt_curr_name_no_clash E_mop_oarray_extract_def)
-  
+    "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc3 lt_cost (\<^bold><) a b \<le> \<Down> bool_rel (timerefine E_mop_oarray_extract (SPECc3 lt_cost (\<^bold><) a' b'))"
+    apply(rule SPECc3_refine) 
+     apply (auto simp: cost_n_leq_TId_n E_mop_oarray_extract_def)
+      using no_clash (* TODO *)
+    sorry
+
 lemma wfR_E: "wfR'' E_mop_oarray_extract"
   by(auto simp: E_mop_oarray_extract_def intro!: wfR''_upd) 
   
@@ -620,7 +668,7 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
     done
   
   
-  lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST (mop_cmp_idxs (cost ''eo_set'' 1 + cost ''eo_set'' 1 + cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + cost lt_curr_name 1))))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  lemma cmp_idxs2_refine: "(uncurry2 cmp_idxs2,uncurry2 (PR_CONST (mop_cmp_idxs (cost ''eo_set'' 1 + cost ''eo_set'' 1 + cost ''eo_extract'' 1 + cost ''eo_extract'' 1 + lt_cost))))\<in>[\<lambda>((xs,i),j). i\<noteq>j]\<^sub>f (Id\<times>\<^sub>rId)\<times>\<^sub>rId \<rightarrow> \<langle>Id\<rangle>nrest_rel"
       unfolding cmp_idxs2_def mop_cmp_idxs_def PR_CONST_def cmpo_idxs2_def unborrow_def SPECc2_def
       unfolding mop_to_eo_conv_def mop_to_wo_conv_def 
       apply (intro frefI nrest_relI)
@@ -640,7 +688,7 @@ lemma wfR_E: "wfR'' E_mop_oarray_extract"
       done
 
 
-definition "cmpo_v_idx2'_cost = lift_acost mop_array_nth_cost + (cost lt_curr_name 1 + lift_acost mop_array_upd_cost)"
+definition "cmpo_v_idx2'_cost = lift_acost mop_array_nth_cost + (lt_cost + lift_acost mop_array_upd_cost)"
 
 
 lemma  cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E:
@@ -649,7 +697,7 @@ lemma  cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E:
   shows "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow> cmpo_v_idx2' a b c \<le> \<Down> bool_rel (timerefine EE (mop_cmpo_v_idx (cost ''cmpo_v_idx'' 1) a' b' c'))"
   supply conc_Id[simp del]
     unfolding cmpo_v_idx2'_def mop_cmpo_v_idx_def
-    unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+    unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc3_alt
           mop_oarray_upd_def mop_eo_set_def consume_alt
     apply normalize_blocks apply(split prod.splits)+
     apply normalize_blocks
@@ -667,7 +715,7 @@ lemma  cmpo_v_idx2'_refines_mop_cmpo_v_idx_with_E:
     done
 
 definition "cmpo_idxs2'_cost = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost 
-        + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost)))"
+        + (lt_cost + (lift_acost mop_array_upd_cost + lift_acost mop_array_upd_cost)))"
     
     
 lemma cmpo_idxs2'_refines_mop_cmpo_idxs_with_E:
@@ -678,7 +726,7 @@ lemma cmpo_idxs2'_refines_mop_cmpo_idxs_with_E:
     cmpo_idxs2' a b c \<le> \<Down> bool_rel (timerefine E (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) a' b' c'))"
   supply conc_Id[simp del]
     unfolding cmpo_idxs2'_def mop_cmpo_idxs_def
-    unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+    unfolding mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc3_alt
           mop_oarray_upd_def mop_eo_set_def consume_alt
     apply normalize_blocks apply(split prod.splits)+
     apply normalize_blocks
@@ -700,7 +748,7 @@ lemma cmpo_idxs2'_refines_mop_cmpo_idxs_with_E:
 
 
 definition "cmp_idxs2'_cost = lift_acost mop_array_nth_cost + (lift_acost mop_array_nth_cost
-                 + (cost lt_curr_name 1 + (lift_acost mop_array_upd_cost
+                 + (lt_cost + (lift_acost mop_array_upd_cost
                  + lift_acost mop_array_upd_cost)))"
 
 lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
@@ -711,7 +759,7 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
     cmp_idxs2' a b c \<le> \<Down> bool_rel (timerefine E (mop_cmp_idxs (cost ''cmp_idxs'' 1) a' b' c'))"
   supply conc_Id[simp del]
     unfolding cmp_idxs2'_def cmpo_idxs2'_def  mop_cmp_idxs_def
-    unfolding  mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc2_alt
+    unfolding  mop_oarray_extract_def mop_eo_extract_def unborrow_def SPECc3_alt
           mop_oarray_upd_def mop_eo_set_def consume_alt
     unfolding mop_to_eo_conv_def mop_to_wo_conv_def
     apply normalize_blocks apply(split prod.splits)+
@@ -734,7 +782,6 @@ lemma cmp_idxs2'_refines_mop_cmp_idxs_with_E:
 
 
 subsubsection \<open>Synthesizing LLVM Code for the Array-Compare Operations\<close>
-
 
   sepref_def cmpo_idxs_impl [llvm_inline] is "uncurry2 (PR_CONST cmpo_idxs2')" :: "(eoarray_assn elem_assn)\<^sup>k *\<^sub>a snat_assn\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
     unfolding cmpo_idxs2'_def PR_CONST_def
@@ -859,19 +906,21 @@ end
 *)
 (* TODO: Refine lemmas to support more general size datatypes! *)
   
-  
-
-thm hn_unat_ops(13)
-lemma unat_sort_impl_context: "8 \<le> LENGTH('size_t) \<Longrightarrow> pure_sort_impl_context TYPE('size_t::len2) (\<le>) (<) ll_icmp_ult ''icmp_ult'' unat_assn"
+   
+lemma SPECc3_to_SPECc2: "SPECc3 (cost n 1) aop = SPECc2 n aop"
+  unfolding SPECc3_def SPECc2_def by auto
+thm hn_unat_ops(13)                                                  
+lemma unat_sort_impl_context: "8 \<le> LENGTH('size_t) \<Longrightarrow> pure_sort_impl_context TYPE('size_t::len2) (\<le>) (<) ll_icmp_ult (cost ''icmp_ult'' 1) unat_assn"
   apply intro_locales
   subgoal apply unfold_locales .
   apply (rule linwo)
   apply unfold_locales
-    apply rule 
+      apply rule 
+      apply(simp_all  only: lift_acost_cost )
+    unfolding Extended_Nat.enat_1 SPECc3_to_SPECc2
     apply (rule hn_unat_ops[unfolded PR_CONST_def]) 
-    apply simp
-  apply simp
-  apply simp
+  apply (simp add: zero_acost_def cost_def)
+  apply (simp add: zero_acost_def cost_def) 
   apply (solve_constraint)
   done
   
