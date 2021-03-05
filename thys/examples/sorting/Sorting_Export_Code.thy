@@ -35,5 +35,24 @@ lemmas [llvm_inline] = unat_sort.introsort_aux_impl_def
 export_llvm "unat_sort_introsort_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort(uint64_t*, int64_t,int64_t)"
   file "../code/introsort.ll"
 
+  
+schematic_goal unat_sort_allcost_simp: "project_all (unat_sort.introsort_impl_cost n) = ?x"  
+  apply (fold norm_cost_tag_def)
+  unfolding unat_sort.projected_introsort_cost_simplified
+  apply (simp add: unat_sort.Sum_any_cost) (* TODO: Move this lemma to global context *)
+  by (rule norm_cost_tagI)
+  
+(* Final results for unat_sort: *)  
+thm unat_sort.introsort_final_hoare_triple'  (* Hoare triple *)
 
+(* Cost estimation *)
+theorem unat_sort_allcost_nlogn: 
+  "(\<lambda>n. real (project_all (unat_sort.introsort_impl_cost n))) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
+  unfolding unat_sort_allcost_simp
+  by auto2
+  
+  
+  
+  
+  
 end

@@ -788,14 +788,13 @@ lemma introsort_final_hoare_triple:
 text \<open>Calculate the cost for all currencies:\<close>
 
 schematic_goal Sum_any_calc: 
-  assumes A: "finite {a. the_acost lt_acost a \<noteq> 0}" (* TODO: Move assumption to locale! *)
   shows "project_all (introsort_impl_cost s) = ?x"
   unfolding norm_cost_tag_def[symmetric]
   apply(subst project_all_is_Sumany_if_lifted[OF introsort_impl_cost_def])
   unfolding introsort_cost3_def 
   apply(simp add: the_acost_propagate add.assoc) 
   
-  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI A
+  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI lt_acost_finite
   
   apply (subst Sum_any.distrib, (intro acost_finiteIs;fail), (intro acost_finiteIs;fail))+
   apply (simp only: Sum_any_cost sum_any_push_costmul)
@@ -808,12 +807,16 @@ text \<open>Give the result a name:\<close>
 concrete_definition (in -) introsort3_allcost is sort_impl_context.Sum_any_calc uses "_ = \<hole>"
 
 lemma introsort3_allcost_is_projected_introsort_impl_cost:
-  assumes A: "finite {a. the_acost lt_acost a \<noteq> 0}" (* TODO: Move assumption to locale! *)
   shows "introsort3_allcost lt_acost n = project_all (introsort_impl_cost n)"  
   apply(subst introsort3_allcost.refine[OF sort_impl_context_axioms, symmetric])
-  using A
   by (simp_all)
 
+lemma projected_introsort_cost_simplified:
+  "project_all (introsort_impl_cost n) = 
+    4387 + (5 * Discrete.log n + (214 * n + (435 * (n * Discrete.log n) 
+  + (306 + (17 * n + 20 * (n * Discrete.log n))) * Sum_any (the_acost lt_acost))))"  
+  unfolding Sum_any_calc by simp
+  
 end 
 
 text \<open>The cost of introsort expanded:\<close>
@@ -821,18 +824,20 @@ text \<open>The cost of introsort expanded:\<close>
 thm introsort3_allcost_def[of lt_cost s]
 
 lemma introsort3_allcost_simplified:
-  "introsort3_allcost lt_cost s \<equiv> 4387 + (5 * Discrete.log s + (214 * s + (435 * (s * Discrete.log s) + (306 + (17 * s + 20 * (s * Discrete.log s))) * Sum_any (the_acost lt_cost))))"
+  "introsort3_allcost lt_cost s \<equiv> 4387 + (5 * Discrete.log s + (214 * s + (435 * (s * Discrete.log s) 
+  + (306 + (17 * s + 20 * (s * Discrete.log s))) * Sum_any (the_acost lt_cost))))"
   (*"introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * Discrete.log n)"*)
   unfolding introsort3_allcost_def
   .
 
+  
 
 text \<open>The asymptotic behaviour of introsort's cost:\<close>
 
 lemma introsort3_allcost_nlogn: (* TODO: Fix! *)
-  "(\<lambda>x. real (introsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
-  unfolding introsort3_allcost_simplified
-  by auto2
+  "(\<lambda>x. real (introsort3_allcost ltc x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
+  unfolding introsort3_allcost_simplified oops
+  (*by auto2*)
 
 
 end

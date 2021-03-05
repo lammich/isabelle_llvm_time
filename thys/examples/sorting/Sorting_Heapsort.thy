@@ -2943,13 +2943,12 @@ lemma sum_any_push_costmul: "Sum_any (the_acost (n *m c)) = n * (Sum_any (the_ac
 
 text \<open>Calculate the cost for all currencies:\<close>
 schematic_goal heapsort3_cost_Sum_any_calc: 
-  assumes A: "finite {a. the_acost lt_acost a \<noteq> 0}" (* TODO: Move assumption to locale! *)
   shows "project_all (heapsort_impl_cost l h) = ?x"
   unfolding norm_cost_tag_def[symmetric]
   apply(subst project_all_is_Sumany_if_lifted[OF heapsort3_cost.refine])
   unfolding heapsort3_cost_def
   apply(simp add: the_acost_propagate add.assoc) 
-  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI A
+  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI lt_acost_finite
   
   apply (subst Sum_any.distrib, (intro acost_finiteIs;fail), (intro acost_finiteIs;fail))+
   apply (simp only: Sum_any_cost sum_any_push_costmul)
@@ -2965,9 +2964,8 @@ concrete_definition (in -) heapsort3_allcost' is sort_impl_context.heapsort3_cos
 thm heapsort3_allcost'_def      
     
 lemma heapsort3_allcost'_Sum_any: 
-  assumes A: "finite {a. the_acost lt_acost a \<noteq> 0}"
   shows "heapsort3_allcost' lt_acost l h = project_all (heapsort_impl_cost l h)"  
-  apply(subst heapsort3_allcost'.refine[OF sort_impl_context_axioms, symmetric, OF A])
+  apply(subst heapsort3_allcost'.refine[OF sort_impl_context_axioms, symmetric])
   by simp
 
 end  
