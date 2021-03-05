@@ -483,8 +483,6 @@ definition mop_list_emptylist where
 
 
 
-
-
 section \<open>Dynamic Lists\<close>
 
 subsection \<open>Dynamic Lists refine lists\<close>
@@ -625,7 +623,7 @@ definition dyn_list_get where
   }"
 
 lemma "( (bs,l,c), as)\<in>dyn_list_rel \<Longrightarrow> dyn_list_get (bs,l,c) i \<le> mop_list_get (\<lambda>_. cost ''list_get'' 1) as i"
-  sorry
+  oops
 
 
 subsubsection \<open>Refinement of dynamic List push\<close>
@@ -714,7 +712,9 @@ text\<open>The amortization inequality is:
       raw_operation \<le> reclaim ( consume advertised_opertion PREPOTENTIAL) POSTPOTENTIAL
  \<close>
 
+
 lemma  dyn_list_push_spec_refines_sketch:
+    \<comment> \<open>This lemma collects the inequalities of the advertised cost ACC and the potential \<Phi>\<close>
   assumes a: "l \<le> c" "c=length bs" "0<length bs"
   shows "dyn_list_push (bs,l,c) x \<le> reclaim (consume (dyn_list_push_spec ACC (bs,l,c) x) (\<Phi> (bs,l,c))) \<Phi>"
   unfolding dyn_list_push_spec_def
@@ -728,19 +728,17 @@ lemma  dyn_list_push_spec_refines_sketch:
   unfolding SPECc2_alt dyn_list_push_basic_spec_def mop_list_set_def
     dyn_list_double_spec_def SPEC_REST_emb'_conv
   apply(refine_vcg \<open>-\<close>)
-  using a 
-  subgoal apply auto sorry
+  using a
+          defer
          apply auto[1]
-        apply auto [1]
-  subgoal 
-    apply simp sorry
+         apply auto [1]
+  defer
       apply auto [1]
      apply auto [1]
   subgoal by force
   using assms  
-   apply auto 
-  done
-
+   apply auto    
+  oops
 
 
 lemma  dyn_list_push_spec_refines:
@@ -822,28 +820,12 @@ section \<open>Implementing Dynamic Lists\<close>
 text \<open>We introduce a locale that expects implementations of the operations of dynamic lists,
     then composes this, to obtain amortized implementations of list operations \<close>
 
-locale dyn_list_impl =
-  fixes dyn_array_push
-    and dyn_array_push_impl :: "'f \<Rightarrow> 'i \<Rightarrow> 'f llM" 
 
-    and dynamiclist_empty2 :: "((('e::llvm_rep) list \<times> nat \<times> nat),ecost) nrest"
-    and dynamiclist_empty_impl :: "'f llM"
-
-    and TR_dynarray
-    and dyn_array_raw_assn :: "('e \<Rightarrow> 'i \<Rightarrow> assn)  \<Rightarrow> 'e list \<times> nat \<times> nat \<Rightarrow> 'f \<Rightarrow> assn"
-  assumes 
-        wfR_TR_dynarray: "wfR'' TR_dynarray"                           
-    and TR_dynarray_keeps_finite: "\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq>0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR_dynarray \<Phi>)"
-    and dyn_array_push_refine: "dyn_array_push dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
-
-    and dyn_array_push_impl_refines: "hn_refine (dyn_array_raw_assn A (bs,l,c) da' ** A x x')
-                        (dyn_array_push_impl da' x')
-                      (invalid_assn (dyn_array_raw_assn A) (bs,l,c) da' ** A x x')
-                        (dyn_array_raw_assn A) (dyn_array_push (bs,l,c) x)"
-
-    and emptylist2_real: "(uncurry0 dynamiclist_empty_impl, uncurry0 dynamiclist_empty2) \<in> unit_assn\<^sup>k \<rightarrow>\<^sub>a  dyn_array_raw_assn A"
-    and emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
-begin 
+locale dyn_list_assn = 
+  fixes 
+    TR_dynarray :: "string \<Rightarrow> ecost"
+    and dyn_array_raw_assn :: " 'e list \<times> nat \<times> nat \<Rightarrow> 'f \<Rightarrow> assn"
+begin
 
 
 text \<open>We lift the raw_assn to contain the Potential Time Credits.\<close>
@@ -851,9 +833,9 @@ text \<open>We lift the raw_assn to contain the Potential Time Credits.\<close>
 abbreviation "\<Phi>_d == \<lambda>x. timerefineA TR_dynarray  (\<Phi>_push' x)"
 
 definition dyn_array_raw_armor_assn where
-  "dyn_array_raw_armor_assn \<equiv> \<lambda>A (bs, l, c) da'.  $\<Phi>_d (bs, l, c) \<and>* dyn_array_raw_assn A (bs, l, c) da'"
+  "dyn_array_raw_armor_assn \<equiv> \<lambda>(bs, l, c) da'.  $\<Phi>_d (bs, l, c) \<and>* dyn_array_raw_assn (bs, l, c) da'"
 
-lemma dyn_array_raw_armor_assn_alt: "dyn_array_raw_armor_assn A = augment_amor_assn \<Phi>_d (dyn_array_raw_assn A)"
+lemma dyn_array_raw_armor_assn_alt: "dyn_array_raw_armor_assn = augment_amor_assn \<Phi>_d (dyn_array_raw_assn)"
   unfolding augment_amor_assn_def dyn_array_raw_armor_assn_def 
   apply (rule ext) 
   apply (rule ext) by simp
@@ -861,12 +843,47 @@ lemma dyn_array_raw_armor_assn_alt: "dyn_array_raw_armor_assn A = augment_amor_a
 
 text \<open>and combining it with the refinement relation between dynamic lists and lists\<close>
 
-definition "dyn_array_assn A = hr_comp (dyn_array_raw_armor_assn A) dyn_list_rel"
+definition "dyn_array_assn A = hr_comp (hr_comp (dyn_array_raw_armor_assn) dyn_list_rel) (\<langle>the_pure A\<rangle>list_rel)"
 
-lemma dyn_array_raw_armor_: "hr_comp (dyn_array_raw_armor_assn A) dyn_list_rel = dyn_array_assn A"
+definition "b_aux = hr_comp (dyn_array_raw_armor_assn) dyn_list_rel"
+lemma b_aux_unf: "hr_comp (dyn_array_raw_armor_assn) dyn_list_rel = b_aux"
+  unfolding b_aux_def by auto
+declare b_aux_unf[fcomp_norm_unfold]
+lemma dyn_array_raw_armor_aux: "hr_comp (b_aux) (\<langle>the_pure A\<rangle>list_rel)
+           = dyn_array_assn A"
+  unfolding b_aux_def dyn_array_assn_def by auto
+declare dyn_array_raw_armor_aux[fcomp_norm_unfold]
+  
+lemma dyn_array_raw_armor_: "hr_comp (hr_comp (dyn_array_raw_armor_assn) dyn_list_rel) (\<langle>the_pure A\<rangle>list_rel)
+           = dyn_array_assn A"
   unfolding dyn_array_assn_def by auto
  (*TODO: is this the right way to instrument FCOMP in order to fold the hr_comp ?*)
 declare dyn_array_raw_armor_[fcomp_norm_unfold]
+
+end
+
+locale dyn_list_impl = dyn_list_assn TR_dynarray dyn_array_raw_assn 
+    for TR_dynarray and dyn_array_raw_assn :: "('e::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> 'f \<Rightarrow> assn" + 
+  fixes dyn_array_push
+    and dyn_array_push_impl :: "'f \<Rightarrow> 'e \<Rightarrow> 'f llM" 
+
+    and dynamiclist_empty2 :: "((('e) list \<times> nat \<times> nat),ecost) nrest"
+    and dynamiclist_empty_impl :: "'f llM"
+
+  assumes 
+        wfR_TR_dynarray: "wfR'' TR_dynarray"                           
+    and TR_dynarray_keeps_finite: "\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq>0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR_dynarray \<Phi>)"
+    and dyn_array_push_refine: "dyn_array_push dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
+
+    and dyn_array_push_impl_refines: "hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
+                        (dyn_array_push_impl da' x')
+                      (invalid_assn (dyn_array_raw_assn) (bs,l,c) da' ** id_assn x x')
+                        (dyn_array_raw_assn) (dyn_array_push (bs,l,c) x)"
+
+    and emptylist2_real: "(uncurry0 dynamiclist_empty_impl, uncurry0 dynamiclist_empty2) \<in> unit_assn\<^sup>k \<rightarrow>\<^sub>a  dyn_array_raw_assn"
+    and emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
+begin 
+
 
 
 
@@ -935,10 +952,10 @@ text \<open>Now we combine the raw hnr-rule @{thm dyn_array_push_impl_refines} w
   amortization refinement @{thm dyn_array_push_refines}}\<close>
 
 lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = length bs; 0 < length bs\<rbrakk>
-\<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn A) (bs, l, c) da' \<and>* hn_ctxt A r r')
+\<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn) (bs, l, c) da' \<and>* hn_ctxt id_assn r r')
      (dyn_array_push_impl $ da' $ r')
-     (hn_invalid (dyn_array_raw_armor_assn A) (bs, l, c) da' \<and>* hn_ctxt A r r')
-       (dyn_array_raw_armor_assn A)
+     (hn_invalid (dyn_array_raw_armor_assn) (bs, l, c) da' \<and>* hn_ctxt id_assn r r')
+       (dyn_array_raw_armor_assn)
       (PR_CONST (dyn_list_push_spec push_concrete_advertised_cost) $ (bs, l, c) $ r) "
   unfolding hn_ctxt_def APP_def PR_CONST_def
   unfolding dyn_array_raw_armor_assn_alt apply (simp only: prod.case)        
@@ -973,10 +990,10 @@ lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = l
 
 
 lemma dyn_array_push_impl_refines_dyn_list_push_spec': "\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs)\<rbrakk>
-  \<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn A) x x' \<and>* hn_ctxt A r r')
+  \<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn) x x' \<and>* hn_ctxt id_assn r r')
      (dyn_array_push_impl $ x' $ r')
-     (hn_invalid (dyn_array_raw_armor_assn A) x x' \<and>* hn_ctxt A r r')
-       (dyn_array_raw_armor_assn A)
+     (hn_invalid (dyn_array_raw_armor_assn) x x' \<and>* hn_ctxt id_assn r r')
+       (dyn_array_raw_armor_assn)
       (PR_CONST (dyn_list_push_spec push_concrete_advertised_cost) $ x $ r) "
   apply(cases x)
   apply (simp only:)
@@ -1056,7 +1073,7 @@ thm emptylist2_real[to_hnr]
 thm emptylist2_refine
 
 lemma YEAH32: "hn_refine \<box> dynamiclist_empty_impl \<box>
-       (dyn_array_raw_armor_assn A)
+       (dyn_array_raw_armor_assn)
       (PR_CONST (dyn_list_empty_spec el_concrete_advertised_cost) ) "
   unfolding hn_ctxt_def APP_def PR_CONST_def
   unfolding dyn_array_raw_armor_assn_alt
@@ -1088,19 +1105,30 @@ lemma dynamiclist_empty_refines_fref: "(uncurry0 (PR_CONST (dyn_list_empty_spec 
 lemmas GGG = RICHTIGCOOL2[FCOMP dynamiclist_empty_refines_fref, folded dynamiclist_empty_spec_def, unfolded PR_CONST_def]
 
 
+
+lemma taaaa: "(uncurry0 (  (dynamiclist_empty_spec)), uncurry0 (  (dynamiclist_empty_spec)))
+        \<in> unit_rel \<rightarrow>\<^sub>f \<langle>\<langle>the_pure A\<rangle>list_rel\<rangle>nrest_rel" 
+  apply auto sorry
+
+lemmas GGG' = GGG[FCOMP taaaa]
+
 end
 
 
 definition dyn_array_raw_assn where
-  "dyn_array_raw_assn A \<equiv> \<lambda>(bs,l,c) (p,l',c'). array_assn A bs p ** snat_assn l l' ** snat_assn c c'"
+  "dyn_array_raw_assn \<equiv> \<lambda>(bs,l,c) (p,l',c'). array_assn id_assn bs p ** snat_assn l l' ** snat_assn c c'"
+
 
 definition "dyn_array_push_impl = undefined"
 definition "dynamiclist_empty_impl = undefined"
 definition "TR_dynarray = undefined"
+definition "dynamiclist_append2 = undefined"
+definition "dynamiclist_empty2 = undefined"
 
-global_interpretation dyn_array: dyn_list_impl dynamiclist_append2 dyn_array_push_impl
+global_interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
+                            dynamiclist_append2 dyn_array_push_impl
                             dynamiclist_empty2 dynamiclist_empty_impl
-                            TR_dynarray dyn_array_raw_assn
+                             
     defines dynamic_array_append_spec = "dyn_array.dyn_array_push_spec"
       and dynamic_array_empty_spec = "dyn_array.dynamiclist_empty_spec" 
       and dynamic_array_assn = dyn_array.dyn_array_assn
@@ -1109,9 +1137,13 @@ global_interpretation dyn_array: dyn_list_impl dynamiclist_append2 dyn_array_pus
 sepref_register dynamic_array_append_spec
 declare dyn_array.dyn_array_push_impl_refines_dyn_array_push_spec[sepref_fr_rules]
 
+
 term dynamic_array_empty_spec
 sepref_register dynamic_array_empty_spec
 declare dyn_array.GGG[sepref_fr_rules]
+
+
+thm dyn_array.dyn_array_push_impl_refines_dyn_array_push_spec dyn_array.GGG
 
 
 
@@ -1135,7 +1167,10 @@ definition "algorithm = doN {
     RETURNT s
   }"
 
-term "dynnamic_array_assn snat_assn"
+term "dynamic_array_assn (snat_assn' TYPE(32))"
+term "(snat_assn' TYPE(32))"
+
+term unat_assn'
 
 term narray_new
 
@@ -1313,9 +1348,6 @@ lemma "dyn_list_double ini (bs,l,c) \<le> dyn_list_double_spec (bs,l,c)"
   sorry
 
 
-
-
-
-
+\<close>
 
 end
