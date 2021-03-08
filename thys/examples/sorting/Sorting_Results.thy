@@ -33,9 +33,10 @@ lemma
   apply(rule heapsort_final_hoare_triple[unfolded hn_ctxt_def])
   done
 
-text \<open>@{term heapsort_impl_cost} projected to a function @{typ "nat \<Rightarrow> nat"} \<close>
+(*text \<open>@{term heapsort_impl_cost} projected to a function @{typ "nat \<Rightarrow> nat"} \<close>
 lemma "heapsort3_allcost (h-l) = project_all (heapsort_impl_cost l h)"
   by (simp add: heapsort3_allcost_is_heapsort3_allcost' heapsort3_allcost'_Sum_any)
+  *)
 
 end
 
@@ -55,7 +56,7 @@ lemma "slice_sort_aux xs\<^sub>0 xs l h \<equiv> (length xs = length xs\<^sub>0 
   by simp
 
 text \<open>Final correctness lemma:\<close>
-lemma
+lemma introsort_final_hoare_triple':
   assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
   shows "llvm_htriple ($introsort_impl_cost (h-l) \<and>* arr_assn xs\<^sub>0 p
            \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')
@@ -65,17 +66,17 @@ lemma
   by (rule introsort_final_hoare_triple[OF assms, unfolded hn_ctxt_def])
 
 text \<open>introsort_impl_cost projected to a function @{typ "nat \<Rightarrow> nat"} \<close>
-lemma "introsort3_allcost n = project_all (introsort_impl_cost n)"  
+lemma "introsort3_allcost lt_acost n = project_all (introsort_impl_cost n)"  
   by (rule introsort3_allcost_is_projected_introsort_impl_cost)
 
 end
-
+(*
 lemma "introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * Discrete.log n)"
   by(fact introsort3_allcost_simplified)
 
   
 lemma "(\<lambda>x. real (introsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
   by (fact introsort3_allcost_nlogn)
-
+*)
 
 end

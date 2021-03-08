@@ -459,7 +459,7 @@ locale sort_impl_context = size_t_context size_t + weak_ordering
     "the_acost (lift_acost lt_acost) ''eo_extract'' = 0"
     "the_acost (lift_acost lt_acost) ''eo_set'' = 0" (* both are no llvm currencies, thus it does not
                                                 clash!  *)
-(*  assumes size_t_min: "8 \<le> LENGTH('size_t)" *)
+  assumes lt_acost_finite: "finite {a. the_acost lt_acost a \<noteq> 0}"                                                
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
@@ -922,7 +922,8 @@ lemma unat_sort_impl_context: "8 \<le> LENGTH('size_t) \<Longrightarrow> pure_so
     unfolding Extended_Nat.enat_1 SPECc3_to_SPECc2
     apply (rule hn_unat_ops[unfolded PR_CONST_def]) 
   apply (simp add: zero_acost_def cost_def)
-  apply (simp add: zero_acost_def cost_def) 
+  apply (simp add: zero_acost_def cost_def)
+  apply (metis finite_sum_nonzero_cost) 
   apply (solve_constraint)
   done
   
