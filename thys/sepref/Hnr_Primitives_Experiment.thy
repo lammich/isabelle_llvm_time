@@ -580,7 +580,14 @@ context
   fixes A :: "'a  \<Rightarrow> 'b:: llvm_rep \<Rightarrow> assn"
   assumes [fcomp_norm_simps]: "CONSTRAINT is_pure A"
 begin
-  lemmas hnr_array_upd[sepref_fr_rules] = hnr_raw_array_upd[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], folded mop_array_upd_def]
+  (* lemmas hnr_array_upd[sepref_fr_rules] = hnr_raw_array_upd[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], folded mop_array_upd_def] *)
+  lemma hnr_array_upd[sepref_fr_rules]: "(uncurry2 array_upd, uncurry2 mop_array_upd) \<in> (array_assn A)\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a A\<^sup>k \<rightarrow>\<^sub>a array_assn A"
+    apply(rule hnr_raw_array_upd[unfolded mop_array_upd_def, FCOMP param_mop_list_set[of _ A], folded mop_array_upd_def]) 
+    unfolding SC_attains_sup_def mop_array_upd_def
+    apply safe
+    apply(rule one_time_attains_sup)
+    apply simp
+    by(intro OT_consume OT_return one_time_bind_ASSERT) 
 
   (* TODO: solve side condition in FCOMP automatically
   lemmas hnr_array_nth[sepref_fr_rules] = hnr_raw_array_nth[unfolded mop_array_nth_def, FCOMP param_mop_list_get[of _ A], folded mop_array_nth_def] *)
@@ -594,6 +601,8 @@ begin
   
 end  
 
+thm OT_intros
+
 context 
   fixes A :: "'a  \<Rightarrow> 'c:: llvm_rep \<Rightarrow> assn"
     and x :: 'a
@@ -604,11 +613,17 @@ begin
   
   context
     notes PURE[fcomp_norm_simps]
-  begin
+begin
+
+lemma cheat[OT_intros]: "SC_attains_sup (\<forall>a1 b1.  attains_sup (mop_list_init_raw (\<lambda>n. lift_acost (cost'_narray_new n)) b1) (PR_CONST (mop_array_new A x) a1) (\<langle>the_pure A\<rangle>list_rel))"
+  apply(intro allI SC_attains_supI)
+  apply (rule one_time_attains_sup)
+  unfolding PR_CONST_def mop_array_new_def mop_list_init_def apply simp
+  apply(intro OT_intros) done
+
     lemmas hnr_array_new[sepref_fr_rules] 
-      = hnr_raw_array_new[FCOMP refine_mop_list_init_raw[OF INIT], folded mop_array_new_def[of A]]
-      
-  end  
+      = hnr_raw_array_new[FCOMP refine_mop_list_init_raw[OF INIT], folded mop_array_new_def[of A], OF cheat]
+   end  
   
 end  
   

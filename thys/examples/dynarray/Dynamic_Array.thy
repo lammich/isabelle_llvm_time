@@ -1,7 +1,125 @@
 theory Dynamic_Array
   imports "../../sepref/Hnr_Primitives_Experiment" "../../nrest/Refine_Heuristics"
-  "../../nrest/NREST_Automation"
+  "../../nrest/NREST_Automation" "../sorting/Sorting_Setup"
 begin
+
+
+
+
+
+subsection \<open>Array Copy\<close>
+
+definition "array_copy_impl dst src n = doM {
+          return dst      
+      }"
+
+
+definition list_copy_spec where
+  "list_copy_spec T dst src n = doN {
+       ASSERT (n\<le>length dst \<and> n\<le>length src);
+       REST [take n src @ drop n dst \<mapsto> T n]
+    }"
+
+
+
+definition list_copy :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, (char list, enat) acost) nrest" where
+"list_copy dst src n = doN {
+          (dst,_) \<leftarrow> monadic_WHILEIET (\<lambda>(dst',n'). n'\<le>n \<and> length dst' = length dst \<and> dst' = take n' src @ drop n' dst)
+              (\<lambda>(_::'a list,n'). (n-n') *m (cost ''if'' 1 + cost ''call'' 1 + cost ''list_get'' 1 + 
+                                        cost ''list_set'' 1 + cost ''add'' 1) )
+            (\<lambda>(_,n'). SPECc2 ''less'' (<) n' n)
+            (\<lambda>(dst',n'). doN {
+              x \<leftarrow> mop_list_get (\<lambda>_. cost ''list_get'' 1) src n';
+              dst'' \<leftarrow> mop_list_set (\<lambda>_. cost ''list_set'' 1) dst' n' x;
+              n'' \<leftarrow> SPECc2 ''add'' (+) n' 1;
+              RETURNT (dst'',n'')
+            })
+          (dst,0);
+          RETURNT dst
+      }"
+
+definition list_copy2 :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, (char list, enat) acost) nrest" where
+  "list_copy2 dst src n = doN {
+          (dst,_) \<leftarrow> monadic_WHILEIET (\<lambda>(dst',n'). n'\<le>n \<and> length dst' = length dst \<and> dst' = take n' src @ drop n' dst)
+              (\<lambda>(_::'a list,n'). (n-n') *m (cost ''if'' 1 + cost ''call'' 1 + cost ''list_get'' 1 + 
+                                        cost ''list_set'' 1 + cost ''add'' 1) )
+            (\<lambda>(_,n'). SPECc2 ''icmp_slt'' (<) n' n)
+            (\<lambda>(dst',n'). doN {
+              x \<leftarrow> mop_array_nth src n';
+              dst'' \<leftarrow> mop_array_upd dst' n' x;
+              ASSERT (n'+1\<le>n);
+              n'' \<leftarrow> SPECc2 ''add'' (+) n' 1;
+              RETURNT (dst'',n'')
+            })
+          (dst,0);
+          RETURNT dst
+      }"
+
+definition "TR_lst_copy = 0(''list_get'':=lift_acost mop_array_nth_cost,''list_set'':=lift_acost mop_array_upd_cost)"
+
+lemma "list_copy dst src n \<le> \<Down>Id (\<Down>\<^sub>C TR_lst_copy (list_copy_spec (\<lambda>n. cost ''list_copy_c'' (enat n)) dst src n))"
+  sorry
+
+definition "list_copy_spec_time n = undefined"
+
+lemma "(uncurry2 list_copy2, uncurry2 (PR_CONST (list_copy_spec list_copy_spec_time)))
+       \<in>  \<rightarrow>\<^sub>f list_rel"
+  sorry
+
+
+thm OT_intros
+
+lemma one_time_bind_assert[OT_intros]: "one_time m \<Longrightarrow> one_time (doN { ASSERT P; m})"
+  unfolding one_time_def
+  apply(cases P) by auto
+
+(*
+declare hnr_array_upd[sepref_fr_rules del] 
+lemma hnr_array_upd_ohne_sc[sepref_fr_rules]:
+  "CONSTRAINT is_pure A \<Longrightarrow>(uncurry2 array_upd, uncurry2 mop_array_upd) \<in> (array_assn A)\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a A\<^sup>k \<rightarrow>\<^sub>a array_assn A"
+  apply(rule hnr_array_upd)
+   apply simp 
+  unfolding SC_attains_sup_def
+  apply safe
+  apply(rule one_time_attains_sup)
+  unfolding mop_array_upd_def mop_list_set_def
+  unfolding uncurry_def apply simp
+  by(intro OT_intros) *)
+
+
+context size_t_context
+begin
+
+  thm hnr_array_upd
+  thm hnr_eoarray_upd'
+
+
+thm hnr_array_upd
+
+lemmas [safe_constraint_rules] = CN_FALSEI[of is_pure "array_assn A" for A]
+
+   sepref_def list_copy_impl is "uncurry2 list_copy2"  
+    :: "(array_assn (pure R))\<^sup>d *\<^sub>a (array_assn (pure R))\<^sup>k *\<^sub>a size_assn\<^sup>k  \<rightarrow>\<^sub>a array_assn (pure R)"
+    unfolding  list_copy2_def PR_CONST_def  
+    unfolding monadic_WHILEIET_def
+  apply (annot_snat_const "TYPE('size_t)")
+    by sepref 
+
+
+  thm list_copy_impl.refine
+
+  thm list_copy_impl.refine
+
+
+end
+
+
+
+
+sepref_def dynamiclist_empty_impl is "  (PR_CONST (\<lambda>_::nat. RETURNT (0::nat)))"
+  :: "(snat_assn)\<^sup>k \<rightarrow>\<^sub>a snat_assn"
+  oops
+
 
 section \<open>Misc\<close>
 
@@ -1016,10 +1134,35 @@ text \<open>this makes the tactic \<open>solve_attains_sup\<close> solve the sup
 declare dyn_list_rel_def[simp] \<comment> \<open>don't know how to tag this fact such that FCOMP picks it up
     correctly\<close>
 lemmas dyn_array_push_impl_refines_dyn_array_push_spec
-  = dyn_array_push_impl_refines_dyn_list_push_spec_hfref[FCOMP dyn_list_push_spec_refines_fref, folded dyn_array_push_spec_def, unfolded PR_CONST_def]
+  = dyn_array_push_impl_refines_dyn_list_push_spec_hfref[FCOMP dyn_list_push_spec_refines_fref, folded dyn_array_push_spec_def]
 declare dyn_list_rel_def[simp del]
 
 thm dyn_array_push_impl_refines_dyn_array_push_spec
+
+
+
+lemma taaaa: "(uncurry (PR_CONST dyn_array_push_spec), uncurry (PR_CONST dyn_array_push_spec))
+        \<in>  \<langle>R\<rangle>list_rel \<times>\<^sub>r R \<rightarrow>\<^sub>f \<langle>\<langle>R\<rangle>list_rel\<rangle>nrest_rel" 
+  apply rule
+  unfolding nrest_rel_def dyn_array_push_spec_def   
+  apply auto
+  unfolding conc_fun_RES apply auto 
+  apply (simp add: le_fun_def)  
+  apply(rule Sup_upper) apply auto  
+  by (meson list_rel_append2 list_rel_simp(4) refine_list(1))  
+
+lemmas G =  dyn_array_push_impl_refines_dyn_array_push_spec[FCOMP taaaa] 
+
+lemma G_push : "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
+  \<Longrightarrow> (uncurry dyn_array_push_impl, uncurry (PR_CONST dyn_array_push_spec)) 
+    \<in> (dyn_array_assn A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow>\<^sub>a dyn_array_assn A"
+  apply(rule G)
+   apply simp
+  sorry
+
+
+
+
 
 
 subsubsection \<open>obsolete\<close>
@@ -1102,56 +1245,274 @@ lemma dynamiclist_empty_refines_fref: "(uncurry0 (PR_CONST (dyn_list_empty_spec 
   apply(rule SPEC_leq_SPEC_I_even_stronger)
   by auto
 
-lemmas GGG = RICHTIGCOOL2[FCOMP dynamiclist_empty_refines_fref, folded dynamiclist_empty_spec_def, unfolded PR_CONST_def]
+lemmas GGG = RICHTIGCOOL2[FCOMP dynamiclist_empty_refines_fref, folded dynamiclist_empty_spec_def]
 
 
 
-lemma taaaa: "(uncurry0 (  (dynamiclist_empty_spec)), uncurry0 (  (dynamiclist_empty_spec)))
+lemma taaaa_emp: "(uncurry0 (PR_CONST  (dynamiclist_empty_spec)), uncurry0 (PR_CONST  (dynamiclist_empty_spec)))
         \<in> unit_rel \<rightarrow>\<^sub>f \<langle>\<langle>the_pure A\<rangle>list_rel\<rangle>nrest_rel" 
-  apply auto sorry
+  apply rule
+  unfolding nrest_rel_def dynamiclist_empty_spec_def mop_list_emptylist_def 
+  apply auto
+  unfolding conc_fun_RES apply auto 
+  by (simp add: le_fun_def)  
 
-lemmas GGG' = GGG[FCOMP taaaa]
+lemmas GGG' = GGG[FCOMP taaaa_emp]
+
+(* TODO: move *)
+lemma one_time_SPECT_map[OT_intros]: "one_time (SPECT [x\<mapsto>t])"
+  unfolding one_time_def by auto
+
+lemma GGG_empty: "(uncurry0 dynamiclist_empty_impl, uncurry0 (PR_CONST dynamiclist_empty_spec)) \<in> unit_assn\<^sup>k \<rightarrow>\<^sub>a dyn_array_assn A"
+  apply(rule GGG')
+  apply(intro allI SC_attains_supI) 
+  apply(rule one_time_attains_sup)
+  unfolding uncurry0_def dynamiclist_empty_spec_def mop_list_emptylist_def apply simp
+  apply(intro OT_intros)
+  done
 
 end
 
+context size_t_context begin
 
-definition dyn_array_raw_assn where
-  "dyn_array_raw_assn \<equiv> \<lambda>(bs,l,c) (p,l',c'). array_assn id_assn bs p ** snat_assn l l' ** snat_assn c c'"
+definition dyn_array_raw_assn  :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> 'x ptr \<times> ('size_t) word \<times> 'size_t word \<Rightarrow> assn" where
+  "dyn_array_raw_assn  \<equiv> (array_assn id_assn \<times>\<^sub>a snat_assn' TYPE('size_t) \<times>\<^sub>a snat_assn' TYPE('size_t))"
+(*
+     \<lambda>(bs,l,c) (p,l',c'). array_assn id_assn bs p ** snat_assn' TYPE('size_t) l l' ** snat_assn' TYPE('size_t) c c'"
+*)
 
 
+
+definition "dynarray_free = (\<lambda>(p,l,c). doN { narray_free p })"
+lemma FREE_dyn_array_raw_assn[sepref_frame_free_rules]:
+  assumes PURE: "is_pure A"
+  shows "MK_FREE dyn_array_raw_assn dynarray_free" 
+  sorry
+
+
+
+
+subsection  \<open>implement push\<close>
+
+
+definition "TR_dynarray = 0(''list_init_c'':=cost'_narray_new 1)"
 definition "dyn_array_push_impl = undefined"
-definition "dynamiclist_empty_impl = undefined"
-definition "TR_dynarray = undefined"
-definition "dynamiclist_append2 = undefined"
-definition "dynamiclist_empty2 = undefined"
 
-global_interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
+term   dyn_list_double_spec
+
+definition dyn_list_double :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('x list \<times> nat \<times> nat, (char list, enat) acost) nrest"  where
+  "dyn_list_double  \<equiv> \<lambda>(bs,l,c). doN {
+       ASSERT (l\<le>c \<and> c=length bs);
+       c' \<leftarrow> SPECc2 ''mult'' (*) c 2;
+       bs' \<leftarrow> mop_array_new id_assn init c';
+       bs'' \<leftarrow> list_copy_spec (cost ''list_copy_c'' (enat l)) bs' bs l;
+       RETURNT (bs'',l,c')
+  }"
+
+definition "dynamiclist_append2 = undefined"
+
+lemma dyn_array_push_refine: "dynamiclist_append2 dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
+  sorry
+
+lemma dyn_array_push_impl_refines: "hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
+                        (dyn_array_push_impl da' x')
+                      (invalid_assn (dyn_array_raw_assn) (bs,l,c) da' ** id_assn x x')
+                        (dyn_array_raw_assn) (dyn_array_push (bs,l,c) x)"
+  sorry
+
+
+
+subsection  \<open>implement empty\<close>
+
+definition  dynamiclist_empty2 :: "('a::llvm_rep list \<times> nat \<times> nat, ecost) nrest"   where
+  "dynamiclist_empty2 = do {
+       dst \<leftarrow> mop_array_new id_assn init 8 ;
+       RETURNT (dst,0,8)
+    }"
+
+thm  hnr_raw_array_new
+term "mop_list_init_raw (\<lambda>n. lift_acost (cost'_narray_new n))"
+
+lemma wfr_TR_dynarray[simp]: "wfR'' TR_dynarray" sorry
+
+lemma consumea_bind_return_is_SPECT: "do {
+      _ \<leftarrow> consumea t;
+      RETURNTecost x
+    } = SPECT [x\<mapsto>t]"
+  unfolding consumea_def bindT_def by (auto simp add: RETURNT_def)
+
+lemma emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
+  unfolding dyn_list_new_raw_def dynamiclist_empty2_def mop_array_new_def
+  apply(rule order.trans)
+   defer apply(rule timerefine_bindT_ge2)  
+   apply (simp_all add: timerefine_consume timerefine_RETURNT) 
+  apply normalize_blocks
+  unfolding consumea_bind_return_is_SPECT  apply auto
+  apply(auto simp: le_fun_def)
+  unfolding TR_dynarray_def apply (simp add: timerefineA_cost_apply_costmult costmult_add_distrib costmult_cost norm_cost)
+  apply sc_solve by (auto simp: numeral_eq_enat )
+ 
+
+ 
+(* declare [[show_types,show_consts]]
+*)
+
+  thm SIZE_T
+
+  find_in_thms mop_list_init_raw hn_refine in sepref_fr_rules
+
+sepref_def dynamiclist_empty_impl is "(uncurry0 (dynamiclist_empty2 :: ('a::llvm_rep list \<times> nat \<times> nat, ecost) nrest) )"
+  :: "(unit_assn)\<^sup>k \<rightarrow>\<^sub>a (dyn_array_raw_assn :: ('a::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('a::llvm_rep) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)"
+  unfolding dynamiclist_empty2_def dyn_array_raw_assn_def
+  apply (annot_snat_const "TYPE('size_t)")  
+  by sepref 
+   
+ 
+   
+
+thm dynamiclist_empty_impl.refine
+
+
+
+
+
+
+interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
                             dynamiclist_append2 dyn_array_push_impl
                             dynamiclist_empty2 dynamiclist_empty_impl
-                             
+      (*                       
     defines dynamic_array_append_spec = "dyn_array.dyn_array_push_spec"
       and dynamic_array_empty_spec = "dyn_array.dynamiclist_empty_spec" 
-      and dynamic_array_assn = dyn_array.dyn_array_assn
-  sorry (* TODO: provide the implementations *)
+      and dynamic_array_assn = dyn_array.dyn_array_assn *)
+  apply standard (* TODO: provide the implementations *)
+  subgoal sorry
+  subgoal sorry
+  subgoal sorry
+  subgoal sorry
+  subgoal by (fact dynamiclist_empty_impl.refine)
+  subgoal by (fact emptylist2_refine) 
+  done 
 
-sepref_register dynamic_array_append_spec
-declare dyn_array.dyn_array_push_impl_refines_dyn_array_push_spec[sepref_fr_rules]
 
+sepref_register dyn_array.dyn_array_push_spec
+lemmas da_push_rule  = dyn_array.G_push
+declare dyn_array.G_push[sepref_fr_rules]
+thm dyn_array.G_push
 
 term dynamic_array_empty_spec
-sepref_register dynamic_array_empty_spec
-declare dyn_array.GGG[sepref_fr_rules]
+sepref_register dyn_array.dynamiclist_empty_spec
+lemmas da_empty_rule = dyn_array.GGG_empty 
+declare dyn_array.GGG_empty[sepref_fr_rules]
+thm dyn_array.GGG_empty  
 
+lemmas dyn_array_dyn_array_push_spec_def = dyn_array.dyn_array_push_spec_def
+lemmas  dyn_array_dynamiclist_empty_spec_def =  dyn_array.dynamiclist_empty_spec_def
+lemmas  dyn_array_dynamic_array_assn_def =  dyn_array.dyn_array_assn_def
+
+term dyn_array.dyn_array_assn
 
 thm dyn_array.dyn_array_push_impl_refines_dyn_array_push_spec dyn_array.GGG
 
 
+concrete_definition dynamic_array_assn2 is dyn_array_dynamic_array_assn_def
 
-term dyn_array.dynamiclist_empty_spec
-term dyn_array.dyn_array_push_spec
+definition  "da \<equiv> dyn_array.dyn_array_assn"
 
 
-term dynamic_array_append_spec
+
+thm FREE_array_assn
+lemma FREE_dynarray_assn[sepref_frame_free_rules]:
+  assumes PURE: "is_pure A"
+  shows "MK_FREE (dyn_array.dyn_array_assn A) dynarray_free" 
+  apply rule
+  unfolding dyn_array.dyn_array_assn_def
+  unfolding
+    dyn_list_assn.dyn_array_raw_armor_assn_def
+  apply(subst hr_comp_assoc)
+  unfolding dyn_array_raw_assn_def
+  sorry
+
+end
+
+ 
+
+concrete_definition dynarray_free is size_t_context.dynarray_free_def
+
+
+
+concrete_definition dynamiclist_empty_impl is size_t_context.dynamiclist_empty_impl_def
+concrete_definition dyn_array_push_impl is size_t_context.dyn_array_push_impl_def
+
+concrete_definition dynamic_array_append_spec is size_t_context.dyn_array_dyn_array_push_spec_def
+
+concrete_definition dynamic_array_empty_spec is size_t_context.dyn_array_dynamiclist_empty_spec_def
+thm dynamic_array_empty_spec.refine
+
+definition [simp]: "dynamic_array_empty_spec_a TYPE('l::len2)\<equiv> dynamic_array_empty_spec"
+
+concrete_definition dynamic_array_assn is size_t_context.dyn_array_dynamic_array_assn_def
+
+abbreviation "al_assn' TYPE('l::len2) R \<equiv> dynamic_array_assn R :: (_ \<Rightarrow> _ \<times> 'l word \<times> 'l word \<Rightarrow> _)"
+
+
+
+lemma dyn_array_nth[sepref_fr_rules]:
+  "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A \<Longrightarrow> (uncurry dyn_array_nth, uncurry mop_array_nth)
+     \<in> (dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A" 
+  sorry
+
+
+lemma FREE_dynarray_assn[sepref_frame_free_rules]:
+  assumes PURE: "is_pure A"
+  shows "MK_FREE (al_assn' TYPE('l::len2) A) dynarray_free" 
+  sorry
+
+lemma pull_cond_hfref: "(P \<Longrightarrow>  p \<in> x \<rightarrow>\<^sub>a y) \<Longrightarrow> p \<in> [\<lambda>_. P]\<^sub>a x \<rightarrow> y"
+  unfolding hfref_def by auto
+
+
+sepref_register dynamic_array_empty_spec
+sepref_register "dynamic_array_empty_spec_a TYPE('l::len2)"
+lemma pf: "(uncurry0 dynamiclist_empty_impl, uncurry0 (PR_CONST (dynamic_array_empty_spec_a TYPE('l::len2))))
+   \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a  unit_assn\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
+  apply(rule pull_cond_hfref)
+  apply(subgoal_tac "size_t_context TYPE('l)")
+  subgoal premises p 
+    supply f= size_t_context.da_empty_rule[where 'size_t='l, unfolded 
+                    dynamic_array_assn.refine[OF p(2)]
+                    dynamic_array_empty_spec.refine[OF p(2)]
+                    dynamiclist_empty_impl.refine[OF p(2)] ]
+    unfolding dynamic_array_empty_spec_a_def
+    apply(rule f) by fact
+  apply standard apply simp done
+declare pf[sepref_fr_rules]
+
+
+lemma annot: "dynamic_array_empty_spec = dynamic_array_empty_spec_a TYPE('l::len2)"
+  apply simp done
+thm annot
+
+
+sepref_register dynamic_array_append_spec
+lemma pf2: "
+Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
+   \<Longrightarrow> (uncurry dyn_array_push_impl, uncurry dynamic_array_append_spec)
+     \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a  (al_assn' TYPE('l::len2) A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
+  apply(rule pull_cond_hfref)
+  apply(subgoal_tac "size_t_context TYPE('l)")
+  subgoal premises p 
+    supply f= size_t_context.da_push_rule[where 'size_t='l, unfolded 
+                    dynamic_array_assn.refine[OF p(3)]
+                    dynamic_array_append_spec.refine[OF p(3)]
+                    dyn_array_push_impl.refine[OF p(3)], unfolded PR_CONST_def ] 
+    apply(rule f) using p by auto
+  apply standard apply simp done
+declare pf2[sepref_fr_rules]
+
+
+  term snat_assn
+
+
 
 definition "algorithm = doN {
     (s::nat list) \<leftarrow> dynamic_array_empty_spec;
@@ -1167,6 +1528,7 @@ definition "algorithm = doN {
     RETURNT s
   }"
 
+
 term "dynamic_array_assn (snat_assn' TYPE(32))"
 term "(snat_assn' TYPE(32))"
 
@@ -1174,11 +1536,24 @@ term unat_assn'
 
 term narray_new
 
+thm sepref_fr_rules
+
 sepref_def algorithm_impl is "uncurry0 algorithm"
-  :: "(unit_assn)\<^sup>k \<rightarrow>\<^sub>a dynamic_array_assn (snat_assn' TYPE(32))"
+  :: "(unit_assn)\<^sup>k \<rightarrow>\<^sub>a al_assn' TYPE(32) (snat_assn' TYPE(32))"
   unfolding algorithm_def
-    supply [[goals_limit = 1]]
-    apply (annot_snat_const "TYPE(32)")
+    supply [[goals_limit = 2]]
+  apply (annot_snat_const "TYPE(32)")
+  apply(rewrite annot[where 'l=32])
+  by sepref (*
+  apply sepref_dbg_trans_keep
+             apply sepref_dbg_trans_step_keep 
+  apply(rule sepref_fr_rules(1)[unfolded PR_CONST_def])
+  using sepref_fr_rules(1)
+
+         apply sepref_dbg_trans_step
+  apply(rule sepref_fr_rules(2)[unfolded PR_CONST_def])
+
+  oops (*
   apply sepref_dbg_preproc
   apply sepref_dbg_cons_init
   apply sepref_dbg_id
@@ -1189,9 +1564,9 @@ sepref_def algorithm_impl is "uncurry0 algorithm"
   apply sepref_dbg_cons_solve
   apply sepref_dbg_cons_solve
   apply sepref_dbg_constraints
-  done
-
-
+  done *)
+  *)
+\<^cancel>\<open>
 
 
 section \<open>Array with Length\<close>
@@ -1221,111 +1596,6 @@ lemma "llist_nth T lcs i \<le> \<Down>llist_rel (mop_list_get T cs i)"
  
 
 
-
-
-subsection \<open>Array Copy\<close>
-
-definition "array_copy_impl dst src n = doM {
-          return dst      
-      }"
-
-
-definition list_copy_spec where
-  "list_copy_spec T dst src n = doN {
-       ASSERT (n\<le>length dst \<and> n\<le>length src);
-       REST [take n src @ drop n dst \<mapsto> T]
-    }"
-
-
-
-definition list_copy :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, (char list, enat) acost) nrest" where
-"list_copy dst src n = doN {
-          monadic_WHILEIET (\<lambda>(dst',n'). n'\<le>n \<and> length dst' = length dst \<and> dst' = take n' src @ drop n' dst)
-              (\<lambda>(_::'a list,n'). (n-n') *m (cost ''if'' 1 + cost ''call'' 1 + cost ''list_get'' 1 + 
-                                        cost ''list_set'' 1 + cost ''add'' 1) )
-            (\<lambda>(_,n'). SPECc2 ''less'' (<) n' n)
-            (\<lambda>(dst',n'). doN {
-              x \<leftarrow> mop_list_get (\<lambda>_. cost ''list_get'' 1) src n';
-              dst'' \<leftarrow> mop_list_set (\<lambda>_. cost ''list_set'' 1) dst n' x;
-              n'' \<leftarrow> SPECc2 ''add'' (+) n' 1;
-              RETURNT (dst'',n'')
-            })
-          (dst,0);
-          RETURNT dst
-      }"
-
-
-definition list_copy2 :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, (char list, enat) acost) nrest" where
-  "list_copy2 dst src n = doN {
-          monadic_WHILEIET (\<lambda>(dst',n'). n'\<le>n \<and> length dst' = length dst \<and> dst' = take n' src @ drop n' dst)
-              (\<lambda>(_::'a list,n'). (n-n') *m (cost ''if'' 1 + cost ''call'' 1 + cost ''list_get'' 1 + 
-                                        cost ''list_set'' 1 + cost ''add'' 1) )
-            (\<lambda>(_,n'). SPECc2 ''icmp_slt'' (<) n' n)
-            (\<lambda>(dst',n'). doN {
-              x \<leftarrow> mop_array_nth src n';
-              dst'' \<leftarrow> mop_array_upd dst n' x;
-              ASSERT (n'+1\<le>n);
-              n'' \<leftarrow> SPECc2 ''add'' (+) n' 1;
-              RETURNT (dst'',n'')
-            })
-          (dst,0);
-          RETURNT dst
-      }"
-
-definition "TR_lst_copy = 0(''list_get'':=lift_acost mop_array_nth_cost,''list_set'':=lift_acost mop_array_upd_cost)"
-
-lemma "list_copy dst src n \<le> \<Down>Id (\<Down>\<^sub>C TR_lst_copy (list_copy_spec (cost ''list_copy_c'' (enat n)) dst src n))"
-  sorry
-
-
-thm OT_intros
-
-lemma one_time_bind_assert[OT_intros]: "one_time m \<Longrightarrow> one_time (doN { ASSERT P; m})"
-  unfolding one_time_def
-  apply(cases P) by auto
-
-declare hnr_array_upd[sepref_fr_rules del] 
-lemma hnr_array_upd_ohne_sc[sepref_fr_rules]:
-  "CONSTRAINT is_pure A \<Longrightarrow>(uncurry2 array_upd, uncurry2 mop_array_upd) \<in> (array_assn A)\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a A\<^sup>k \<rightarrow>\<^sub>a array_assn A"
-  apply(rule hnr_array_upd)
-   apply simp 
-  unfolding SC_attains_sup_def
-  apply safe
-  apply(rule one_time_attains_sup)
-  unfolding mop_array_upd_def mop_list_set_def
-  unfolding uncurry_def apply simp
-  by(intro OT_intros)
-
-
-locale size_t_context = 
-  fixes size_t :: "'size_t::len2 itself" 
-    and elem_assn :: "'a \<Rightarrow> 'ai::llvm_rep \<Rightarrow> assn"
-  assumes SIZE_T: "8\<le>LENGTH('size_t)"
-begin
-  abbreviation "size_assn \<equiv> snat_assn' TYPE('size_t)"
-
-  thm hnr_array_upd
-  thm hnr_eoarray_upd'
-
-   sepref_def list_copy_impl is "uncurry2 list_copy2"  
-    :: "(array_assn (pure R))\<^sup>d *\<^sub>a (array_assn (pure R))\<^sup>d *\<^sub>a size_assn\<^sup>k  \<rightarrow>\<^sub>a array_assn (pure R)"
-    unfolding  list_copy2_def PR_CONST_def  
-    unfolding monadic_WHILEIET_def
-  apply (annot_snat_const "TYPE('size_t)")
-  apply sepref_dbg_preproc
-  apply sepref_dbg_cons_init
-  apply sepref_dbg_id
-  apply sepref_dbg_monadify
-  apply sepref_dbg_opt_init
-  apply sepref_dbg_trans
-       apply sepref_dbg_opt
-     apply sepref_dbg_cons_solve
-     apply sepref_dbg_cons_solve
-    apply sepref_dbg_constraints
-    apply auto
-    sorry
-
-end
 
 
 
