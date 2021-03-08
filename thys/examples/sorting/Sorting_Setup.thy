@@ -459,12 +459,14 @@ locale sort_impl_context = size_t_context size_t + weak_ordering
     "the_acost (lift_acost lt_acost) ''eo_extract'' = 0"
     "the_acost (lift_acost lt_acost) ''eo_set'' = 0" (* both are no llvm currencies, thus it does not
                                                 clash!  *)
-  assumes size_t_min: "8 \<le> LENGTH('size_t)"
+(*  assumes size_t_min: "8 \<le> LENGTH('size_t)" *)
   notes lt_hnr[sepref_fr_rules] = gen_refines_relpD[OF lt_impl]
   
   notes [[sepref_register_adhoc "(\<^bold><)"]]
   notes [[sepref_register_adhoc "lt_acost"]]
 begin
+
+lemmas size_t_min = SIZE_T (* TODO propagate *)
 
   abbreviation "arr_assn \<equiv> array_assn elem_assn"
 

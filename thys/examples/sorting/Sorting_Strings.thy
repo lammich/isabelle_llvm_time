@@ -1,5 +1,6 @@
 theory Sorting_Strings
-imports "HOL-Library.List_Lexorder" Sorting_Setup
+  imports "HOL-Library.List_Lexorder" Sorting_Setup 
+  "../dynarray/Dynamic_Array" "Sorting_Quicksort_Partition"
 begin
 
   text \<open>The string comparison algorithm from libstdc++, abstractly: Compare min-length first, then compare lengths to break tie\<close>
@@ -54,25 +55,25 @@ begin
   definition "compare1 xs ys n \<equiv> doN {
     ASSERT (n\<le>length xs \<and> n\<le>length ys);
     (i,r)\<leftarrow> monadic_WHILEIET (\<lambda>(i,r). i\<le>n \<and> r=cmpi (take i xs) (take i ys) )
-        (\<lambda>(i::nat,r::int). False)
+        (\<lambda>(i::nat,r::int). undefined:: (string, nat) acost)
        (\<lambda>(i,r).doN { 
-              if\<^sub>N SPECc2 ''ult_lt'' (<) i n 
-                then SPECc2 ''ult_eq'' (=) r 0
+              if\<^sub>N SPECc2 ''icmp_slt'' (<) i n 
+                then SPECc2 ''icmp_eq'' (=) r 0
                 else RETURNT False
             } )
        (\<lambda>(i,r). doN {
       x \<leftarrow> mop_array_nth xs i;
       y \<leftarrow> mop_array_nth ys i;
       ASSERT (i<n);
-      if\<^sub>N SPECc2 ''ult_eq'' (=) x y
+      if\<^sub>N SPECc2 ''icmp_eq'' (=) x y
         then doN {
-            i' \<leftarrow> SPECc2 ''ult_add'' (+) i 1;
+            i' \<leftarrow> SPECc2 ''add'' (+) i 1;
             RETURNT (i',0) }
-      else if\<^sub>N SPECc2 ''ult_lt'' (<) x y then doN {
-            i' \<leftarrow> SPECc2 ''ult_add'' (+) i 1;
+      else if\<^sub>N SPECc2 ''icmp_ult'' (<) x y then doN {
+            i' \<leftarrow> SPECc2 ''add'' (+) i 1;
             RETURNT (i',-1) }
       else doN {
-            i' \<leftarrow> SPECc2 ''ult_add'' (+) i 1;
+            i' \<leftarrow> SPECc2 ''add'' (+) i 1;
             RETURNT (i',1) }
     }) (0,0);
     RETURN r
@@ -110,24 +111,85 @@ begin
         unfolding compare1_def compare_spec_def
         apply (refine_vcg WHILEIT_rule[where R="measure (\<lambda>(i,_). n-i)"])
         by (auto simp: take_Suc_conv_app_nth list_less_def lexord_append compare_impl_aux1 lexord_irreflD[OF preorder_less_irrefl])
-      done *)
-      sorry
+      done *)      
+      apply(intro fun_relI nrest_relI)
+      unfolding compare_spec_def 
+      unfolding compare1_def
+      unfolding SPECc2_def
+      unfolding mop_array_nth_def
+      apply(rule ASSERT_D2_leI)
+      apply simp
+      apply(rule gwp_specifies_I)
+      apply(refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET If_le_rule)
+      subgoal sorry
+      subgoal 
+        apply(rule loop_body_conditionI)
+        sorry
+      subgoal 
+        apply(rule loop_body_conditionI)
+        sorry
+      subgoal 
+        apply(rule loop_body_conditionI)
+        sorry
+      subgoal sorry
+      subgoal sorry
+      subgoal sorry
+      subgoal 
+        apply(rule loop_exit_conditionI)
+        sorry
+      (* have a look at the proof in *)
+      thm weak_ordering.qsp_next_l_refine
+
+      sorry (* TODO: Peter *) 
       
   end
 
 
   abbreviation "string_assn' TYPE('size_t::len2) TYPE('w::len) \<equiv> al_assn' TYPE('size_t::len2) (unat_assn' TYPE('w::len))"
-  
-  sepref_definition compare_impl [llvm_inline, llvm_code] is "uncurry2 compare1" :: 
+
+
+  sepref_definition compare_impl2 [llvm_inline, llvm_code] is "uncurry2 compare1" :: 
     "(string_assn' TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (string_assn' TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k \<rightarrow>\<^sub>a sint_assn' TYPE('r::len2)"  
     unfolding compare1_def
+    unfolding monadic_WHILEIET_def
     apply (annot_snat_const "TYPE('size_t)")
     apply (annot_sint_const "TYPE('r)")
-    by sepref
-  
+    by sepref 
+
+  term b_assn
+  term nbn_assn
+
+definition "bstring_assn n TYPE('size_t::len2) TYPE('w::len)
+       = b_assn (string_assn' TYPE('size_t::len2) TYPE('w::len)) (\<lambda>ls. length ls \<le> n)"
+
+
+(*sepref_definition dyn_array_nth2 is "uncurry mop_array_nth"::
+     "(bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn' TYPE('w::len)" 
+  unfolding bstring_assn_def
+  (* using dyn_array_nth *)
+  apply sepref_dbg_keep
+  sorry
+*)
+lemma bstring_nth[sepref_fr_rules]:
+  "(uncurry dyn_array_nth, uncurry mop_array_nth)
+     \<in> (bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn' TYPE('w::len)" 
+  apply sepref
+  using dyn_array_nth (* TODO PETER*)
+  sorry
+
+
+
+  sepref_definition compare_impl [llvm_inline, llvm_code] is "uncurry2 compare1" :: 
+    "(bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (bstring_assn n TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k \<rightarrow>\<^sub>a sint_assn' TYPE('r::len2)"  
+    unfolding compare1_def
+    unfolding monadic_WHILEIET_def 
+    apply (annot_snat_const "TYPE('size_t)")
+    apply (annot_sint_const "TYPE('r) ")
+    by sepref 
+ 
   lemmas compare_hnr[sepref_fr_rules] = compare_impl.refine[FCOMP compare1_refine]
   
-    
+    (*
   definition "strcmp xs ys \<equiv> doN {
     let n = min (length xs) (length ys);
     i \<leftarrow> compare_spec xs ys n;
@@ -142,7 +204,7 @@ begin
     apply refine_vcg
     by (simp_all)
     
-  lemma strcmp_refines_aux: "(strcmp,RETURN oo (<)) \<in> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+  lemma strcmp_refines_aux: "(strcmp,RETURN oo (<)) \<in> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     using strcmp_correct by (force intro!: nres_relI)
     
   
@@ -150,19 +212,41 @@ begin
     unfolding strcmp_def min_def
     apply (annot_sint_const "TYPE(2)")
     by sepref
-    
+
+  *)
+
+definition "strcmp_impl = undefined"
+definition "string_cmp_cost n = cost ''bla'' n"
+
+
+term string_cmp_cost
+term compare_cost
+
+(* hier passiert die überabschätzung *)
+
+lemma strcmp_impl_refine:
+  "(uncurry strcmp_impl, uncurry (SPECc3 (lift_acost (string_cmp_cost n)) (<)))
+   \<in> (bstring_assn n TYPE('size_t::len2) TYPE('w::len2))\<^sup>k *\<^sub>a (bstring_assn n TYPE('size_t) TYPE('w))\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
+  sorry
+
   export_llvm "strcmp_impl :: 64 word \<times> 64 word \<times> 8 word ptr \<Rightarrow> 64 word \<times> 64 word \<times> 8 word ptr \<Rightarrow> 1 word llM"
 
 
-  lemma strcmp_refines_relp: "GEN_ALGO strcmp_impl (refines_relp (al_assn unat_assn) (<))"
+
+lemma strcmp_refines_relp: "GEN_ALGO strcmp_impl (refines_relp (bstring_assn n TYPE('size_t::len2) TYPE('w::len2))
+                    (lift_acost (string_cmp_cost n)) (<))"
     apply rule
-    using strcmp_impl.refine[FCOMP strcmp_refines_aux] .
-  
-  lemma strcmp_sort_impl_context: "sort_impl_context (\<le>) (<) strcmp_impl (string_assn' TYPE('size_t::len2) TYPE('w::len))"
+    using strcmp_impl_refine[of n, where 'size_t='size_t] .
+
+ 
+
+lemma strcmp_sort_impl_context: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> sort_impl_context TYPE('size_t) (\<le>) (<) strcmp_impl (string_cmp_cost n)
+               (bstring_assn n TYPE('size_t) TYPE('w::len2))"
     apply unfold_locales
     apply (auto simp: strcmp_refines_relp)
-    done
-  
+  sorry
+
+
   
   
 end
