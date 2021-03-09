@@ -1,6 +1,7 @@
 theory Dynamic_Array
   imports "../../sepref/Hnr_Primitives_Experiment" "../../nrest/Refine_Heuristics"
   "../../nrest/NREST_Automation" "../sorting/Sorting_Setup"
+  "../../nrest/Synth_Rate"
 begin
 
 
@@ -20,29 +21,12 @@ definition list_copy_spec where
        REST [take n src @ drop n dst \<mapsto> T n]
     }"
 
-
-
-definition list_copy :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, (char list, enat) acost) nrest" where
-"list_copy dst src n = doN {
+definition "list_copy_body_cost = (cost ''if'' 1 + cost ''call'' 1 +  mop_array_nth_cost + 
+                                         mop_array_upd_cost + cost ''add'' 1 + cost ''icmp_slt'' 1)"
+definition list_copy :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, ecost) nrest" where
+  "list_copy dst src n = doN {
           (dst,_) \<leftarrow> monadic_WHILEIET (\<lambda>(dst',n'). n'\<le>n \<and> length dst' = length dst \<and> dst' = take n' src @ drop n' dst)
-              (\<lambda>(_::'a list,n'). (n-n') *m (cost ''if'' 1 + cost ''call'' 1 + cost ''list_get'' 1 + 
-                                        cost ''list_set'' 1 + cost ''add'' 1) )
-            (\<lambda>(_,n'). SPECc2 ''less'' (<) n' n)
-            (\<lambda>(dst',n'). doN {
-              x \<leftarrow> mop_list_get (\<lambda>_. cost ''list_get'' 1) src n';
-              dst'' \<leftarrow> mop_list_set (\<lambda>_. cost ''list_set'' 1) dst' n' x;
-              n'' \<leftarrow> SPECc2 ''add'' (+) n' 1;
-              RETURNT (dst'',n'')
-            })
-          (dst,0);
-          RETURNT dst
-      }"
-
-definition list_copy2 :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> ('a list, (char list, enat) acost) nrest" where
-  "list_copy2 dst src n = doN {
-          (dst,_) \<leftarrow> monadic_WHILEIET (\<lambda>(dst',n'). n'\<le>n \<and> length dst' = length dst \<and> dst' = take n' src @ drop n' dst)
-              (\<lambda>(_::'a list,n'). (n-n') *m (cost ''if'' 1 + cost ''call'' 1 + cost ''list_get'' 1 + 
-                                        cost ''list_set'' 1 + cost ''add'' 1) )
+              (\<lambda>(_::'a list,n'). (n-n') *m list_copy_body_cost )
             (\<lambda>(_,n'). SPECc2 ''icmp_slt'' (<) n' n)
             (\<lambda>(dst',n'). doN {
               x \<leftarrow> mop_array_nth src n';
@@ -55,19 +39,42 @@ definition list_copy2 :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Righ
           RETURNT dst
       }"
 
-definition "TR_lst_copy = 0(''list_get'':=lift_acost mop_array_nth_cost,''list_set'':=lift_acost mop_array_upd_cost)"
+definition "list_copy_spec_time n = (enat (n)) *m (lift_acost list_copy_body_cost)
+           + cost ''if'' 1 + cost ''call'' 1 + cost ''icmp_slt'' 1"
 
-lemma "list_copy dst src n \<le> \<Down>Id (\<Down>\<^sub>C TR_lst_copy (list_copy_spec (\<lambda>n. cost ''list_copy_c'' (enat n)) dst src n))"
-  sorry
-
-definition "list_copy_spec_time n = undefined"
-
-lemma "(uncurry2 list_copy2, uncurry2 (PR_CONST (list_copy_spec list_copy_spec_time)))
-       \<in>  \<rightarrow>\<^sub>f list_rel"
-  sorry
-
-
-thm OT_intros
+lemma list_copy_correct: "(uncurry2 list_copy, uncurry2 (list_copy_spec list_copy_spec_time))
+       \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
+  apply rule
+  apply (rule nrest_relI)    
+  unfolding uncurry_def 
+  unfolding list_copy_spec_def 
+  apply (auto simp add: le_fun_def)    
+  apply(rule le_acost_ASSERTI) 
+  unfolding list_copy_def
+  unfolding list_copy_body_cost_def
+  unfolding SPECc2_def mop_array_nth_def mop_list_get_def mop_array_upd_def  mop_list_set_def
+  apply(rule gwp_specifies_I)
+  apply(refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET If_le_rule)
+  subgoal
+    unfolding wfR2_def
+    apply (auto simp:  costmult_add_distrib costmult_cost the_acost_propagate zero_acost_def)
+      by(auto simp: cost_def zero_acost_def)
+  subgoal apply(rule loop_body_conditionI)
+    subgoal apply (auto simp: norm_cost) apply(sc_solve) by auto
+    subgoal apply (auto simp: norm_cost) apply(sc_solve) by (auto simp: one_enat_def)
+    subgoal apply (auto simp: norm_cost) by(simp add: upd_conv_take_nth_drop take_Suc_conv_app_nth)
+    done
+  subgoal apply auto done
+  subgoal apply auto done
+  subgoal apply auto done
+  subgoal
+    apply(rule loop_exit_conditionI)
+    apply(refine_vcg \<open>-\<close> rules:)
+    unfolding list_copy_spec_time_def list_copy_body_cost_def
+    apply (auto simp: norm_cost lift_acost_propagate cost_zero)
+    apply(sc_solve) by auto
+  subgoal apply auto done
+  done
 
 lemma one_time_bind_assert[OT_intros]: "one_time m \<Longrightarrow> one_time (doN { ASSERT P; m})"
   unfolding one_time_def
@@ -93,32 +100,23 @@ begin
   thm hnr_array_upd
   thm hnr_eoarray_upd'
 
-
-thm hnr_array_upd
+  thm hnr_array_upd
 
 lemmas [safe_constraint_rules] = CN_FALSEI[of is_pure "array_assn A" for A]
 
-   sepref_def list_copy_impl is "uncurry2 list_copy2"  
-    :: "(array_assn (pure R))\<^sup>d *\<^sub>a (array_assn (pure R))\<^sup>k *\<^sub>a size_assn\<^sup>k  \<rightarrow>\<^sub>a array_assn (pure R)"
-    unfolding  list_copy2_def PR_CONST_def  
-    unfolding monadic_WHILEIET_def
-  apply (annot_snat_const "TYPE('size_t)")
-    by sepref 
+   sepref_def list_copy_impl is "uncurry2 list_copy"  
+     :: "(array_assn (pure R))\<^sup>d *\<^sub>a (array_assn (pure R))\<^sup>k *\<^sub>a size_assn\<^sup>k  \<rightarrow>\<^sub>a array_assn (pure R)"
+     unfolding  list_copy_def PR_CONST_def  
+     unfolding monadic_WHILEIET_def
+     apply (annot_snat_const "TYPE('size_t)")
+     by sepref 
 
 
   thm list_copy_impl.refine
 
   thm list_copy_impl.refine
-
 
 end
-
-
-
-
-sepref_def dynamiclist_empty_impl is "  (PR_CONST (\<lambda>_::nat. RETURNT (0::nat)))"
-  :: "(snat_assn)\<^sup>k \<rightarrow>\<^sub>a snat_assn"
-  oops
 
 
 section \<open>Misc\<close>
@@ -1290,12 +1288,26 @@ lemma FREE_dyn_array_raw_assn[sepref_frame_free_rules]:
   sorry
 
 
+subsection \<open>implement nth\<close>
 
+
+(* TODO *)
 
 subsection  \<open>implement push\<close>
 
+lemma wfR''_zero[simp]: "wfR'' 0" "wfR'' (\<lambda>_. 0)"
+  unfolding wfR''_def by (auto simp: zero_acost_def)
 
-definition "TR_dynarray = 0(''list_init_c'':=cost'_narray_new 1)"
+definition "TR_dynarray = 0(''dyn_list_double_c'':=   cost'_narray_new 2
+                               + lift_acost list_copy_body_cost
+                                + cost ''icmp_slt'' 1 + cost ''call'' 1 + cost ''if'' 1
+                                + cost ''mult'' 1
+                                          )"
+
+lemma wfR''_TR_dynarray[simp]: "wfR'' TR_dynarray"
+  unfolding TR_dynarray_def
+  by auto 
+
 definition "dyn_array_push_impl = undefined"
 
 term   dyn_list_double_spec
@@ -1305,9 +1317,281 @@ definition dyn_list_double :: "('x::llvm_rep) list \<times> nat \<times> nat \<R
        ASSERT (l\<le>c \<and> c=length bs);
        c' \<leftarrow> SPECc2 ''mult'' (*) c 2;
        bs' \<leftarrow> mop_array_new id_assn init c';
-       bs'' \<leftarrow> list_copy_spec (cost ''list_copy_c'' (enat l)) bs' bs l;
+       bs'' \<leftarrow> list_copy_spec list_copy_spec_time bs' bs l;
        RETURNT (bs'',l,c')
   }"
+
+
+lemma dyn_list_double_correct:
+    "c>0 \<Longrightarrow> l=c \<Longrightarrow> dyn_list_double (bs,l,c) \<le> \<Down> Id ( \<Down>\<^sub>C TR_dynarray (dyn_list_double_spec (bs,l,c)))"
+  unfolding dyn_list_double_spec_def 
+  apply(split prod.splits)+ apply (rule)+
+  apply(rule ASSERT_D3_leI) 
+  apply (auto simp add: le_fun_def SPEC_timerefine_conv split: prod.splits)  
+  unfolding SPEC_def 
+  apply(rule gwp_specifies_I) 
+  unfolding dyn_list_double_def SPECc2_def mop_array_new_def mop_list_init_def
+  unfolding list_copy_spec_def
+  apply(refine_vcg \<open>-\<close> rules:)
+  subgoal for a b ca
+     apply(rule If_le_Some_rule2)
+    unfolding list_copy_spec_time_def list_copy_body_cost_def TR_dynarray_def
+     apply (auto simp: norm_cost)
+    apply(sc_solve) 
+    apply (auto simp: numeral_eq_enat one_enat_def)
+    apply(rule order.trans[where b="1+(1+1)"]) apply simp apply(rule add_mono) apply simp
+      apply(rule add_mono) apply simp_all done
+  subgoal by auto
+  subgoal by auto
+  subgoal by auto
+  done
+
+
+definition dyn_list_double2 :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('x list \<times> nat \<times> nat, (char list, enat) acost) nrest"  where
+  "dyn_list_double2  \<equiv> \<lambda>(bs,l,c). doN {
+       ASSERT (l\<le>c \<and> c=length bs);
+       c' \<leftarrow> SPECc2 ''mult'' (*) c 2;
+       bs' \<leftarrow> mop_array_new id_assn init c';
+       bs'' \<leftarrow> list_copy bs' bs l;
+       RETURNT (bs'',l,c')
+  }"
+
+lemma nrest_C_relI:
+  fixes a :: "(_,ecost) nrest"
+  shows "a \<le> \<Down>R (\<Down>\<^sub>C TId b) \<Longrightarrow> (a,b) \<in> \<langle>R\<rangle>nrest_rel"
+  apply(rule nrest_relI) by (auto simp: timerefine_id)
+
+ (*
+lemma "(dyn_list_double2, dyn_list_double) \<in> Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
+  apply rule
+  apply (rule nrest_C_relI)   
+  unfolding dyn_list_double2_def dyn_list_double_def
+  unfolding SPECc2_alt
+    apply normalize_blocks
+  apply(refine_rcg consumea_Id_refine bindT_refine_easy) *)
+
+term "TTId {''malloc'', ''free'' , ''if'' , ''if'' , ''icmp_eq'' , ''ptrcmp_eq''}" 
+
+lemma TTId_simps: "x \<in> S \<Longrightarrow> TTId S x = cost x 1"
+      "x \<notin> S \<Longrightarrow> TTId S x = 0"
+  unfolding TTId_def by auto
+
+lemma
+  mop_array_new_minimal_Trefinement:
+   "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> mop_array_new R a b \<le> \<Down> Id (timerefine (TTId {''malloc'', ''free'' , ''if'' , ''if'' , ''icmp_eq'' , ''ptrcmp_eq''}) (mop_array_new R a' b'))"
+  unfolding mop_array_new_def mop_list_init_def 
+  apply(simp del: conc_Id)
+  apply(rule consume_refine)
+  subgoal apply(rule wfR''_TTId_if_finite) by simp
+  subgoal apply(auto simp add: norm_cost intro!: wfR''_TTId_if_finite)
+    apply(subst timerefineA_propagate) apply(intro wfR''_TTId_if_finite) apply simp
+    apply(subst timerefineA_propagate) apply(intro wfR''_TTId_if_finite) apply simp
+    apply(subst timerefineA_propagate) apply(intro wfR''_TTId_if_finite) apply simp
+    apply(subst timerefineA_propagate) apply(intro wfR''_TTId_if_finite) apply simp
+    apply(subst timerefineA_propagate) apply(intro wfR''_TTId_if_finite) apply simp
+    by(auto simp add: norm_cost TTId_simps)
+  subgoal  apply(rule RETURNT_refine_t) by simp
+  done
+
+lemma
+  mop_array_new_Trefinement:
+   "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> mop_array_new R a b \<le> \<Down> Id (timerefine TId (mop_array_new R a' b'))"
+  by (auto simp: timerefine_id)
+
+thm selfrefine_TTId_currs_of_M_both
+
+lemma pff: "list_copy a b c \<le>  list_copy_spec list_copy_spec_time a b c"
+  using list_copy_correct[THEN frefD, THEN nrest_relD, unfolded uncurry_def, simplified]
+  by auto 
+
+lemma list_copy_self_refine: "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> (c,c')\<in>Id
+    \<Longrightarrow> list_copy a b c \<le> \<Down>Id (\<Down>\<^sub>C TId (list_copy_spec list_copy_spec_time a' b' c'))"
+  using list_copy_correct[THEN frefD, THEN nrest_relD, unfolded uncurry_def, simplified]
+  by (auto simp: timerefine_id) 
+
+lemma zzz: "(nofailT (list_copy_spec list_copy_spec_time dst src n))
+    \<Longrightarrow> currs_of_M (list_copy_spec list_copy_spec_time dst src n) = currs_of (list_copy_spec_time n)"
+  unfolding list_copy_spec_def 
+  unfolding currs_of_M_def
+  by (auto simp: nofailT_bindT_ASSERT_iff split: if_splits)
+
+lemma currs_of_add:
+  fixes a :: ecost
+  shows "currs_of (a+b) = currs_of a \<union> currs_of b"
+  apply(cases a; cases b)
+  by (auto simp:  currs_of_def)
+
+lemma currs_of_costmult:
+  fixes b :: ecost
+  shows "currs_of (a *m b) \<subseteq> currs_of b"
+  apply(cases b)
+  by (auto simp: costmult_def currs_of_def) 
+
+lemma currs_of_costmult_gt:
+  fixes b :: ecost
+  shows "a>0 \<Longrightarrow> currs_of (a *m b) = currs_of b"
+  apply(cases b)
+  by (auto simp: costmult_def currs_of_def) 
+
+lemma uu: "(\<Union>n. currs_of (list_copy_spec_time n)) = currs_of (list_copy_spec_time 1)"
+  unfolding list_copy_spec_time_def
+  apply (auto simp: list_copy_body_cost_def norm_cost )   
+  subgoal for x n
+    apply(cases "n=0") 
+     apply(simp add: currs_of_add cost_zero zero_enat_def[symmetric])
+    by (auto simp:  currs_of_add pff2 zero_enat_def) 
+  done
+
+ 
+  
+
+lemma tta: "currs_of (list_copy_spec_time n) \<subseteq> (\<Union>n. currs_of (list_copy_spec_time n))"
+  unfolding list_copy_spec_time_def
+  by (auto simp: list_copy_body_cost_def norm_cost )    
+
+
+lemma list_copy_tight: "(dsti,dst)\<in>Id \<Longrightarrow> (srci,src)\<in>Id \<Longrightarrow> (ni,n)\<in>Id \<Longrightarrow>
+          list_copy dsti srci ni \<le> \<Down> Id (\<Down>\<^sub>C (TTId (\<Union>n. currs_of (list_copy_spec_time n)))
+                                         (list_copy_spec list_copy_spec_time dst src n))"
+  apply auto
+  apply(rule order.trans)
+   apply(rule pff)
+  apply(rule order.trans[rotated])
+   apply(rule timerefine_TTId_mono)
+  apply(rule tta[where n=n]) defer
+   apply(subst selfrefine_TTId_currs_of_M_both_yeah)
+  supply [[show_types]]
+    apply(rule zzz) apply simp apply auto 
+  unfolding uu 
+  unfolding list_copy_spec_time_def list_copy_body_cost_def
+  by(auto simp: norm_cost currs_of_add intro: finite_subset[OF currs_cost] )
+ 
+
+
+lemma pff3: "currs_of (cost x (i::enat)) \<subseteq> {x}"
+  unfolding currs_of_def cost_def  by (auto simp: zero_acost_def)
+
+lemma finite_currs_of_lcst[simp]: "finite (currs_of (list_copy_spec_time l))"
+  unfolding list_copy_spec_time_def list_copy_body_cost_def
+  by(auto simp add: norm_cost currs_of_add pff2 intro: finite_subset[OF pff3])    
+
+declare RETURNT_refine_t[refine0 del]
+
+lemma RETURNT_refine_tight[refine0]: "(c,a)\<in>R \<Longrightarrow> RETURNT c \<le> \<Down>R (\<Down>\<^sub>C 0 (RETURNT a))"
+  by (rule RETURNT_refine_t)
+
+
+schematic_goal dyn_list_double2_refine_tight: "dyn_list_double2 (bs, l, c) \<le> \<Down> Id (\<Down>\<^sub>C (?E) (dyn_list_double (bs, l, c)))"
+  unfolding dyn_list_double2_def dyn_list_double_def
+  apply(refine_rcg) apply auto[1]
+  apply(refine_rcg  bindT_refine_conc_time_my_inres_sup
+          SPECc2_refine_exch mop_array_new_minimal_Trefinement
+          list_copy_tight)
+                 apply refine_dref_type 
+  by (auto simp: TId_apply uu intro!: wfR''_supI wfR''_TTId_if_finite )
+
+concrete_definition TR_dld2 is dyn_list_double2_refine_tight uses "_ \<le> \<Down> Id (\<Down>\<^sub>C \<hole> _)" 
+thm TR_dld2.refine TR_dld2_def
+
+lemma II:
+  fixes A :: "_ \<Rightarrow> ecost"
+  shows "sup A 0 = A" 
+  apply (auto simp: sup_fun_def sup_acost_def zero_acost_def) apply(rule ext)  
+  by (simp add: complete_linorder_sup_max)  
+
+
+lemma  III:
+  shows "sup ( (TTId A) :: _ \<Rightarrow> ecost) (TTId B) = TTId (A\<union>B)" 
+  unfolding TTId_def apply(auto simp: sup_acost_def sup_fun_def)
+  apply(rule ext) by (auto simp: zero_acost_def complete_linorder_sup_max)
+
+lemma h: "(\<lambda>_. 0)(''mult'' := cost ''mult'' 1) = TTId {''mult''}"
+  unfolding TTId_def by auto
+
+definition "hide a b = (a=b)"
+lemma hideI: "a=b \<Longrightarrow> hide a b" unfolding hide_def by simp
+lemma hide: "hide a b \<Longrightarrow> a = b" unfolding hide_def by simp
+
+schematic_goal TR_dld2_alt: "TR_dld2 = ?A"
+  apply(rule hide)
+  unfolding TR_dld2_def
+  unfolding list_copy_spec_time_def
+  apply(simp only: II III h )
+  apply(auto simp: currs_of_add)
+  apply(subst currs_of_costmult_gt) apply (simp add: zero_enat_def)
+  unfolding list_copy_body_cost_def
+  apply(auto simp: currs_of_add norm_cost)
+  apply(auto simp: currs_of_cost_gt zero_enat_def) 
+  apply(subst currs_of_cost_gt, simp)+ 
+  apply simp
+  apply(rule hideI) apply simp done
+
+(* obsolete *)
+lemma dyn_list_double2_refine: "dyn_list_double2 (bs, l, c) \<le> \<Down> Id (\<Down>\<^sub>C TId (dyn_list_double (bs, l, c)))"
+  unfolding dyn_list_double2_def dyn_list_double_def
+  apply(refine_rcg bindT_refine_easy SPECc2_refine mop_array_new_Trefinement
+        list_copy_self_refine
+       )
+  apply refine_dref_type
+  by (auto simp: TId_apply)
+
+
+  thm bindT_refine_conc_time_my_inres_sup
+
+lemma wfR''_wfR''[simp]: "wfR'' TR_dld2"
+  unfolding TR_dld2_alt apply(rule wfR''_TTId_if_finite)
+  by simp
+
+
+  thm dyn_list_double2_refine dyn_list_double_correct
+
+lemma dyn_list_double2_correct:"\<lbrakk>0 < c; l = c; (bs,bs')\<in>Id; (l,l')\<in>Id; (c,c')\<in>Id \<rbrakk> \<Longrightarrow>
+  dyn_list_double2 (bs', l', c') \<le> \<Down> Id (\<Down>\<^sub>C (pp TR_dld2 TR_dynarray) (dyn_list_double_spec (bs, l, c))) "
+  apply(rule order.trans)
+   apply(rule TR_dld2.refine)
+  apply (simp add: timerefine_id timerefine_iter2[symmetric])
+  apply(rule timerefine_mono2)
+  subgoal  by simp 
+  apply(rule order.trans[rotated])
+   apply(rule dyn_list_double_correct[simplified])
+  by auto
+
+
+lemma "pp TR (F(x:=l)) = (pp TR F)(x:=timerefineA TR l)"
+  using pp_fun_upd by metis
+
+lemma pp_0: "pp TR 0 = (0::_ \<Rightarrow> ecost)"
+  unfolding pp_def by(auto simp: zero_acost_def)
+
+schematic_goal TR_dld2_dynaaray_simp: "(pp TR_dld2 TR_dynarray) = ?gg"
+  apply(rule hide)
+  unfolding TR_dynarray_def 
+  apply(simp only: pp_fun_upd pp_0)
+  unfolding list_copy_body_cost_def
+  apply(auto simp: norm_cost )
+  apply(auto simp: TR_dld2_alt TTId_simps)
+  apply(auto simp: costmult_cost)
+  apply(rule hideI)
+  apply(rule refl) done
+
+thm TR_dld2_dynaaray_simp
+
+
+term dyn_list_push_basic_spec
+                               
+definition dyn_list_push_basic where
+  "dyn_list_push_basic \<equiv> \<lambda>(bs,l,c) x. doN {
+      ASSERT (l < length bs);
+      bs' \<leftarrow> mop_array_upd  bs l x;
+      l' \<leftarrow> SPECc2 ''add'' (+) l 1;
+      RETURNT (bs',l',c)
+  }"
+
+
+lemma "dyn_list_push_basic (bs,l,c) x  \<le> \<Down>Id (\<Down>\<^sub>C TId )"
+
+
+
 
 definition "dynamiclist_append2 = undefined"
 
@@ -1454,7 +1738,14 @@ concrete_definition dynamic_array_assn is size_t_context.dyn_array_dynamic_array
 
 abbreviation "al_assn' TYPE('l::len2) R \<equiv> dynamic_array_assn R :: (_ \<Rightarrow> _ \<times> 'l word \<times> 'l word \<Rightarrow> _)"
 
+ 
+thm hnr_array_nth 
 
+term "(\<lambda>((dl,_,_),n). mop_array_nth dl n)"
+term "(dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A"
+
+sepref_def dyn_array_nth is "(\<lambda>((dl,_,_),n). mop_array_nth dl n)"
+     :: "(dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A" 
 
 lemma dyn_array_nth[sepref_fr_rules]:
   "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A \<Longrightarrow> (uncurry dyn_array_nth, uncurry mop_array_nth)
