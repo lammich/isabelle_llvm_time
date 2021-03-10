@@ -174,16 +174,16 @@ lemma hr_comp_brel[fcomp_norm_simps]: "hr_comp A (b_rel B P) = b_assn (hr_comp A
 lemma mop_array_nth_len_bound:
   fixes nth_impl A B
   assumes "(uncurry nth_impl, uncurry mop_array_nth) \<in> A\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
-  shows "(uncurry nth_impl, uncurry mop_array_nth) \<in> (b_assn A (\<lambda>xs. P (length xs)))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
+  shows "(uncurry nth_impl, uncurry mop_array_nth) \<in> (b_assn A P)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
 proof -
-  have A: "(mop_array_nth, mop_array_nth) \<in> b_rel Id (\<lambda>xs. P (length xs)) \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+  have A: "(mop_array_nth, mop_array_nth) \<in> b_rel Id P \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     by (auto simp add: refine_pw_simps fun_rel_def pw_acost_nrest_rel_iff)
     
   from assms(1)[FCOMP A[to_fref]] show ?thesis .
 qed    
     
 lemma mop_array_upd_len_bound:
-  fixes nth_impl A B
+  fixes upd_impl A B
   assumes "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> A\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow>\<^sub>a A"
   shows "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> (b_assn A (\<lambda>xs. P (length xs)))\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow>\<^sub>a (b_assn A (\<lambda>xs. P (length xs)))"
 proof -
