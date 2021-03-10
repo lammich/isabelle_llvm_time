@@ -1871,7 +1871,7 @@ interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
   subgoal by (fact wfR''_TR_dynarray)
   subgoal sorry
   subgoal by(fact dyn_array_push_refine)
-  subgoal apply(rule dyn_array_push_impl_refines) done
+  subgoal apply(rule dyn_array_push_impl_refines) sorry
   subgoal by (fact dynamiclist_empty_impl.refine)
   subgoal by (fact emptylist2_refine) 
   done 
