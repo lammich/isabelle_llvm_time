@@ -112,12 +112,14 @@ lemmas [safe_constraint_rules] = CN_FALSEI[of is_pure "array_assn A" for A]
      by sepref 
 
 
-  thm list_copy_impl.refine
+lemmas list_copy_impl_refine = list_copy_impl.refine 
 
   thm list_copy_impl.refine
 
 end
 
+thm size_t_context.list_copy_impl_refine
+thm size_t_context.list_copy_impl_def
 
 section \<open>Misc\<close>
 
@@ -1298,24 +1300,23 @@ subsection  \<open>implement push\<close>
 lemma wfR''_zero[simp]: "wfR'' 0" "wfR'' (\<lambda>_. 0)"
   unfolding wfR''_def by (auto simp: zero_acost_def)
 
-definition "TR_dynarray = 0(''dyn_list_double_c'':=   cost'_narray_new 2
+definition "TR_doublec = 0(''dyn_list_double_c'':=   cost'_narray_new 2
                                + lift_acost list_copy_body_cost
                                 + cost ''icmp_slt'' 1 + cost ''call'' 1 + cost ''if'' 1
-                                + cost ''mult'' 1
+                                + cost ''mul'' 1
                                           )"
 
-lemma wfR''_TR_dynarray[simp]: "wfR'' TR_dynarray"
-  unfolding TR_dynarray_def
+lemma wfR''_TR_doublec[simp]: "wfR'' TR_doublec"
+  unfolding TR_doublec_def
   by auto 
 
-definition "dyn_array_push_impl = undefined"
 
 term   dyn_list_double_spec
 
 definition dyn_list_double :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('x list \<times> nat \<times> nat, (char list, enat) acost) nrest"  where
   "dyn_list_double  \<equiv> \<lambda>(bs,l,c). doN {
        ASSERT (l\<le>c \<and> c=length bs);
-       c' \<leftarrow> SPECc2 ''mult'' (*) c 2;
+       c' \<leftarrow> SPECc2 ''mul'' (*) c 2;
        bs' \<leftarrow> mop_array_new id_assn init c';
        bs'' \<leftarrow> list_copy_spec list_copy_spec_time bs' bs l;
        RETURNT (bs'',l,c')
@@ -1323,7 +1324,7 @@ definition dyn_list_double :: "('x::llvm_rep) list \<times> nat \<times> nat \<R
 
 
 lemma dyn_list_double_correct:
-    "c>0 \<Longrightarrow> l=c \<Longrightarrow> dyn_list_double (bs,l,c) \<le> \<Down> Id ( \<Down>\<^sub>C TR_dynarray (dyn_list_double_spec (bs,l,c)))"
+    "c>0 \<Longrightarrow> l=c \<Longrightarrow> dyn_list_double (bs,l,c) \<le> \<Down> Id ( \<Down>\<^sub>C TR_doublec (dyn_list_double_spec (bs,l,c)))"
   unfolding dyn_list_double_spec_def 
   apply(split prod.splits)+ apply (rule)+
   apply(rule ASSERT_D3_leI) 
@@ -1335,7 +1336,7 @@ lemma dyn_list_double_correct:
   apply(refine_vcg \<open>-\<close> rules:)
   subgoal for a b ca
      apply(rule If_le_Some_rule2)
-    unfolding list_copy_spec_time_def list_copy_body_cost_def TR_dynarray_def
+    unfolding list_copy_spec_time_def list_copy_body_cost_def TR_doublec_def
      apply (auto simp: norm_cost)
     apply(sc_solve) 
     apply (auto simp: numeral_eq_enat one_enat_def)
@@ -1350,7 +1351,7 @@ lemma dyn_list_double_correct:
 definition dyn_list_double2 :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('x list \<times> nat \<times> nat, (char list, enat) acost) nrest"  where
   "dyn_list_double2  \<equiv> \<lambda>(bs,l,c). doN {
        ASSERT (l\<le>c \<and> c=length bs);
-       c' \<leftarrow> SPECc2 ''mult'' (*) c 2;
+       c' \<leftarrow> SPECc2 ''mul'' (*) c 2;
        bs' \<leftarrow> mop_array_new id_assn init c';
        bs'' \<leftarrow> list_copy bs' bs l;
        RETURNT (bs'',l,c')
@@ -1481,7 +1482,9 @@ lemma RETURNT_refine_tight[refine0]: "(c,a)\<in>R \<Longrightarrow> RETURNT c \<
   by (rule RETURNT_refine_t)
 
 
-schematic_goal dyn_list_double2_refine_tight: "dyn_list_double2 (bs, l, c) \<le> \<Down> Id (\<Down>\<^sub>C (?E) (dyn_list_double (bs, l, c)))"
+schematic_goal dyn_list_double2_refine_tight: 
+  "(bs,bs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (c,c')\<in>Id
+    \<Longrightarrow> dyn_list_double2 (bs, l, c) \<le> \<Down> Id (\<Down>\<^sub>C (?E) (dyn_list_double (bs', l', c')))"
   unfolding dyn_list_double2_def dyn_list_double_def
   apply(refine_rcg) apply auto[1]
   apply(refine_rcg  bindT_refine_conc_time_my_inres_sup
@@ -1491,6 +1494,7 @@ schematic_goal dyn_list_double2_refine_tight: "dyn_list_double2 (bs, l, c) \<le>
   by (auto simp: TId_apply uu intro!: wfR''_supI wfR''_TTId_if_finite )
 
 concrete_definition TR_dld2 is dyn_list_double2_refine_tight uses "_ \<le> \<Down> Id (\<Down>\<^sub>C \<hole> _)" 
+lemmas dyn_list_double2_refine = TR_dld2.refine
 thm TR_dld2.refine TR_dld2_def
 
 lemma II:
@@ -1505,7 +1509,7 @@ lemma  III:
   unfolding TTId_def apply(auto simp: sup_acost_def sup_fun_def)
   apply(rule ext) by (auto simp: zero_acost_def complete_linorder_sup_max)
 
-lemma h: "(\<lambda>_. 0)(''mult'' := cost ''mult'' 1) = TTId {''mult''}"
+lemma h: "(\<lambda>_. 0)(''mul'' := cost ''mul'' 1) = TTId {''mul''}"
   unfolding TTId_def by auto
 
 definition "hide a b = (a=b)"
@@ -1527,7 +1531,7 @@ schematic_goal TR_dld2_alt: "TR_dld2 = ?A"
   apply(rule hideI) apply simp done
 
 (* obsolete *)
-lemma dyn_list_double2_refine: "dyn_list_double2 (bs, l, c) \<le> \<Down> Id (\<Down>\<^sub>C TId (dyn_list_double (bs, l, c)))"
+lemma dyn_list_double2_refine_coarse: "dyn_list_double2 (bs, l, c) \<le> \<Down> Id (\<Down>\<^sub>C TId (dyn_list_double (bs, l, c)))"
   unfolding dyn_list_double2_def dyn_list_double_def
   apply(refine_rcg bindT_refine_easy SPECc2_refine mop_array_new_Trefinement
         list_copy_self_refine
@@ -1546,9 +1550,9 @@ lemma wfR''_wfR''[simp]: "wfR'' TR_dld2"
   thm dyn_list_double2_refine dyn_list_double_correct
 
 lemma dyn_list_double2_correct:"\<lbrakk>0 < c; l = c; (bs,bs')\<in>Id; (l,l')\<in>Id; (c,c')\<in>Id \<rbrakk> \<Longrightarrow>
-  dyn_list_double2 (bs', l', c') \<le> \<Down> Id (\<Down>\<^sub>C (pp TR_dld2 TR_dynarray) (dyn_list_double_spec (bs, l, c))) "
+  dyn_list_double2 (bs', l', c') \<le> \<Down> Id (\<Down>\<^sub>C (pp TR_dld2 TR_doublec) (dyn_list_double_spec (bs, l, c))) "
   apply(rule order.trans)
-   apply(rule TR_dld2.refine)
+   apply(rule dyn_list_double2_refine) apply simp apply simp apply simp
   apply (simp add: timerefine_id timerefine_iter2[symmetric])
   apply(rule timerefine_mono2)
   subgoal  by simp 
@@ -1563,9 +1567,9 @@ lemma "pp TR (F(x:=l)) = (pp TR F)(x:=timerefineA TR l)"
 lemma pp_0: "pp TR 0 = (0::_ \<Rightarrow> ecost)"
   unfolding pp_def by(auto simp: zero_acost_def)
 
-schematic_goal TR_dld2_dynaaray_simp: "(pp TR_dld2 TR_dynarray) = ?gg"
+schematic_goal TR_dld2_dynaaray_simp: "(pp TR_dld2 TR_doublec) = ?gg"
   apply(rule hide)
-  unfolding TR_dynarray_def 
+  unfolding TR_doublec_def 
   apply(simp only: pp_fun_upd pp_0)
   unfolding list_copy_body_cost_def
   apply(auto simp: norm_cost )
@@ -1587,16 +1591,159 @@ definition dyn_list_push_basic where
       RETURNT (bs',l',c)
   }"
 
+lemma mop_array_upd_refines:
+  "(bs,bs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (x,x')\<in>Id 
+     \<Longrightarrow> mop_array_upd bs l x \<le>  \<Down>Id (\<Down>\<^sub>C (0(''list_set'':=lift_acost mop_array_upd_cost)) (mop_list_setN bs' l' x'))"
+  unfolding mop_array_upd_def mop_list_set_def
+  apply(refine_rcg) by (auto simp: norm_cost)
+  
 
-lemma "dyn_list_push_basic (bs,l,c) x  \<le> \<Down>Id (\<Down>\<^sub>C TId )"
+schematic_goal dyn_list_push_basic_refine_tight:
+  "(bs,bs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow> (x,x')\<in>Id
+    \<Longrightarrow> dyn_list_push_basic (bs,l,c) x  \<le> \<Down>Id (\<Down>\<^sub>C ?TR (dyn_list_push_basic_spec (bs',l',c') x'))"
+  unfolding dyn_list_push_basic_def dyn_list_push_basic_spec_def
+  apply(refine_rcg) apply auto[1]
+  apply(refine_rcg  bindT_refine_conc_time_my_inres_sup
+          SPECc2_refine_exch mop_array_upd_refines)
+                 apply refine_dref_type 
+  by (auto simp: TId_apply intro!: wfR''_supI wfR''_TTId_if_finite )
+
+concrete_definition TR_dlpc is dyn_list_push_basic_refine_tight uses "_ \<le> \<Down> Id (\<Down>\<^sub>C \<hole> _)" 
+thm TR_dlpc.refine
+lemmas dyn_list_push_basic_refine = TR_dlpc.refine
 
 
+lemma wfR''_TR_dlpc[simp]: "wfR'' TR_dlpc"
+  unfolding TR_dlpc_def
+  apply(intro wfR''_supI wfR''_upd)
+  by(auto)
+
+definition dynamiclist_append2 where
+  "dynamiclist_append2 \<equiv> \<lambda>(bs,l,c) x. doN {
+      ASSERT (l\<le>c \<and> c=length bs \<and> 0<length bs);
+      if\<^sub>N SPECc2 ''icmp_slt'' (<) l c then doN {
+        dyn_list_push_basic (bs,l,c) x
+      } else doN {          
+        (bs',l',c') \<leftarrow> dyn_list_double2 (bs,l,c);
+        ASSERT (l'=l \<and> l<c' \<and> c'=length bs' \<and> take l bs = take l bs' );
+        dyn_list_push_basic (bs',l',c') x
+      }
+  }"
+
+lemma dynamiclist_append2_refines_tight_aux: 
+    "(\<langle>Id\<rangle>list_rel \<times>\<^sub>r nat_rel \<times>\<^sub>r nat_rel) = Id"
+  apply simp done
+
+schematic_goal dynamiclist_append2_refines_tight:
+  "(bs,bs')\<in>Id \<Longrightarrow> (l,l')\<in>Id \<Longrightarrow> (c,c')\<in>Id \<Longrightarrow> (x,x')\<in>Id \<Longrightarrow>
+      dynamiclist_append2 (bs,l,c) x \<le>  \<Down>Id (\<Down>\<^sub>C ?TR (dyn_list_push (bs',l',c') x'))"
+  unfolding dynamiclist_append2_def dyn_list_push_def
+  apply(refine_rcg) apply auto[1]
+  apply(refine_rcg  bindT_refine_conc_time_my_inres_sup
+          SPECc2_refine_exch mop_array_upd_refines
+          MIf_refine_sup dyn_list_push_basic_refine
+          dyn_list_double2_refine
+        )
+                apply refine_dref_type 
+                     apply(auto)[4]
+  apply(simp only: dynamiclist_append2_refines_tight_aux)
+                apply(rule dyn_list_double2_correct)
+ 
+  apply (auto simp: TId_apply   intro!: wfR''_supI wfR''_TTId_if_finite wfR''_ppI )
+        apply(auto simp: inres_SPECc2)
+  apply(auto intro!: wfR''_upd)
+  done
+concrete_definition TR_da is dynamiclist_append2_refines_tight uses "_ \<le> \<Down> Id (\<Down>\<^sub>C \<hole> _)" 
+thm TR_da_def
+lemmas dynamiclist_append2_refines_aux = TR_da.refine
+lemma wfR''_TR_da[simp]: "wfR'' TR_da"
+  unfolding TR_da_def
+  apply(intro wfR''_supI wfR''_upd wfR''_ppI) by simp_all
+
+lemma dynamiclist_append2_refines:
+    "dynamiclist_append2 dl x \<le> \<Down> Id (\<Down>\<^sub>C TR_da (dyn_list_push dl x))"
+  apply(cases dl) apply (simp del: conc_Id)
+  apply(rule dynamiclist_append2_refines_aux) by auto
 
 
-definition "dynamiclist_append2 = undefined"
+term id_assn
+term "id_assn\<^sup>k *\<^sub>a id_assn\<^sup>k"
+term dyn_array_raw_assn
+term "dyn_array_raw_assn\<^sup>d *\<^sub>a id_assn\<^sup>k"
+term "dynamiclist_append2"
+declare [[show_types]]
 
-lemma dyn_array_push_refine: "dynamiclist_append2 dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
+thm FREE_array_assn
+
+lemma helper[sepref_frame_free_rules]:
+  "MK_FREE (array_assn id_assn \<times>\<^sub>a snat_assn' TYPE('size_t) \<times>\<^sub>a snat_assn' TYPE('size_t)) ll"
   sorry
+
+thm FREE_array_assn
+
+sepref_def dyn_list_double_impl is "dyn_list_double2 :: ('a::llvm_rep) list \<times> _ \<Rightarrow> _"
+  :: "[\<lambda>(ls,l,c). length ls * 2 < max_snat LENGTH('size_t)]\<^sub>a (dyn_array_raw_assn :: ('a) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>d
+        \<rightarrow> (dyn_array_raw_assn :: ('a) list \<times> _ \<Rightarrow> _)"
+  unfolding dyn_list_double2_def
+  unfolding dyn_array_raw_assn_def
+  apply (annot_snat_const "TYPE('size_t)")  
+
+  apply sepref_dbg_preproc
+  apply sepref_dbg_cons_init
+  apply sepref_dbg_id
+  apply sepref_dbg_monadify
+  apply sepref_dbg_opt_init 
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step (* MK FREE of invalid_assn (array_assn ... ) *)
+     apply sepref_dbg_trans_step
+     apply sepref_dbg_trans_step (* another?! MK FREE of invalid_assn (array_assn ... ) *)
+     apply sepref_dbg_trans_step 
+     apply sepref_dbg_trans_step 
+     apply sepref_dbg_trans_step 
+     apply sepref_dbg_trans_step (* QUESTION TO PETER: Where is the MK_FREE introduced into the program *)
+
+  sorry
+
+  oops
+  apply sepref_dbg_keep
+  
+  sorry
+
+sepref_def dyn_array_push_impl is "uncurry (dynamiclist_append2 :: ('a::llvm_rep) list \<times> _ \<Rightarrow> _)"
+    :: "(dyn_array_raw_assn :: ('a) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>d
+             *\<^sub>a id_assn\<^sup>k \<rightarrow>\<^sub>a (dyn_array_raw_assn :: ('a) list \<times> _ \<Rightarrow> _)"
+  unfolding dynamiclist_append2_def dyn_list_push_basic_def
+  unfolding dyn_array_raw_assn_def
+  apply (annot_snat_const "TYPE('size_t)")  
+  apply sepref_dbg_keep
+  apply sepref_dbg_trans_keep
+  apply sepref_dbg_trans_step_keep
+     (* QUESTION TO PETER: how to unfold and fold dyn_array_raw_assn effectiveley  *)
+  
+  using size_t_context.list_copy_impl_refine
+
+  oops
+
+definition "dyn_array_push_impl = undefined"
 
 lemma dyn_array_push_impl_refines: "hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
                         (dyn_array_push_impl da' x')
@@ -1616,8 +1763,7 @@ definition  dynamiclist_empty2 :: "('a::llvm_rep list \<times> nat \<times> nat,
 
 thm  hnr_raw_array_new
 term "mop_list_init_raw (\<lambda>n. lift_acost (cost'_narray_new n))"
-
-lemma wfr_TR_dynarray[simp]: "wfR'' TR_dynarray" sorry
+ 
 
 lemma consumea_bind_return_is_SPECT: "do {
       _ \<leftarrow> consumea t;
@@ -1625,7 +1771,12 @@ lemma consumea_bind_return_is_SPECT: "do {
     } = SPECT [x\<mapsto>t]"
   unfolding consumea_def bindT_def by (auto simp add: RETURNT_def)
 
-lemma emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
+definition "TR_de = 0(''list_init_c'':=lift_acost (cost'_narray_new 1))"
+lemma wfR''_TR_de[simp]: "wfR'' TR_de"
+  unfolding TR_de_def
+  by(auto intro!: wfR''_upd)
+
+lemma emptylist2_refine_aux: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_de dyn_list_new_raw"
   unfolding dyn_list_new_raw_def dynamiclist_empty2_def mop_array_new_def
   apply(rule order.trans)
    defer apply(rule timerefine_bindT_ge2)  
@@ -1633,8 +1784,27 @@ lemma emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray d
   apply normalize_blocks
   unfolding consumea_bind_return_is_SPECT  apply auto
   apply(auto simp: le_fun_def)
-  unfolding TR_dynarray_def apply (simp add: timerefineA_cost_apply_costmult costmult_add_distrib costmult_cost norm_cost)
+  unfolding TR_de_def apply (simp add: timerefineA_cost_apply_costmult costmult_add_distrib costmult_cost norm_cost)
   apply sc_solve by (auto simp: numeral_eq_enat )
+
+
+definition "TR_dynarray =  sup TR_de TR_da"
+lemma wfR''_TR_dynarray: "wfR'' TR_dynarray"
+  unfolding TR_dynarray_def
+  by(auto intro: wfR''_supI)
+
+lemma emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
+  unfolding TR_dynarray_def
+  apply(rule timerefine_supI2[OF emptylist2_refine_aux])
+  by simp_all
+
+
+lemma dyn_array_push_refine: "dynamiclist_append2 dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
+  unfolding TR_dynarray_def
+  apply(rule timerefine_supI[OF dynamiclist_append2_refines[simplified]])
+  using dynamiclist_append2_refines
+  by simp_all
+
  
 
  
@@ -1669,10 +1839,10 @@ interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
       and dynamic_array_empty_spec = "dyn_array.dynamiclist_empty_spec" 
       and dynamic_array_assn = dyn_array.dyn_array_assn *)
   apply standard (* TODO: provide the implementations *)
+  subgoal by (fact wfR''_TR_dynarray)
   subgoal sorry
-  subgoal sorry
-  subgoal sorry
-  subgoal sorry
+  subgoal by(fact dyn_array_push_refine)
+  subgoal apply(rule dyn_array_push_impl_refines) done
   subgoal by (fact dynamiclist_empty_impl.refine)
   subgoal by (fact emptylist2_refine) 
   done 
@@ -1716,6 +1886,17 @@ lemma FREE_dynarray_assn[sepref_frame_free_rules]:
   unfolding dyn_array_raw_assn_def
   sorry
 
+term mop_array_nth
+
+sepref_def dyn_array_nth_impl is "(\<lambda>((dl::'a::llvm_rep list,_,_),n). (mop_array_nth :: 'a list \<Rightarrow> nat \<Rightarrow> ('a, (char list, enat) acost) nrest) dl n)"
+     :: "(dyn_array_raw_assn :: ('a) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t) )\<^sup>k \<rightarrow>\<^sub>a (id_assn::'a \<Rightarrow> 'a \<Rightarrow> assn)"
+  unfolding dyn_array_raw_assn_def
+  apply sepref_dbg_keep
+  apply sepref_dbg_trans_keep
+  apply sepref_dbg_trans_step_keep
+  oops
+
+
 end
 
  
@@ -1744,8 +1925,7 @@ thm hnr_array_nth
 term "(\<lambda>((dl,_,_),n). mop_array_nth dl n)"
 term "(dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A"
 
-sepref_def dyn_array_nth is "(\<lambda>((dl,_,_),n). mop_array_nth dl n)"
-     :: "(dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A" 
+
 
 lemma dyn_array_nth[sepref_fr_rules]:
   "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A \<Longrightarrow> (uncurry dyn_array_nth, uncurry mop_array_nth)

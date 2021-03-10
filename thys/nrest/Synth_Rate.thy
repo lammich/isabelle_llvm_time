@@ -51,6 +51,53 @@ shows "bindT m f \<le>  \<Down> R (timerefine E (bindT m' f'))"
   done
 
 
+lemma timerefine_supI:
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "x \<le> timerefine R y"
+      "wfR'' R'" "wfR'' R"
+  shows "x \<le> timerefine (sup R' R) y"
+  apply(rule order.trans)
+   apply(rule assms)
+  apply(rule timerefine_R_mono_wfR'') 
+  apply(rule wfR''_supI)
+    apply fact+ apply(rule sup_ge2) done
+
+lemma timerefine_supI2:
+  fixes R :: "_ \<Rightarrow> ('a, enat) acost"
+  assumes "x \<le> timerefine R y"
+      "wfR'' R'" "wfR'' R"
+    shows "x \<le> timerefine (sup R R') y"
+  apply(subst sup.commute)
+  by(rule timerefine_supI[OF assms])
+
+
+lemma MIf_refine_sup:
+  fixes f :: "(_,(string, enat) acost) nrest"
+  shows "(b,b')\<in>bool_rel \<Longrightarrow> (b \<Longrightarrow> f \<le> \<Down>R (timerefine EIfa f'))
+           \<Longrightarrow> (\<not>b \<Longrightarrow> g \<le> \<Down>R (timerefine EIfb g')) \<Longrightarrow> E= sup ((\<lambda>_. 0)(''call'':=cost ''call'' 1,''if'':=cost ''if'' 1)) (sup EIfa EIfb)  \<Longrightarrow> 
+       wfR'' EIfa  \<Longrightarrow> wfR'' EIfb
+       \<Longrightarrow>  MIf b f g  \<le> \<Down>R (timerefine E (MIf b' f' g' ))"
+  apply(rule MIf_refine)
+  subgoal sorry
+  subgoal sorry
+  apply simp
+  subgoal premises pr 
+      using pr apply - apply(rule order.trans) apply simp apply(rule nrest_Rel_mono)
+      unfolding pr(4)
+      apply(rule timerefine_R_mono_wfR'') subgoal sorry
+      apply(subst sup.left_commute)
+      apply simp
+      done
+  subgoal premises pr 
+      using pr apply - apply(rule order.trans) apply simp apply(rule nrest_Rel_mono)
+      unfolding pr(4)
+      apply(rule timerefine_R_mono_wfR'') subgoal sorry
+      apply(subst (2) sup.commute)
+      apply(subst sup.left_commute)
+      apply simp
+      done
+    done
+
 
 lemma SPECc2_refine_exch:
   shows  "(op x y, op' x' y')\<in>R  \<Longrightarrow> (SPECc2 n op x y :: (_,(_,enat) acost)nrest) \<le> \<Down> R (timerefine ((\<lambda>_. 0)(n':=cost n 1)) (SPECc2 n' op' x' y'))"
