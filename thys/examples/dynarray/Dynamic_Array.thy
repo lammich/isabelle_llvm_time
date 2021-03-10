@@ -5,6 +5,11 @@ theory Dynamic_Array
 begin
 
 
+(* TODO: Move *)
+lemma nrest_C_relI:
+  fixes a :: "(_,ecost) nrest"
+  shows "a \<le> \<Down>R (\<Down>\<^sub>C TId b) \<Longrightarrow> (a,b) \<in> \<langle>R\<rangle>nrest_rel"
+  apply(rule nrest_relI) by (auto simp: timerefine_id)
 
 
 
@@ -411,6 +416,14 @@ lemma pull_timerefine_through_reclaim:
 subsection \<open>augment_amor_assn\<close>
 
 definition "augment_amor_assn \<Phi> A = (\<lambda>ra r. $\<Phi> ra ** A ra r)"
+lemma amor_orthogonal:
+  assumes "(C, A) \<in> (assn)\<^sup>k *\<^sub>a S \<rightarrow>\<^sub>a R"
+  shows "(C, A) \<in> (augment_amor_assn PHI assn)\<^sup>k *\<^sub>a S \<rightarrow>\<^sub>a R"
+  unfolding augment_amor_assn_def
+  apply(rule hfrefI)
+  apply (auto)
+  apply(rule hn_refine_frame'') 
+  using assms[THEN hfrefD] by auto
 
 lemma invalid_assn_augment_amor_assn: "invalid_assn (augment_amor_assn \<Phi> A) = invalid_assn A"
   unfolding augment_amor_assn_def invalid_assn_def
@@ -982,7 +995,9 @@ end
 
 locale dyn_list_impl = dyn_list_assn TR_dynarray dyn_array_raw_assn 
     for TR_dynarray and dyn_array_raw_assn :: "('e::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> 'f \<Rightarrow> assn" + 
-  fixes dyn_array_push
+    fixes
+      push_size_bound  :: "'e list \<times> nat \<times> nat \<Rightarrow> bool"
+    and  dyn_array_push
     and dyn_array_push_impl :: "'f \<Rightarrow> 'e \<Rightarrow> 'f llM" 
 
     and dynamiclist_empty2 :: "((('e) list \<times> nat \<times> nat),ecost) nrest"
@@ -993,7 +1008,7 @@ locale dyn_list_impl = dyn_list_assn TR_dynarray dyn_array_raw_assn
     and TR_dynarray_keeps_finite: "\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq>0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR_dynarray \<Phi>)"
     and dyn_array_push_refine: "dyn_array_push dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
 
-    and dyn_array_push_impl_refines: "hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
+    and dyn_array_push_impl_refines: "push_size_bound (bs,l,c) \<Longrightarrow> hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
                         (dyn_array_push_impl da' x')
                       (invalid_assn (dyn_array_raw_assn) (bs,l,c) da' ** id_assn x x')
                         (dyn_array_raw_assn) (dyn_array_push (bs,l,c) x)"
@@ -1069,7 +1084,7 @@ lemma dyn_array_push_refines:
 text \<open>Now we combine the raw hnr-rule @{thm dyn_array_push_impl_refines} with the
   amortization refinement @{thm dyn_array_push_refines}}\<close>
 
-lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = length bs; 0 < length bs\<rbrakk>
+lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = length bs; 0 < length bs; push_size_bound (bs, l, c)\<rbrakk>
 \<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn) (bs, l, c) da' \<and>* hn_ctxt id_assn r r')
      (dyn_array_push_impl $ da' $ r')
      (hn_invalid (dyn_array_raw_armor_assn) (bs, l, c) da' \<and>* hn_ctxt id_assn r r')
@@ -1099,7 +1114,7 @@ lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = l
       apply(rule ccontr) unfolding cost_def zero_acost_def zero_enat_def by auto
     by(auto intro: finite_cost_lift_acost)
   apply(rule hn_refine_ref)
-   apply(rule dyn_array_push_impl_refines)
+   apply(rule dyn_array_push_impl_refines) apply simp
   apply(rule dyn_array_push_refines)
     apply auto
   done
@@ -1107,7 +1122,8 @@ lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = l
 
 
 
-lemma dyn_array_push_impl_refines_dyn_list_push_spec': "\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs)\<rbrakk>
+lemma dyn_array_push_impl_refines_dyn_list_push_spec':
+"\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs \<and> push_size_bound (bs,l,c))\<rbrakk>
   \<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn) x x' \<and>* hn_ctxt id_assn r r')
      (dyn_array_push_impl $ x' $ r')
      (hn_invalid (dyn_array_raw_armor_assn) x x' \<and>* hn_ctxt id_assn r r')
@@ -1131,11 +1147,39 @@ thm dyn_array_push_impl_refines_dyn_list_push_spec' dyn_list_push_spec_refines_f
 text \<open>this makes the tactic \<open>solve_attains_sup\<close> solve the supattains sidecondition, 
   because \<open>tagged_solver\<close> can then solve the single_valued goal. \<close>
 
+thm auto_weaken_pre_comp_PRE_I
+
+lemma "(\<And>a aa. push_size_bound (a, aa, length a)) \<Longrightarrow>
+  comp_PRE (dyn_list_rel \<times>\<^sub>r Id) (\<lambda>_. True) (\<lambda>x (a, b). case a of (bs, l, c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs \<and> push_size_bound (bs, l, c))
+   (\<lambda>x. nofailT (uncurry (PR_CONST (mop_list_snoc push_concrete_advertised_cost)) x)) (a, b)"
+  apply(rule auto_weaken_pre_comp_PRE_I)
+   apply simp 
+  apply (simp_all add: dyn_list_rel_def )
+  apply safe    
+  subgoal apply simp done
+  subgoal apply simp done
+  subgoal apply simp done
+  subgoal apply simp
+    oops
+lemma "\<lbrakk>\<And>a aa. X (a, aa, length a); (((aa, aaa, ba), baa), a, b) \<in> {((bs, l, length bs), take l bs) |bs l. l \<le> length bs \<and> bs \<noteq> []} \<times>\<^sub>r Id\<rbrakk>
+    \<Longrightarrow> X (aa, aaa, ba)" apply simp
+
+lemma zzz: "\<lbrakk>\<And>a aa. push_size_bound (a, aa, length a); ((aa, aaa, b), a) \<in> dyn_list_rel\<rbrakk> \<Longrightarrow> push_size_bound (aa, aaa, b)"
+  sorry
+
+
+context begin
 declare dyn_list_rel_def[simp] \<comment> \<open>don't know how to tag this fact such that FCOMP picks it up
     correctly\<close>
+ 
+
+lemma [simp]: "  push_size_bound (dl', l', c')"
+  sorry (* TODO *)
+
 lemmas dyn_array_push_impl_refines_dyn_array_push_spec
   = dyn_array_push_impl_refines_dyn_list_push_spec_hfref[FCOMP dyn_list_push_spec_refines_fref, folded dyn_array_push_spec_def]
 declare dyn_list_rel_def[simp del]
+end 
 
 thm dyn_array_push_impl_refines_dyn_array_push_spec
 
@@ -1357,11 +1401,6 @@ definition dyn_list_double2 :: "('x::llvm_rep) list \<times> nat \<times> nat \<
        mop_free bs;
        RETURNT (bs'',l,c')
   }"
-
-lemma nrest_C_relI:
-  fixes a :: "(_,ecost) nrest"
-  shows "a \<le> \<Down>R (\<Down>\<^sub>C TId b) \<Longrightarrow> (a,b) \<in> \<langle>R\<rangle>nrest_rel"
-  apply(rule nrest_relI) by (auto simp: timerefine_id)
 
  (*
 lemma "(dyn_list_double2, dyn_list_double) \<in> Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nrest_rel"
@@ -1681,7 +1720,7 @@ lemma dynamiclist_append2_refines:
     "dynamiclist_append2 dl x \<le> \<Down> Id (\<Down>\<^sub>C TR_da (dyn_list_push dl x))"
   apply(cases dl) apply (simp del: conc_Id)
   apply(rule dynamiclist_append2_refines_aux) by auto
-
+ 
 
 term id_assn
 term "id_assn\<^sup>k *\<^sub>a id_assn\<^sup>k"
@@ -1726,15 +1765,21 @@ sepref_def dyn_array_push_impl is "uncurry (dynamiclist_append2 :: ('a::llvm_rep
   unfolding dynamiclist_append2_def 
   by sepref 
 
+thm dyn_array_push_impl.refine[]
 
-definition "dyn_array_push_impl = undefined"
+lemmas prepare = dyn_array_push_impl.refine[to_hnr, unfolded hn_ctxt_def APP_def]
 
-lemma dyn_array_push_impl_refines: "hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
+definition "push_size_bound TYPE('size_t) dl \<equiv> length (fst dl) * (2::nat) < max_snat LENGTH('size_t)"
+
+lemma dyn_array_push_impl_refines: "
+        push_size_bound TYPE('size_t) (bs,l,c) \<Longrightarrow>
+          hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
                         (dyn_array_push_impl da' x')
                       (invalid_assn (dyn_array_raw_assn) (bs,l,c) da' ** id_assn x x')
-                        (dyn_array_raw_assn) (dyn_array_push (bs,l,c) x)"
-  sorry
-
+                        (dyn_array_raw_assn) (dynamiclist_append2 (bs,l,c) x)"
+  apply(rule prepare)
+  unfolding push_size_bound_def
+  by auto
 
 
 subsection  \<open>implement empty\<close>
@@ -1816,7 +1861,7 @@ thm dynamiclist_empty_impl.refine
 
 
 interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
-                            dynamiclist_append2 dyn_array_push_impl
+                            "push_size_bound TYPE('size_t)" dynamiclist_append2 dyn_array_push_impl
                             dynamiclist_empty2 dynamiclist_empty_impl
       (*                       
     defines dynamic_array_append_spec = "dyn_array.dyn_array_push_spec"
@@ -1884,10 +1929,41 @@ sepref_def dyn_array_nth_impl is "uncurry dyn_array_nth"
 term dyn_array.dyn_array_assn
 
 term nrest_rel
-thm dyn_array_dynamic_array_assn_def
-lemma "(dyn_array_nth, mop_list_get) \<in> dyn_list_rel \<rightarrow> Id \<rightarrow>  \<langle>dyn_list_rel\<rangle>nrest_rel " (* TODO *) sorry
+lemma dyn_array_nth_dyn_list_refine: "(uncurry dyn_array_nth, uncurry mop_array_nth) \<in> dyn_list_rel \<times>\<^sub>r Id \<rightarrow>\<^sub>f  \<langle>Id\<rangle>nrest_rel "
+  apply(rule)
+  apply(rule nrest_C_relI)
+  unfolding dyn_array_nth_def mop_array_nth_def mop_list_get_def uncurry_def
+  apply(refine_rcg bindT_refine_easy)
+  by(auto simp: dyn_list_rel_def)  
 
-lemmas a = dyn_array_nth_impl.refine
+lemma mop_array_nth_refine_R: "(uncurry mop_array_nth, uncurry mop_array_nth) \<in> \<langle>R\<rangle>list_rel \<times>\<^sub>r Id \<rightarrow>\<^sub>f  \<langle>R\<rangle>nrest_rel"
+  apply(rule)
+  apply(rule nrest_C_relI)
+  unfolding mop_array_nth_def mop_list_get_def uncurry_def
+  apply(refine_rcg bindT_refine_easy)
+  by(auto simp: param_nth list_rel_imp_same_length)
+
+thm dyn_array_dynamic_array_assn_def
+thm dyn_array.dyn_array_raw_armor_assn_def
+thm dyn_array.dyn_array_raw_armor_assn_alt
+(* TODO: move *) 
+
+lemmas dyn_array_nth_aux1 = dyn_array_nth_impl.refine[THEN amor_orthogonal[where PHI=dyn_array.\<Phi>_d], folded dyn_array.dyn_array_raw_armor_assn_alt]
+
+(* TODO: Move *)
+lemma one_time_uncurry[OT_intros]:
+  "(\<And>a b. x=(a,b) \<Longrightarrow> one_time (f a b)) \<Longrightarrow> one_time (uncurry f x)"
+  unfolding uncurry_def 
+  by (metis old.prod.case old.prod.exhaust) 
+
+lemma one_time_mop_list_get[OT_intros]: "one_time (mop_list_get T a b)"
+  unfolding mop_array_nth_def mop_list_get_def by (intro OT_intros)
+
+lemma one_time_mop_array_nth[OT_intros]: "one_time (mop_array_nth a b)"
+  unfolding mop_array_nth_def by (intro OT_intros)
+
+lemmas END = dyn_array_nth_aux1[FCOMP dyn_array_nth_dyn_list_refine, FCOMP mop_array_nth_refine_R]
+
 
 end
 
