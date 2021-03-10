@@ -103,18 +103,6 @@ subsection \<open>Solver for Time Side conditions\<close>
 lemma lift_acost_propagate: "lift_acost (t+t') = lift_acost t + lift_acost t' "
   unfolding lift_acost_def by (cases t; cases t'; auto)
 
-lemma ecost_add_commute: "a + b = b + (a::(string,enat) acost)"
-  by (simp add: add.commute)
-
-lemma ecost_add_left_commute: "b + (a + c) = a + ((b::(string,enat) acost) + c)"
-  by (simp add: add.left_commute)
-
-lemma cost_same_curr_add: "cost n x + cost n y = cost n (x+y)"
-  by (simp add: cost_same_curr_add)
-
-lemma cost_same_curr_left_add: "cost n x + (cost n y + c) = cost n (x+y) + c"
-  by (simp add: add.assoc[symmetric] cost_same_curr_add)
-
 definition "leq_sidecon (a::(string,enat) acost) as1 as2 b bs1 bs2 T \<equiv> a + as1 + as2 \<le> b + bs1 + bs2 \<and> T"
 
 lemma leq_sc_init: 

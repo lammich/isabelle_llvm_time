@@ -1,5 +1,6 @@
 theory Abstract_Cost
-imports Main "HOL-Library.Extended_Nat"
+  imports Main "HOL-Library.Extended_Nat" "HOL-Library.List_Lexorder"
+  "Automatic_Refinement.Refine_Lib"
 begin
 
 
@@ -231,6 +232,99 @@ lemma costmult_cost:
   fixes x :: "'b::comm_semiring_1"
   shows "x *m (cost n y) = cost n (x*y)"
   by(auto simp: costmult_def cost_def zero_acost_def)
+
+
+
+lemma ecost_add_commute: "a + b = b + (a::(string,enat) acost)"
+  by (simp add: add.commute)
+
+lemma ecost_add_left_commute: "b + (a + c) = a + ((b::(string,enat) acost) + c)"
+  by (simp add: add.left_commute)
+ 
+
+lemma cost_same_curr_left_add: "cost n x + (cost n y + c) = cost n (x+y) + c"
+  by (simp add: add.assoc[symmetric] cost_same_curr_add)
+
+
+
+
+subsection \<open>summarize_same_cost\<close>
+ML \<open>
+
+  fun dest_sum @{mpat \<open>?a+?b\<close>} = dest_sum a @ dest_sum b
+    | dest_sum t = [t]
+
+  fun cost_name @{mpat \<open>cost ?name _\<close>} = try HOLogic.dest_string name
+    | cost_name _ = NONE
+    
+  fun cost_term @{mpat \<open>_ *m ?ct\<close>} = ct
+    | cost_term t = t
+    
+  fun mk_plus a b = @{mk_term "?a+?b"}  
+  fun mk_sum [t] = t
+    | mk_sum (t::ts) = mk_plus t (mk_sum ts)
+    | mk_sum [] = raise Match
+    
+  fun summarize_cost t = let
+    val ts = dest_sum t
+      |> map (fn t => (t,cost_name t))
+  
+    val (cts,ots) = List.partition (is_some o snd) ts 
+    val cts = map (apsnd the) cts |> sort_by snd 
+    val cts = map fst cts
+    val ots = map (fn (t,_) => (t,cost_term t)) ots
+      |> sort (Term_Ord.fast_term_ord o apply2 snd)
+      |> map fst
+    
+  in
+    mk_sum (cts@ots)
+  end  
+  
+  
+  fun summarize_cost_conv ctxt = let
+    open Refine_Util Conv
+    fun is_sum_conv ct = case Thm.term_of ct of @{mpat "_+_"} => all_conv ct | _ => no_conv ct
+  
+    val tac = ALLGOALS (simp_tac (put_simpset HOL_ss ctxt addsimps @{thms add_ac}))
+  in
+    is_sum_conv 
+    then_conv f_tac_conv ctxt summarize_cost tac
+  end  
+  
+  fun summarize_cost_tac ctxt = CONVERSION (Conv.top_sweep_conv (summarize_cost_conv) ctxt)
+  
+\<close>  
+
+
+lemma summarize_same_cost_mult: 
+  "n *m c + m *m c = (n+m) *m c" 
+  "n *m c + (m *m c + x) = (n+m) *m c + x" 
+  
+  "n *m c + c = (n+1) *m c" 
+  "n *m c + (c + x) = (n+1) *m c + x" 
+  
+  "c + m *m c = (1+m) *m c" 
+  "c + (m *m c + x) = (1+m) *m c + x" 
+  
+  "c+c = 2 *m c"
+  "c+(c+x) = 2 *m c + x"
+  for c :: "('n,enat) acost"
+  unfolding costmult_def
+  apply (cases c; auto simp: fun_eq_iff algebra_simps mult_2_right; fail)+
+  done
+
+lemma costmult_cost_left:
+  fixes x :: "'b::comm_semiring_1"
+  shows "x *m (cost n y + cc) = cost n (x*y) + x *m cc"
+  apply (cases cc)
+  apply(auto simp: costmult_def cost_def zero_acost_def fun_eq_iff algebra_simps)
+  done
+  
+method_setup summarize_same_cost_aux = \<open>Scan.succeed (SIMPLE_METHOD' o summarize_cost_tac)\<close>
+method summarize_same_cost = summarize_same_cost_aux, 
+  (simp only: cost_same_curr_add cost_same_curr_left_add add.assoc costmult_cost 
+    summarize_same_cost_mult costmult_cost_left costmult_zero_is_zero_enat)?
+
 
 
 
