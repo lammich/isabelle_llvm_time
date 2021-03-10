@@ -163,22 +163,45 @@ definition "bstring_assn n TYPE('size_t::len2) TYPE('w::len)
        = b_assn (string_assn' TYPE('size_t::len2) TYPE('w::len)) (\<lambda>ls. length ls \<le> n)"
 
 
-(*sepref_definition dyn_array_nth2 is "uncurry mop_array_nth"::
-     "(bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn' TYPE('w::len)" 
-  unfolding bstring_assn_def
-  (* using dyn_array_nth *)
-  apply sepref_dbg_keep
-  sorry
-*)
+  
+find_theorems hr_comp b_rel  
+  
+(* TODO: Move *)
+lemma hr_comp_brel[fcomp_norm_simps]: "hr_comp A (b_rel B P) = b_assn (hr_comp A B) P"
+  by (auto simp: hr_comp_def fun_eq_iff sep_algebra_simps pred_lift_extract_simps)
+
+  
+lemma mop_array_nth_len_bound:
+  fixes nth_impl A B
+  assumes "(uncurry nth_impl, uncurry mop_array_nth) \<in> A\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
+  shows "(uncurry nth_impl, uncurry mop_array_nth) \<in> (b_assn A (\<lambda>xs. P (length xs)))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
+proof -
+  have A: "(mop_array_nth, mop_array_nth) \<in> b_rel Id (\<lambda>xs. P (length xs)) \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
+    by (auto simp add: refine_pw_simps fun_rel_def pw_acost_nrest_rel_iff)
+    
+  from assms(1)[FCOMP A[to_fref]] show ?thesis .
+qed    
+    
+lemma mop_array_upd_len_bound:
+  fixes nth_impl A B
+  assumes "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> A\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow>\<^sub>a A"
+  shows "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> (b_assn A (\<lambda>xs. P (length xs)))\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow>\<^sub>a (b_assn A (\<lambda>xs. P (length xs)))"
+proof -
+  have A: "(mop_array_upd, mop_array_upd) \<in> b_rel Id (\<lambda>xs. P (length xs)) \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>b_rel Id (\<lambda>xs. P (length xs))\<rangle>nrest_rel"
+    by (auto simp add: refine_pw_simps fun_rel_def pw_acost_nrest_rel_iff mop_array_upd_def)
+    
+  from assms(1)[FCOMP A[to_fref]] show ?thesis .
+qed    
+
 lemma bstring_nth[sepref_fr_rules]:
   "(uncurry dyn_array_nth, uncurry mop_array_nth)
      \<in> (bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn' TYPE('w::len)" 
-  apply sepref
-  using dyn_array_nth (* TODO PETER*)
-  sorry
-
-
-
+  unfolding bstring_assn_def    
+  apply (rule mop_array_nth_len_bound)
+  apply (rule dyn_array_nth[of unat_assn dyn_array_nth]) (* TODO: delete of dyn_array_nth when rule is complete *)
+  by simp
+  
+  
   sepref_definition compare_impl [llvm_inline, llvm_code] is "uncurry2 compare1" :: 
     "(bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (bstring_assn n TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k \<rightarrow>\<^sub>a sint_assn' TYPE('r::len2)"  
     unfolding compare1_def
