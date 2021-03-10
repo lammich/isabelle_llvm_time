@@ -3,6 +3,95 @@ theory Sorting_Strings
   "../dynarray/Dynamic_Array" "Sorting_Quicksort_Partition"
 begin
 
+  
+ML \<open>
+
+  fun dest_sum @{mpat \<open>?a+?b\<close>} = dest_sum a @ dest_sum b
+    | dest_sum t = [t]
+
+  fun cost_name @{mpat \<open>cost ?name _\<close>} = try HOLogic.dest_string name
+    | cost_name _ = NONE
+    
+  fun cost_term @{mpat \<open>_ *m ?ct\<close>} = ct
+    | cost_term t = t
+    
+  fun mk_plus a b = @{mk_term "?a+?b"}  
+  fun mk_sum [t] = t
+    | mk_sum (t::ts) = mk_plus t (mk_sum ts)
+    | mk_sum [] = raise Match
+    
+  fun summarize_cost t = let
+    val ts = dest_sum t
+      |> map (fn t => (t,cost_name t))
+  
+    val (cts,ots) = List.partition (is_some o snd) ts 
+    val cts = map (apsnd the) cts |> sort_by snd 
+    val cts = map fst cts
+    val ots = map (fn (t,_) => (t,cost_term t)) ots
+      |> sort (Term_Ord.fast_term_ord o apply2 snd)
+      |> map fst
+    
+  in
+    mk_sum (cts@ots)
+  end  
+  
+  
+  fun summarize_cost_conv ctxt = let
+    open Refine_Util Conv
+    fun is_sum_conv ct = case Thm.term_of ct of @{mpat "_+_"} => all_conv ct | _ => no_conv ct
+  
+    val tac = ALLGOALS (simp_tac (put_simpset HOL_ss ctxt addsimps @{thms add_ac}))
+  in
+    is_sum_conv 
+    then_conv f_tac_conv ctxt summarize_cost tac
+  end  
+  
+  fun summarize_cost_tac ctxt = CONVERSION (Conv.top_sweep_conv (summarize_cost_conv) ctxt)
+  
+\<close>  
+
+
+lemma summarize_same_cost_mult: 
+  "n *m c + m *m c = (n+m) *m c" 
+  "n *m c + (m *m c + x) = (n+m) *m c + x" 
+  
+  "n *m c + c = (n+1) *m c" 
+  "n *m c + (c + x) = (n+1) *m c + x" 
+  
+  "c + m *m c = (1+m) *m c" 
+  "c + (m *m c + x) = (1+m) *m c + x" 
+  
+  "c+c = 2 *m c"
+  "c+(c+x) = 2 *m c + x"
+  for c :: "('n,enat) acost"
+  unfolding costmult_def
+  apply (cases c; auto simp: fun_eq_iff algebra_simps mult_2_right; fail)+
+  done
+
+lemma costmult_cost_left:
+  fixes x :: "'b::comm_semiring_1"
+  shows "x *m (cost n y + cc) = cost n (x*y) + x *m cc"
+  apply (cases cc)
+  apply(auto simp: costmult_def cost_def zero_acost_def fun_eq_iff algebra_simps)
+  done
+  
+method_setup summarize_same_cost_aux = \<open>Scan.succeed (SIMPLE_METHOD' o summarize_cost_tac)\<close>
+method summarize_same_cost = summarize_same_cost_aux, 
+  (simp only: cost_same_curr_add cost_same_curr_left_add add.assoc costmult_cost 
+    summarize_same_cost_mult costmult_cost_left costmult_zero_is_zero_enat)?
+
+
+
+
+
+
+
+
+
+
+
+
+
   text \<open>The string comparison algorithm from libstdc++, abstractly: Compare min-length first, then compare lengths to break tie\<close>
   lemma list_lexorder_alt: "xs < ys \<longleftrightarrow> (let n=min (length xs) (length ys) in (take n xs < take n ys) \<or> (take n xs = take n ys \<and> length xs < length ys))"
   proof (cases "length xs < length ys")
@@ -45,17 +134,31 @@ begin
 
  
   term "m *m e"
-  definition "compare_cost xs ys n = (enat n) *m (cost ''ult_lt'' 1 
+(*  definition "compare_cost xs ys n = (enat n) *m (cost ''ult_lt'' 1 
               + lift_acost mop_array_nth_cost + lift_acost mop_array_nth_cost 
               + cost ''ult_eq'' 1 + cost ''ult_add'' 1)"
+*)              
+
+  definition "compare1_body_cost :: (char list, nat) acost \<equiv> 
+      cost ''add'' 1 +
+        (cost ''call'' 1 +
+         (cost ''icmp_eq'' 2 +
+          (cost ''icmp_slt'' 1 +
+            (cost ''icmp_ult'' 1 +
+           (cost ''if'' 4 +
+            (cost ''load'' 2 + (cost ''ofs_ptr'' 2)))))))"
+
+  definition "compare_cost xs ys n = 
+    lift_acost (n *m compare1_body_cost ) +
+        (cost ''if'' 1 + cost ''icmp_slt'' 1 + cost ''icmp_eq'' 1 + cost ''if'' 1 + cost ''call'' 1)"
   
   definition "compare_spec xs ys n \<equiv> doN {ASSERT (n\<le>length xs \<and> n\<le>length ys); SPECT [ (cmpi (take n xs) (take n ys)) \<mapsto> compare_cost xs ys n]}"
 
-
+  
   definition "compare1 xs ys n \<equiv> doN {
     ASSERT (n\<le>length xs \<and> n\<le>length ys);
     (i,r)\<leftarrow> monadic_WHILEIET (\<lambda>(i,r). i\<le>n \<and> r=cmpi (take i xs) (take i ys) )
-        (\<lambda>(i::nat,r::int). undefined:: (string, nat) acost)
+        (\<lambda>(i::nat,r::int). (n-i) *m (compare1_body_cost))
        (\<lambda>(i,r).doN { 
               if\<^sub>N SPECc2 ''icmp_slt'' (<) i n 
                 then SPECc2 ''icmp_eq'' (=) r 0
@@ -95,6 +198,16 @@ begin
   lemma lexord_irrefl_common_prefix: "irrefl R \<Longrightarrow> (u@v,u@w)\<in>lexord R \<longleftrightarrow> (v,w)\<in>lexord R"
     by (auto simp: lexord_append lexord_irreflD)
     
+  (* TODO: Move, TODO: simp-lemma! *)  
+  lemma lift_acost_le_iff: "lift_acost A \<le> lift_acost B \<longleftrightarrow> A\<le>B"  
+    by (meson lift_acost_mono lift_acost_mono')
+    
+  (* TODO: Move *)  
+  lemma finite_the_acost_cost[simp]: "finite {n. 0 < the_acost (cost nx (c::_::order)) n}"  
+    by (auto simp: cost_def zero_acost_def)
+    
+  (* TODO: Move *)  
+  declare the_acost_zero_app[simp]    
     
   context begin
     private lemma take_smaller: "m\<le>n \<Longrightarrow> take n xs = take m xs @ (take (n-m) (drop m xs))"
@@ -120,27 +233,60 @@ begin
       apply(rule ASSERT_D2_leI)
       apply simp
       apply(rule gwp_specifies_I)
-      apply(refine_vcg \<open>-\<close> rules: gwp_monadic_WHILEIET If_le_rule)
-      subgoal sorry
+      apply(refine_vcg \<open>(simp; fail)?\<close> rules: gwp_monadic_WHILEIET If_le_rule)
+      subgoal by (auto simp: wfR2_def norm_cost compare1_body_cost_def)
       subgoal 
         apply(rule loop_body_conditionI)
-        sorry
+        subgoal by (auto intro!: costmult_right_mono simp: lift_acost_le_iff)
+        subgoal
+          unfolding compare1_body_cost_def
+          apply (auto simp: norm_cost)
+          apply sc_solve
+          apply (auto simp: one_enat_def algebra_simps numeral_eq_enat) 
+          done
+        subgoal 
+          apply auto
+          by (metis less_le_trans take_Suc_conv_app_nth)
+        done
       subgoal 
         apply(rule loop_body_conditionI)
-        sorry
+        subgoal by (auto intro!: costmult_right_mono simp: lift_acost_le_iff)
+        subgoal
+          unfolding compare1_body_cost_def
+          apply (auto simp: norm_cost)
+          apply sc_solve
+          apply (auto simp: one_enat_def algebra_simps numeral_eq_enat) 
+          done
+        subgoal 
+          by (auto simp: take_Suc_conv_app_nth list_less_def lexord_append)
+        done  
       subgoal 
         apply(rule loop_body_conditionI)
-        sorry
-      subgoal sorry
-      subgoal sorry
-      subgoal sorry
+        subgoal by (auto intro!: costmult_right_mono simp: lift_acost_le_iff)
+        subgoal
+          unfolding compare1_body_cost_def
+          apply (auto simp: norm_cost)
+          apply sc_solve
+          apply (auto simp: one_enat_def algebra_simps numeral_eq_enat) 
+          done
+        subgoal 
+          by (auto simp: take_Suc_conv_app_nth list_less_def lexord_append compare_impl_aux1 lexord_irreflD[OF preorder_less_irrefl])
+        done
       subgoal 
         apply(rule loop_exit_conditionI)
-        sorry
-      (* have a look at the proof in *)
-      thm weak_ordering.qsp_next_l_refine
-
-      sorry (* TODO: Peter *) 
+        apply (refine_vcg \<open>-\<close>)
+        apply (auto)
+        apply (smt (z3) compare_impl_aux1 dual_order.trans nat_less_le)
+        unfolding compare_cost_def
+        apply (subst costmult_minus_distrib)
+        by (meson Dynamic_Array.costmult_right_mono add_right_mono diff_le_self lift_acost_le_iff)
+      subgoal 
+        apply(rule loop_exit_conditionI)
+        apply (refine_vcg \<open>-\<close>)
+        apply (auto)
+        unfolding compare_cost_def
+        by (metis add.right_neutral add_left_mono add_mono_thms_linordered_semiring(3) ecost_nneg)
+      done  
       
   end
 
