@@ -1,7 +1,7 @@
 (* Obsolete version without unguarded-option! *)
 theory Sorting_Insertion_Sort
   imports Sorting_Setup 
-   "Imperative_HOL_Time.Asymptotics_1D"
+   "../../lib/Asymptotics_1D"
   "../../nrest/NREST_Automation"
 begin
 
