@@ -1020,11 +1020,12 @@ definition "b_aux = hr_comp (dyn_array_raw_armor_assn) dyn_list_rel"
 lemma b_aux_unf: "hr_comp (dyn_array_raw_armor_assn) dyn_list_rel = b_aux"
   unfolding b_aux_def by auto
 declare b_aux_unf[fcomp_norm_unfold]
+thm b_aux_unf
 lemma dyn_array_raw_armor_aux: "hr_comp (b_aux) (\<langle>the_pure A\<rangle>list_rel)
            = dyn_array_assn A"
   unfolding b_aux_def dyn_array_assn_def by auto
 declare dyn_array_raw_armor_aux[fcomp_norm_unfold]
-  
+thm dyn_array_raw_armor_aux
 lemma dyn_array_raw_armor_: "hr_comp (hr_comp (dyn_array_raw_armor_assn) dyn_list_rel) (\<langle>the_pure A\<rangle>list_rel)
            = dyn_array_assn A"
   unfolding dyn_array_assn_def by auto
@@ -1188,7 +1189,7 @@ text \<open>this makes the tactic \<open>solve_attains_sup\<close> solve the sup
   because \<open>tagged_solver\<close> can then solve the single_valued goal. \<close>
 
 thm auto_weaken_pre_comp_PRE_I
-
+(*
 lemma "(\<And>a aa. push_size_bound (a, aa, length a)) \<Longrightarrow>
   comp_PRE (dyn_list_rel \<times>\<^sub>r Id) (\<lambda>_. True) (\<lambda>x (a, b). case a of (bs, l, c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs \<and> push_size_bound (bs, l, c))
    (\<lambda>x. nofailT (uncurry (PR_CONST (mop_list_snoc push_concrete_advertised_cost)) x)) (a, b)"
@@ -1207,19 +1208,21 @@ lemma "\<lbrakk>\<And>a aa. X (a, aa, length a); (((aa, aaa, ba), baa), a, b) \<
 lemma zzz: "\<lbrakk>\<And>a aa. push_size_bound (a, aa, length a); ((aa, aaa, b), a) \<in> dyn_list_rel\<rbrakk> \<Longrightarrow> push_size_bound (aa, aaa, b)"
   sorry
 
+*)
 
-context begin
-declare dyn_list_rel_def[simp] \<comment> \<open>don't know how to tag this fact such that FCOMP picks it up
-    correctly\<close>
  
+thm dyn_array_push_impl_refines_dyn_list_push_spec_hfref dyn_list_push_spec_refines_fref
 
-lemma [simp]: "  push_size_bound (dl', l', c')"
+lemma XXX[fcomp_prenorm_simps]: "(x',x)\<in> dyn_list_rel \<Longrightarrow> push_size_bound x' = push_size_bound ([],0,length x)"
   sorry (* TODO *)
+
+lemma dyn_array_push_fcomp_prenorm[fcomp_prenorm_simps]:
+  "((bs,l,c),x)\<in> dyn_list_rel \<Longrightarrow> l \<le> c \<and> c = length bs \<and> bs \<noteq> []"
+  by(auto simp: dyn_list_rel_def)
 
 lemmas dyn_array_push_impl_refines_dyn_array_push_spec
   = dyn_array_push_impl_refines_dyn_list_push_spec_hfref[FCOMP dyn_list_push_spec_refines_fref, folded dyn_array_push_spec_def]
-declare dyn_list_rel_def[simp del]
-end 
+
 
 thm dyn_array_push_impl_refines_dyn_array_push_spec
 
@@ -2045,6 +2048,8 @@ lemmas dyn_array_nth_aux1 = dyn_array_nth_impl.refine[THEN amor_orthogonal[where
 thm dyn_array_nth_aux1 dyn_array_nth_dyn_list_refine
 lemmas dyn_array_nth_aux2 = dyn_array_nth_aux1[FCOMP dyn_array_nth_dyn_list_refine]
 thm dyn_array_nth_aux2 mop_array_nth_refine_R
+thm fcomp_norm_unfold
+thm fcomp_norm_norm
 lemmas dyn_array_nth_rule = dyn_array_nth_aux2[FCOMP mop_array_nth_refine_R]
 
 
@@ -2085,12 +2090,13 @@ thm dyn_array_length_aux2 mop_array_length_refine_R
 
 thm dyn_array.dyn_array_raw_armor_
 thm dyn_array.dyn_array_raw_armor_aux
-lemmas dyn_array_length_rule = dyn_array_length_aux2[FCOMP mop_array_length_refine_R]
-(* TODO: IDG *)
+thm fcomp_norm_unfold
+lemmas dyn_array_length_rule = dyn_array_length_aux2[FCOMP mop_array_length_refine_R[where R="the_pure R" for R]]
+(* TODO: IDG 
 lemma dyn_array_length_rule:
   "\<^cancel>\<open>Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure U
        \<Longrightarrow> \<close>(dyn_array_length_impl, mop_list_length) \<in> (dyn_array.dyn_array_assn U)\<^sup>k \<rightarrow>\<^sub>a snat_assn"
-  sorry
+  sorry *)
 
 end
 
