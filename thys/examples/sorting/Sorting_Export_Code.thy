@@ -56,7 +56,7 @@ theorem unat_sort_allcost_nlogn:
 
 
 global_interpretation string_sort: sort_impl_context "(\<le>)" "(<)" "TYPE(64)" strcmp_impl
-              "string_cmp_cost n" "bstring_assn n TYPE(64) TYPE('w::len2)"
+              "strcmp_cost n n" "bstring_assn n TYPE(64) TYPE('w::len2)"
   defines string_sort_is_guarded_insert_impl = string_sort.is_guarded_insert_impl
       and string_sort_is_unguarded_insert_impl = string_sort.is_unguarded_insert_impl
       and string_sort_unguarded_insertion_sort_impl = string_sort.unguarded_insertion_sort_impl
@@ -72,26 +72,41 @@ global_interpretation string_sort: sort_impl_context "(\<le>)" "(<)" "TYPE(64)" 
       and string_sort_introsort_aux_impl = string_sort.introsort_aux_impl
       and string_sort_move_median_to_first_impl = string_sort.move_median_to_first_impl
       and string_sort_introsort_impl        = string_sort.introsort_impl  
-
+    
+      and string_sort_cmpo_v_idx_impl = string_sort.cmpo_v_idx_impl
+      and string_sort_cmpo_idxs_impl = string_sort.cmpo_idxs_impl
+      and string_sort_cmp_idxs_impl = string_sort.cmp_idxs_impl
+      
   apply (rule strcmp_sort_impl_context)
   by simp
 
 
-lemma cheat[llvm_code,llvm_inline]: "(strcmp_impl :: 'w word ptr \<times> 'size_t word \<times> 'size_t word
+(*lemma cheat[llvm_code,llvm_inline]: "(strcmp_impl :: 'w word ptr \<times> 'size_t word \<times> 'size_t word
    \<Rightarrow> 'w word ptr \<times> 'size_t word \<times> 'size_t word
       \<Rightarrow> 1 word llM) a v = return 1"
   sorry
+*)  
+
+print_named_simpset llvm_inline
+
+term "sort_impl_context.cmpo_v_idx_impl"
+
+thm string_sort.cmpo_v_idx_impl_def
+lemmas [llvm_inline] = strcmp_impl_def (*string_sort.cmpo_v_idx_impl_def*)
+
 lemmas [llvm_inline] = string_sort.introsort_aux_impl_def 
                       string_sort.final_insertion_sort_impl_def
                       string_sort.guarded_insertion_sort_impl_def
                       string_sort.unguarded_insertion_sort_impl_def
                       string_sort.is_guarded_insert_impl_def
                       string_sort.is_unguarded_insert_impl_def 
+                      
+                
+                      
 export_llvm   "string_sort_introsort_impl :: (8 word ptr \<times> 64 word \<times> 64 word) ptr \<Rightarrow> _" is "llstring* str_introsort(llstring*, int64_t, int64_t)"
  defines \<open>typedef struct {char *data; struct {int64_t size; int64_t capacity;};} llstring;\<close> (*
   file "../code/string_introsort.ll"
 *)
-
 
 
 end

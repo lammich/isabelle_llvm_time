@@ -1242,6 +1242,10 @@ lemma taaaa: "(uncurry (PR_CONST dyn_array_push_spec), uncurry (PR_CONST dyn_arr
 lemma one_time_dyn_array_push_spec[OT_intros]: "one_time (dyn_array_push_spec a b)"
   apply(auto simp:  dyn_array_push_spec_def) by (intro OT_intros)
 
+(* TODO: Move! *)  
+lemmas [fcomp_prenorm_simps] = list_rel_imp_same_length  
+  
+  
 lemmas G_push =  dyn_array_push_impl_refines_dyn_array_push_spec[FCOMP taaaa] 
  
 
@@ -2136,7 +2140,7 @@ concrete_definition dyn_array_nth_impl is size_t_context.dyn_array_nth_impl_def
 sepref_register dyn_array_nth_impl
 lemma dyn_array_nth[sepref_fr_rules]:
   "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
-  \<Longrightarrow> (uncurry dyn_array_nth_impl, uncurry mop_array_nth) \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a (al_assn' TYPE('l::len2) A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> A"
+  \<Longrightarrow> (uncurry dyn_array_nth_impl, uncurry mop_array_nth) \<in> [\<lambda>_. 8\<le>LENGTH('l)]\<^sub>a (al_assn' TYPE('l::len2) A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> A"
   apply(rule pull_cond_hfref)
   apply(subgoal_tac "size_t_context TYPE('l)")
   subgoal premises p
@@ -2166,7 +2170,7 @@ sepref_register dyn_array_length_impl
   thus avoid the precondition with the length *)
 lemma dyn_array_length[sepref_fr_rules]:
   "\<^cancel>\<open>Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
-  \<Longrightarrow>\<close> ( dyn_array_length_impl,  mop_list_length) \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a (al_assn' TYPE('l::len2) A)\<^sup>k \<rightarrow> snat_assn"
+  \<Longrightarrow>\<close> ( dyn_array_length_impl,  mop_list_length) \<in> [\<lambda>_. 8\<le>LENGTH('l)]\<^sub>a (al_assn' TYPE('l::len2) A)\<^sup>k \<rightarrow> snat_assn"
   apply(rule pull_cond_hfref)
   apply(subgoal_tac "size_t_context TYPE('l)")
   subgoal premises p
@@ -2184,7 +2188,7 @@ lemma dyn_array_length[sepref_fr_rules]:
 sepref_register dynamic_array_empty_spec
 sepref_register "dynamic_array_empty_spec_a TYPE('l::len2)"
 lemma pf: "(uncurry0 dynamiclist_empty_impl, uncurry0 (PR_CONST (dynamic_array_empty_spec_a TYPE('l::len2))))
-   \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a  unit_assn\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
+   \<in> [\<lambda>_. 8\<le>LENGTH('l)]\<^sub>a  unit_assn\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
   apply(rule pull_cond_hfref)
   apply(subgoal_tac "size_t_context TYPE('l)")
   subgoal premises p 
@@ -2207,7 +2211,7 @@ sepref_register dynamic_array_append_spec
 lemma pf2: "
 Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
    \<Longrightarrow> (uncurry dyn_array_push_impl, uncurry dynamic_array_append_spec)
-     \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a  (al_assn' TYPE('l::len2) A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
+     \<in> [\<lambda>_. 8\<le>LENGTH('l)]\<^sub>a  (al_assn' TYPE('l::len2) A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
   apply(rule pull_cond_hfref)
   apply(subgoal_tac "size_t_context TYPE('l)")
   subgoal premises p 
@@ -2215,7 +2219,9 @@ Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
                     dynamic_array_assn.refine[OF p(3)]
                     dynamic_array_append_spec.refine[OF p(3)]
                     dyn_array_push_impl.refine[OF p(3)], unfolded PR_CONST_def ] 
-    apply(rule f) using p by auto
+    using f                    
+    unfolding size_t_context.push_size_bound_def sorry
+    (*apply(rule f) using p by auto*)
   apply standard apply simp done
 declare pf2[sepref_fr_rules]
 
