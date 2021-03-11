@@ -11,6 +11,38 @@ lemma nrest_C_relI:
   shows "a \<le> \<Down>R (\<Down>\<^sub>C TId b) \<Longrightarrow> (a,b) \<in> \<langle>R\<rangle>nrest_rel"
   apply(rule nrest_relI) by (auto simp: timerefine_id)
 
+(* TODO: Move *)
+definition mop_list_length :: "_ \<Rightarrow> (_,ecost) nrest" where
+  "mop_list_length xs = RETURNT (length xs)"
+
+
+(* TODO: move *)
+lemma one_time_SPECT_map[OT_intros]: "one_time (SPECT [x\<mapsto>t])"
+  unfolding one_time_def by auto
+
+
+lemma one_time_bind_assert[OT_intros]: "one_time m \<Longrightarrow> one_time (doN { ASSERT P; m})"
+  unfolding one_time_def
+  apply(cases P) by auto
+
+(* TODO: Move *)
+lemma one_time_uncurry[OT_intros]:
+  "(\<And>a b. x=(a,b) \<Longrightarrow> one_time (f a b)) \<Longrightarrow> one_time (uncurry f x)"
+  unfolding uncurry_def 
+  by (metis old.prod.case old.prod.exhaust) 
+
+lemma one_time_mop_list_get[OT_intros]: "one_time (mop_list_get T a b)"
+  unfolding mop_array_nth_def mop_list_get_def by (intro OT_intros)
+
+lemma one_time_mop_array_nth[OT_intros]: "one_time (mop_array_nth a b)"
+  unfolding mop_array_nth_def by (intro OT_intros)
+
+
+lemma one_time_PR_CONST[OT_intros]: "one_time x \<Longrightarrow> one_time (PR_CONST x)"
+         "one_time (y b) \<Longrightarrow> one_time (PR_CONST y b)"
+         "one_time (z c d) \<Longrightarrow> one_time (PR_CONST z c d)"
+  unfolding PR_CONST_def by simp
+
 
 
 subsection \<open>Array Copy\<close>
@@ -81,9 +113,6 @@ lemma list_copy_correct: "(uncurry2 list_copy, uncurry2 (list_copy_spec list_cop
   subgoal apply auto done
   done
 
-lemma one_time_bind_assert[OT_intros]: "one_time m \<Longrightarrow> one_time (doN { ASSERT P; m})"
-  unfolding one_time_def
-  apply(cases P) by auto
 
 (*
 declare hnr_array_upd[sepref_fr_rules del] 
@@ -424,6 +453,17 @@ lemma amor_orthogonal:
   apply (auto)
   apply(rule hn_refine_frame'') 
   using assms[THEN hfrefD] by auto
+
+
+lemma amor_orthogonal_empt:
+  assumes "(C, A) \<in> (assn)\<^sup>k \<rightarrow>\<^sub>a R"
+  shows "(C, A) \<in> (augment_amor_assn PHI assn)\<^sup>k \<rightarrow>\<^sub>a R"
+  unfolding augment_amor_assn_def
+  apply(rule hfrefI)
+  apply (auto)
+  apply(rule hn_refine_frame'') 
+  using assms[THEN hfrefD] by auto
+
 
 lemma invalid_assn_augment_amor_assn: "invalid_assn (augment_amor_assn \<Phi> A) = invalid_assn A"
   unfolding augment_amor_assn_def invalid_assn_def
@@ -1195,15 +1235,12 @@ lemma taaaa: "(uncurry (PR_CONST dyn_array_push_spec), uncurry (PR_CONST dyn_arr
   apply(rule Sup_upper) apply auto  
   by (meson list_rel_append2 list_rel_simp(4) refine_list(1))  
 
-lemmas G =  dyn_array_push_impl_refines_dyn_array_push_spec[FCOMP taaaa] 
 
-lemma G_push : "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
-  \<Longrightarrow> (uncurry dyn_array_push_impl, uncurry (PR_CONST dyn_array_push_spec)) 
-    \<in> (dyn_array_assn A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow>\<^sub>a dyn_array_assn A"
-  apply(rule G)
-   apply simp
-  sorry
+lemma one_time_dyn_array_push_spec[OT_intros]: "one_time (dyn_array_push_spec a b)"
+  apply(auto simp:  dyn_array_push_spec_def) by (intro OT_intros)
 
+lemmas G_push =  dyn_array_push_impl_refines_dyn_array_push_spec[FCOMP taaaa] 
+ 
 
 
 
@@ -1303,9 +1340,6 @@ lemma taaaa_emp: "(uncurry0 (PR_CONST  (dynamiclist_empty_spec)), uncurry0 (PR_C
 
 lemmas GGG' = GGG[FCOMP taaaa_emp]
 
-(* TODO: move *)
-lemma one_time_SPECT_map[OT_intros]: "one_time (SPECT [x\<mapsto>t])"
-  unfolding one_time_def by auto
 
 lemma GGG_empty: "(uncurry0 dynamiclist_empty_impl, uncurry0 (PR_CONST dynamiclist_empty_spec)) \<in> unit_assn\<^sup>k \<rightarrow>\<^sub>a dyn_array_assn A"
   apply(rule GGG')
@@ -1327,11 +1361,6 @@ definition dyn_array_raw_assn  :: "('x::llvm_rep) list \<times> nat \<times> nat
 
 
 
-definition "dynarray_free = (\<lambda>(p,l,c). doN { narray_free p })"
-lemma FREE_dyn_array_raw_assn[sepref_frame_free_rules]:
-  assumes PURE: "is_pure A"
-  shows "MK_FREE dyn_array_raw_assn dynarray_free" 
-  sorry
 
 
 subsection \<open>implement nth\<close>
@@ -1722,21 +1751,7 @@ lemma dynamiclist_append2_refines:
   apply(rule dynamiclist_append2_refines_aux) by auto
  
 
-term id_assn
-term "id_assn\<^sup>k *\<^sub>a id_assn\<^sup>k"
-term dyn_array_raw_assn
-term "dyn_array_raw_assn\<^sup>d *\<^sub>a id_assn\<^sup>k"
-term "dynamiclist_append2"
-declare [[show_types]]
 
-thm FREE_array_assn
-
-lemma helper :
-  "MK_FREE (array_assn id_assn \<times>\<^sub>a snat_assn' TYPE('size_t) \<times>\<^sub>a snat_assn' TYPE('size_t)) ll"
-  sorry
-
-thm FREE_array_assn
-term ll_free
 sepref_def dyn_list_double_impl is "dyn_list_double2 :: ('a::llvm_rep) list \<times> _ \<Rightarrow> _"
   :: "[\<lambda>(ls,l,c). length ls * 2 < max_snat LENGTH('size_t)]\<^sub>a
      (dyn_array_raw_assn :: ('a) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>d
@@ -1856,9 +1871,81 @@ sepref_def dynamiclist_empty_impl is "(uncurry0 (dynamiclist_empty2 :: ('a::llvm
 thm dynamiclist_empty_impl.refine
 
 
+definition "finite_cost_preserves TR = (\<forall>\<Phi>. finite {x. the_acost \<Phi> x \<noteq> 0} \<longrightarrow> finite_cost \<Phi> \<longrightarrow> finite_cost (timerefineA TR \<Phi>))"   
+
+lemma finite_cost_preservesI:
+    "(\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq> 0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR \<Phi>))
+    \<Longrightarrow> finite_cost_preserves TR "
+  unfolding finite_cost_preserves_def by auto
+
+lemma finite_cost_preservesD:
+    "finite_cost_preserves TR \<Longrightarrow> 
+        finite {x. the_acost \<Phi> x \<noteq> 0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR \<Phi>)"
+  unfolding finite_cost_preserves_def by auto
+
+lemma finite_cost_preserves_sup:
+  assumes "finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA A \<Phi>)"      
+       "finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA B \<Phi>)"
+      and f: "finite_cost \<Phi>"
+    shows "finite_cost (timerefineA (sup A B) \<Phi>)"
+  apply(rule finite_costI)
+  subgoal for x
+  using assms(1,2)[OF f, THEN finite_costD, of x]
+  unfolding finite_cost_def timerefineA_def apply auto
+  oops
+
+lemma finite_cost_preserves_sup:
+  assumes "finite_cost_preserves A"
+  assumes "finite_cost_preserves B"
+  shows "finite_cost_preserves (sup A B)"
+  sorry
+
+lemma finite_cost_preserves_upd:
+  "finite_cost_preserves F \<Longrightarrow> finite_cost a \<Longrightarrow> finite_cost_preserves (F(x:=a))"
+  sorry
 
 
+lemma finite_cost_zero: "finite_cost (0::ecost)"
+  unfolding finite_cost_def by (auto simp: zero_acost_def) 
 
+lemma timerefineA_zero_acost[simp]: "timerefineA 0 \<Phi> = 0"
+  unfolding timerefineA_def by (auto simp: zero_acost_def)
+lemma timerefineA_zero_acost'[simp]: "timerefineA (\<lambda>_. 0) \<Phi> = 0"
+  unfolding timerefineA_def by (auto simp: zero_acost_def)
+
+lemma finite_cost_cost_enat[simp]: "x < \<infinity> \<Longrightarrow> finite_cost (cost n (x::enat))"
+  apply(rule finite_costI)
+  by (auto simp: cost_def zero_acost_def zero_enat_def ) 
+
+lemma finite_cost_preserves_zero[simp]:
+  "finite_cost_preserves (0::_\<Rightarrow>ecost)"
+  apply(rule finite_cost_preservesI) 
+  by (auto simp: finite_cost_zero) 
+lemma finite_cost_preserves_zero'[simp]:
+  "finite_cost_preserves ((\<lambda>_. 0)::_\<Rightarrow>ecost)"
+  apply(rule finite_cost_preservesI) 
+  by (auto simp: finite_cost_zero) 
+
+lemma finite_cost_preserves_TR_dynarray: "finite_cost_preserves TR_dynarray"
+  unfolding TR_dynarray_def
+  apply(rule finite_cost_preserves_sup)
+  subgoal 
+    unfolding TR_de_def  
+    apply(rule finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
+  subgoal 
+    unfolding TR_da_def  
+    apply(rule finite_cost_preserves_sup)
+    subgoal 
+      apply(rule finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
+    subgoal 
+      apply(rule finite_cost_preserves_sup)
+      subgoal 
+        apply(rule finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
+  
+    
+  sorry
+  sorry
+  done
 
 interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
                             "push_size_bound TYPE('size_t)" dynamiclist_append2 dyn_array_push_impl
@@ -1869,9 +1956,11 @@ interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn
       and dynamic_array_assn = dyn_array.dyn_array_assn *)
   apply standard (* TODO: provide the implementations *)
   subgoal by (fact wfR''_TR_dynarray)
-  subgoal sorry
+  subgoal
+    apply(rule finite_cost_preservesD) apply auto
+    apply(rule finite_cost_preserves_TR_dynarray) done
   subgoal by(fact dyn_array_push_refine)
-  subgoal apply(rule dyn_array_push_impl_refines) sorry
+  subgoal apply(rule dyn_array_push_impl_refines) by simp
   subgoal by (fact dynamiclist_empty_impl.refine)
   subgoal by (fact emptylist2_refine) 
   done 
@@ -1918,6 +2007,8 @@ lemma FREE_dynarray_assn[sepref_frame_free_rules]:
 term mop_array_nth
 
 
+subsection \<open>Nth operation\<close>
+
 definition dyn_array_nth :: "('a list \<times> nat \<times> nat) \<Rightarrow> nat \<Rightarrow> ('a, (char list, enat) acost) nrest"
   where "dyn_array_nth = (\<lambda>(dl,_,_) n. (mop_array_nth dl n))"
 
@@ -1950,26 +2041,60 @@ thm dyn_array.dyn_array_raw_armor_assn_alt
 
 lemmas dyn_array_nth_aux1 = dyn_array_nth_impl.refine[THEN amor_orthogonal[where PHI=dyn_array.\<Phi>_d], folded dyn_array.dyn_array_raw_armor_assn_alt]
 
-(* TODO: Move *)
-lemma one_time_uncurry[OT_intros]:
-  "(\<And>a b. x=(a,b) \<Longrightarrow> one_time (f a b)) \<Longrightarrow> one_time (uncurry f x)"
-  unfolding uncurry_def 
-  by (metis old.prod.case old.prod.exhaust) 
 
-lemma one_time_mop_list_get[OT_intros]: "one_time (mop_list_get T a b)"
-  unfolding mop_array_nth_def mop_list_get_def by (intro OT_intros)
+thm dyn_array_nth_aux1 dyn_array_nth_dyn_list_refine
+lemmas dyn_array_nth_aux2 = dyn_array_nth_aux1[FCOMP dyn_array_nth_dyn_list_refine]
+thm dyn_array_nth_aux2 mop_array_nth_refine_R
+lemmas dyn_array_nth_rule = dyn_array_nth_aux2[FCOMP mop_array_nth_refine_R]
 
-lemma one_time_mop_array_nth[OT_intros]: "one_time (mop_array_nth a b)"
-  unfolding mop_array_nth_def by (intro OT_intros)
 
-lemmas END = dyn_array_nth_aux1[FCOMP dyn_array_nth_dyn_list_refine, FCOMP mop_array_nth_refine_R]
 
+subsection \<open>length operation\<close>
+
+definition dyn_array_length :: "(('a::llvm_rep) list \<times> nat \<times> nat) \<Rightarrow> (nat, (char list, enat) acost) nrest"
+  where "dyn_array_length = (\<lambda>(_,l,_) . RETURNT l)"
+
+
+
+sepref_def dyn_array_length_impl is "dyn_array_length"
+     :: "(dyn_array_raw_assn :: ('a::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>k \<rightarrow>\<^sub>a  (snat_assn' TYPE('size_t) )"
+  unfolding dyn_array_raw_assn_def dyn_array_length_def
+  by sepref
+
+lemmas dyn_array_length_aux1 = dyn_array_length_impl.refine[THEN amor_orthogonal_empt[where PHI=dyn_array.\<Phi>_d], folded dyn_array.dyn_array_raw_armor_assn_alt]
+
+lemma dyn_array_length_dyn_list_refine: "(dyn_array_length, mop_list_length) \<in> dyn_list_rel \<rightarrow>\<^sub>f  \<langle>nat_rel\<rangle>nrest_rel "
+  apply(rule)
+  apply(rule nrest_C_relI)
+  unfolding dyn_array_length_def mop_list_length_def
+  apply(refine_rcg bindT_refine_easy)
+  by(auto simp: dyn_list_rel_def)  
+
+lemma mop_array_length_refine_R: "(mop_list_length, mop_list_length) \<in> \<langle>R\<rangle>list_rel \<rightarrow>\<^sub>f  \<langle>nat_rel\<rangle>nrest_rel"
+  apply(rule)
+  apply(rule nrest_C_relI)
+  unfolding mop_list_length_def
+  apply(refine_rcg bindT_refine_easy)
+  by(auto simp: param_nth list_rel_imp_same_length)
+
+thm mop_array_length_refine_R mop_array_nth_refine_R
+
+lemmas dyn_array_length_aux2 = dyn_array_length_aux1[FCOMP dyn_array_length_dyn_list_refine]
+thm dyn_array_length_aux2  dyn_array_nth_aux2
+thm dyn_array_length_aux2 mop_array_length_refine_R
+
+thm dyn_array.dyn_array_raw_armor_
+thm dyn_array.dyn_array_raw_armor_aux
+lemmas dyn_array_length_rule = dyn_array_length_aux2[FCOMP mop_array_length_refine_R]
+(* TODO: IDG *)
+lemma dyn_array_length_rule:
+  "\<^cancel>\<open>Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure U
+       \<Longrightarrow> \<close>(dyn_array_length_impl, mop_list_length) \<in> (dyn_array.dyn_array_assn U)\<^sup>k \<rightarrow>\<^sub>a snat_assn"
+  sorry
 
 end
 
  
-
-concrete_definition dynarray_free is size_t_context.dynarray_free_def
 
 
 
@@ -1993,21 +2118,61 @@ thm hnr_array_nth
 term "(\<lambda>((dl,_,_),n). mop_array_nth dl n)"
 term "(dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A"
 
+(* TODO: Move *)
+lemma pull_cond_hfref: "(P \<Longrightarrow>  p \<in> x \<rightarrow>\<^sub>a y) \<Longrightarrow> p \<in> [\<lambda>_. P]\<^sub>a x \<rightarrow> y"
+  unfolding hfref_def by auto
 
 
+concrete_definition dyn_array_nth_impl is size_t_context.dyn_array_nth_impl_def
+
+(* TODO one could move the definition of dyn_array_nth_impl out of the size context and
+  thus avoid the precondition with the length *)
+sepref_register dyn_array_nth_impl
 lemma dyn_array_nth[sepref_fr_rules]:
+  "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
+  \<Longrightarrow> (uncurry dyn_array_nth_impl, uncurry mop_array_nth) \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a (al_assn' TYPE('l::len2) A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> A"
+  apply(rule pull_cond_hfref)
+  apply(subgoal_tac "size_t_context TYPE('l)")
+  subgoal premises p
+    supply f = size_t_context.dyn_array_nth_rule[where 'size_t='l, unfolded 
+                    dynamic_array_assn.refine[OF p(3)]
+                    dyn_array_nth_impl.refine[OF p(3)]
+                   ]
+    thm f
+    apply(rule f) using p by auto
+  apply standard apply simp done
+
+
+(*
+lemma dyn_array_nth_old[sepref_fr_rules]:
   "Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A \<Longrightarrow> (uncurry dyn_array_nth, uncurry mop_array_nth)
      \<in> (dynamic_array_assn A)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a A" 
   sorry
 
+thm dyn_array_nth dyn_array_nth_old
+*)
 
-lemma FREE_dynarray_assn[sepref_frame_free_rules]:
-  assumes PURE: "is_pure A"
-  shows "MK_FREE (al_assn' TYPE('l::len2) A) dynarray_free" 
-  sorry
 
-lemma pull_cond_hfref: "(P \<Longrightarrow>  p \<in> x \<rightarrow>\<^sub>a y) \<Longrightarrow> p \<in> [\<lambda>_. P]\<^sub>a x \<rightarrow> y"
-  unfolding hfref_def by auto
+
+concrete_definition dyn_array_length_impl is size_t_context.dyn_array_length_impl_def
+sepref_register dyn_array_length_impl
+(* TODO one could move the definition of dyn_array_nth_impl out of the size context and
+  thus avoid the precondition with the length *)
+lemma dyn_array_length[sepref_fr_rules]:
+  "\<^cancel>\<open>Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
+  \<Longrightarrow>\<close> ( dyn_array_length_impl,  mop_list_length) \<in> [\<lambda>_. 8<LENGTH('l)]\<^sub>a (al_assn' TYPE('l::len2) A)\<^sup>k \<rightarrow> snat_assn"
+  apply(rule pull_cond_hfref)
+  apply(subgoal_tac "size_t_context TYPE('l)")
+  subgoal premises p
+    supply f = size_t_context.dyn_array_length_rule[where 'size_t='l, unfolded 
+                    dynamic_array_assn.refine[OF p(2)]
+                    dyn_array_length_impl.refine[OF p(2)]
+                   ]
+    thm f
+    apply(rule f) using p by auto
+  apply standard apply simp done
+
+
 
 
 sepref_register dynamic_array_empty_spec
@@ -2062,6 +2227,10 @@ definition "algorithm = doN {
     s \<leftarrow> dynamic_array_append_spec s (32::nat);
     s \<leftarrow> dynamic_array_append_spec s (31::nat);
     s \<leftarrow> dynamic_array_append_spec s (42::nat);
+    s \<leftarrow> dynamic_array_append_spec s (1::nat);
+    s \<leftarrow> dynamic_array_append_spec s (1::nat);
+    len \<leftarrow> mop_list_length s;
+    s \<leftarrow> dynamic_array_append_spec s len;
     s \<leftarrow> dynamic_array_append_spec s (1::nat);
     s \<leftarrow> dynamic_array_append_spec s (1::nat);
     RETURNT s
