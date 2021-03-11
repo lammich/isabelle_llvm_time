@@ -59,11 +59,11 @@ begin
            (cost ''if'' 4 +
             (cost ''load'' 2 + (cost ''ofs_ptr'' 2)))))))"
 
-  definition "compare_cost xs ys n = 
+  definition "compare_cost n = 
     lift_acost (n *m compare1_body_cost ) +
         (cost ''if'' 1 + cost ''icmp_slt'' 1 + cost ''icmp_eq'' 1 + cost ''if'' 1 + cost ''call'' 1)"
   
-  definition "compare_spec xs ys n \<equiv> doN {ASSERT (n\<le>length xs \<and> n\<le>length ys); SPECT [ (cmpi (take n xs) (take n ys)) \<mapsto> compare_cost xs ys n]}"
+  definition "compare_spec xs ys n \<equiv> doN {ASSERT (n\<le>length xs \<and> n\<le>length ys); SPECT [ (cmpi (take n xs) (take n ys)) \<mapsto> compare_cost n]}"
 
   
   definition "compare1 xs ys n \<equiv> doN {
@@ -206,7 +206,7 @@ begin
 
 
   sepref_definition compare_impl2 [llvm_inline, llvm_code] is "uncurry2 compare1" :: 
-    "(string_assn' TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (string_assn' TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k \<rightarrow>\<^sub>a sint_assn' TYPE('r::len2)"  
+    "[\<lambda>_. 8<LENGTH('size_t::len2)]\<^sub>a (string_assn' TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (string_assn' TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k \<rightarrow> sint_assn' TYPE('r::len2)"  
     unfolding compare1_def
     unfolding monadic_WHILEIET_def
     apply (annot_snat_const "TYPE('size_t)")
@@ -230,37 +230,40 @@ lemma hr_comp_brel[fcomp_norm_simps]: "hr_comp A (b_rel B P) = b_assn (hr_comp A
   
 lemma mop_array_nth_len_bound:
   fixes nth_impl A B
-  assumes "(uncurry nth_impl, uncurry mop_array_nth) \<in> A\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
-  shows "(uncurry nth_impl, uncurry mop_array_nth) \<in> (b_assn A P)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a B"
+  assumes "(uncurry nth_impl, uncurry mop_array_nth) \<in> [Q]\<^sub>a A\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> B"
+  shows "(uncurry nth_impl, uncurry mop_array_nth) \<in> [Q]\<^sub>a (b_assn A P)\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> B"
 proof -
   have A: "(mop_array_nth, mop_array_nth) \<in> b_rel Id P \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
     by (auto simp add: refine_pw_simps fun_rel_def pw_acost_nrest_rel_iff)
     
-  from assms(1)[FCOMP A[to_fref]] show ?thesis .
+  from assms(1)[FCOMP A[to_fref]] show ?thesis by simp
 qed    
     
 lemma mop_array_upd_len_bound:
   fixes upd_impl A B
-  assumes "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> A\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow>\<^sub>a A"
-  shows "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> (b_assn A (\<lambda>xs. P (length xs)))\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow>\<^sub>a (b_assn A (\<lambda>xs. P (length xs)))"
+  assumes "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> [Q]\<^sub>a A\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow> A"
+  shows "(uncurry2 upd_impl, uncurry2 mop_array_upd) \<in> [Q]\<^sub>a (b_assn A (\<lambda>xs. P (length xs)))\<^sup>d *\<^sub>a snat_assn\<^sup>k *\<^sub>a B\<^sup>k \<rightarrow> (b_assn A (\<lambda>xs. P (length xs)))"
 proof -
   have A: "(mop_array_upd, mop_array_upd) \<in> b_rel Id (\<lambda>xs. P (length xs)) \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>b_rel Id (\<lambda>xs. P (length xs))\<rangle>nrest_rel"
     by (auto simp add: refine_pw_simps fun_rel_def pw_acost_nrest_rel_iff mop_array_upd_def)
-    
-  from assms(1)[FCOMP A[to_fref]] show ?thesis .
+
+  have *: "(\<lambda>((a, b), ba). Q ((a, b), ba)) = Q" by auto
+  from assms(1)[FCOMP A[to_fref]] show ?thesis unfolding * .
 qed    
 
 lemma bstring_nth[sepref_fr_rules]:
-  "(uncurry dyn_array_nth, uncurry mop_array_nth)
-     \<in> (bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow>\<^sub>a unat_assn' TYPE('w::len)" 
+  "(uncurry dyn_array_nth_impl, uncurry mop_array_nth)
+     \<in> [\<lambda>_. 8<LENGTH('size_t::len2)]\<^sub>a (bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a snat_assn\<^sup>k \<rightarrow> unat_assn' TYPE('w::len)" 
   unfolding bstring_assn_def    
   apply (rule mop_array_nth_len_bound)
-  apply (rule dyn_array_nth[of unat_assn dyn_array_nth]) (* TODO: delete of dyn_array_nth when rule is complete *)
+  apply (rule dyn_array_nth[of unat_assn]) (* TODO: delete of dyn_array_nth when rule is complete *)
   by simp
   
   
   sepref_definition compare_impl [llvm_inline, llvm_code] is "uncurry2 compare1" :: 
-    "(bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (bstring_assn n TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k \<rightarrow>\<^sub>a sint_assn' TYPE('r::len2)"  
+    "[\<lambda>_. 8<LENGTH('size_t::len2)]\<^sub>a 
+      (bstring_assn n TYPE('size_t::len2) TYPE('w::len))\<^sup>k *\<^sub>a (bstring_assn n TYPE('size_t) TYPE('w))\<^sup>k *\<^sub>a (snat_assn' TYPE('size_t))\<^sup>k
+       \<rightarrow> sint_assn' TYPE('r::len2)"  
     unfolding compare1_def
     unfolding monadic_WHILEIET_def 
     apply (annot_snat_const "TYPE('size_t)")
@@ -294,8 +297,8 @@ lemma bstring_nth[sepref_fr_rules]:
   term mop_list_get
   
   definition "strcmp xs ys \<equiv> doN {
-    lx \<leftarrow> RETURNT (length xs);
-    ly \<leftarrow> RETURNT (length ys);
+    lx \<leftarrow> mop_list_length xs;
+    ly \<leftarrow> mop_list_length ys;
     n \<leftarrow> min1 lx ly;
     i \<leftarrow> compare_spec xs ys n;
     if\<^sub>N icmp_eq i (-1) then RETURNT True
@@ -304,21 +307,43 @@ lemma bstring_nth[sepref_fr_rules]:
   }"
 
   thm gwp_specifies_rev_I[OF min_refine1]
-  
-  lemma strcmp_correct: "strcmp xs ys \<le> SPECT [xs<ys \<mapsto> foo]"  
-    unfolding strcmp_def compare_spec_def
+
+  definition "strcmp_cost xs ys = cost ''if'' 2 + (min_cost + compare_cost (min (length xs) (length ys)) + cost ''icmp_eq'' 2 + cost ''icmp_ult'' 1)"
+
+  (* TODO: Move *)
+  lemma zero_minus_acost_eq_zero[simp]: "(0::ecost) - x = 0"
+    by(cases x; auto simp: zero_acost_def minus_acost_alt)
+
+  lemma strcmp_correct: "strcmp xs ys \<le> SPECT [xs<ys \<mapsto> strcmp_cost xs ys]"  
+    unfolding strcmp_def compare_spec_def mop_list_length_def
     apply (rewrite in "_ \<le> \<hole>" list_lexorder_alt)
     apply(rule gwp_specifies_I)
     
     thm vcg_rules'
-    xxx, stuck here: Wie bekomme ich mein min_refine1 (oder min-correct) in den VCG?
-    
-    apply (refine_vcg simp rules: gwp_specifies_rev_I[OF min_refine1])
-    
-    thm gwp_specifies_rev_I[OF min_refine1]
-    
-    by (simp_all)
-      
+    (* xxx, stuck here: Wie bekomme ich mein min_refine1 (oder min-correct) in den VCG? *)
+
+    apply (refine_vcg simp rules: gwp_SPECc2 gwp_specifies_rev_I[OF min_refine1, THEN gwp_conseq4])
+
+       apply (auto simp: Let_def split: if_splits)
+    unfolding strcmp_cost_def
+        apply (auto simp: algebra_simps)
+    subgoal
+      apply(auto simp: min_cost_def compare_cost_def compare1_body_cost_def norm_cost)
+      apply(sc_solve) by auto
+    subgoal 
+      by (metis less_irrefl list_lexorder_alt) 
+    subgoal 
+      by (metis list_lexorder_alt min.idem min_simps(1) take_take) 
+    subgoal   
+      apply(auto simp: min_cost_def compare_cost_def compare1_body_cost_def norm_cost)
+      apply(sc_solve) by auto
+        (* alternative: 
+            apply(summarize_same_cost) then use bohua's component in Imperative-HOL-Time *)
+    subgoal   
+      apply(auto simp: min_cost_def compare_cost_def compare1_body_cost_def norm_cost)
+      apply(sc_solve) by auto
+    done
+     
       
     (*
   definition "strcmp xs ys \<equiv> doN {
