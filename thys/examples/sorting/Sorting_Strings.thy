@@ -269,6 +269,57 @@ lemma bstring_nth[sepref_fr_rules]:
  
   lemmas compare_hnr[sepref_fr_rules] = compare_impl.refine[FCOMP compare1_refine]
   
+  find_theorems "(+)" hn_refine
+  
+  definition min_cost :: "ecost" where "min_cost \<equiv> cost ''if'' 1 + cost ''icmp_slt'' 1"
+  
+  definition min1 :: "'a \<Rightarrow> 'a \<Rightarrow> ('a::linorder, ecost) nrest" 
+    where "min1 a b \<equiv> if\<^sub>N SPECc2 ''icmp_slt'' (<) a b then RETURNT a else RETURNT b"
+  
+  lemma min_refine1: "min1 a b \<le> SPECT [min a b \<mapsto> min_cost]"
+    unfolding min1_def
+    apply(rule gwp_specifies_I)
+    apply (refine_vcg \<open>-\<close> rules: gwp_SPECc2)
+    unfolding min_cost_def
+    by auto
+
+  sepref_def min_impl is "uncurry min1" :: "(snat_assn' TYPE('l::len2))\<^sup>k *\<^sub>a (snat_assn' TYPE('l::len2))\<^sup>k \<rightarrow>\<^sub>a snat_assn' TYPE('l::len2)"
+    unfolding min1_def
+    by sepref
+    
+
+  abbreviation "icmp_eq x y \<equiv> SPECc2 ''icmp_eq'' (=) x y"
+  abbreviation "icmp_ult x y \<equiv> SPECc2 ''icmp_ult'' (<) x y"
+    
+  term mop_list_get
+  
+  definition "strcmp xs ys \<equiv> doN {
+    lx \<leftarrow> RETURNT (length xs);
+    ly \<leftarrow> RETURNT (length ys);
+    n \<leftarrow> min1 lx ly;
+    i \<leftarrow> compare_spec xs ys n;
+    if\<^sub>N icmp_eq i (-1) then RETURNT True
+    else if\<^sub>N icmp_eq i 0 then icmp_ult xs ys
+    else RETURNT False
+  }"
+
+  thm gwp_specifies_rev_I[OF min_refine1]
+  
+  lemma strcmp_correct: "strcmp xs ys \<le> SPECT [xs<ys \<mapsto> foo]"  
+    unfolding strcmp_def compare_spec_def
+    apply (rewrite in "_ \<le> \<hole>" list_lexorder_alt)
+    apply(rule gwp_specifies_I)
+    
+    thm vcg_rules'
+    xxx, stuck here: Wie bekomme ich mein min_refine1 (oder min-correct) in den VCG?
+    
+    apply (refine_vcg simp rules: gwp_specifies_rev_I[OF min_refine1])
+    
+    thm gwp_specifies_rev_I[OF min_refine1]
+    
+    by (simp_all)
+      
+      
     (*
   definition "strcmp xs ys \<equiv> doN {
     let n = min (length xs) (length ys);
