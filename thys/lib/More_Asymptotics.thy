@@ -1,6 +1,7 @@
 theory More_Asymptotics
   imports
    "Asymptotics_1D"
+   "Asymptotics_2D"
    "HOL-Real_Asymp.Real_Asymp"
 begin
 

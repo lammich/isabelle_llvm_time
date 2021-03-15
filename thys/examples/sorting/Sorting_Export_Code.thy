@@ -55,8 +55,8 @@ theorem unat_sort_allcost_nlogn:
 
 
 
-global_interpretation string_sort: sort_impl_context "(\<le>)" "(<)" "TYPE(64)" strcmp_impl
-              "strcmp_cost n n" "bstring_assn n TYPE(64) TYPE('w::len2)"
+global_interpretation string_sort: sort_impl_context "(\<le>)" "(<)" "TYPE(64)" "strcmp_impl'"
+              "strcmp_cost' n" "bstring_assn n TYPE(64) TYPE('w::len2)"
   defines string_sort_is_guarded_insert_impl = string_sort.is_guarded_insert_impl
       and string_sort_is_unguarded_insert_impl = string_sort.is_unguarded_insert_impl
       and string_sort_unguarded_insertion_sort_impl = string_sort.unguarded_insertion_sort_impl
@@ -92,7 +92,7 @@ print_named_simpset llvm_inline
 term "sort_impl_context.cmpo_v_idx_impl"
 
 thm string_sort.cmpo_v_idx_impl_def
-lemmas [llvm_inline] = strcmp_impl_def (*string_sort.cmpo_v_idx_impl_def*)
+(*lemmas [llvm_inline] = strcmp_impl_def (*string_sort.cmpo_v_idx_impl_def*) *)
 
 lemmas [llvm_inline] = string_sort.introsort_aux_impl_def 
                       string_sort.final_insertion_sort_impl_def
@@ -100,13 +100,72 @@ lemmas [llvm_inline] = string_sort.introsort_aux_impl_def
                       string_sort.unguarded_insertion_sort_impl_def
                       string_sort.is_guarded_insert_impl_def
                       string_sort.is_unguarded_insert_impl_def 
-                      
-                
-                      
+
+(* TODO: Move and Dup *)
+lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
+  unfolding cost_def by (simp add: zero_acost_def)
+
+
+lemma sum_any_push_costmul: "Sum_any (the_acost (n *m c)) = n * (Sum_any (the_acost c))" for n :: nat 
+  apply (cases c) subgoal for x
+  apply (auto simp: costmult_def algebra_simps) 
+  apply (cases "finite {a. x a \<noteq> 0}"; cases "n=0")
+  apply (simp_all add: Sum_any_right_distrib)
+  done done
+
+term "\<Theta>\<^sub>2"
+
+term "string_sort.introsort_impl_cost"
+
+schematic_goal string_sort_allcost_simp: "project_all (string_sort.introsort_impl_cost m n) = ?x"  
+  apply (fold norm_cost_tag_def)
+  unfolding string_sort.projected_introsort_cost_simplified
+  unfolding strcmp_cost'_def strcmp_cost_def compare_cost_def compare1_body_cost_def min_cost_def
+  apply (simp add: string_sort.Sum_any_cost norm_cost) (* TODO: Move this lemma to global context *)
+
+  apply(simp add: the_acost_propagate add.assoc) 
+  
+  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI
+  
+  apply (subst Sum_any.distrib, (intro acost_finiteIs;fail), (intro acost_finiteIs;fail))+
+  apply (simp only: Sum_any_cost sum_any_push_costmul)
+  apply (simp add: add_ac)
+
+  by (rule norm_cost_tagI)
+
+concrete_definition p is string_sort_allcost_simp 
+thm p_def
+thm p.refine
+
+
+lemma p_absch: "(\<lambda>(m::nat,n::nat). real (p m n)) \<in> \<Theta>\<^sub>2(\<lambda>(m::nat,n::nat). (real m) *  (real n) * ln (real n) )"
+  unfolding p_def
+  by auto2
+
+
+(* *)
+term dynamiclist_empty_impl
+term dyn_array_push_impl
+
+lemmas [llvm_code] = dynamiclist_empty_impl_def
+
+(* ! PROBLEM ! *)
+thm dynamiclist_empty_impl_def
+declare [[llvm_gen_header=true]]
+export_llvm  
+  "dynamiclist_empty_impl :: (8 word ptr \<times> 64 word \<times> 64 word) llM" is "llstring"
+  defines \<open>typedef struct {int64_t data; struct {int64_t size; int64_t capacity;};} llstring;\<close>
+  file "blub.ll"
+
+
 export_llvm   "string_sort_introsort_impl :: (8 word ptr \<times> 64 word \<times> 64 word) ptr \<Rightarrow> _" is "llstring* str_introsort(llstring*, int64_t, int64_t)"
  defines \<open>typedef struct {char *data; struct {int64_t size; int64_t capacity;};} llstring;\<close> (*
   file "../code/string_introsort.ll"
 *)
 
+
+(* Final results for string_sort: *)  
+thm string_sort.introsort_final_hoare_triple'  (* Hoare triple *)
+ p_absch[unfolded p.refine[symmetric]]
 
 end
