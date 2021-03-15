@@ -1396,7 +1396,7 @@ term   dyn_list_double_spec
 
 definition dyn_list_double :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('x list \<times> nat \<times> nat, (char list, enat) acost) nrest"  where
   "dyn_list_double  \<equiv> \<lambda>(bs,l,c). doN {
-       ASSERT (l\<le>c \<and> c=length bs);
+       ASSERT (l=c \<and> c=length bs);
        c' \<leftarrow> SPECc2 ''mul'' (*) c 2;
        bs' \<leftarrow> mop_array_new id_assn init c';
        bs'' \<leftarrow> list_copy_spec list_copy_spec_time bs' bs l;
@@ -1431,7 +1431,7 @@ lemma dyn_list_double_correct:
 
 definition dyn_list_double2 :: "('x::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> ('x list \<times> nat \<times> nat, (char list, enat) acost) nrest"  where
   "dyn_list_double2  \<equiv> \<lambda>(bs,l,c). doN {
-       ASSERT (l\<le>c \<and> c=length bs);
+       ASSERT (l=c \<and> c=length bs);
        c' \<leftarrow> SPECc2 ''mul'' (*) c 2;
        bs' \<leftarrow> mop_array_new id_assn init c';
        bs'' \<leftarrow> list_copy bs' bs l;

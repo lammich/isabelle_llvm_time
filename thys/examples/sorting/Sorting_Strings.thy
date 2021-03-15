@@ -390,11 +390,20 @@ lemma bstring_nth[sepref_fr_rules]:
     unfolding strcmp_def min_def 
     apply (annot_sint_const "TYPE(2)")
     by sepref
+   
+definition "mop_str_cmp N = (\<lambda>xs ys.  (SPECT [xs < ys \<mapsto> lift_acost (strcmp_cost N N)]))"
 
-  lemma strcmp_impl_refine': 
-    "(uncurry strcmp_impl, uncurry (\<lambda>xs ys. SPECT [xs < ys \<mapsto> lift_acost (strcmp_cost N N)]))
+context
+  fixes N :: nat
+begin
+  sepref_register "mop_str_cmp N"
+end
+
+  lemma strcmp_impl_refine'[sepref_fr_rules]: 
+    "(uncurry strcmp_impl, uncurry (PR_CONST (mop_str_cmp N)))
     \<in> [\<lambda>b. 8 \<le> LENGTH('size_t::len2)]\<^sub>a (bstring_assn N TYPE('size_t) TYPE('w::len))\<^sup>k *\<^sub>a (bstring_assn N TYPE('size_t) TYPE('w))\<^sup>k \<rightarrow> bool1_assn"
-    using strcmp_impl.refine[FCOMP strcmp_refines_aux,FCOMP strcmp_refines_aux2, folded bstring_assn_def]
+    unfolding PR_CONST_def mop_str_cmp_def
+    using strcmp_impl.refine[FCOMP strcmp_refines_aux,FCOMP strcmp_refines_aux2, folded bstring_assn_def, of N]
     .
     
   (* TODO: Move! *)  
@@ -405,12 +414,45 @@ lemma bstring_nth[sepref_fr_rules]:
   export_llvm "strcmp_impl :: 8 word ptr \<times> 64 word \<times> 64 word \<Rightarrow> 8 word ptr \<times> 64 word \<times> 64 word \<Rightarrow> 1 word llM"
 
 
+(* TEST
+ strcmp_impl_def
 
-lemma strcmp_refines_relp: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> GEN_ALGO strcmp_impl (refines_relp (bstring_assn n TYPE('size_t::len2) TYPE('w::len2))
-                    (lift_acost (strcmp_cost n n)) (<))"
+definition [llvm_code]: "foo xs ys = ll_call (strcmp_impl xs ys)"
+
+
+  export_llvm "foo :: 8 word ptr \<times> 64 word \<times> 64 word \<Rightarrow> 8 word ptr \<times> 64 word \<times> 64 word \<Rightarrow> 1 word llM"
+ *)
+
+definition "strcmp_cost' m = strcmp_cost m m + cost ''call'' 1" 
+
+
+definition "mop_str_cmp' N = (\<lambda>xs ys. (mop_call (mop_str_cmp N xs ys)))"
+
+context
+  fixes N :: nat
+begin
+  sepref_register "mop_str_cmp' N"
+end
+
+  sepref_def strcmp_impl' is "uncurry (PR_CONST (mop_str_cmp' N)) " 
+    :: "[\<lambda>_. 8\<le>LENGTH('size_t::len2)]\<^sub>a (bstring_assn N TYPE('size_t) TYPE('w::len))\<^sup>k *\<^sub>a (bstring_assn N TYPE('size_t) TYPE('w))\<^sup>k \<rightarrow> bool1_assn"
+    unfolding strcmp_def min_def  mop_str_cmp'_def PR_CONST_def
+    by sepref
+
+lemmas [llvm_inline] = strcmp_impl'_def
+
+thm strcmp_impl'.refine
+
+lemma XX: "PR_CONST (mop_str_cmp' n) = (\<lambda>a b. SPECT [a < b \<mapsto> lift_acost (strcmp_cost' n)])"
+  unfolding mop_str_cmp'_def strcmp_cost'_def PR_CONST_def mop_call_def mop_str_cmp_def
+  apply(auto intro!: ext)
+  sorry
+
+lemma strcmp_refines_relp: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> GEN_ALGO strcmp_impl' (refines_relp (bstring_assn n TYPE('size_t::len2) TYPE('w::len2))
+                    (lift_acost (strcmp_cost' n)) (<))"
     apply rule
-    using strcmp_impl_refine'[of n, where 'size_t='size_t] 
-    unfolding SPECc3_def
+    using strcmp_impl'.refine[of n, where 'b='size_t] 
+    unfolding SPECc3_def  XX
     by simp
  
 lemma the_acost_apply_neq[simp]: "n\<noteq>n' \<Longrightarrow> the_acost (cost n c) n' = 0"
@@ -428,14 +470,15 @@ lemma finite_the_acost_mult_nonzeroI: "finite {a. the_acost c a \<noteq> 0} \<Lo
   by (auto simp: the_acost_mult_eq_z_iff)
   
   
-lemma strcmp_sort_impl_context: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> sort_impl_context TYPE('size_t) (\<le>) (<) strcmp_impl (strcmp_cost n n)
+lemma strcmp_sort_impl_context: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> sort_impl_context TYPE('size_t) (\<le>) (<)
+           strcmp_impl'  (strcmp_cost' n)
                (bstring_assn n TYPE('size_t) TYPE('w::len2))"
     apply unfold_locales
     apply (auto simp: strcmp_refines_relp) [10]
-    subgoal by (auto simp: strcmp_cost_def min_cost_def compare_cost_def norm_cost compare1_body_cost_def)
-    subgoal by (auto simp: strcmp_cost_def min_cost_def compare_cost_def norm_cost compare1_body_cost_def)
+  subgoal by   (auto simp: strcmp_cost'_def  strcmp_cost_def min_cost_def compare_cost_def norm_cost compare1_body_cost_def)
+    subgoal by (auto simp: strcmp_cost'_def strcmp_cost_def min_cost_def compare_cost_def norm_cost compare1_body_cost_def)
     subgoal
-      unfolding strcmp_cost_def min_cost_def compare_cost_def compare1_body_cost_def
+      unfolding strcmp_cost'_def strcmp_cost_def min_cost_def compare_cost_def compare1_body_cost_def
       apply(simp only: add.assoc norm_cost)  
       (* TODO: Solver for these equations. See DUPs in Heapsort, Introsort *)
       supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI
