@@ -32,8 +32,6 @@ lemmas [llvm_inline] = unat_sort.introsort_aux_impl_def
                       unat_sort.unguarded_insertion_sort_impl_def
                       unat_sort.is_guarded_insert_impl_def
                       unat_sort.is_unguarded_insert_impl_def
-export_llvm "unat_sort_introsort_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort(uint64_t*, int64_t,int64_t)"
-  file "../code/introsort.ll"
 
   
 schematic_goal unat_sort_allcost_simp: "project_all (unat_sort.introsort_impl_cost n) = ?x"  
@@ -147,21 +145,58 @@ lemma p_absch: "(\<lambda>(m::nat,n::nat). real (p m n)) \<in> \<Theta>\<^sub>2(
 term dynamiclist_empty_impl
 term dyn_array_push_impl
 
-lemmas [llvm_code] = dynamiclist_empty_impl_def
+lemmas [llvm_code] = dynamiclist_empty_impl_def dyn_array_push_impl_def
 
-(* ! PROBLEM ! *)
-thm dynamiclist_empty_impl_def
-declare [[llvm_gen_header=true]]
-export_llvm  
-  "dynamiclist_empty_impl :: (8 word ptr \<times> 64 word \<times> 64 word) llM" is "llstring"
-  defines \<open>typedef struct {int64_t data; struct {int64_t size; int64_t capacity;};} llstring;\<close>
-  file "blub.ll"
+type_synonym llstring = "(8 word ptr * 64 word * 64 word)"
 
+definition str_init :: "llstring ptr \<Rightarrow> unit llM" where [llvm_code]:
+  "str_init sp \<equiv> doM {
+    t \<leftarrow> ll_call dynamiclist_empty_impl;
+    ll_store t sp
+  }"
+
+definition str_append :: "llstring ptr \<Rightarrow> 8 word \<Rightarrow> unit llM" where [llvm_code]:
+  "str_append sp x \<equiv> doM {
+    s \<leftarrow> ll_load sp;
+    s \<leftarrow> ll_call (dyn_array_push_impl s x);
+    ll_store s sp
+  }"
+
+  
+definition llstrcmp :: "llstring ptr \<Rightarrow> _ \<Rightarrow> 8 word llM" where [llvm_code]:
+  "llstrcmp ap bp \<equiv> doM {
+    a \<leftarrow> ll_load ap;
+    b \<leftarrow> ll_load bp;
+    r \<leftarrow> strcmp_impl' a b;
+    t \<leftarrow> ll_icmp_ne r 0;
+    llc_if t (return 1) (return 0)
+  }"
+
+
+context size_t_context begin  
+  lemmas [llvm_inline] = 
+    has_enough_space_impl_def dyn_list_push_basic_impl_def dyn_list_double_impl_def
+    list_copy_impl_def narray_free_def
+    
+
+end
+
+(*
+export_llvm "unat_sort_introsort_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort(uint64_t*, int64_t,int64_t)"
+  file "../code/introsort.ll"
 
 export_llvm   "string_sort_introsort_impl :: (8 word ptr \<times> 64 word \<times> 64 word) ptr \<Rightarrow> _" is "llstring* str_introsort(llstring*, int64_t, int64_t)"
- defines \<open>typedef struct {char *data; struct {int64_t size; int64_t capacity;};} llstring;\<close> (*
-  file "../code/string_introsort.ll"
 *)
+export_llvm 
+  "unat_sort_introsort_impl :: 64 word ptr \<Rightarrow> _" is "uint64_t* introsort(uint64_t*, int64_t, int64_t)" 
+  "string_sort_introsort_impl :: (8 word ptr \<times> 64 word \<times> 64 word) ptr \<Rightarrow> _" is "llstring* str_introsort(llstring*, int64_t, int64_t)"  
+  "str_init" is "void str_init(llstring *)"
+  "str_append" is "void str_append(llstring *, char)"
+  "llstrcmp" is "char llstrcmp(llstring*,llstring*)"
+
+ defines \<open>typedef struct {char *data; struct {int64_t size; int64_t capacity;};} llstring;\<close> 
+  file "../code/introsort.ll"
+
 
 
 (* Final results for string_sort: *)  

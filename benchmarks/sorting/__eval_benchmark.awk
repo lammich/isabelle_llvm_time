@@ -313,10 +313,10 @@ function check_divergs() {
 
 
 END {
-#  check_divergs()
+ check_divergs()
 
 #  output_pgf()
-  output_pgf_abs()
+#  output_pgf_abs()
 
 }
 
