@@ -644,6 +644,12 @@ context fixes T :: ecost begin
 definition mop_list_snoc where
  [simp]: "mop_list_snoc  xs x = SPECT [xs @ [x] \<mapsto> T]"
 sepref_register mop_list_snoc
+
+
+definition mop_list_emptylist where
+  [simp]: "mop_list_emptylist = SPECT [ [] \<mapsto> T ]"
+sepref_register mop_list_emptylist
+
 end
 
 
@@ -651,8 +657,6 @@ end
 text \<open>The abstract program A for empty list:\<close>
 
 
-definition mop_list_emptylist where
-  "mop_list_emptylist T = SPECT [ [] \<mapsto> T ]"
 
 
 
@@ -1040,7 +1044,7 @@ end
 locale dyn_list_impl = dyn_list_assn TR_dynarray dyn_array_raw_assn 
     for TR_dynarray and dyn_array_raw_assn :: "('e::llvm_rep) list \<times> nat \<times> nat \<Rightarrow> 'f \<Rightarrow> assn" + 
     fixes
-      push_size_bound  :: "'e list \<times> nat \<times> nat \<Rightarrow> bool"
+      push_size_bound  :: "nat \<Rightarrow> bool"
     and  dyn_array_push
     and dyn_array_push_impl :: "'f \<Rightarrow> 'e \<Rightarrow> 'f llM" 
 
@@ -1052,7 +1056,7 @@ locale dyn_list_impl = dyn_list_assn TR_dynarray dyn_array_raw_assn
     and TR_dynarray_keeps_finite: "\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq>0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR_dynarray \<Phi>)"
     and dyn_array_push_refine: "dyn_array_push dl x \<le> \<Down>\<^sub>C TR_dynarray (dyn_list_push dl x)"
 
-    and dyn_array_push_impl_refines: "push_size_bound (bs,l,c) \<Longrightarrow> hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
+    and dyn_array_push_impl_refines: "push_size_bound l \<Longrightarrow> hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
                         (dyn_array_push_impl da' x')
                       (invalid_assn (dyn_array_raw_assn) (bs,l,c) da' ** id_assn x x')
                         (dyn_array_raw_assn) (dyn_array_push (bs,l,c) x)"
@@ -1128,7 +1132,7 @@ lemma dyn_array_push_refines:
 text \<open>Now we combine the raw hnr-rule @{thm dyn_array_push_impl_refines} with the
   amortization refinement @{thm dyn_array_push_refines}}\<close>
 
-lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = length bs; 0 < length bs; push_size_bound (bs, l, c)\<rbrakk>
+lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = length bs; 0 < length bs; push_size_bound l\<rbrakk>
 \<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn) (bs, l, c) da' \<and>* hn_ctxt id_assn r r')
      (dyn_array_push_impl $ da' $ r')
      (hn_invalid (dyn_array_raw_armor_assn) (bs, l, c) da' \<and>* hn_ctxt id_assn r r')
@@ -1167,7 +1171,7 @@ lemma dyn_array_push_impl_refines_dyn_list_push_spec: "\<lbrakk>l \<le> c; c = l
 
 
 lemma dyn_array_push_impl_refines_dyn_list_push_spec':
-"\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs \<and> push_size_bound (bs,l,c))\<rbrakk>
+"\<lbrakk>(case x of (bs,l,c) \<Rightarrow> l \<le> c \<and> c = length bs \<and> 0 < length bs \<and> push_size_bound l)\<rbrakk>
   \<Longrightarrow> hn_refine (hn_ctxt (dyn_array_raw_armor_assn) x x' \<and>* hn_ctxt id_assn r r')
      (dyn_array_push_impl $ x' $ r')
      (hn_invalid (dyn_array_raw_armor_assn) x x' \<and>* hn_ctxt id_assn r r')
@@ -1216,8 +1220,8 @@ lemma zzz: "\<lbrakk>\<And>a aa. push_size_bound (a, aa, length a); ((aa, aaa, b
  
 thm dyn_array_push_impl_refines_dyn_list_push_spec_hfref dyn_list_push_spec_refines_fref
 
-lemma XXX[fcomp_prenorm_simps]: "(x',x)\<in> dyn_list_rel \<Longrightarrow> push_size_bound x' = push_size_bound ([],0,length x)"
-  sorry (* TODO *)
+lemma XXX[fcomp_prenorm_simps]: "((as,l,c),x)\<in> dyn_list_rel \<Longrightarrow> push_size_bound l = push_size_bound (length x)"
+  unfolding dyn_list_rel_def by auto
 
 lemma dyn_array_push_fcomp_prenorm[fcomp_prenorm_simps]:
   "((bs,l,c),x)\<in> dyn_list_rel \<Longrightarrow> l \<le> c \<and> c = length bs \<and> bs \<noteq> []"
@@ -1761,7 +1765,7 @@ lemma dynamiclist_append2_refines:
 
 
 sepref_def dyn_list_double_impl is "dyn_list_double2 :: ('a::llvm_rep) list \<times> _ \<Rightarrow> _"
-  :: "[\<lambda>(ls,l,c). length ls * 2 < max_snat LENGTH('size_t)]\<^sub>a
+  :: "[\<lambda>(ls,l,c). l * 2 < max_snat LENGTH('size_t)]\<^sub>a
      (dyn_array_raw_assn :: ('a) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>d
         \<rightarrow> (dyn_array_raw_assn :: ('a) list \<times> _ \<Rightarrow> _)"
   unfolding dyn_list_double2_def
@@ -1782,7 +1786,7 @@ sepref_def dyn_list_push_basic_impl is "uncurry dyn_list_push_basic"
   by sepref 
 
 sepref_def dyn_array_push_impl is "uncurry (dynamiclist_append2 :: ('a::llvm_rep) list \<times> _ \<Rightarrow> _)"
-    :: "[\<lambda>(dl,_). length (fst dl) * 2 < max_snat LENGTH('size_t)]\<^sub>a
+    :: "[\<lambda>((dl,l,c),_). l * 2 < max_snat LENGTH('size_t)]\<^sub>a
           (dyn_array_raw_assn :: ('a) list \<times> nat \<times> nat \<Rightarrow> ('a) ptr \<times> 'size_t word \<times> 'size_t word \<Rightarrow> assn)\<^sup>d
              *\<^sub>a id_assn\<^sup>k \<rightarrow> (dyn_array_raw_assn :: ('a) list \<times> _ \<Rightarrow> _)"
   unfolding dynamiclist_append2_def 
@@ -1792,10 +1796,10 @@ thm dyn_array_push_impl.refine[]
 
 lemmas prepare = dyn_array_push_impl.refine[to_hnr, unfolded hn_ctxt_def APP_def]
 
-definition "push_size_bound TYPE('size_t) dl \<equiv> length (fst dl) * (2::nat) < max_snat LENGTH('size_t)"
+definition "push_size_bound TYPE('size_t) l \<equiv> l * (2::nat) < max_snat LENGTH('size_t)"
 
 lemma dyn_array_push_impl_refines: "
-        push_size_bound TYPE('size_t) (bs,l,c) \<Longrightarrow>
+        push_size_bound TYPE('size_t) l \<Longrightarrow>
           hn_refine (dyn_array_raw_assn (bs,l,c) da' ** id_assn x x')
                         (dyn_array_push_impl da' x')
                       (invalid_assn (dyn_array_raw_assn) (bs,l,c) da' ** id_assn x x')
@@ -1879,7 +1883,8 @@ sepref_def dynamiclist_empty_impl is "(uncurry0 (dynamiclist_empty2 :: ('a::llvm
 thm dynamiclist_empty_impl.refine
 
 
-definition "finite_cost_preserves TR = (\<forall>\<Phi>. finite {x. the_acost \<Phi> x \<noteq> 0} \<longrightarrow> finite_cost \<Phi> \<longrightarrow> finite_cost (timerefineA TR \<Phi>))"   
+definition finite_cost_preserves  :: "(_ \<Rightarrow> ecost) \<Rightarrow> bool" where
+  "finite_cost_preserves TR = (\<forall>\<Phi>. finite {x. the_acost \<Phi> x \<noteq> 0} \<longrightarrow> finite_cost \<Phi> \<longrightarrow> finite_cost (timerefineA TR \<Phi>))"   
 
 lemma finite_cost_preservesI:
     "(\<And>\<Phi>. finite {x. the_acost \<Phi> x \<noteq> 0} \<Longrightarrow> finite_cost \<Phi> \<Longrightarrow> finite_cost (timerefineA TR \<Phi>))
@@ -1902,17 +1907,71 @@ lemma finite_cost_preserves_sup:
   unfolding finite_cost_def timerefineA_def apply auto
   oops
 
+lemma timerefineA_if_finite_support:
+  "finite  {x. the_acost \<Phi> x \<noteq> 0}
+  \<Longrightarrow> timerefineA TR \<Phi> = acostC (\<lambda>cc. sum (\<lambda>ac. the_acost \<Phi> ac * the_acost (TR ac) cc) {x. the_acost \<Phi> x \<noteq> 0})"
+  unfolding timerefineA_def apply auto
+  apply(rule ext)
+  apply(subst Sum_any.expand_superset[of "{x. the_acost \<Phi> x \<noteq> 0}"]) by auto
+
+
+lemma finite_cost_sup:
+  fixes A :: "ecost"
+  shows "finite_cost A \<Longrightarrow> finite_cost B \<Longrightarrow> finite_cost (sup A B)"
+  unfolding finite_cost_def apply (auto simp: sup_acost_def) 
+  by (simp add: max_def sup_enat_def) 
+
+thm wfR''_def
+
+
+lemma finite_sum_iff: "finite S \<Longrightarrow> sum f S < (\<infinity>::enat) \<longleftrightarrow> (\<forall>x\<in>S. f x < \<infinity>)"
+  apply(induct S rule: finite_induct)
+  apply simp apply auto
+  by (metis add.commute enat.exhaust plus_enat_simps(3)) 
+
+lemma finite_cost_timerefineA:
+  assumes "finite  {x. the_acost \<Phi> x \<noteq> (0::enat)}"
+  shows "finite_cost (timerefineA A \<Phi>) \<longleftrightarrow> (\<forall>ac\<in>{x. the_acost \<Phi> x \<noteq> 0}. (\<forall>cc. the_acost \<Phi> ac * the_acost (A ac) cc < \<infinity>))"
+  unfolding timerefineA_if_finite_support[OF assms(1)] finite_cost_def
+  apply (simp del: enat_ord_simps(4))
+  apply(subst finite_sum_iff) apply(subst assms(1))
+  apply (simp del: enat_ord_simps(4)) by auto
+
+
 lemma finite_cost_preserves_sup:
-  fixes A :: "'a \<Rightarrow> ('b, enat) acost"
-  assumes "finite_cost_preserves A"
-  assumes "finite_cost_preserves B"
+  fixes A :: "'a \<Rightarrow> ecost"
+  assumes A: "finite_cost_preserves A"
+  assumes B: "finite_cost_preserves B"
   shows "finite_cost_preserves (sup A B)"
-  sorry
+proof (rule finite_cost_preservesI)
+  fix \<Phi> :: "('a, enat) acost"
+  assume f: "finite {x. the_acost \<Phi> x \<noteq> 0}" "finite_cost \<Phi>"
+  show "finite_cost (timerefineA (sup A B) \<Phi>)"
+    unfolding finite_cost_timerefineA[OF f(1)]
+    apply safe
+    subgoal premises p for ac cc 
+    using A[THEN finite_cost_preservesD, OF f, unfolded  finite_cost_timerefineA[OF f(1)], rule_format, of ac cc]
+    using B[THEN finite_cost_preservesD, OF f,  unfolded  finite_cost_timerefineA[OF f(1)], rule_format, of ac cc]
+    using p apply simp
+    by (simp add: max_def sup_acost_def sup_max)
+  done
+qed
+
 
 lemma finite_cost_preserves_upd:
-  "finite_cost_preserves F \<Longrightarrow> finite_cost a \<Longrightarrow> finite_cost_preserves (F(x:=a))"
-  sorry
-
+  assumes  "finite_cost_preserves F " " finite_cost a"
+  shows "finite_cost_preserves (F(x:=a))"
+  apply(rule finite_cost_preservesI)  
+  subgoal premises p for \<Phi>
+  apply(subst finite_cost_timerefineA)
+  apply (simp add: p)
+  using assms(1)[THEN finite_cost_preservesD, OF p]
+  apply(subst (asm) finite_cost_timerefineA)
+   apply (simp add: p)
+  apply auto
+  using assms(2)[unfolded finite_cost_def] 
+  by (metis finite_costD less_infinityE p(2) times_enat_simps(1)) 
+  done
 
 lemma finite_cost_zero: "finite_cost (0::ecost)"
   unfolding finite_cost_def by (auto simp: zero_acost_def) 
@@ -1935,6 +1994,34 @@ lemma finite_cost_preserves_zero'[simp]:
   apply(rule finite_cost_preservesI) 
   by (auto simp: finite_cost_zero) 
 
+(* finite_cost_preserves_pp may even be wrong 
+lemma finite_Sum_any_comp: 
+  fixes  R :: "'a \<Rightarrow> ecost"
+  assumes "\<forall>f. finite {s. the_acost (B s) f \<noteq> 0}" "finite {x. the_acost \<Phi> x \<noteq> 0}"
+  shows "finite {x. ((Sum_any (\<lambda>ac. (the_acost Mc ac * (the_acost (R ac) x)))) \<noteq> 0)}"
+proof - 
+  thm finite_cartesian_product
+
+  have "\<And>f. G ( {x. the_acost \<Phi> x \<noteq> 0} \<times> {s. the_acost (B s) f \<noteq> 0})" sorry
+
+  {fix x
+    have "((Sum_any (\<lambda>ac. ((the_acost Mc ac) * (the_acost (R ac) x)))) \<noteq> 0)
+      \<Longrightarrow> \<exists>ac. (the_acost Mc ac) * (the_acost (R ac) x) \<noteq> 0"
+      using Sum_any.not_neutral_obtains_not_neutral by blast 
+  } then 
+  have "{x. ((Sum_any (\<lambda>ac. ((the_acost Mc ac) * (the_acost (R ac) x)))) \<noteq> 0)}
+          \<subseteq> {x. \<exists>ac. ((the_acost Mc ac) * (the_acost (R ac) x)) \<noteq> 0}" by blast
+  also have "\<dots> \<subseteq> snd ` {(ac,x). ((the_acost Mc ac) * (the_acost (R ac) x)) \<noteq> 0}" by auto 
+  also have "\<dots> \<subseteq> snd ` {(ac,x).  (the_acost (R ac) x) \<noteq> 0 \<and> (the_acost Mc ac) \<noteq> 0}" by auto
+
+
+  finally  show ?thesis 
+    apply(rule finite_subset ) apply auto
+    apply(rule finite_imageI) 
+    apply(rule finite_subset )
+    
+qed 
+
 
 lemma finite_cost_preserves_pp:
   fixes A :: "string \<Rightarrow> ecost"
@@ -1945,28 +2032,39 @@ lemma finite_cost_preserves_pp:
       shows "finite_cost_preserves (pp A B)"
 proof (rule finite_cost_preservesI)
   fix \<Phi> :: "ecost"
-  assume T: "finite {x. the_acost \<Phi> x \<noteq> 0}" "finite_cost \<Phi>"
-
-  
+  assume T: "finite {x. the_acost \<Phi> x \<noteq> 0}" "finite_cost \<Phi>"  
   have "finite {x. the_acost (timerefineA B \<Phi>) x \<noteq> 0}" "finite_cost (timerefineA B \<Phi>)"
-    subgoal using assms(4) T 
-      unfolding timerefineA_def apply simp  sorry
-    sorry
+    subgoal using assms(4)[unfolded wfR''_def] T 
+      unfolding timerefineA_def
+      apply simp apply(rule wfR_finite_Sum_any)
+      unfolding wfR_def 
+      sorry
+    subgoal
+      using B[THEN finite_cost_preservesD, OF T] .
+    done
   from A[THEN finite_cost_preservesD, OF this]
   have "finite_cost (timerefineA A (timerefineA B \<Phi>))" .
 
   show "finite_cost (timerefineA (pp A B) \<Phi>)"
     apply(subst timerefineA_iter2[symmetric])
     by fact+ 
-qed
-  
+qed *)
+
 
 lemma finite_cost_preserves_TTId:
   "finite A \<Longrightarrow> finite_cost_preserves (TTId A)"
-  sorry
+  apply(rule finite_cost_preservesI)
+  unfolding finite_cost_def 
+  apply(subst timerefineA_if_finite_support) apply simp
+  apply (simp del: enat_ord_simps(4)) apply safe
+  apply(subst finite_sum_iff)
+  by (auto simp: TTId_def zero_acost_def norm_cost cost_def simp del: enat_ord_simps(4))
 
-lemma finite_cost_addI: "finite_cost a \<Longrightarrow> finite_cost b \<Longrightarrow> finite_cost (a+b)"
-  sorry
+lemma finite_cost_addI:
+  fixes a b :: ecost
+  shows "finite_cost a \<Longrightarrow> finite_cost b \<Longrightarrow> finite_cost (a+b)"
+  unfolding finite_cost_def apply (cases a; cases b; auto simp: plus_acost_alt)
+  by (metis plus_enat_simps(1)) 
 
 lemma finite_cost_preserves_TR_dlpc: "finite_cost_preserves TR_dlpc"
   unfolding TR_dlpc_def
@@ -1995,27 +2093,9 @@ lemma finite_cost_preserves_TR_dynarray: "finite_cost_preserves TR_dynarray"
     subgoal  
       by (fact finite_cost_preserves_TR_dlpc)
     subgoal 
-      apply(rule finite_cost_preserves_pp)
-      subgoal 
-        unfolding TR_dld2_def
-        apply(intro finite_cost_preserves_sup finite_cost_preserves_upd finite_cost_preserves_TTId)
-        by(simp_all add: finite_currs_of_lcst)
-      subgoal 
-        unfolding TR_doublec_def list_copy_body_cost_def
-        apply(intro finite_cost_preserves_sup finite_cost_preserves_upd
-                    finite_cost_addI finite_cost_preserves_TTId)
-        apply (simp_all add: norm_cost) 
-        unfolding TR_doublec_def list_copy_body_cost_def
-        apply(intro finite_cost_preserves_sup finite_cost_preserves_upd
-                    finite_cost_addI finite_cost_preserves_TTId)
-        by (simp_all add: norm_cost) 
-      subgoal 
-        apply (fact wfR''_TR_dld2)
-        done
-      subgoal 
-        apply(fact wfR''_TR_doublec)
-        done
-      done
+      unfolding TR_dld2_dynaaray_simp
+      apply(intro finite_cost_addI finite_cost_preserves_sup finite_cost_preserves_upd finite_cost_preserves_TTId)       
+      by (simp_all add: norm_cost) 
     subgoal 
       by (fact finite_cost_preserves_TR_dlpc)
     done
@@ -2273,24 +2353,39 @@ lemma annot: "dynamic_array_empty_spec = dynamic_array_empty_spec_a TYPE('l::len
   apply simp done
 thm annot
 
+lemma hfrefD_precond: "(f,g) \<in> [\<lambda>_. P]\<^sub>a S \<rightarrow> R \<Longrightarrow> P  \<Longrightarrow> (f,g) \<in> S \<rightarrow>\<^sub>a R"
+  unfolding hfref_def by auto   
+
+lemma hfrefD_precond2: "(f,g) \<in> [\<lambda>_. P]\<^sub>a S \<rightarrow> R\<Longrightarrow> True"
+  by auto    
+
+
+lemma weaken_cond_hfref: "(p \<in> [\<lambda>a. P' a]\<^sub>a x \<rightarrow> y) \<Longrightarrow> (\<And>a. P a \<Longrightarrow> P' a)   \<Longrightarrow> p \<in> [\<lambda>a. P a]\<^sub>a x \<rightarrow> y"
+  unfolding hfref_def by auto
+
+
+lemma pull_cond_hfref': "(\<And>a. R a \<Longrightarrow> P) \<Longrightarrow>(P \<Longrightarrow> p \<in> [R]\<^sub>a x \<rightarrow> y) \<Longrightarrow>  p \<in> [R]\<^sub>a x \<rightarrow> y"
+  unfolding hfref_def by auto
+
+thm size_t_context.push_size_bound_def
 
 sepref_register dynamic_array_append_spec
-lemma pf2: "
+lemma dyn_array_push_impl_rule: "
 Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
    \<Longrightarrow> (uncurry dyn_array_push_impl, uncurry dynamic_array_append_spec)
-     \<in> [\<lambda>_. 8\<le>LENGTH('l)]\<^sub>a  (al_assn' TYPE('l::len2) A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
-  apply(rule pull_cond_hfref)
+     \<in> [\<lambda>(ls,_). 2 * length ls < max_snat LENGTH('l) \<and> 8\<le>LENGTH('l)]\<^sub>a  (al_assn' TYPE('l::len2) A)\<^sup>d *\<^sub>a A\<^sup>k \<rightarrow> al_assn' TYPE('l) A"
+  apply(rule pull_cond_hfref'[where P="8\<le>LENGTH('l)"]) apply auto[1]
   apply(subgoal_tac "size_t_context TYPE('l)")
   subgoal premises p 
     supply f= size_t_context.da_push_rule[where 'size_t='l, unfolded 
                     dynamic_array_assn.refine[OF p(3)]
                     dynamic_array_append_spec.refine[OF p(3)]
                     dyn_array_push_impl.refine[OF p(3)], unfolded PR_CONST_def ] 
-    using f                    
-    unfolding size_t_context.push_size_bound_def sorry
-    (*apply(rule f) using p by auto*)
-  apply standard apply simp done
-declare pf2[sepref_fr_rules]
+    apply(rule weaken_cond_hfref[OF f] ) 
+    unfolding size_t_context.push_size_bound_def size_t_context.push_size_bound_def[OF p(3)]
+    using p by auto
+  apply standard apply simp done 
+declare dyn_array_push_impl_rule[sepref_fr_rules]
 
 
   term snat_assn
@@ -2324,6 +2419,15 @@ term unat_assn'
 term narray_new
 
 thm sepref_fr_rules
+
+(* TODO: I GUESS registering those lemmas as simp is TOO eager,
+    they should help solving the size side conditions in the following sepref call *)
+lemmas [simp] = dynamic_array_empty_spec_def dynamic_array_append_spec_def
+
+lemma [simp]:
+  fixes t::ecost
+  shows "RETURNT x \<le> SPECT [y \<mapsto> t] \<longleftrightarrow> x = y"
+  by (auto simp: RETURNT_def le_fun_def  ecost_nneg)  
 
 sepref_def algorithm_impl is "uncurry0 algorithm"
   :: "(unit_assn)\<^sup>k \<rightarrow>\<^sub>a al_assn' TYPE(32) (snat_assn' TYPE(32))"

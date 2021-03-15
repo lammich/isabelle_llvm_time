@@ -442,17 +442,19 @@ end
 lemmas [llvm_inline] = strcmp_impl'_def
 
 thm strcmp_impl'.refine
+lemma consume_SPEC_map: "NREST.consume (SPECT [x \<mapsto> T]) t = SPECT [x \<mapsto> t+T]"
+  unfolding consume_def by auto
 
-lemma XX: "PR_CONST (mop_str_cmp' n) = (\<lambda>a b. SPECT [a < b \<mapsto> lift_acost (strcmp_cost' n)])"
+lemma strcmp_refines_relp_aux: "PR_CONST (mop_str_cmp' n) = (\<lambda>a b. SPECT [a < b \<mapsto> lift_acost (strcmp_cost' n)])"
   unfolding mop_str_cmp'_def strcmp_cost'_def PR_CONST_def mop_call_def mop_str_cmp_def
-  apply(auto intro!: ext)
-  sorry
+  by(auto simp: consume_SPEC_map norm_cost one_enat_def algebra_simps intro!: ext)
+
 
 lemma strcmp_refines_relp: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> GEN_ALGO strcmp_impl' (refines_relp (bstring_assn n TYPE('size_t::len2) TYPE('w::len2))
                     (lift_acost (strcmp_cost' n)) (<))"
     apply rule
     using strcmp_impl'.refine[of n, where 'b='size_t] 
-    unfolding SPECc3_def  XX
+    unfolding SPECc3_def strcmp_refines_relp_aux
     by simp
  
 lemma the_acost_apply_neq[simp]: "n\<noteq>n' \<Longrightarrow> the_acost (cost n c) n' = 0"
