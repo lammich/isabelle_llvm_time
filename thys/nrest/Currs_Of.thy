@@ -431,7 +431,6 @@ lemma R_bind2:
    apply(rule timerefine_TTId_mono) apply simp
   subgoal using assms by auto
   apply(rule order.trans)
-  apply simp
   apply(rule assms(3))
    apply(rule timerefine_TTId_mono) apply simp
   subgoal using assms by auto
@@ -711,7 +710,7 @@ lemma ocoM_RETURNT: "ocoM {} (RETURNT x)"
 
 lemma ocoM_prod: "ocoM X (m (fst xb) (snd xb)) \<Longrightarrow> ocoM X (case xb of (x, xs) \<Rightarrow> m x xs)"
   unfolding ocoM_def by (auto split: prod.splits)
- 
+ (*
 lemma assumes "(\<And>D s. (\<And>s'. ocoM X (D s')) \<Longrightarrow> ocoM X (F D s))"
     "mono2 F"
   shows "ocoM X (RECT (\<lambda>D s. F D s) x)"
@@ -723,7 +722,7 @@ lemma assumes "(\<And>D s. (\<And>s'. ocoM X (D s')) \<Longrightarrow> ocoM X (F
   subgoal unfolding ocoM_def nofailT_def by simp 
   subgoal   sorry
   oops
-
+*)
 
 lemma assumes "(\<And>D s. (\<And>s'. ocoM X (D s')) \<Longrightarrow> ocoM X (F D s))"
     "mono2 F"

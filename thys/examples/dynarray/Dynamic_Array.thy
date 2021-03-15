@@ -4,6 +4,9 @@ theory Dynamic_Array
   "../../nrest/Synth_Rate"
 begin
 
+(* TODO: Move *)
+lemma wfR''_zero[simp]: "wfR'' 0"
+  unfolding wfR''_def by (auto simp: zero_acost_def)
 
 (* TODO: Move *)
 lemma nrest_C_relI:
@@ -1377,8 +1380,6 @@ subsection \<open>implement nth\<close>
 
 subsection  \<open>implement push\<close>
 
-lemma wfR''_zero[simp]: "wfR'' 0" "wfR'' (\<lambda>_. 0)"
-  unfolding wfR''_def by (auto simp: zero_acost_def)
 
 definition "TR_doublec = 0(''dyn_list_double_c'':=   cost'_narray_new 2
                                + lift_acost list_copy_body_cost
@@ -1622,7 +1623,7 @@ lemma dyn_list_double2_refine_coarse: "dyn_list_double2 (bs, l, c) \<le> \<Down>
 
   thm bindT_refine_conc_time_my_inres_sup
 
-lemma wfR''_wfR''[simp]: "wfR'' TR_dld2"
+lemma wfR''_TR_dld2[simp]: "wfR'' TR_dld2"
   unfolding TR_dld2_alt apply(rule wfR''_TTId_if_finite)
   by simp
 
@@ -1902,6 +1903,7 @@ lemma finite_cost_preserves_sup:
   oops
 
 lemma finite_cost_preserves_sup:
+  fixes A :: "'a \<Rightarrow> ('b, enat) acost"
   assumes "finite_cost_preserves A"
   assumes "finite_cost_preserves B"
   shows "finite_cost_preserves (sup A B)"
@@ -1933,6 +1935,50 @@ lemma finite_cost_preserves_zero'[simp]:
   apply(rule finite_cost_preservesI) 
   by (auto simp: finite_cost_zero) 
 
+
+lemma finite_cost_preserves_pp:
+  fixes A :: "string \<Rightarrow> ecost"
+  and  B :: "string \<Rightarrow> ecost"
+  assumes A: "finite_cost_preserves A"
+      and B:  "finite_cost_preserves B"
+      and "wfR'' A" "wfR'' B"
+      shows "finite_cost_preserves (pp A B)"
+proof (rule finite_cost_preservesI)
+  fix \<Phi> :: "ecost"
+  assume T: "finite {x. the_acost \<Phi> x \<noteq> 0}" "finite_cost \<Phi>"
+
+  
+  have "finite {x. the_acost (timerefineA B \<Phi>) x \<noteq> 0}" "finite_cost (timerefineA B \<Phi>)"
+    subgoal using assms(4) T 
+      unfolding timerefineA_def apply simp  sorry
+    sorry
+  from A[THEN finite_cost_preservesD, OF this]
+  have "finite_cost (timerefineA A (timerefineA B \<Phi>))" .
+
+  show "finite_cost (timerefineA (pp A B) \<Phi>)"
+    apply(subst timerefineA_iter2[symmetric])
+    by fact+ 
+qed
+  
+
+lemma finite_cost_preserves_TTId:
+  "finite A \<Longrightarrow> finite_cost_preserves (TTId A)"
+  sorry
+
+lemma finite_cost_addI: "finite_cost a \<Longrightarrow> finite_cost b \<Longrightarrow> finite_cost (a+b)"
+  sorry
+
+lemma finite_cost_preserves_TR_dlpc: "finite_cost_preserves TR_dlpc"
+  unfolding TR_dlpc_def
+  apply(intro finite_cost_preserves_sup)
+  subgoal 
+    apply(intro finite_cost_preserves_upd)
+    by (simp_all add: finite_cost_lift_acost)
+  subgoal 
+    apply(intro finite_cost_preserves_upd)
+    by (simp_all add: finite_cost_lift_acost)
+  by (simp_all add: finite_cost_lift_acost)
+
 lemma finite_cost_preserves_TR_dynarray: "finite_cost_preserves TR_dynarray"
   unfolding TR_dynarray_def
   apply(rule finite_cost_preserves_sup)
@@ -1941,17 +1987,38 @@ lemma finite_cost_preserves_TR_dynarray: "finite_cost_preserves TR_dynarray"
     apply(rule finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
   subgoal 
     unfolding TR_da_def  
-    apply(rule finite_cost_preserves_sup)
+    apply(intro finite_cost_preserves_sup)
     subgoal 
       apply(rule finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
     subgoal 
-      apply(rule finite_cost_preserves_sup)
+      apply(intro finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
+    subgoal  
+      by (fact finite_cost_preserves_TR_dlpc)
+    subgoal 
+      apply(rule finite_cost_preserves_pp)
       subgoal 
-        apply(rule finite_cost_preserves_upd) by (simp_all add: finite_cost_lift_acost)
-  
-    
-  sorry
-  sorry
+        unfolding TR_dld2_def
+        apply(intro finite_cost_preserves_sup finite_cost_preserves_upd finite_cost_preserves_TTId)
+        by(simp_all add: finite_currs_of_lcst)
+      subgoal 
+        unfolding TR_doublec_def list_copy_body_cost_def
+        apply(intro finite_cost_preserves_sup finite_cost_preserves_upd
+                    finite_cost_addI finite_cost_preserves_TTId)
+        apply (simp_all add: norm_cost) 
+        unfolding TR_doublec_def list_copy_body_cost_def
+        apply(intro finite_cost_preserves_sup finite_cost_preserves_upd
+                    finite_cost_addI finite_cost_preserves_TTId)
+        by (simp_all add: norm_cost) 
+      subgoal 
+        apply (fact wfR''_TR_dld2)
+        done
+      subgoal 
+        apply(fact wfR''_TR_doublec)
+        done
+      done
+    subgoal 
+      by (fact finite_cost_preserves_TR_dlpc)
+    done
   done
 
 interpretation dyn_array: dyn_list_impl TR_dynarray dyn_array_raw_assn

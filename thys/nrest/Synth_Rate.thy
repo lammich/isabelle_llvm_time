@@ -4,6 +4,8 @@ begin
 
 
 
+lemma wfR''_zero[simp]: "wfR'' (\<lambda>_. 0)"
+  unfolding wfR''_def by (auto simp: zero_acost_def)
 
 lemma wfR''_supI:
   fixes R:: "'b \<Rightarrow> ('c, enat) acost"
@@ -71,6 +73,10 @@ lemma timerefine_supI2:
   by(rule timerefine_supI[OF assms])
 
 
+lemma costmult_sup_distrib: "(a::enat) *m (sup b c) = sup (a *m b) (a *m c)"
+  unfolding sup_acost_def costmult_def apply auto apply(rule ext)
+  by (metis max.orderE max.orderI max_def max_enat_simps(2) mult.commute mult_right_mono sup_max) 
+
 lemma MIf_refine_sup:
   fixes f :: "(_,(string, enat) acost) nrest"
   shows "(b,b')\<in>bool_rel \<Longrightarrow> (b \<Longrightarrow> f \<le> \<Down>R (timerefine EIfa f'))
@@ -78,20 +84,22 @@ lemma MIf_refine_sup:
        wfR'' EIfa  \<Longrightarrow> wfR'' EIfb
        \<Longrightarrow>  MIf b f g  \<le> \<Down>R (timerefine E (MIf b' f' g' ))"
   apply(rule MIf_refine)
-  subgoal sorry
-  subgoal sorry
+  subgoal unfolding struct_preserving_def by (auto simp: costmult_sup_distrib norm_cost timerefineA_cost_apply_costmult)
+  subgoal apply simp apply(intro wfR''_supI wfR''_upd) by auto
   apply simp
   subgoal premises pr 
       using pr apply - apply(rule order.trans) apply simp apply(rule nrest_Rel_mono)
       unfolding pr(4)
-      apply(rule timerefine_R_mono_wfR'') subgoal sorry
+      apply(rule timerefine_R_mono_wfR'')
+        subgoal apply(intro wfR''_supI wfR''_upd) by auto 
       apply(subst sup.left_commute)
       apply simp
       done
   subgoal premises pr 
       using pr apply - apply(rule order.trans) apply simp apply(rule nrest_Rel_mono)
       unfolding pr(4)
-      apply(rule timerefine_R_mono_wfR'') subgoal sorry
+      apply(rule timerefine_R_mono_wfR'')
+      subgoal apply(intro wfR''_supI wfR''_upd) by auto
       apply(subst (2) sup.commute)
       apply(subst sup.left_commute)
       apply simp
