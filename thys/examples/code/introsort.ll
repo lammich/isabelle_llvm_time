@@ -10,7 +10,7 @@ target triple = "x86_64-pc-linux-gnu"
 define i64 @Sorting_Log2_size_t_context_log2_iter_impl(i64 %x) {
 
   start:
-    %x1 = call i64 @Sorting_Export_Code_log2_iter_impl_f_013823818 (i64 %x)
+    %x1 = call i64 @Sorting_Export_Code_log2_iter_impl_f_011027062 (i64 %x)
     ret i64 %x1
 }
 
@@ -510,7 +510,7 @@ define i64* @introsort(i64* %x, i64 %x1, i64 %x2) {
     %tmpb = insertvalue { i64, { i64, i64 } } %xe, { i64, i64 } %tmpa, 1
     %xf = insertvalue { i64*, { i64, { i64, i64 } } } zeroinitializer, i64* %x, 0
     %tmpc = insertvalue { i64*, { i64, { i64, i64 } } } %xf, { i64, { i64, i64 } } %tmpb, 1
-    %xda = call i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_013820764 ({ i64*, { i64, { i64, i64 } } } %tmpc)
+    %xda = call i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_011024008 ({ i64*, { i64, { i64, i64 } } } %tmpc)
     %xea = sub i64 %x2, %x1
     %xfa = icmp sle i64 %xea, 16
     br i1 %xfa, label %thena, label %elsea
@@ -765,7 +765,7 @@ define i64* @introsort(i64* %x, i64 %x1, i64 %x2) {
     ret i64* %x16
 }
 
-define i64 @Sorting_Export_Code_log2_iter_impl_f_013823818(i64 %x) {
+define i64 @Sorting_Export_Code_log2_iter_impl_f_011027062(i64 %x) {
 
   start:
     %x1 = icmp slt i64 %x, 2
@@ -776,7 +776,7 @@ define i64 @Sorting_Export_Code_log2_iter_impl_f_013823818(i64 %x) {
 
   else:
     %xa = udiv i64 %x, 2
-    %xb = call i64 @Sorting_Export_Code_log2_iter_impl_f_013823818 (i64 %xa)
+    %xb = call i64 @Sorting_Export_Code_log2_iter_impl_f_011027062 (i64 %xa)
     %x2 = add i64 %xb, 1
     br label %ctd_if
 
@@ -955,7 +955,7 @@ define { i64*, i64 } @Sorting_Export_Code_unat_sort_qs_partition_impl(i64 %x, i6
     ret { i64*, i64 } %x14
 }
 
-define i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_013820764({ i64*, { i64, { i64, i64 } } } %x) {
+define i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_011024008({ i64*, { i64, { i64, i64 } } } %x) {
 
   start:
     %a1 = extractvalue { i64*, { i64, { i64, i64 } } } %x, 0
@@ -1227,14 +1227,14 @@ define i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_013820764({ i64*, { 
     %tmpi = insertvalue { i64, { i64, i64 } } %ye2, { i64, i64 } %tmph, 1
     %yf = insertvalue { i64*, { i64, { i64, i64 } } } zeroinitializer, i64* %a1ca, 0
     %yg = insertvalue { i64*, { i64, { i64, i64 } } } %yf, { i64, { i64, i64 } } %tmpi, 1
-    %yda = call i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_013820764 ({ i64*, { i64, { i64, i64 } } } %yg)
+    %yda = call i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_011024008 ({ i64*, { i64, { i64, i64 } } } %yg)
     %yh = insertvalue { i64, i64 } zeroinitializer, i64 %a1b, 0
     %tmpj = insertvalue { i64, i64 } %yh, i64 %yca, 1
     %yi4 = insertvalue { i64, { i64, i64 } } zeroinitializer, i64 %a2c2, 0
     %tmpk = insertvalue { i64, { i64, i64 } } %yi4, { i64, i64 } %tmpj, 1
     %yj4 = insertvalue { i64*, { i64, { i64, i64 } } } zeroinitializer, i64* %yda, 0
     %x6 = insertvalue { i64*, { i64, { i64, i64 } } } %yj4, { i64, { i64, i64 } } %tmpk, 1
-    %x7 = call i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_013820764 ({ i64*, { i64, { i64, i64 } } } %x6)
+    %x7 = call i64* @Sorting_Export_Code_unat_sort_introsort_impl_f_011024008 ({ i64*, { i64, { i64, i64 } } } %x6)
     br label %ctd_ifa
 
   ctd_ifa:

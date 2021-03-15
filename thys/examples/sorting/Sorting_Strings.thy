@@ -402,9 +402,24 @@ lemma bstring_nth[sepref_fr_rules]:
   
   lemmas [llvm_inline] = min_impl_def 
     
-  export_llvm "strcmp_impl :: 8 word ptr \<times> 64 word \<times> 64 word \<Rightarrow> 8 word ptr \<times> 64 word \<times> 64 word \<Rightarrow> 1 word llM"
+(*  
 
-
+  definition llstrcmp :: "(8 word ptr * 64 word * 64 word) ptr \<Rightarrow> _ \<Rightarrow> 8 word llM" where [llvm_code]:
+    "llstrcmp ap bp \<equiv> doM {
+      a \<leftarrow> ll_load ap;
+      b \<leftarrow> ll_load bp;
+      r \<leftarrow> ll_call (strcmp_impl a b);
+      b \<leftarrow> ll_icmp_eq r 0;
+      llc_if b (return 0) (return 1)
+    }"
+  
+  
+  export_llvm "llstrcmp"
+    is "char llstrcmp (llstring *, llstring * )"
+    defines \<open>typedef struct {char *data; struct {int64_t size; int64_t capacity;};} llstring;\<close> 
+    file "strcmp_impl.ll"
+    
+*)
 
 lemma strcmp_refines_relp: "8 \<le> LENGTH('size_t::len2) \<Longrightarrow> GEN_ALGO strcmp_impl (refines_relp (bstring_assn n TYPE('size_t::len2) TYPE('w::len2))
                     (lift_acost (strcmp_cost n n)) (<))"
