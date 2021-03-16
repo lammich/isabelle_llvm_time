@@ -25,10 +25,10 @@ text \<open>Final correctness lemma:\<close>
 lemma 
   assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
   shows "llvm_htriple ($heapsort_impl_cost l h \<and>* arr_assn xs\<^sub>0 p
-           \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')
+           \<and>* snat_assn l l' \<and>* snat_assn h h')
         (heapsort_impl p l' h')
       (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>(slice_sort_aux xs\<^sub>0 xs l h) \<and>* arr_assn xs r) s)
-           \<and>* invalid_assn arr_assn xs\<^sub>0 p \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')"
+            \<and>* snat_assn l l' \<and>* snat_assn h h')"
   using assms
   apply(rule heapsort_final_hoare_triple[unfolded hn_ctxt_def])
   done
@@ -49,6 +49,7 @@ lemma "(\<lambda>x. real (heapsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real
 
 subsection \<open>Introsort\<close>
 
+subsubsection \<open>For Nats\<close>
 
 (*
 lemma "introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * Discrete.log n)"
@@ -58,5 +59,47 @@ lemma "introsort3_allcost n = 4693 + 5 *  Discrete.log n + 231 * n + 455 * (n * 
 lemma "(\<lambda>x. real (introsort3_allcost x)) \<in> \<Theta>(\<lambda>n. (real n)*(ln (real n)))"
   by (fact introsort3_allcost_nlogn)
 *)
+(* Final results for unat_sort: *)  
+thm unat_sort.introsort_final_hoare_triple[no_vars] (* Hoare triple *)
+
+lemma "l \<le> h \<and> h \<le> length xs\<^sub>0 \<Longrightarrow>
+  llvm_htriple 
+    ($unat_sort.introsort_impl_cost (h - l) \<and>* unat_sort.arr_assn xs\<^sub>0 p 
+        \<and>* snat_assn l l' \<and>* snat_assn h h') 
+      (unat_sort_introsort_impl p l' h')
+    (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>unat_sort.slice_sort_aux xs\<^sub>0 xs l h \<and>* unat_sort.arr_assn xs r) s)
+        \<and>* snat_assn l l' \<and>* snat_assn h h')"
+  apply(rule unat_sort.introsort_final_hoare_triple) .
+
+(* Cost estimation *)
+  
+theorem "(\<lambda>n. real (project_all (unat_sort.introsort_impl_cost n)))
+            \<in> \<Theta>(\<lambda>n. (real n) * (ln (real n)))"
+  unfolding unat_sort_allcost_simp
+  by auto2
+
+
+subsubsection \<open>For Strings\<close>
+
+
+thm string_sort.introsort_final_hoare_triple[no_vars]  (* Hoare triple *)
+ string_sort_introsort_cost
+
+lemma "l \<le> h \<and> h \<le> length xs\<^sub>0 \<Longrightarrow>
+  llvm_htriple 
+    ($string_sort.introsort_impl_cost m (h - l) \<and>* string_sort.arr_assn m xs\<^sub>0 p
+         \<and>* snat_assn l l' \<and>* snat_assn h h') 
+      (string_sort_introsort_impl p l' h')
+    (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>string_sort.slice_sort_aux xs\<^sub>0 xs l h \<and>* string_sort.arr_assn m xs r) s)
+         \<and>* snat_assn l l' \<and>* snat_assn h h')"
+  apply(rule string_sort.introsort_final_hoare_triple) .
+
+
+lemma "(\<lambda>(m, n). real (project_all (string_sort.introsort_impl_cost m n)))
+             \<in> \<Theta>\<^sub>2 (\<lambda>(m, n). real m * real n * ln (real n))"
+  apply(rule string_sort_introsort_cost) .
+
+
+
 
 end

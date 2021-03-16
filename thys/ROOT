@@ -5,8 +5,10 @@ session Isabelle_LLVM_Time = "HOL-Analysis" +
     "Refine_Imperative_HOL"
     "Word_Lib"
     "Separation_Algebra"
-    "Imperative_HOL_Time"
     "HOL-Real_Asymp"
+    "HOL-Library"
+    "Akra_Bazzi"
+    "Auto2_HOL"
   directories
     basic
     "basic/kernel"
@@ -14,6 +16,7 @@ session Isabelle_LLVM_Time = "HOL-Analysis" +
     ds
     examples
     "examples/sorting"
+    "examples/dynarray"
     lib
     sepref
     nrest
@@ -32,7 +35,7 @@ session Isabelle_LLVM_Time = "HOL-Analysis" +
     "sepref/IICF/IICF"  
     *)
   theories
-    "examples/sorting/Sorting_Export_Code"
+    "examples/sorting/Sorting_Results"
 (*    
     "examples/sorting/Sorting_Heapsort"
     "examples/sorting/Sorting_Final_insertion_Sort"

@@ -530,11 +530,7 @@ subsubsection \<open>Implementing the Array-Compare Operations\<close>
 
   definition "E_cmpo_idxs \<equiv> TId(''cmpo_idxs'':=(cost ''eo_extract'' 2) + lt_cost)"
 
-  lemma "mop_cmpo_idxs (cost ''eo_extract'' 1 + cost ''eo_extract'' 1  + lt_cost) xs i j \<le> \<Down>Id (timerefine E_cmpo_idxs (mop_cmpo_idxs (cost ''cmpo_idxs'' 1) xs i j))"
-    unfolding mop_cmpo_idxs_def
-    apply(refine_rcg)
-      apply (auto simp: E_cmpo_idxs_def timerefineA_update_apply_same_cost)
-    apply sc_solve  sorry
+
 
   lemma cmpo_v_idx2_refine: "(cmpo_v_idx2, PR_CONST (mop_cmpo_v_idx (cost ''eo_set'' 1 + (cost ''eo_extract'' 1 + lt_cost)))) \<in> Id \<rightarrow> Id \<rightarrow> Id \<rightarrow> \<langle>Id\<rangle>nrest_rel"
      unfolding cmpo_v_idx2_def  mop_cmpo_v_idx_def unborrow_def SPECc2_def
@@ -631,13 +627,27 @@ lemma unborrow_refine[refine]:
     apply(intro refine0) 
    apply simp_all
     done
-  
+
+lemma the_acost_timerefineA_upd_if_neq: "the_acost T y = 0 \<Longrightarrow> timerefineA (F(y := t)) T = timerefineA F T"
+  unfolding timerefineA_def
+  unfolding fun_upd_def 
+  apply simp apply(rule ext)
+  apply(rule Sum_any.cong) by auto
+
   lemma SPECc2_lt_refine[refine]:
     "(a,a')\<in>Id \<Longrightarrow> (b,b')\<in>Id \<Longrightarrow> SPECc3 lt_cost (\<^bold><) a b \<le> \<Down> bool_rel (timerefine E_mop_oarray_extract (SPECc3 lt_cost (\<^bold><) a' b'))"
     apply(rule SPECc3_refine) 
      apply (auto simp: cost_n_leq_TId_n E_mop_oarray_extract_def)
-      using no_clash (* TODO *)
-    sorry
+    using no_clash
+    unfolding less_eq_acost_def
+    apply(auto)
+    subgoal for x
+      apply(cases "x=''eo_extract''") apply simp
+      apply(cases "x=''eo_set''") apply simp
+      apply(subst the_acost_timerefineA_upd_if_neq) apply simp
+      apply(subst the_acost_timerefineA_upd_if_neq) apply simp 
+      by simp
+    done
 
 lemma wfR_E: "wfR'' E_mop_oarray_extract"
   by(auto simp: E_mop_oarray_extract_def intro!: wfR''_upd) 

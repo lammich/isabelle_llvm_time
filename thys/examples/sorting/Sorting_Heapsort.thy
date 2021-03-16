@@ -2819,7 +2819,7 @@ concrete_definition heapsort3_cost is lift_heapsort3_acost uses "_ = lift_acost 
 abbreviation "slice_sort_aux xs\<^sub>0 xs l h \<equiv> (length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0
                     \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec (\<^bold><) (slice l h xs\<^sub>0) (slice l h xs))"
 
-lemma heapsort_final_hoare_triple:
+lemma heapsort_final_hoare_triple_aux:
   assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
   shows "llvm_htriple ($heapsort_impl_cost l h \<and>* hn_ctxt arr_assn xs\<^sub>0 p
            \<and>* hn_val snat_rel l l' \<and>* hn_val snat_rel h h')
@@ -2830,7 +2830,23 @@ lemma heapsort_final_hoare_triple:
   by(rule  llvm_htriple_more_time[OF heapsort_impl_cost.refine heapsort_ht,
                 unfolded  hr_comp_Id2  ])
 
+(* TODO: Move *)
+lemma sep_conj_pred_lift: "(A \<and>* (pred_lift B)) s = (A s \<and> B)"
+  apply(cases B) by (auto simp: pure_true_conv)
 
+lemma heapsort_final_hoare_triple:
+  assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
+  shows "llvm_htriple ($heapsort_impl_cost l h \<and>* arr_assn xs\<^sub>0 p
+           \<and>* snat_assn l l' \<and>* snat_assn h h')
+        (heapsort_impl p l' h')
+      (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>(slice_sort_aux xs\<^sub>0 xs l h) \<and>* arr_assn xs r) s)
+            \<and>* snat_assn l l' \<and>* snat_assn h h')"
+  apply(rule cons_post_rule) (* TODO: very ugly proof to get rid of the invalid_assn! *)
+   apply (rule heapsort_final_hoare_triple_aux[OF assms, unfolded hn_ctxt_def])
+  apply(simp add: pred_lift_extract_simps  invalid_assn_def pure_part_def)
+  apply(subst (asm) (2) sep_conj_commute)
+  apply(subst (asm) (1) sep_conj_assoc[symmetric])
+  apply(subst (asm) sep_conj_pred_lift) by simp
 
 definition (in -) "project_all T =  (Sum_any (the_enat o the_acost T))"
 

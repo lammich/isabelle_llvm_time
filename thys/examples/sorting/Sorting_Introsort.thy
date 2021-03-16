@@ -770,7 +770,7 @@ lemma Sum_any_cost2: "Sum_any (the_acost (cost n x)) = x"
 
 subsection \<open>The final Hoare Triple\<close>
 
-lemma introsort_final_hoare_triple:
+lemma introsort_final_hoare_triple_aux:
   assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
   shows "llvm_htriple ($introsort_impl_cost (h-l) \<and>* hn_ctxt arr_assn xs\<^sub>0 p
            \<and>* hn_val snat_rel l l' \<and>* hn_val snat_rel h h')
@@ -847,20 +847,21 @@ lemma "slice_sort_aux xs\<^sub>0 xs l h \<equiv> (length xs = length xs\<^sub>0 
                     \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec (\<^bold><) (slice l h xs\<^sub>0) (slice l h xs))"
   by simp
 
+
 text \<open>Final correctness lemma:\<close>
-lemma introsort_final_hoare_triple':
+lemma introsort_final_hoare_triple:
   assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
   shows "llvm_htriple ($introsort_impl_cost (h-l) \<and>* arr_assn xs\<^sub>0 p
            \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')
         (introsort_impl p l' h')
       (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>(slice_sort_aux xs\<^sub>0 xs l h) \<and>* arr_assn xs r) s)
             \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')"
-  apply(rule cons_post_rule)
-   apply (rule introsort_final_hoare_triple[OF assms, unfolded hn_ctxt_def])
-  apply(rule entailsD) apply blast
-  unfolding invalid_assn_def pure_part_def
-  apply(rule ENTAILSD)  
-  sorry
+  apply(rule cons_post_rule) (* TODO: very ugly proof to get rid of the invalid_assn! *)
+   apply (rule introsort_final_hoare_triple_aux[OF assms, unfolded hn_ctxt_def]) 
+  apply(simp add: pred_lift_extract_simps  invalid_assn_def pure_part_def)
+  apply(subst (asm) (2) sep_conj_commute)
+  apply(subst (asm) (1) sep_conj_assoc[symmetric])
+  apply(subst (asm) sep_conj_pred_lift) by simp
 
 
 text \<open>introsort_impl_cost projected to a function @{typ "nat \<Rightarrow> nat"} \<close>

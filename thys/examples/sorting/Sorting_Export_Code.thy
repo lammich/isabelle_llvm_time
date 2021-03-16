@@ -43,7 +43,7 @@ schematic_goal unat_sort_allcost_simp: "project_all (unat_sort.introsort_impl_co
   by (rule norm_cost_tagI)
   
 (* Final results for unat_sort: *)  
-thm unat_sort.introsort_final_hoare_triple'  (* Hoare triple *)
+thm unat_sort.introsort_final_hoare_triple (* Hoare triple *)
 
 
 (* Cost estimation *)
@@ -133,16 +133,16 @@ schematic_goal string_sort_allcost_simp: "project_all (string_sort.introsort_imp
 
   by (rule norm_cost_tagI)
 
-concrete_definition p is string_sort_allcost_simp 
-thm p_def
-thm p.refine
+concrete_definition string_sort_allcost is string_sort_allcost_simp 
+thm string_sort_allcost_def
+thm string_sort_allcost.refine
 
 
-lemma p_absch: "(\<lambda>(m::nat,n::nat). real (p m n)) \<in> \<Theta>\<^sub>2(\<lambda>(m::nat,n::nat). (real m) *  (real n) * ln (real n) )"
-  unfolding p_def
+lemma string_sort_allcost_absch: "(\<lambda>(m::nat,n::nat). real (string_sort_allcost m n)) \<in> \<Theta>\<^sub>2(\<lambda>(m::nat,n::nat). (real m) *  (real n) * ln (real n) )"
+  unfolding string_sort_allcost_def
   by auto2
 
-lemmas string_sort_introsort_cost = p_absch[unfolded p.refine[symmetric]]
+lemmas string_sort_introsort_cost = string_sort_allcost_absch[unfolded string_sort_allcost.refine[symmetric]]
 
 (* *)
 term dynamiclist_empty_impl
@@ -166,7 +166,7 @@ export_llvm   "string_sort_introsort_impl :: (8 word ptr \<times> 64 word \<time
 
 
 (* Final results for string_sort: *)  
-thm string_sort.introsort_final_hoare_triple'  (* Hoare triple *)
+thm string_sort.introsort_final_hoare_triple  (* Hoare triple *)
  string_sort_introsort_cost
 
 end
