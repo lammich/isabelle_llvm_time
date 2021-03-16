@@ -1,5 +1,5 @@
 theory Sorting_Export_Code
-imports (* Sorting_PDQ *) Sorting_Introsort Sorting_Strings Sorting_Results
+imports (* Sorting_PDQ *) Sorting_Introsort Sorting_Strings
 begin
   
 text \<open>
@@ -142,6 +142,7 @@ lemma p_absch: "(\<lambda>(m::nat,n::nat). real (p m n)) \<in> \<Theta>\<^sub>2(
   unfolding p_def
   by auto2
 
+lemmas string_sort_introsort_cost = p_absch[unfolded p.refine[symmetric]]
 
 (* *)
 term dynamiclist_empty_impl
@@ -166,6 +167,6 @@ export_llvm   "string_sort_introsort_impl :: (8 word ptr \<times> 64 word \<time
 
 (* Final results for string_sort: *)  
 thm string_sort.introsort_final_hoare_triple'  (* Hoare triple *)
- p_absch[unfolded p.refine[symmetric]]
+ string_sort_introsort_cost
 
 end

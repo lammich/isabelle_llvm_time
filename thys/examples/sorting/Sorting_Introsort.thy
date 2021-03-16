@@ -840,4 +840,35 @@ lemma introsort3_allcost_nlogn: (* TODO: Fix! *)
   (*by auto2*)
 
 
+
+context sort_impl_context begin
+
+lemma "slice_sort_aux xs\<^sub>0 xs l h \<equiv> (length xs = length xs\<^sub>0 \<and> take l xs = take l xs\<^sub>0
+                    \<and> drop h xs = drop h xs\<^sub>0 \<and> sort_spec (\<^bold><) (slice l h xs\<^sub>0) (slice l h xs))"
+  by simp
+
+text \<open>Final correctness lemma:\<close>
+lemma introsort_final_hoare_triple':
+  assumes "l \<le> h \<and> h \<le> length xs\<^sub>0"
+  shows "llvm_htriple ($introsort_impl_cost (h-l) \<and>* arr_assn xs\<^sub>0 p
+           \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')
+        (introsort_impl p l' h')
+      (\<lambda>r. (\<lambda>s. \<exists>xs. (\<up>(slice_sort_aux xs\<^sub>0 xs l h) \<and>* arr_assn xs r) s)
+            \<and>* pure snat_rel l l' \<and>* pure snat_rel h h')"
+  apply(rule cons_post_rule)
+   apply (rule introsort_final_hoare_triple[OF assms, unfolded hn_ctxt_def])
+  apply(rule entailsD) apply blast
+  unfolding invalid_assn_def pure_part_def
+  apply(rule ENTAILSD)  
+  sorry
+
+
+text \<open>introsort_impl_cost projected to a function @{typ "nat \<Rightarrow> nat"} \<close>
+lemma "introsort3_allcost lt_acost n = project_all (introsort_impl_cost n)"  
+  by (rule introsort3_allcost_is_projected_introsort_impl_cost)
+
+end
+
+
+
 end
