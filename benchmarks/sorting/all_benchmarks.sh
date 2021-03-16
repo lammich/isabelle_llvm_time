@@ -6,14 +6,14 @@
 
 # Defaults
 
-export DO_BENCHMARK="./do_benchmark_notime"
+export DO_BENCHMARK="./do_benchmark"
 
 export NITER=10   # Number of iterations
 export NIELEM=100000000 # Number of integer elements
 export NSELEM=10000000 # Number of string elements
 
-# export NIELEM=10000000 # Number of integer elements
-# export NSELEM=1000000 # Number of string elements
+# export NIELEM=10000 # Number of integer elements
+# export NSELEM=1000 # Number of string elements
 
 export INT_DATA="random random-dup-10 random-boolean organ-pipe sorted equal almost-sorted-.1 almost-sorted-1 almost-sorted-10 almost-sorted-50 sorted-end-.1 sorted-end-1 sorted-end-10 sorted-middle-.1 sorted-middle-1 sorted-middle-10 rev-sorted rev-sorted-end-.1 rev-sorted-end-1 rev-sorted-end-10 rev-sorted-middle-.1 rev-sorted-middle-1 rev-sorted-middle-10"
 
@@ -92,11 +92,11 @@ for i in $INT_DATA; do
 #   run_int_gcc $i
 done
 
-# for i in $STR_DATA; do
-#   run_str_isa $i
-#   run_str_std $i
-#   run_pdq_str_isa $i
-#   run_pdq_str_std $i
-# done
+for i in $STR_DATA; do
+  run_str_isa $i
+  run_str_std $i
+#  run_pdq_str_isa $i
+#  run_pdq_str_std $i
+done
 
 
