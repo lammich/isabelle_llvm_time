@@ -4,6 +4,13 @@ theory Dynamic_Array
   "../../nrest/Synth_Rate"
 begin
 
+
+
+definition "hide a b = (a=b)"
+lemma hideI: "a=b \<Longrightarrow> hide a b" unfolding hide_def by simp
+lemma hide: "hide a b \<Longrightarrow> a = b" unfolding hide_def by simp
+
+
 (* TODO: Move *)
 lemma wfR''_zero[simp]: "wfR'' 0"
   unfolding wfR''_def by (auto simp: zero_acost_def)
@@ -1595,10 +1602,6 @@ lemma  III:
 lemma h: "(\<lambda>_. 0)(''mul'' := cost ''mul'' 1) = TTId {''mul''}"
   unfolding TTId_def by auto
 
-definition "hide a b = (a=b)"
-lemma hideI: "a=b \<Longrightarrow> hide a b" unfolding hide_def by simp
-lemma hide: "hide a b \<Longrightarrow> a = b" unfolding hide_def by simp
-
 schematic_goal TR_dld2_alt: "TR_dld2 = ?A"
   apply(rule hide)
   unfolding TR_dld2_def
@@ -1848,6 +1851,66 @@ definition "TR_dynarray =  sup TR_de TR_da"
 lemma wfR''_TR_dynarray: "wfR'' TR_dynarray"
   unfolding TR_dynarray_def
   by(auto intro: wfR''_supI)
+
+
+lemma sup_upd: "sup (F(x:=y::ecost)) G = (sup F G)(x:=sup y (G x))"
+  unfolding fun_upd_def 
+  by fastforce 
+
+lemma sup_0:
+  fixes x y z :: "_ \<Rightarrow> ecost"
+  shows "sup 0 x = x" "sup (\<lambda>_. 0) y = y"
+      "sup z 0 = z" "sup y (\<lambda>_. 0) = y"
+  subgoal using II   sup.commute 
+    by metis
+  subgoal using II[unfolded zero_fun_def]   sup.commute 
+    by metis
+  subgoal using II 
+    by metis
+  subgoal using II[unfolded zero_fun_def] 
+    by metis
+  done
+
+lemma sup_0_enat:
+  fixes x y z :: "ecost"
+  shows "sup 0 x = x" "sup z 0 = z" 
+  by (simp_all add: needname_nonneg sup_absorb2 sup.commute)
+
+thm TR_da_def
+
+thm fun_upd_apply
+lemma f_upd_app: "x\<noteq>y \<Longrightarrow>(f(x:=t)) y = f y"
+    "x=y \<Longrightarrow>  (f(x:=t)) y = t"
+  by simp_all
+
+schematic_goal TR_dynarray_aux: "sup (pp TR_dld2 TR_doublec) TR_dlpc = ?x"
+  apply(rule hide)
+  unfolding TR_dld2_dynaaray_simp TR_dlpc_def 
+  apply(simp add: sup_0_enat sup_upd sup_0 norm_cost f_upd_app del: fun_upd_apply )
+  apply summarize_same_cost
+  apply(rule hideI)
+  by simp
+
+schematic_goal TR_dynarray_aux2: "sup TR_dlpc (sup (pp TR_dld2 TR_doublec) TR_dlpc) = ?x"
+  apply(rule hide)
+  unfolding TR_dynarray_aux
+  unfolding TR_dlpc_def 
+  apply(simp add: sup_0_enat sup_upd sup_0 norm_cost f_upd_app del: fun_upd_apply )
+  apply summarize_same_cost
+  apply(rule hideI)
+  by simp
+
+lemma one_enat_fold: "enat (Suc 0) = 1"
+  by (simp add: one_enat_def)
+schematic_goal TR_dynarray_simplified: "TR_dynarray = ?x"
+  apply(rule hide)
+  unfolding TR_dynarray_def 
+  unfolding TR_da_def   TR_dynarray_aux2 TR_de_def
+  apply(simp add: sup_0_enat sup_upd sup_0 norm_cost f_upd_app del: fun_upd_apply )
+  unfolding one_enat_fold  apply simp
+  apply(rule hideI)
+  by simp
+
 
 lemma emptylist2_refine: "dynamiclist_empty2 \<le> \<Down>\<^sub>C TR_dynarray dyn_list_new_raw"
   unfolding TR_dynarray_def
@@ -2249,6 +2312,28 @@ lemma dyn_array_length_rule:
        \<Longrightarrow> \<close>(dyn_array_length_impl, mop_list_length) \<in> (dyn_array.dyn_array_assn U)\<^sup>k \<rightarrow>\<^sub>a snat_assn"
   sorry *)
 
+
+
+
+
+concrete_definition dynamic_array_append_spec_cost is size_t_context.dyn_array_dyn_array_push_spec_def
+  uses "_ = mop_list_snoc \<hole>"
+
+
+schematic_goal dynamic_array_append_spec_cost_simplified: "dynamic_array_append_spec_cost = ?x"
+  apply(rule hide)
+  unfolding dynamic_array_append_spec_cost_def 
+  unfolding push_amortized_cost_def push_overhead_cost_def
+  apply(simp add: norm_cost wfR''_TR_dynarray)
+  unfolding TR_dynarray_simplified
+  apply(simp add: norm_cost )
+  apply summarize_same_cost
+  apply (simp add: numeral_eq_enat )  
+  apply(rule hideI)
+  by simp
+
+thm dynamic_array_append_spec_cost_simplified
+
 end
 
  
@@ -2388,7 +2473,15 @@ Sepref_Constraints.CONSTRAINT Sepref_Basic.is_pure A
 declare dyn_array_push_impl_rule[sepref_fr_rules]
 
 
-  term snat_assn
+thm dynamic_array_append_spec_def
+
+
+thm size_t_context.TR_dynarray_def
+
+thm size_t_context.TR_dynarray_simplified
+
+
+
 
 
 
