@@ -15,6 +15,7 @@ It is based on the [Isabelle/HOL](https://isabelle.in.tum.de) theorem prover.
 #### Introsort Case Study
   [Final Results](Isabelle_LLVM_Time/Sorting_Results.html)
   [Introsort](Isabelle_LLVM_Time/Sorting_Introsort.html)
+  [Dynamic Arrays](Isabelle_LLVM_Time/Dynamic_Array.html)
 
 #### Isabelle-LLVM
   [Shallow Embedding of LLVM Semantics](Isabelle_LLVM_Time/LLVM_Shallow.html)
@@ -50,6 +51,11 @@ It is based on the [Isabelle/HOL](https://isabelle.in.tum.de) theorem prover.
   This will invoke Isabelle to check all proofs and re-generate the exported code.
 
 ## Talks and Publications
+
+### Isabelle-LLVM-Time
+  [TOPLAS'2021 Paper Manuscript](manuscript_TOPLAS2021.pdf)
+
+  [ETAPS'2021 Paper](ESOP2021.pdf) [Slides](slides_ESOP2021.pdf) [Talk](https://www.morressier.com/article/few-dollars--verified-finegrained-algorithm-analysis-down-llvm/604907f41a80aac83ca25d21)
 
 
 ### Isabelle-LLVM without Time

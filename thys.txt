@@ -15,6 +15,7 @@ thys/ds/LLVM_DS_Array.thy
 thys/ds/LLVM_DS_Dflt.thy
 thys/ds/LLVM_DS_NArray.thy
 thys/ds/Proto_EOArray.thy
+thys/examples/dynarray/Dynamic_Array.thy
 thys/examples/sorting/Sorting_Export_Code.thy
 thys/examples/sorting/Sorting_Final_insertion_Sort.thy
 thys/examples/sorting/Sorting_Heapsort.thy
@@ -58,6 +59,7 @@ thys/nrest/NREST_Main.thy
 thys/nrest/NREST_Type_Classes.thy
 thys/nrest/Refine_Heuristics.thy
 thys/nrest/Time_Refinement.thy
+thys/nrest/Currs_Of.thy
 thys/sepref/Hnr_Primitives_Experiment.thy
 thys/sepref/Lib/Concl_Pres_Clarification.thy
 thys/sepref/Lib/PO_Normalizer.ML
