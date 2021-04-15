@@ -204,12 +204,11 @@ function output_pgf_abs () {
   pr_res_pgf_abs("std-uint64 (laptop)","green","uint64","L","std::sort");
 
 
-#
-#   pr_res_pgf_abs("isa-string (server)","blue",  "llstring","S","isabelle::sort");
-#   pr_res_pgf_abs("std-string (server)","blue",  "llstring","S","std::sort");
-#
-#   pr_res_pgf_abs("isa-string (laptop)","black","llstring","L","isabelle::sort");
-#   pr_res_pgf_abs("std-string (laptop)","black","llstring","L","std::sort");
+  pr_res_pgf_abs("isa-string (server)","blue",  "llstring","S","isabelle::sort");
+  pr_res_pgf_abs("std-string (server)","blue",  "llstring","S","std::sort");
+
+  pr_res_pgf_abs("isa-string (laptop)","black","llstring","L","isabelle::sort");
+  pr_res_pgf_abs("std-string (laptop)","black","llstring","L","std::sort");
 
 
 #   print "@ pdqsort"
@@ -313,10 +312,10 @@ function check_divergs() {
 
 
 END {
- check_divergs()
+# check_divergs()
 
 #  output_pgf()
-#  output_pgf_abs()
+ output_pgf_abs()
 
 }
 

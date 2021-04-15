@@ -6,7 +6,7 @@
 
 # Defaults
 
-export DO_BENCHMARK="./do_benchmark"
+export DO_BENCHMARK="./do_benchmark_notime"
 
 export NITER=10   # Number of iterations
 export NIELEM=100000000 # Number of integer elements
@@ -86,7 +86,7 @@ function run_int_gcc() {
 
 for i in $INT_DATA; do
   run_int_isa $i
-  run_int_std $i
+#  run_int_std $i
 #   run_pdq_int_isa $i
 #   run_pdq_int_std $i
 #   run_int_gcc $i
@@ -94,7 +94,7 @@ done
 
 for i in $STR_DATA; do
   run_str_isa $i
-  run_str_std $i
+#  run_str_std $i
 #  run_pdq_str_isa $i
 #  run_pdq_str_std $i
 done
