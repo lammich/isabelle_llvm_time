@@ -100,6 +100,22 @@ lemma "(\<lambda>(m, n). real (project_all (string_sort.introsort_impl_cost m n)
   apply(rule string_sort_introsort_cost) .
 
 
+subsection \<open>Dynamic arrays\<close>
+
+lemma
+  assumes "Sepref_Basic.is_pure A"
+  and "2 * length a < max_snat LENGTH('c::len2)"
+  and "8 \<le> LENGTH('c)"
+shows dyn_array_push_impl_ht:
+    "llvm_htriple
+      ($da_append_spec_cost \<and>* al_assn' TYPE('c) A a ai \<and>* A b bi)
+         (dyn_array_push_impl ai bi)
+     (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(x = a @ [b]) \<and>* dynamic_array_assn A x r) s) \<and>* A b bi)"
+  apply(rule introsort_final_hoare_triple[OF assms]) .
+
+lemma "(\<lambda>_::nat. real (project_all da_append_spec_cost)) \<in> \<Theta>(\<lambda>_::nat. 1::real)"
+  unfolding all_da_append_spec_cost
+  by auto2
 
 
 end

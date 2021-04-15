@@ -2848,30 +2848,8 @@ lemma heapsort_final_hoare_triple:
   apply(subst (asm) (1) sep_conj_assoc[symmetric])
   apply(subst (asm) sep_conj_pred_lift) by simp
 
-definition (in -) "project_all T =  (Sum_any (the_enat o the_acost T))"
-
-lemma (in -) project_all_is_Sumany_if_lifted:
-  "f = lift_acost g \<Longrightarrow> project_all f = (Sum_any (the_acost g))"
-  unfolding project_all_def lift_acost_def
-  by simp
 
 
-definition (in -) "norm_cost_tag a b = (a=b)"
-
-lemma (in -) norm_cost_tagI: "norm_cost_tag a a"
-  unfolding norm_cost_tag_def
-  by simp
-
-lemma the_acost_mult_eq_z_iff: "the_acost (n *m c) a = 0 \<longleftrightarrow> the_acost c a = 0 \<or> n=0" for n :: nat 
-  apply (cases c)
-  apply (auto simp: costmult_def)
-  done
-  
-lemma finite_the_acost_mult_nonzeroI: "finite {a. the_acost c a \<noteq> 0} \<Longrightarrow> finite {a. the_acost (n *m c) a \<noteq> 0}" for n :: nat 
-  apply (erule finite_subset[rotated])
-  by (auto simp: the_acost_mult_eq_z_iff)
-  
-  
   
   
 lemma sum_any_push_costmul: "Sum_any (the_acost (n *m c)) = n * (Sum_any (the_acost c))" for n :: nat 

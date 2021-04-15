@@ -2208,7 +2208,6 @@ concrete_definition dynamic_array_assn2 is dyn_array_dynamic_array_assn_def
 definition  "da \<equiv> dyn_array.dyn_array_assn"
 
 
-
 thm FREE_array_assn(*
 lemma FREE_dynarray_assn[sepref_frame_free_rules]:
   assumes PURE: "is_pure A"
@@ -2314,11 +2313,11 @@ lemma dyn_array_length_rule:
 
 
 
+term dyn_array.push_concrete_advertised_cost
 
 
-concrete_definition dynamic_array_append_spec_cost is size_t_context.dyn_array_dyn_array_push_spec_def
+concrete_definition dynamic_array_append_spec_cost is dyn_array_dyn_array_push_spec_def
   uses "_ = mop_list_snoc \<hole>"
-
 
 schematic_goal dynamic_array_append_spec_cost_simplified: "dynamic_array_append_spec_cost = ?x"
   apply(rule hide)
@@ -2332,12 +2331,24 @@ schematic_goal dynamic_array_append_spec_cost_simplified: "dynamic_array_append_
   apply(rule hideI)
   by simp
 
+
+schematic_goal dynamic_array_append_spec_cost_simplified2: "dyn_array.push_concrete_advertised_cost = ?x"
+  apply(rule hide)
+  unfolding push_amortized_cost_def unfolding push_overhead_cost_def
+  apply(simp add: norm_cost wfR''_TR_dynarray)
+  unfolding TR_dynarray_simplified
+  apply(simp add: norm_cost )
+  apply summarize_same_cost
+  apply (simp add: numeral_eq_enat )  
+  apply(rule hideI)
+  by simp
+
+
 thm dynamic_array_append_spec_cost_simplified
 
 end
 
  
-
 
 
 concrete_definition dynamiclist_empty_impl is size_t_context.dynamiclist_empty_impl_def
@@ -2480,8 +2491,77 @@ thm size_t_context.TR_dynarray_def
 
 thm size_t_context.TR_dynarray_simplified
 
+lemma ht_from_hnr_triv: 
+  assumes "hn_refine \<Gamma> c \<Gamma>' R (SPECT (emb Q T))"
+  shows " llvm_htriple ($T ** \<Gamma>) c (\<lambda>r. (EXS ra. \<up>(Q ra) ** R ra r) ** \<Gamma>')" 
+  apply(rule ht_from_hnr[where \<Phi>=True and E="TId", simplified timerefineA_TId_eq])
+  using assms by (auto simp: timerefine_id)  
 
 
+
+concrete_definition da_append_spec_cost is size_t_context.dynamic_array_append_spec_cost_simplified2
+  uses "_ = \<hole>"
+
+
+
+lemma assumes "Sepref_Basic.is_pure A"
+  and "2 * length a < max_snat LENGTH('c::len2)"
+  and "8 \<le> LENGTH('c)"
+shows dyn_array_push_impl_ht': "llvm_htriple ($da_append_spec_cost \<and>* al_assn' TYPE('c) A a ai \<and>* A b bi) (dyn_array_push_impl ai bi)
+     (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(x = a @ [b]) \<and>* dynamic_array_assn A x r) s) \<and>* hn_invalid (dynamic_array_assn A) a ai \<and>* A b bi)"
+proof - 
+  from assms(3) have S: "size_t_context TYPE('c)"
+    apply unfold_locales .
+
+  note f = size_t_context.dynamic_array_append_spec_cost_simplified2[OF S, folded da_append_spec_cost_def]
+
+  from dyn_array_push_impl_rule[to_hnr, unfolded dynamic_array_append_spec_def f APP_def mop_list_snoc_def SPECT_assign_emb'
+               , THEN  ht_from_hnr_triv]
+  show ?thesis
+    unfolding Sepref_Constraints.CONSTRAINT_def hn_ctxt_def using assms by fast
+qed
+
+
+(* TODO: Move *)
+lemma sep_conj_pred_lift: "(A \<and>* (pred_lift B)) s = (A s \<and> B)"
+  apply(cases B) by (auto simp: pure_true_conv)
+
+lemma introsort_final_hoare_triple:assumes "Sepref_Basic.is_pure A"
+  and "2 * length a < max_snat LENGTH('c::len2)"
+  and "8 \<le> LENGTH('c)"
+shows dyn_array_push_impl_ht: "llvm_htriple ($da_append_spec_cost \<and>* al_assn' TYPE('c) A a ai \<and>* A b bi) (dyn_array_push_impl ai bi)
+     (\<lambda>r. (\<lambda>s. \<exists>x. (\<up>(x = a @ [b]) \<and>* dynamic_array_assn A x r) s) \<and>* A b bi)"
+  apply(rule cons_post_rule) (* TODO: very ugly proof to get rid of the invalid_assn! *)
+   apply (rule dyn_array_push_impl_ht'[OF assms, unfolded hn_ctxt_def]) 
+  apply(simp add: pred_lift_extract_simps  invalid_assn_def pure_part_def)
+  apply(subst (asm) (2) sep_conj_commute)
+  apply(subst (asm) (1) sep_conj_assoc[symmetric])
+  apply(subst (asm) sep_conj_pred_lift) by simp
+
+lemma Sum_any_cost: "Sum_any (the_acost (cost n x)) = x"
+  unfolding cost_def by (simp add: zero_acost_def)
+lemma sum_any_push_costmul: "Sum_any (the_acost (n *m c)) = n * (Sum_any (the_acost c))" for n :: nat 
+  apply (cases c) subgoal for x
+  apply (auto simp: costmult_def algebra_simps) 
+  apply (cases "finite {a. x a \<noteq> 0}"; cases "n=0")
+  apply (simp_all add: Sum_any_right_distrib)
+  done done
+  
+
+schematic_goal all_da_append_spec_cost: "project_all da_append_spec_cost = ?x"
+  apply (fold norm_cost_tag_def)
+  unfolding da_append_spec_cost_def
+  apply(subst project_all_is_Sumany_if_lifted )
+  apply(simp only: lift_acost_cost[symmetric] lift_acost_propagate[symmetric]) 
+  apply(simp add: the_acost_propagate add.assoc) 
+  
+  supply acost_finiteIs = finite_sum_nonzero_cost finite_sum_nonzero_if_summands_finite_nonzero finite_the_acost_mult_nonzeroI
+  
+  apply (subst Sum_any.distrib, (intro acost_finiteIs;fail), (intro acost_finiteIs;fail))+
+  apply (simp only: Sum_any_cost sum_any_push_costmul)
+  apply (simp add: add_ac)
+
+  by (rule norm_cost_tagI)
 
 
 
