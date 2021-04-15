@@ -13,7 +13,7 @@ parserArgumentsOpenCL=-ferror-limit=100 -fspell-checking -Wdocumentation -Wunuse
 Name=Clang
 
 [CustomDefinesAndIncludes][ProjectPath0][Includes]
-1=/home/peter/devel/isabelle/isabelle_llvm/thys/examples/code
+1=/home/peter/devel/isabelle/isabelle_llvm_time/thys/examples/code
 2=/home/peter/include
 
 [Project]

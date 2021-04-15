@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # LOG="log/all-2020-10-09.log"
-LOG="log/test.log"
+LOG="log/all_03_21.log"
+LOG="log/all_03_21_notime.log"
 
 rm -rf ~/tmp/data*.tex
 
