@@ -2,3 +2,8 @@
 *.fdb_latexmk
 *.fls
 *.log
+*.cpt
+*.bbl
+*.blg
+*.out
+*.cut
