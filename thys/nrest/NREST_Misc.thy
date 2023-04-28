@@ -30,7 +30,7 @@ lemma my_these_def: "Option.these M = {f. Some f \<in> M}"
 
 lemma option_Some_image: 
     "A \<noteq> {} \<Longrightarrow> A \<noteq> {None} \<Longrightarrow> case_option None (Some \<circ> f) ` A \<noteq> {None}" 
-  by (metis (mono_tags, hide_lams) comp_apply empty_iff everywhereNone
+  by (metis (mono_tags) comp_apply empty_iff everywhereNone
                   imageI in_these_eq option.exhaust option.simps(5) these_insert_None)
 
 

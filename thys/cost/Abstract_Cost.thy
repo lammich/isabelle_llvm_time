@@ -285,7 +285,7 @@ ML \<open>
     open Refine_Util Conv
     fun is_sum_conv ct = case Thm.term_of ct of @{mpat "_+_"} => all_conv ct | _ => no_conv ct
   
-    val tac = ALLGOALS (simp_tac (put_simpset HOL_ss ctxt addsimps @{thms add_ac}))
+    fun tac ctxt = ALLGOALS (simp_tac (put_simpset HOL_ss ctxt addsimps @{thms add_ac}))
   in
     is_sum_conv 
     then_conv f_tac_conv ctxt summarize_cost tac
