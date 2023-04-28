@@ -198,7 +198,7 @@ subsection \<open>Preprocessor\<close>
         thm 
         |> (simplify (put_simpset HOL_ss ctxt addsimps @{thms Monad.bind_laws atomize_eq}))
         |> cthm_norm_lambda ctxt
-        |> (Conv.fconv_rule (Refine_Util.f_tac_conv ctxt normalize_eq (norm_tac ctxt)))
+        |> (Conv.fconv_rule (Refine_Util.f_tac_conv ctxt normalize_eq (norm_tac)))
         |> (Conv.fconv_rule (Conv.top_sweep_conv (K (Conv.rewr_conv @{thm unit_meta_eq})) ctxt))
       end
       
@@ -213,16 +213,21 @@ subsection \<open>Preprocessor\<close>
         (c,thm)
       end
       
-      fun dep_try_instantiate_code_thm c (l,thm) = let
-        val thy = Thm.theory_of_thm thm
+      fun dep_try_instantiate_code_thm ctxt c (l,thm) = let
+        val c = Thm.cterm_of ctxt c
+        val incr = Thm.maxidx_of_cterm c + 1
+        val thm = Thm.incr_indexes incr thm
+        val l = Thm.cterm_of ctxt l |> Thm.incr_indexes_cterm incr
+      
       in
-        case SOME (Pattern.match thy (l,c) (Vartab.empty,Vartab.empty)) handle Pattern.MATCH => NONE of
+        case try Thm.match (l,c) of
           NONE => NONE
-        | SOME m => SOME (instantiate_uc m thm)
+        | SOME inst => SOME (Thm.instantiate inst thm)
       end
       
-      fun dep_find_code_thm pthms c = 
-        case get_first (dep_try_instantiate_code_thm c) pthms of
+      
+      fun dep_find_code_thm ctxt pthms c = 
+        case get_first (dep_try_instantiate_code_thm ctxt c) pthms of
           SOME eqn => eqn
         | NONE => raise TERM ("No code equation",[c])
       
@@ -266,7 +271,7 @@ subsection \<open>Preprocessor\<close>
           | NONE => let
               val _ = assert_monomorphic_const c
               (* Get code theorem and inline it *)
-              val teqn = dep_find_code_thm pthms c |> monadify_inline_cthm lthy
+              val teqn = dep_find_code_thm lthy pthms c |> monadify_inline_cthm lthy
 
               (* Extract recursion equations *)
               val exs = default_extractions lthy

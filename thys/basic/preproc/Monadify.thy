@@ -172,9 +172,13 @@ begin
       fun monadify_conv ctxt ct = let
           val _ = is_monadT (Thm.typ_of_cterm ct |> body_type) 
             orelse raise TYPE("No monad type",[Thm.typ_of_cterm ct],[Thm.term_of ct])
-      
-          val ctxt = put_simpset HOL_basic_ss ctxt addsimps monad_laws
-          val tac = ALLGOALS (simp_tac ctxt)
+          
+          fun tac ctxt = let
+            val ctxt = put_simpset HOL_basic_ss ctxt addsimps (monad_laws)
+          in
+            ALLGOALS (simp_tac ctxt)
+          end
+
         in 
           (* TODO: f_tac_conv will choke on beta-redexes! *)
           Thm.beta_conversion true then_conv Refine_Util.f_tac_conv ctxt (monadify ctxt) tac then_conv eta_ret_conv ctxt 
