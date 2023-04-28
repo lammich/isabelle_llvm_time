@@ -166,7 +166,7 @@ subsection \<open>Specification of Sorting Algorithms\<close>
 
 
 lemma sorted_sorted_wrt_lt: "sorted = sorted_wrt_lt ((<)::_::linorder \<Rightarrow>_)"
-  apply (intro ext) unfolding sorted_sorted_wrt by simp
+  apply (intro ext) by simp
 
 definition "sort_spec lt xs xs' \<equiv> mset xs'=mset xs \<and> sorted_wrt_lt lt xs'" 
   

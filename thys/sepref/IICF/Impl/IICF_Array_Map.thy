@@ -94,7 +94,7 @@ begin
       sepref_definition am2_contains_key [llvm_inline] is "uncurry am1_contains_key" 
         :: "K_assn\<^sup>k *\<^sub>a am2_assn\<^sup>k \<rightarrow>\<^sub>a bool1_assn"
         unfolding am1_contains_key_def am2_assn_def
-        by sepref
+        by sep ref
 
       sepref_decl_impl (no_register,ismop) am2_contains_key: am2_contains_key.refine[FCOMP am1_contains_key_refine] 
         uses mop_map_contains_key.fref[where K=Id and V=Id] .

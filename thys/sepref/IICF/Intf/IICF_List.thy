@@ -140,7 +140,7 @@ lemma gen_mop_list_swap: "mop_list_swap l i j = do {
     RETURN l
   }"
   unfolding mop_list_swap_def
-  by (auto simp: pw_eq_iff refine_pw_simps gen_swap)
+  by (auto simp: pw_acost_eq_iff' refine_pw_simps gen_swap)
 
 lemmas gen_op_list_swap = gen_swap[folded op_list_swap_def]
   

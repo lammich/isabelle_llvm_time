@@ -55,7 +55,6 @@ struct
 structure Data = Theory_Data (
   type T = thm Symtab.table;
   val empty = Symtab.empty;
-  val extend = I;
   val merge = Symtab.merge Thm.eq_thm
 )
 
@@ -63,15 +62,7 @@ structure Data = Theory_Data (
 fun bd_of_th th =
     th |> prop_of' |> dest_arg
 
-fun dest_abs_t t =
-    case t of
-        Abs (abs as (_, T, _)) =>
-        let
-          val (x, body) = Term.dest_abs abs
-        in
-          (Free (x, T), body)
-        end
-      | _ => raise Fail "dest_abs_t"
+val dest_abs_t = Term.dest_abs_global #>> Free
 
 (* Given th of the form (%x. f(x)) : \Theta(%x. g(x)), add the theorem
    as an asymptotic bound rule under the function name f. *)
@@ -117,7 +108,7 @@ fun to_real_t ctxt ct =
         let
           val n = UtilArith.dest_numc t
           val t' = nat_to_real $ mk_nat n
-          val eq = UtilArith.prove_by_arith ctxt [] (UtilBase.mk_eq (t, t'))
+          val eq = UtilArith.prove_by_arith ctxt [] (Auto2_UtilBase.mk_eq (t, t'))
         in
           to_meta_eq eq
         end
@@ -143,7 +134,7 @@ fun from_real ctxt ct =
           let
             val n = UtilArith.dest_numc (dest_arg t)
             val t' = HOLogic.mk_number @{typ real} n
-            val eq = UtilArith.prove_by_arith ctxt [] (UtilBase.mk_eq (t, t'))
+            val eq = UtilArith.prove_by_arith ctxt [] (Auto2_UtilBase.mk_eq (t, t'))
           in
             to_meta_eq eq
           end
@@ -272,13 +263,13 @@ fun analyze_poly_log t =
 (* (a1 < a2) | (a1 = a2 & b1 < b2) *)
 fun pair_less_goal (a1, a2, b1, b2) =
     disj $ (Nat_Util.mk_less (mk_nat a1, mk_nat a2))
-         $ (conj $ (UtilBase.mk_eq (mk_nat a1, mk_nat a2))
+         $ (conj $ (Auto2_UtilBase.mk_eq (mk_nat a1, mk_nat a2))
                  $ Nat_Util.mk_less (mk_nat b1, mk_nat b2))
 
 (* (a1 < a2) | (a1 = a2 & b1 <= b2) *)
 fun pair_le_goal (a1, a2, b1, b2) =
     disj $ (Nat_Util.mk_less (mk_nat a1, mk_nat a2))
-         $ (conj $ (UtilBase.mk_eq (mk_nat a1, mk_nat a2))
+         $ (conj $ (Auto2_UtilBase.mk_eq (mk_nat a1, mk_nat a2))
                  $ Nat_Util.mk_le (mk_nat b1, mk_nat b2))
 
 (* Given two polylog functions s and t, return one of (EQUAL, (s == t)),
@@ -523,7 +514,7 @@ fun asym_bound_gen ctxt (ct, goal) =
     end
 
 val asym_bound_prfstep =
-    ProofStep.prfstep_custom
+    Auto2_Setup.ProofStep.prfstep_custom
         "asym_bound"
         [WithItem (TY_PROP, @{term_pat "~((?f::nat=>real) : \<Theta>(?g))"})]
         (fn ((id, _), ths) => fn _ => fn ctxt =>
@@ -531,15 +522,15 @@ val asym_bound_prfstep =
               val th = the_single ths
               val (t, goal) = th |> prop_of' |> dest_not |> Util.dest_binop_args
               val res = asym_bound_gen ctxt (Thm.cterm_of ctxt t, goal)
-              val contra = ([th, res] MRS UtilBase.contra_triv_th)
+              val contra = ([th, res] MRS Auto2_UtilBase.contra_triv_th)
                               |> fold Thm.implies_intr (map (Thm.cterm_of ctxt) (Thm.hyps_of res))
               val contra = if Util.is_implies (Thm.prop_of contra) then
-                             contra |> apply_to_thm UtilLogic.rewrite_from_contra_form
-                                    |> apply_to_thm (UtilLogic.to_obj_conv ctxt)
+                             contra |> apply_to_thm Auto2_Setup.UtilLogic.rewrite_from_contra_form
+                                    |> apply_to_thm (Auto2_Setup.UtilLogic.to_obj_conv ctxt)
                            else
                              contra
             in
-              [Update.thm_update (id, contra)]
+              [Auto2_Setup.Update.thm_update (id, contra)]
             end)
 
 val add_asym_bound_proofsteps =

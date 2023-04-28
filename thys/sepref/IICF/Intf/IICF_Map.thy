@@ -118,9 +118,9 @@ subsection \<open>Operations\<close>
   sepref_decl_op map_the_lookup: 
     "the oo op_map_lookup" :: "[\<lambda>(k,m). m k \<noteq> None]\<^sub>f K \<times>\<^sub>r \<langle>K,V\<rangle>map_rel \<rightarrow> V"
     subgoal
-      apply (intro frefI nres_relI)
+      apply (intro frefI nrest_relI)
       apply (clarsimp simp: map_rel_def)
-      apply (drule (1) fun_relD)
+      apply (drule (1) fun_relD) 
       by (auto simp add: option_rel_inv_conv)
     subgoal
       apply (clarsimp simp: map_rel_def)

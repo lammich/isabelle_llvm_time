@@ -269,7 +269,7 @@ fun reduce_poly_log2_plus1 ctxt ct =
     let
       val arg = ct |> Thm.term_of |> dest_arg
       val (fs, g) = arg |> Util.dest_binop_args
-                        |> apfst (ACUtil.dest_ac plus_ac_fn)
+                        |> apfst (Auto2_HOL_Extra_Setup.ACUtil.dest_ac plus_ac_fn)
     in
       if length fs = 1 then
         case compare_poly_log2 ctxt (the_single fs, g) of
@@ -281,8 +281,8 @@ fun reduce_poly_log2_plus1 ctxt ct =
           | SOME (i, (ord, th)) =>
             Conv.every_conv [
               Conv.arg_conv (Conv.arg1_conv (
-                                ACUtil.move_outmost plus_ac_fn (nth fs i))),
-              Conv.arg_conv (ACUtil.assoc_cv plus_ac_fn),
+                                Auto2_HOL_Extra_Setup.ACUtil.move_outmost plus_ac_fn (nth fs i))),
+              Conv.arg_conv (Auto2_HOL_Extra_Setup.ACUtil.assoc_cv plus_ac_fn),
               theta2_arg_cv ctxt (cv_of_compare (ord, th)),
               reduce_poly_log2_plus1 ctxt] ct
     end
@@ -297,7 +297,7 @@ fun reduce_poly_log2_sum ctxt ct =
     in
       if UtilArith.is_plus b then
         Conv.every_conv [
-          Conv.arg_conv (ACUtil.assoc_sym_cv plus_ac_fn),
+          Conv.arg_conv (Auto2_HOL_Extra_Setup.ACUtil.assoc_sym_cv plus_ac_fn),
           theta2_arg1_cv ctxt (reduce_poly_log2_plus1 ctxt),
           reduce_poly_log2_sum ctxt] ct
       else
@@ -481,7 +481,7 @@ fun asym_bound2_gen ctxt (ct, goal) =
     end
 
 val asym_bound2_prfstep =
-    ProofStep.prfstep_custom
+    Auto2_Setup.ProofStep.prfstep_custom
         "asym_bound2"
         [WithItem (TY_PROP,
                    @{term_pat "~((?f::nat*nat=>real) : \<Theta>\<^sub>2(?g))"})]
@@ -490,15 +490,15 @@ val asym_bound2_prfstep =
               val th = the_single ths
               val (t, goal) = th |> prop_of' |> dest_not |> Util.dest_binop_args
               val res = asym_bound2_gen ctxt (Thm.cterm_of ctxt t, goal)
-              val contra = ([th, res] MRS UtilBase.contra_triv_th)
+              val contra = ([th, res] MRS Auto2_UtilBase.contra_triv_th)
                               |> fold Thm.implies_intr (map (Thm.cterm_of ctxt) (Thm.hyps_of res))
               val contra = if Util.is_implies (Thm.prop_of contra) then
-                             contra |> apply_to_thm UtilLogic.rewrite_from_contra_form
-                                    |> apply_to_thm (UtilLogic.to_obj_conv ctxt)
+                             contra |> apply_to_thm Auto2_Setup.UtilLogic.rewrite_from_contra_form
+                                    |> apply_to_thm (Auto2_Setup.UtilLogic.to_obj_conv ctxt)
                            else
                              contra
             in
-              [Update.thm_update (id, contra)]
+              [Auto2_Setup.Update.thm_update (id, contra)]
             end)
 
 val add_asym_bound2_proofsteps =

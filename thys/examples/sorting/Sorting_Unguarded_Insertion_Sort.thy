@@ -1132,7 +1132,7 @@ subsection \<open>insertion_sort_unguarded\<close>
         \<le> \<Down>Id (timerefine (TId(''slice_sort'' := enat (h-i\<^sub>0+1) *m insort_step_cost)) (
           slice_sort_spec (\<^bold><) xs 0 h))"
     unfolding insertion_sort_unguarded_def sort_one_more_spec_unguarded_def
-          slice_sort_spec_def sort_spec_def sorted_sorted_wrt
+          slice_sort_spec_def sort_spec_def 
     
     apply (intro refine0)
     subgoal by simp
@@ -1406,7 +1406,7 @@ subsection \<open>insertion_sort_guarded\<close>
       \<Longrightarrow> insertion_sort_guarded i\<^sub>0 h xs 
         \<le> \<Down>Id (timerefine (TId(''slice_sort'' := enat (h-i\<^sub>0+1) *m insort_guarded_step_cost)) (
           slice_sort_spec (\<^bold><) xs 0 h))"
-    unfolding insertion_sort_guarded_def sort_one_more_spec_guarded_def slice_sort_spec_def sort_spec_def sorted_sorted_wrt
+    unfolding insertion_sort_guarded_def sort_one_more_spec_guarded_def slice_sort_spec_def sort_spec_def
     
     apply (intro refine0)
     subgoal by simp

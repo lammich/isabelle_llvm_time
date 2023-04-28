@@ -2,6 +2,7 @@ theory Asymptotics_2D
   imports Akra_Bazzi.Akra_Bazzi_Method Asymptotics_1D
 begin
 
+
 abbreviation "O\<^sub>2(\<lambda>x. f x) \<equiv> O[at_top \<times>\<^sub>F at_top](\<lambda>x. f x)"
 abbreviation "o\<^sub>2(\<lambda>x. f x) \<equiv> o[at_top \<times>\<^sub>F at_top](\<lambda>x. f x)"
 abbreviation "\<Theta>\<^sub>2(\<lambda>x. f x) \<equiv> \<Theta>[at_top \<times>\<^sub>F at_top](\<lambda>x. f x)"
@@ -316,19 +317,21 @@ proof -
     apply (rule bigoI[where c="c1 * c3"])
     unfolding eventually_prod_sequentially
     apply (rule exI[where x="?n"])
-  proof safe
+  proof safe 
     fix n m :: nat 
     assume n: "?n\<le>n"
-    have z1a: "n1 \<le> f2a n" using n nf2a by auto
-    have z3a: "n3 \<le> g2a n" using n ng2a by auto
+    have z1a: "n1 \<le> f2a n" using n nf2a unfolding max.bounded_iff by auto
+    have z3a: "n3 \<le> g2a n" using n ng2a unfolding max.bounded_iff by auto
     assume m: "?n\<le>m"                       
-    have z1b: "n1 \<le> f2b m" using m nf2b by auto 
-    have z3b: "n3 \<le> g2b m" using m ng2b by auto
+    have z1b: "n1 \<le> f2b m" using m nf2b unfolding max.bounded_iff by auto 
+    have z3b: "n3 \<le> g2b m" using m ng2b unfolding max.bounded_iff by auto
 
     have "norm (real (f1 (f2a n, f2b m))) \<le> c1 * norm (g1 (f2a n, f2b m))"
-      apply (rule f1)  using z1a z1b m by auto
+      apply (rule f1)  using z1a z1b m unfolding max.bounded_iff by auto
     also { have " norm (g1 (f2a n, f2b m)) \<le> norm (g1 (c2a * g2a n, c2b * g2b m))"
-      apply (rule monog1) using f2a f2b nf3a nf3b n m by auto 
+      apply (rule monog1) using f2a f2b nf3a nf3b n m 
+      unfolding max.bounded_iff
+      by auto
     also have "\<dots> \<le> c3 * norm (g1 (g2a n, g2b m))"
       apply (rule f3) using z3a z3b by auto
     finally have " c1 * norm (g1 (f2a n, f2b m)) \<le> c1 * (c3 * norm (g1 (g2a n, g2b m)))"
@@ -387,20 +390,20 @@ proof -
   proof safe
     fix n m :: nat
     assume n: "?n\<le>n"
-    have z1a: "n1 \<le> f2a n" using n nf2a by auto
-    have z2a: "n2a \<le> n"  using n   by auto
-    have z3a: "n3 \<le> f2a n"  using n ng2a by auto 
-    have z4a: "nM \<le> g2a n" using ng3a n by auto
+    have z1a: "n1 \<le> f2a n" using n nf2a unfolding max.bounded_iff by auto
+    have z2a: "n2a \<le> n"  using n unfolding max.bounded_iff  by auto
+    have z3a: "n3 \<le> f2a n"  using n ng2a unfolding max.bounded_iff by auto 
+    have z4a: "nM \<le> g2a n" using ng3a n unfolding max.bounded_iff by auto
     assume m: "?n\<le>m"
-    have z1b: "n1 \<le> f2b m" using m nf2b by auto
-    have z2b: "n2b \<le>m "  using m   by auto
-    have z3b: "n3 \<le> f2b m"  using m ng2b by auto 
-    have z4b: "nM \<le> g2b m" using ng3b m by auto
+    have z1b: "n1 \<le> f2b m" using m nf2b unfolding max.bounded_iff by auto
+    have z2b: "n2b \<le>m "  using m unfolding max.bounded_iff  by auto
+    have z3b: "n3 \<le> f2b m"  using m ng2b unfolding max.bounded_iff by auto 
+    have z4b: "nM \<le> g2b m" using ng3b m unfolding max.bounded_iff by auto
 
     have za: "g2a n \<le> c2a * f2a n" using f2a z2a by auto
     have zb: "g2b m \<le> c2b * f2b m" using f2b z2b by auto
     have "norm ( (g1 (g2a n,g2b m))) \<le> norm (g1 (c2a * f2a n,c2b * f2b m))"
-      apply (rule monog1) using n m za zb z4a z4b by auto
+      apply (rule monog1) using n m za zb z4a z4b unfolding max.bounded_iff by auto
     also have "\<dots> \<le> c3 * norm (g1 (f2a n, f2b m))" apply(rule f3) using  z3a z3b by auto
     also have "\<dots> \<le> c3 * (norm (f1 (f2a n, f2b m))/c1)" apply(rule mult_left_mono) apply(rule f1)
        using c3 z1a z1b by auto 

@@ -168,28 +168,23 @@ lemma of_bl_eqZ:
   by (metis to_bl_0 to_bl_use_of_bl word_bl_Rep')    
 
 lemma word_clz'_rec: "word_clz' x = (if x <=s 0 then 0 else 1 + word_clz' (x << 1))"  
-  (* TODO: Clean up this mess! *)  
   apply (clarsimp simp: word_clz'_def word_clz_def)
-  apply (cases "to_bl x")
-  apply auto
-  apply (simp add: word_msb_alt word_sle_msb_le)
-  apply (simp add: word_msb_alt word_sle_msb_le)
-  apply (simp add: word_msb_alt word_sle_msb_le shiftl_bl)
-  apply (subst (asm) of_bl_eqZ)
-  apply (auto) [] 
-  apply (metis length_Cons word_bl_Rep')
-  apply (metis length_append_singleton length_replicate replicate_Suc replicate_append_same rotate1_rl' to_bl_0 word_bl.Rep_eqD)
-  apply (simp add: word_msb_alt word_sle_msb_le)
-  apply (simp add: bl_shiftl shiftl_bl)
-  apply (subst (asm) of_bl_eqZ)
-  apply auto
-  apply (metis length_Cons word_bl_Rep')
-  apply (subst word_bl.Abs_inverse)
-  apply auto 
-  apply (metis length_Cons word_bl_Rep')
-  apply (subgoal_tac "True\<in>set list")
-  apply simp
-  by (simp add: eq_zero_set_bl)
+  apply (cases "to_bl x"; simp)
+  apply safe
+  subgoal by (simp add: word_msb_alt word_sle_msb_le)
+  subgoal by (simp add: word_msb_alt word_sle_msb_le)
+  subgoal 
+    apply (simp add: word_msb_alt word_sle_msb_le shiftl_bl mult.commute[of x 2])
+    apply (simp add: double_eq_zero_iff[of x])
+    by (metis list.sel(1) msb_big order_refl word_msb_alt)
+  subgoal
+    by (simp add: word_msb_alt word_sle_msb_le)  
+  subgoal for b bs 
+    apply (clarsimp simp: mult.commute[of x 2] to_bl_double_eq)
+    apply (subgoal_tac "True\<in>set bs")
+    apply simp
+    by (simp add: eq_zero_set_bl)
+  done  
   
 lemma word_clz'_rec2: "word_clz' x = (if 0 <s x then 1 + word_clz' (x << 1) else 0)"  
   by (meson signed.not_le word_clz'_rec)
