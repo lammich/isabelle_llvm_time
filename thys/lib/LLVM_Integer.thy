@@ -3,6 +3,11 @@ theory LLVM_Integer
 imports LLVM_More_Word "HOL-Library.Signed_Division"
 begin
 
+
+
+
+
+
 subsection \<open>Lifting of Operations\<close>  
 
 definition "cnv_uop1 f a \<equiv> bin_to_bl (length a) (f (bl_to_bin a))"
@@ -442,7 +447,7 @@ definition "lint_abort_bool (_::unit) \<equiv> undefined::bool"
 (*lemma l_abort_ne[simp]: "lint_abort () \<noteq> []" unfolding lint_abort_def by auto*)
 declare [[ code abort: lint_abort lint_abort_bool]]
 
-instantiation lint :: "{plus,minus,times,divide,modulo,uminus,signed_division}"
+instantiation lint :: "{plus,minus,times,divide,modulo,uminus}" (*,signed_division*)
 begin
   lift_definition plus_lint :: "lint \<Rightarrow> lint \<Rightarrow> lint" is "cnv_uop2 (lint_abort) (+)" by simp
   lift_definition minus_lint :: "lint \<Rightarrow> lint \<Rightarrow> lint" is "cnv_uop2 (lint_abort) (-)" by simp
@@ -455,16 +460,27 @@ begin
   definition sdivrem_ovf :: "lint \<Rightarrow> lint \<Rightarrow> bool" where
     "sdivrem_ovf a b \<equiv> lint_to_sint a sdiv lint_to_sint b \<notin> sints (width a)"
   
-  lift_definition signed_divide_lint :: "lint \<Rightarrow> lint \<Rightarrow> lint" 
+  instance ..
+
+end
+
+(*
+  TODO (see header of file): signed-division typeclass no longer syntactic, can't use it anymore.
+*)
+
+instantiation lint :: "{signed_divide, signed_modulo}"
+begin
+  
+  lift_definition signed_divide_lint :: "lint \<Rightarrow> lint \<Rightarrow> lint"
     is "\<lambda>a b. if bl_to_sbin a sdiv bl_to_sbin b \<in> sints (length a) then cnv_sop2 lint_abort (sdiv) a b else lint_abort ()"
     by simp
-    
-  lift_definition signed_modulo_lint :: "lint \<Rightarrow> lint \<Rightarrow> lint" 
+  
+  lift_definition signed_modulo_lint :: "lint \<Rightarrow> lint \<Rightarrow> lint"
     is "\<lambda>a b. if bl_to_sbin a sdiv bl_to_sbin b \<in> sints (length a) then cnv_sop2 lint_abort (smod) a b else lint_abort ()" 
     by simp
   
+  instance by standard
   
-  instance ..
 end
 
 
@@ -660,7 +676,7 @@ lemma uint_AND[simp]:
   shows "lint_to_uint (a lliAND b) = lint_to_uint a AND lint_to_uint b"
   using assms apply (transfer)
   apply (auto simp: )
-  by (metis bin_trunc_ao(1) trunc_bl2bin_len)
+  by (metis trunc_bl2bin_len)
 
 lemma width_OR[simp]:
   assumes "width a = width b"
@@ -872,7 +888,7 @@ lemma word_to_lint_shl[word_to_lint_convs]: "word_to_lint ((a::_::len word) << n
   apply (auto simp: word_to_lint_def)
   apply transfer'
   apply (auto simp: cnv_uop1_def bin_to_bl_eq_iff bintrunc_mod2p shiftl_t2n uint_word_ariths algebra_simps)
-  by (simp add: mod_mult_right_eq semiring_normalization_rules(7) shiftl_int_def)
+  by (simp add: push_bit_eq_mult mod_mult_right_eq semiring_normalization_rules(7) shiftl_int_def)
   
 lemma word_to_lint_lshr[word_to_lint_convs]: "word_to_lint ((a::_::len word) >> n) = bitLSHR (word_to_lint a) n"
   apply (auto simp: word_to_lint_def)
@@ -910,7 +926,7 @@ lemma zext_in_range: "\<lbrakk>w'\<noteq>0; w'\<le>w; 0\<le>a; a<2^w'\<rbrakk> \
 lemma word_to_lint_ucast_up[word_to_lint_convs]: 
   "is_up UCAST('a::len\<rightarrow>'b::len) \<Longrightarrow> word_to_lint (UCAST('a\<rightarrow>'b) a) = zext LENGTH ('b) (word_to_lint a)"
   unfolding word_to_lint_def
-  by (simp add: zext_in_range is_up cast_simps)
+  by (simp add: zext_in_range cast_simps)
   
   
 lemma word_to_lint_scast_up[word_to_lint_convs]: 

@@ -1,6 +1,6 @@
 section \<open>Entry-Point to Word Library and additional lemmas for Isabelle-LLVM\<close>
 theory LLVM_More_Word
-imports "HOL-Library.Word" (*"HOL-Library.Bit_Operations"*) Bits_Natural "Word_Lib.Word_Lib_Sumo"
+imports LLVM_More_Word_Lemmas Bits_Natural "Word_Lib.Word_Lib_Sumo"
 begin
 (* TODO: Fix in Word.thy! 
   Introducing proper infix-syntax for signed comparisons. So, also (<s) and (<=s) get available.
@@ -18,28 +18,6 @@ declare [[coercion_enabled = false]]
 
 subsection \<open>Additional Lemmas\<close>
 
-class len2 = len +
-  assumes len2_not_1 [simp]: "LENGTH('a) \<noteq> Suc 0"
-
-lemma len2_simps[simp]:
-  "LENGTH('a::len2) > Suc 0"
-  "LENGTH('a::len2) \<ge> 2"
-  subgoal by (metis Suc_lessI len2_not_1 len_gt_0)
-  subgoal using \<open>Suc 0 < LENGTH('a)\<close> by linarith
-  done
-  
-lemma len2E: obtains n where "LENGTH('a::len2) = 2+n"
-  apply (cases "LENGTH('a)"; simp)
-  subgoal for k by (cases k; simp)
-  done
-  
-instance bit0 :: (len) len2 
-  by standard simp
-  
-instance bit1 :: (len) len2 
-  by standard simp
-  
-definition "len2 (TYPE('a::len2)) \<equiv> True"  
 
 
 (* Original theorem is in simpset, but useless due to non-normalized LHS *)
@@ -81,6 +59,9 @@ lemma word1_NOT_eq: "~~(x::1 word) = x+1"
 lemma upcast_no_msb[simp]: "LENGTH('small::len) < LENGTH('big::len) \<Longrightarrow> \<not>msb (UCAST('small \<rightarrow> 'big) x)" 
   by (simp add: bit_word_ucast_iff msb_word_eq)
 
+lemma word_split_0[simp]: "word_split 0 = (0,0)"
+  by (auto simp: word_split_def)
+  
 subsection \<open>Integer Division with Rounding Towards Zero\<close>
 
 text \<open>Division with rounding towards zero\<close>
@@ -105,7 +86,7 @@ lemma srem_int_original_def: "(a::int) smod b = (if a\<ge>0 then \<bar>a\<bar> m
   
 text \<open>Standard properties of remainders\<close>
 lemma div_rem_rtz_id: "(a::int) sdiv b * b + a smod b = a"
-  by (simp add: smod_int_def)
+  by (rule signed_division_class.sdiv_mult_smod_eq)
 
 lemma abs_rem_rtz_lt: "b\<noteq>0 \<Longrightarrow> \<bar>a smod b\<bar> < \<bar>b::int\<bar>"
   using srem_int_original_def by auto
@@ -113,7 +94,7 @@ lemma abs_rem_rtz_lt: "b\<noteq>0 \<Longrightarrow> \<bar>a smod b\<bar> < \<bar
 text \<open>LLVM documentation: The remainder is either zero, or has the same sign as the dividend\<close>
 lemma rem_rtz_sign: "(a::int) smod b = 0 \<or> sgn ((a::int) smod b) = sgn a"
   apply (clarsimp simp: srem_int_original_def)
-  by (metis (no_types, hide_lams) Euclidean_Division.pos_mod_sign abs_le_zero_iff abs_of_nonneg add.inverse_neutral mod_0 mod_by_0 neg_le_0_iff_le not_le sgn_pos)
+  by (metis (no_types) Euclidean_Division.pos_mod_sign abs_le_zero_iff abs_of_nonneg add.inverse_neutral mod_0 mod_by_0 neg_le_0_iff_le not_le sgn_pos)
   (*by (smt Euclidean_Division.pos_mod_sign sgn_pos zmod_trival_iff)*)
   
 
