@@ -77,18 +77,13 @@ lemma f: "(t::_::complete_lattice) \<le> Some top \<longleftrightarrow> True"
 lemma minus_cost_mono: 
   fixes q q' :: "'b::{complete_lattice,minus,ord,top,drm} option"
   shows "(m \<noteq> None \<Longrightarrow> q' \<le> q) \<Longrightarrow> minus_cost q m \<ge> minus_cost q' m"
-  unfolding minus_cost_def apply (auto split: option.splits)  
-  subgoal by (simp add: drm_class.diff_right_mono)
-  subgoal using order_trans by auto
-  done
+  unfolding minus_cost_def 
+  by (auto split: option.splits simp: drm_class.diff_right_mono)  
 
 lemma minus_cost_antimono: 
   fixes x y :: "'b::{complete_lattice,minus,ord,top,drm} option"
   shows "x \<le> y \<Longrightarrow> minus_cost q x \<ge> minus_cost q y"
-  unfolding minus_cost_def apply (auto split: option.splits)  
-  subgoal by (simp add: diff_left_mono) 
-  subgoal using order_trans by auto   
-  done
+  unfolding minus_cost_def by (auto split: option.splits simp: diff_left_mono)  
 
 lemma Option_these_non_empty_if_Sup_Some: "Sup X = Some t \<Longrightarrow> Option.these X \<noteq> {}"
   by (simp add: SupD these_empty_eq)

@@ -990,7 +990,7 @@ lemma hn_unat_numeral[sepref_fr_rules]:
   unfolding APP_def
   apply sepref_to_hoare unfolding unat_rel_def unat.rel_def in_br_conv 
   apply vcg'
-  by (metis in_unats_conv int_nat_eq of_nat_numeral uint_nonnegative unat_bintrunc unat_def word_of_int_numeral word_uint.Rep_inverse' word_unat.Rep_cases)
+  by (simp add: max_unat_def take_bit_eq_mod)
 
   
 lemma hn_unat_ops[sepref_fr_rules]:
@@ -1035,7 +1035,7 @@ lemma exists_pure_conv:
   by (auto intro!: exI[of _ a] simp: pure_true_conv pred_lift_def)
 
 lemma unat_distr_shr: "unat (ai >> k) = (unat ai >> k)"
-  by (metis drop_bit_eq_div shiftr_div_2n' shiftr_eq_drop_bit)
+  by (metis shiftr_div_2n' shiftr_eq_div)
 
 lemma bit_lshift_unat_assn[sepref_fr_rules]:
   \<open>(uncurry ll_lshr, uncurry (PR_CONST (SPECc2 ''lshr'' (>>)))) \<in> [\<lambda>(a,b). b < LENGTH('a)]\<^sub>a
@@ -1054,7 +1054,7 @@ lemma bit_lshift_unat_assn[sepref_fr_rules]:
   
 lemma unat_distr_shl:
   "unat a << k < max_unat LENGTH('l) \<Longrightarrow> k < LENGTH('l)  \<Longrightarrow> unat (a << k) = unat (a::'l::len word) << k"
-  apply (auto simp: shiftl_eq_push_bit push_bit_eq_mult)
+  apply (auto simp: shiftl_def push_bit_eq_mult)
   by (metis max_unat_def unat_mult_lem unat_power_lower)
 
 lemma bit_shiftl_unat_assn[sepref_fr_rules]:
@@ -1233,23 +1233,21 @@ proof -
       apply (auto simp: snat_rel_def snat.rel_def in_br_conv) 
       apply (auto simp: max_snat_def snat_def snat_invar_alt)
       by (simp add: msb_unat_big sint_eq_uint)
-    then have \<open>(uint ai) << nat (uint bi) < 2 ^ (LENGTH('a) - Suc 0)\<close>
-      using le a b 
-      by (metis nat_eq_numeral_power_cancel_iff nat_less_numeral_power_cancel_iff nat_mult_distrib push_bit_eq_mult shiftl_eq_push_bit uint_ge_0)
     then have le': \<open>ai << nat (uint bi) < 2 ^ (LENGTH('a) - Suc 0)\<close>
-      using le apply (auto simp: max_snat_def)
-      apply (subst (asm) nat_less_eq_zless[symmetric], simp, subst word_less_alt)
-      apply (subst nat_less_eq_zless[symmetric])
-      using le a b
-      apply (auto simp: snat_rel_def snat.rel_def in_br_conv) 
-      apply (auto simp: max_snat_def snat_def snat_invar_alt)
-      by (metis One_nat_def diff_Suc_1 linorder_not_less msb_unat_big push_bit_eq_mult shiftl_eq_push_bit sint_eq_uint snat_in_bounds_aux unat_def unat_mult_lem unat_power_lower)
+      using le 
+      by (metis (mono_tags, lifting) Suc_0_lt_2p_len_of Suc_lessD 
+        diff_Suc_less len_gt_0 
+        len_not_eq_0 mult_0_right nat_uint_eq nat_zero_less_power_iff push_bit_eq_mult shiftl_def 
+        snat_in_bounds_aux unat_2tp_if unat_mult_lem word_less_nat_alt)
 
     have [simp]: \<open>nat (bintrunc (size ai) (uint ai << nat (uint bi))) = nat (uint ai * 2 ^ nat (uint bi))\<close>
       using le a b 
       apply (auto simp: snat_rel_def snat.rel_def in_br_conv) 
       apply (auto simp: max_snat_def snat_def snat_invar_alt)
-      by (metis H \<open>uint ai << nat (uint bi) < 2 ^ (LENGTH('a) - Suc 0)\<close> max_unat_def nat_less_numeral_power_cancel_iff nat_power_minus_less shiftl_int_def sint_eq_uint snat_invar_alt snat_invar_def unat_def)
+      by (smt (z3) H' One_nat_def diff_Suc_Suc diff_zero max_snat_def nat_mult_distrib nat_uint_eq 
+          push_bit_eq_mult shiftl_def sint_eq_uint snat_invar_alt snat_invar_def uint_lt_0 
+          uint_power_lower unat_2tp_if)
+    
    have \<open>- (3 * 2 ^ (LENGTH('a) - Suc 0)) \<le> uint ai * 2 ^ nat (uint bi)\<close>
      by (smt int_nat_eq nat_mult_distrib of_nat_mult uint_add_ge0 zero_le_power)
    moreover have \<open>uint ai * 2 ^ nat (uint bi) < 3 * 2 ^ (LENGTH('a) - Suc 0)\<close>
@@ -1257,7 +1255,7 @@ proof -
      using le a b
      apply (auto simp: snat_rel_def snat.rel_def in_br_conv) 
      apply (auto simp: max_snat_def snat_def snat_invar_alt)
-     by (smt (z3) Groups.mult_ac(2) One_nat_def Word.of_nat_unat \<open>nat (take_bit (size ai) (uint ai << nat (uint bi))) = nat (uint ai * 2 ^ nat (uint bi))\<close> diff_Suc_1 le' le_less_trans lessI nat_less_numeral_power_cancel_iff nat_mult_distrib nat_power_eq nat_uint_eq nat_zero_less_power_iff not_le of_nat_numeral semiring_1_class.of_nat_power uint_power_lower uint_shiftl unat_arith_simps(2) unat_power_lower zero_less_nat_eq)
+     by (smt (z3) shiftl_def Groups.mult_ac(2) One_nat_def Word.of_nat_unat \<open>nat (take_bit (size ai) (uint ai << nat (uint bi))) = nat (uint ai * 2 ^ nat (uint bi))\<close> diff_Suc_1 le' le_less_trans lessI nat_less_numeral_power_cancel_iff nat_mult_distrib nat_power_eq nat_uint_eq nat_zero_less_power_iff not_le of_nat_numeral semiring_1_class.of_nat_power uint_power_lower uint_shiftl unat_arith_simps(2) unat_power_lower zero_less_nat_eq)
    moreover have \<open>\<not>2 ^ (LENGTH('a) - Suc 0) \<le> uint ai * 2 ^ nat (uint bi)\<close>
      using le
      apply (subst nat_le_eq_zle[symmetric], simp, subst nat_mult_distrib)
@@ -1271,8 +1269,9 @@ proof -
      by (auto simp: snat_rel_def snat.rel_def in_br_conv) 
    ultimately have \<open>nat (sint (ai << nat (uint bi))) = nat (uint ai * 2 ^ nat (uint bi))\<close>
      using H'[of \<open>uint bi\<close> ai]  le a b
-     by (auto simp: sint_uint word_size uint_shiftl sbintrunc_If
+     apply (auto simp: sint_uint word_size uint_shiftl sbintrunc_If shiftl_def
       shiftl_int_def max_snat_def max_unat_def snat_rel_def snat.rel_def)
+     by (simp add: push_bit_eq_mult signed_take_bit_int_eq_self)
    have [simp]: \<open>\<not> msb (ai << nat (uint bi))\<close>
      apply (subst msb_shiftl_word[OF _])
      using le le' a b state
@@ -1297,7 +1296,7 @@ proof -
          cnv_snat_to_uint(1) in_br_conv snat.rel_def snat_invar_def
          simp flip: word_to_lint_shl nat_uint_eq)
      apply vcg'  
-     by (metis \<open>\<not> msb (ai << nat (uint bi))\<close> nat_uint_eq push_bit_eq_mult shiftl_eq_push_bit sint_eq_uint snat_in_bounds_aux unat_mult_lem unat_p2)
+     using \<open>\<not> msb (ai << nat (uint bi))\<close> \<open>nat (sint (ai << nat (uint bi))) = nat (uint ai * 2 ^ nat (uint bi))\<close> nat_mult_distrib nat_power_eq nat_shiftr_div by auto
  qed
 qed
 

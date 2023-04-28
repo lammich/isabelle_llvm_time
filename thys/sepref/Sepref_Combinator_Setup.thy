@@ -505,7 +505,7 @@ ML \<open>
         | SOME n => n
       
       val ((_,itype_thm),lthy) = sepref_register_single basename t ty lthy
-      val _ = Thy_Output.pretty_thm lthy itype_thm |> Pretty.string_of |> writeln
+      val _ = Thm.pretty_thm lthy itype_thm |> Pretty.string_of |> writeln
 
     in
       lthy

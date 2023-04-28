@@ -448,7 +448,7 @@ subsubsection \<open>Basic Setup\<close>
 
 (* TODO: Move *)
 lemma entails_intro_GC: "A \<turnstile> A \<and>* GC"   
-  by (metis (no_types, hide_lams) empty_ent_GC entails_mp entails_refl sep.mult_commute sep_conj_empty') 
+  by (metis (no_types) empty_ent_GC entails_mp entails_refl sep.mult_commute sep_conj_empty') 
 
 lemma hn_pass[sepref_fr_rules]:
   shows "hn_refine (hn_ctxt P x x') (return x') (hn_invalid P x x') P (PASS$x)"
@@ -718,7 +718,7 @@ structure Sepref_Import_Param = struct
     case Thm.concl_of thm of
       @{mpat "Trueprop ((_,_) \<in> fref _ _ _)"} =>
         (@{thm to_import_frefD} OF [thm])
-        |> forall_intr_vars
+        |> Thm.forall_intr_vars
         |> Local_Defs.unfold0 ctxt unf_thms
         |> Variable.gen_all ctxt
     | @{mpat "Trueprop ((_,_) \<in> _)"} =>

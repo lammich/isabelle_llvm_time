@@ -156,7 +156,7 @@ text \<open>We allow the synthesized function to contain tagged function applica
 lemmas [sepref_opt_simps] = Autoref_Tagging.APP_def
 
 
-text {* Revert case-pulling done by monadify *}
+text \<open> Revert case-pulling done by monadify \<close>
 lemma case_prod_return_opt[sepref_opt_simps]:
   "case_prod (\<lambda>a b. return (f a b)) p = return (case_prod f p)"
   by (simp split: prod.split)
@@ -172,7 +172,7 @@ lemma case_list_return[sepref_opt_simps]:
 lemma if_return[sepref_opt_simps]:
   "If b (return t) (return e) = return (If b t e)" by simp
 
-text {* In some cases, pushing in the returns is more convenient *}
+text \<open> In some cases, pushing in the returns is more convenient \<close>
 lemma case_prod_opt2[sepref_opt_simps2]:
   "(\<lambda>x. return (case x of (a,b) \<Rightarrow> f a b)) 
   = (\<lambda>(a,b). return (f a b))"

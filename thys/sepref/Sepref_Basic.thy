@@ -43,7 +43,7 @@ text \<open>
   specified in Imperative/HOL.
 \<close>
 
-subsection {* Values on Heap *}
+subsection \<open>Values on Heap\<close>
 text \<open>We tag every refinement assertion with the tag @{text hn_ctxt}, to
   avoid higher-order unification problems when the refinement assertion 
   is schematic.\<close>
@@ -187,10 +187,10 @@ subsection \<open>Heap-Nres Refinement Calculus\<close>
 
 subsubsection \<open>Definition of hnr\<close>
 
-text {* Predicate that expresses refinement. Given a heap
+text \<open> Predicate that expresses refinement. Given a heap
   @{text "\<Gamma>"}, program @{text "c"} produces a heap @{text "\<Gamma>'"} and
   a concrete result that is related with predicate @{text "R"} to some
-  abstract result from @{text "m"}*}
+  abstract result from @{text "m"}\<close>
 
 definition "hn_refine \<Gamma> c \<Gamma>' R m \<equiv>
   nofailT m \<longrightarrow>
