@@ -190,7 +190,7 @@ begin
       unfolding pto_def block_lifter.lift_assn_def
       apply (rule ext)
       apply (auto simp: sep_algebra_simps)
-      by (metis (no_types, hide_lams) fun_upd_same fun_upd_triv fun_upd_upd prod_Z_lower(1) surjective_pairing zero_fun_def)
+      by (metis (no_types) fun_upd_same fun_upd_triv fun_upd_upd prod_Z_lower(1) surjective_pairing zero_fun_def)
     
       
     fun rptr_cases where "rptr_cases (RP_NULL) = ()" | "rptr_cases (RP_ADDR (ADDR _ _)) = ()"
